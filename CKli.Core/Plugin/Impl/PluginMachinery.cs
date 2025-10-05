@@ -7,6 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -437,20 +438,38 @@ public sealed partial class PluginMachinery
         return CompilePlugins( monitor, vNext: true );
     }
 
-    internal bool AddOrSetPluginPackage( IActivityMonitor monitor, string shortPluginName, string fullPluginName, SVersion version )
+    internal bool AddOrSetPluginPackage( IActivityMonitor monitor,
+                                         string shortPluginName,
+                                         string fullPluginName,
+                                         SVersion version,
+                                         out bool added,
+                                         out bool versionChanged )
     {
         using var gLog = monitor.OpenTrace( $"Adding or updating plugin '{fullPluginName}' at version '{version}'." );
         var ckliPlugins = CKliPluginsProject.Create( monitor, this );
         if( ckliPlugins == null
-            || !ckliPlugins.AddOrSetPackageReference( monitor, shortPluginName, fullPluginName, version, out bool added, out bool versionChanged )
+            || !ckliPlugins.AddOrSetPackageReference( monitor, shortPluginName, fullPluginName, version, out added, out versionChanged )
             || !ckliPlugins.Save( monitor ) )
         {
+            added = false;
+            versionChanged = false;
             return false;
         }
         if( !added && !versionChanged )
         {
             monitor.CloseGroup( "No change, skipping plugins recompilation." );
             return true;
+        }
+        if( added )
+        {
+            using( _definitionFile.StartEdit() )
+            {
+                _definitionFile.Plugins.Add( new XElement( shortPluginName ) );
+            }
+            if( !_definitionFile.SaveFile( monitor ) )
+            {
+                return false;
+            }
         }
         return CompilePlugins( monitor, vNext: true );
     }
@@ -598,9 +617,8 @@ public sealed partial class PluginMachinery
     [GeneratedRegex( @"^[A-Za-z][A-Za-z0-9]{2,}$", RegexOptions.ExplicitCapture | RegexOptions.CultureInvariant )]
     private static partial Regex ValidShortPluginName();
 
-#pragma warning disable CA2211 // Non-constant fields should not be visible
-
-    public static string DefaultSlnFile = """
+#pragma warning disable IDE1006 // Naming Styles
+    const string DefaultSlnFile = """
                 <Solution>
                   <Folder Name="/Solution Items/">
                     <File Path="Directory.Build.props" />
@@ -611,10 +629,7 @@ public sealed partial class PluginMachinery
                 </Solution>
                 """;
 
-    /// <summary>
-    /// Gets the default "CKli.Plugins/CKli.Plugins.csproj" file content.
-    /// </summary>
-    public static string DefaultCKliPluginsCSProj = """
+    const string DefaultCKliPluginsCSProj = """
                 <Project Sdk="Microsoft.NET.Sdk">
 
                   <PropertyGroup>
@@ -629,7 +644,7 @@ public sealed partial class PluginMachinery
                 
                 """;
 
-    public static string DefaultNuGetConfigFile = """
+    const string DefaultNuGetConfigFile = """
                 <configuration>
 
                   <packageSources>
@@ -651,10 +666,8 @@ public sealed partial class PluginMachinery
 
                 </configuration>                
                 """;
-    /// <summary>
-    /// Gets the default "CKli.Plugins/Plugins.cs" file content.
-    /// </summary>
-    public static string DefaultCKliPluginsFile = """
+
+    const string DefaultCKliPluginsFile = """
                 using CKli.Core;
 
                 namespace CKli.Plugins;
@@ -672,10 +685,7 @@ public sealed partial class PluginMachinery
                                 
                 """;
 
-    /// <summary>
-    /// Gets the default "Directory.Package.props" file content.
-    /// </summary>
-    public static string DefaultDirectoryPackageProps = $"""
+    static readonly string DefaultDirectoryPackageProps = $"""
                 <Project>
                   <PropertyGroup>
                     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
@@ -690,7 +700,7 @@ public sealed partial class PluginMachinery
     /// <summary>
     /// Gets the default "Directory.Build.props" file content: the {0} placeholder is for the <see cref="Name"/>.
     /// </summary>
-    public static string DefaultDirectoryBuildPropsPattern = """
+    const string DefaultDirectoryBuildPropsPattern = """
                 <Project>
                   <PropertyGroup>
                     <TargetFramework>net8.0</TargetFramework>
@@ -702,7 +712,7 @@ public sealed partial class PluginMachinery
                 
                 """;
 
-#pragma warning restore CA2211 // Non-constant fields should not be visible
+#pragma warning restore IDE1006 // Naming Styles
 
 }
 

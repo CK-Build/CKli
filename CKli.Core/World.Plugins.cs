@@ -36,21 +36,18 @@ public sealed partial class World
         {
             return false;
         }
-        if( !_pluginMachinery.AddOrSetPluginPackage( monitor, shortName, fullName, version ) )
+        if( !_pluginMachinery.AddOrSetPluginPackage( monitor, shortName, fullName, version, out bool added, out bool versionChanged ) )
         {
             _stackRepository.ResetHard( monitor );
             return false;
         }
-        using( DefinitionFile.StartEdit() )
+        if( !added && !versionChanged )
         {
-            DefinitionFile.Plugins.Add( new XElement( shortName ) );
+            return true;
         }
-        if( !DefinitionFile.SaveFile( monitor ) )
-        {
-            _stackRepository.ResetHard( monitor );
-            return false;
-        }
-        return true;
+        return _stackRepository.Commit( monitor, added
+                                                    ? $"After adding plugin '{fullName}' in version '{version}'."
+                                                    : $"After updating plugin '{fullName}' to version '{version}'." );
     }
 
     internal bool CreatePlugin( IActivityMonitor monitor, string pluginName )
@@ -73,7 +70,7 @@ public sealed partial class World
             _stackRepository.ResetHard( monitor );
             return false;
         }
-        return true;
+        return _stackRepository.Commit( monitor, $"After creating source plugin '{fullName}'." );
     }
 
     [MemberNotNullWhen(true, nameof(_pluginMachinery))]
@@ -141,6 +138,6 @@ public sealed partial class World
                 return false;
             }
         }
-        return true;
+        return _stackRepository.Commit( monitor, $"After removing plugin '{fullName}'." );
     }
 }
