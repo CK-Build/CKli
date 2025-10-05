@@ -84,7 +84,7 @@ sealed partial class CommandCollector
             }
         }
         // Options: Eats strings and string arrays until the first boolean.
-        for( iP = 1; iP < parameters.Length; iP++ )
+        for( ; iP < parameters.Length; iP++ )
         {
             var p = parameters[iP];
             if( p.ParameterType == typeof( string ) )
@@ -185,6 +185,13 @@ sealed partial class CommandCollector
                     Invalid parameter type '{p.ParameterType.Name} {p.Name}' in command method '{typeInfo.TypeName}.{method.Name}'.
                     Only strings without default value (arguments), strings with a default value (options) and boolean (flags) are currently allowed
                     in this order (arguments must come first, then options and then flags).
+                    """ );
+            }
+            if( p.HasDefaultValue && p.DefaultValue is true )
+            {
+                Throw.CKException( $"""
+                    Invalid parameter 'bool {p.Name} = true' in command method '{typeInfo.TypeName}.{method.Name}'.
+                    Flags can only default to false.
                     """ );
             }
             return true;
