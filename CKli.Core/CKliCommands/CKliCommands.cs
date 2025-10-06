@@ -66,7 +66,13 @@ public static class CKliCommands
         // First, tries to locate a CKli intrinsic command and handles it independently when found:
         // one cannot mix the 2 kind of commands: some CKli commands loads the current Stack and World if
         // needed, we cannot pre-load the current World here.
-        var cmd = _commands.FindForExecution( monitor, cmdLine, out var helpPath );
+        // When TryFindForExecution returns false, the command exists but it misses one or more arguments.
+        if( !_commands.TryFindForExecution( monitor, cmdLine, out var cmd, out var helpPath ) )
+        {
+            HelpDisplay.Display( _commands.GetForHelp( helpPath ) );
+            return ValueTask.FromResult( false );
+        }
+        // If it's a CKli command, execute it.
         if( cmd != null )
         {
             return cmd.HandleCommandAsync( monitor, context, cmdLine );
@@ -87,8 +93,8 @@ public static class CKliCommands
         try
         {
             // We are in a World.
-            cmd = world.Commands.FindForExecution( monitor, cmdLine, out helpPath );
-            if( cmd == null )
+            if( !world.Commands.TryFindForExecution( monitor, cmdLine, out cmd, out helpPath )
+                || cmd == null )
             {
                 // No luck.
                 // Displays the help in the context of the World. The World's commands

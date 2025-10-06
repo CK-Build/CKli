@@ -42,20 +42,20 @@ public sealed class CommandNamespace
         return commands.OrderBy( c => c.CommandPath ).ToList();
     }
 
-    internal CommandDescription? FindForExecution( IActivityMonitor monitor, CommandLineArguments cmdLine, out string? helpPath )
+    internal bool TryFindForExecution( IActivityMonitor monitor, CommandLineArguments cmdLine, out CommandDescription? cmd, out string? helpPath )
     {
-        LocateCommand( cmdLine, out CommandDescription? cmd, out helpPath );
+        LocateCommand( cmdLine, out cmd, out helpPath );
         if( cmd == null )
         {
-            monitor.Error( "Unable to find command." );
-            return null;
+            cmd = null;
+            return true;
         }
         if( cmd.Arguments.Length > cmdLine.RemainingCount )
         {
             monitor.Error( $"Command '{cmd.CommandPath}' requires {cmd.Arguments.Length} arguments." );
-            return null;
+            return false;
         }
-        return cmd;
+        return true;
     }
 
     void LocateCommand( CommandLineArguments cmdLine, out CommandDescription? cmd, out string? path )
