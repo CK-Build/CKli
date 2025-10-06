@@ -79,37 +79,4 @@ public sealed class LocalWorldName : WorldName
         }
     }
 
-    internal bool RemoveRepository( IActivityMonitor monitor, string nameOrUrl )
-    {
-        var definitionFile = LoadDefinitionFile( monitor );
-        var layout = definitionFile?.ReadLayout( monitor );
-        if( layout == null )
-        {
-            return false;
-        }
-        Throw.DebugAssert( definitionFile != null );
-        foreach( var (path, uri) in layout )
-        {
-            if( path.LastPart.Equals( nameOrUrl, StringComparison.OrdinalIgnoreCase )
-                || nameOrUrl.Equals( uri.ToString(), StringComparison.OrdinalIgnoreCase ) )
-            {
-                if( !_stack.Commit( monitor, $"Before removing repository '{nameOrUrl}' from world '{FullName}'." ) )
-                {
-                    return false;
-                }
-                using( monitor.OpenInfo( $"Removing '{path.LastPart}' ({uri}) from world '{FullName}'." ) )
-                {
-                    if( !definitionFile.RemoveRepository( monitor, uri, removeEmptyFolder: true )
-                        || !FileHelper.DeleteFolder( monitor, path ) )
-                    {
-                        return false;
-                    }
-                }
-                return _stack.Commit( monitor, $"Removed repository '{path.LastPart}' ({uri})." );
-            }
-        }
-        monitor.Warn( $"Repository '{nameOrUrl}' is not defined in world '{FullName}'." );
-        return true;
-    }
-
 }

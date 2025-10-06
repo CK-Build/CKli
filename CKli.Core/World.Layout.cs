@@ -75,9 +75,7 @@ sealed partial class World
         }
 
         // The folder path must not be in an existing repository.
-        var layout = _definitionFile.ReadLayout( monitor );
-        if( layout == null ) return false;
-        foreach( var (path, uri) in layout )
+        foreach( var (path, uri) in _layout )
         {
             if( path.StartsWith( folderPath, strict: false ) )
             {
@@ -119,7 +117,13 @@ sealed partial class World
         {
             return false;
         }
-        return _name.Stack.Commit( monitor, $"Added repository '{folderPath.LastPart}'." );
+        if( _name.Stack.Commit( monitor, $"Added repository '{folderPath.LastPart}'." ) )
+        {
+            _cachedRepositories.Clear();
+            FillCachedRepositories();
+            return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -134,7 +138,34 @@ sealed partial class World
     public bool RemoveRepository( IActivityMonitor monitor, string nameOrUrl )
     {
         Throw.CheckState( CanChangeLayout );
-        return _name.RemoveRepository( monitor, nameOrUrl );
+        foreach( var (path, uri) in _layout )
+        {
+            if( path.LastPart.Equals( nameOrUrl, StringComparison.OrdinalIgnoreCase )
+                || nameOrUrl.Equals( uri.ToString(), StringComparison.OrdinalIgnoreCase ) )
+            {
+                if( !_name.Stack.Commit( monitor, $"Before removing repository '{nameOrUrl}' from world '{_name.FullName}'." ) )
+                {
+                    return false;
+                }
+                using( monitor.OpenInfo( $"Removing '{path.LastPart}' ({uri}) from world '{_name.FullName}'." ) )
+                {
+                    if( !_definitionFile.RemoveRepository( monitor, uri, removeEmptyFolder: true )
+                        || !FileHelper.DeleteFolder( monitor, path ) )
+                    {
+                        return false;
+                    }
+                }
+                if( _name.Stack.Commit( monitor, $"Removed repository '{path.LastPart}' ({uri})." ) )
+                {
+                    _cachedRepositories.Clear();
+                    FillCachedRepositories();
+                    return true;
+                }
+                return false;
+            }
+        }
+        monitor.Warn( $"Repository '{nameOrUrl}' is not defined in world '{_name.FullName}'." );
+        return true;
     }
 
     /// <summary>

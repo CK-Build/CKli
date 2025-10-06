@@ -67,12 +67,18 @@ public sealed partial class World
         _layout = layout;
         _pluginMachinery = pluginMachinery;
         _cachedRepositories = new Dictionary<string, Repo?>( layout.Count, StringComparer.OrdinalIgnoreCase );
+        FillCachedRepositories();
+        _events = new WorldEvents();
+    }
+
+    void FillCachedRepositories()
+    {
+        Throw.DebugAssert( _cachedRepositories.Count == 0 );
         foreach( var (path, uri) in _layout )
         {
             _cachedRepositories.Add( path, null );
             _cachedRepositories.Add( uri.ToString(), null );
         }
-        _events = new WorldEvents();
     }
 
     /// <summary>
