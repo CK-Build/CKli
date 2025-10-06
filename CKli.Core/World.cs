@@ -92,8 +92,11 @@ public sealed partial class World
         PluginMachinery? machinery = null;
         if( !definitionFile.IsPluginsDisabled && World.PluginLoader != null )
         {
-            machinery = PluginMachinery.Create( monitor, worldName, definitionFile, out PluginCollectorContext? toRecompile );
-            if( machinery == null ) return null;
+            machinery = new PluginMachinery( worldName, definitionFile );
+            if( !machinery.FirstLoad( monitor, out PluginCollectorContext? toRecompile ) )
+            {
+                return null;
+            }
             if( toRecompile != null && !machinery.Recompile( monitor, toRecompile ) )
             {
                 return null;
@@ -106,18 +109,15 @@ public sealed partial class World
                             : $"Plugins are globally disabled by configuration in '{worldName.FullName}.xml'." );
         }
         var w = new World( stackRepository, worldName, definitionFile, layout, machinery );
-        if( machinery != null )
+        if( machinery != null
+            && !w.AcquirePlugins( monitor ) )
         {
-            if( !w.InstantiatePlugins( monitor ) )
-            {
-                w.DisposeRepositoriesAndPlugins();
-                w = null;
-            }
+            w = null;
         }
         return w;
     }
 
-    bool InstantiatePlugins( IActivityMonitor monitor )
+    bool AcquirePlugins( IActivityMonitor monitor )
     {
         Throw.DebugAssert( _pluginMachinery != null );
         try
@@ -132,17 +132,24 @@ public sealed partial class World
         }
     }
 
-    internal void DisposeRepositoriesAndPlugins()
+    internal void ReleasePlugins()
     {
         _events.ReleaseEvents();
         if( _pluginMachinery != null )
         {
-            Throw.DebugAssert( _plugins != null );
-            _plugins.Commands.Clear();
-            _plugins.Dispose();
-            _plugins = null;
+            if( _plugins != null )
+            {
+                _plugins.Commands.Clear();
+                _plugins.Dispose();
+                _plugins = null;
+            }
             _pluginMachinery.ReleasePluginFactory();
         }
+    }
+
+    internal void DisposeRepositoriesAndReleasePlugins()
+    {
+        ReleasePlugins();
         var r = _firstRepo;
         while( r != null )
         {

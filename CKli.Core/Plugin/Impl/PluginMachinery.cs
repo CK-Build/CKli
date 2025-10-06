@@ -6,6 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -24,9 +25,7 @@ public sealed partial class PluginMachinery
     readonly string _name;
     readonly NormalizedPath _root;
     readonly NormalizedPath _runFolder;
-    readonly NormalizedPath _runFolderVNext;
     readonly NormalizedPath _dllPath;
-    readonly NormalizedPath _dllPathVNext;
     readonly WorldDefinitionFile _definitionFile;
     NormalizedPath _slnxPath;
     NormalizedPath _ckliPluginsFolder;
@@ -82,91 +81,92 @@ public sealed partial class PluginMachinery
 
     internal IPluginFactory PluginFactory => _pluginFactory;
 
-    PluginMachinery( LocalWorldName worldName, WorldDefinitionFile definitionFile )
+    internal PluginMachinery( LocalWorldName worldName, WorldDefinitionFile definitionFile )
     {
         _definitionFile = definitionFile;
         _name = $"{worldName.StackName}-Plugins{worldName.LTSName}";
         _root = worldName.Stack.StackWorkingFolder.AppendPart( Name );
         _runFolder = worldName.Stack.StackWorkingFolder.Combine( $"$Local/{Name}/bin/CKli.Plugins/run" );
         _dllPath = _runFolder.AppendPart( "CKli.Plugins.dll" );
-        _runFolderVNext = worldName.Stack.StackWorkingFolder.Combine( $"$Local/{Name}/bin/CKli.Plugins/vNext" );
-        _dllPathVNext = _runFolderVNext.AppendPart( "CKli.Plugins.dll" );
     }
 
-    // First load and potential compilation.
+    // First load.
     [MethodImpl( MethodImplOptions.NoInlining )]
-    internal static PluginMachinery? Create( IActivityMonitor monitor,
-                                             LocalWorldName worldName,
-                                             WorldDefinitionFile definitionFile,
-                                             out PluginCollectorContext? toRecompile )
+    internal bool FirstLoad( IActivityMonitor monitor, out PluginCollectorContext? toRecompile )
     {
-        Throw.DebugAssert( !definitionFile.IsPluginsDisabled && World.PluginLoader != null );
+        Throw.DebugAssert( !_definitionFile.IsPluginsDisabled && World.PluginLoader != null );
         toRecompile = null;
-        var machinery = new PluginMachinery( worldName, definitionFile );
         bool forceRecompile = false;
-        if( !Directory.Exists( machinery.Root ) )
+        if( !Directory.Exists( Root ) )
         {
-            machinery.CreateSolution( monitor );
+            CreateSolution( monitor );
             // Even if the DLLPath in $Local/ folder should not be here, we take no risk and
             // triggers a compilation.
             forceRecompile = true;
         }
         else
         {
-            if( _versionChecked == null || !_versionChecked.Contains( machinery.Root ) )
+            if( _versionChecked == null || !_versionChecked.Contains( Root ) )
             {
-                if( !machinery.CheckCKliPluginsCoreVersion( monitor, out forceRecompile ) )
+                if( !CheckCKliPluginsCoreVersion( monitor, out forceRecompile ) )
                 {
-                    return null;
+                    return false;
                 }
                 _versionChecked ??= new HashSet<string>();
-                _versionChecked.Add( machinery.Root );
+                _versionChecked.Add( Root );
             }
             // If we have a hook for the NuGet config file it must be applied now,
             // before any dotnet/nuget interaction.  
-            if( _nuGetConfigFileHook != null && !ApplyNuGetConfigFileHook( monitor, machinery.NuGetConfigFile ) )
+            if( _nuGetConfigFileHook != null && !ApplyNuGetConfigFileHook( monitor, NuGetConfigFile ) )
             {
-                return null;
+                return false;
             }
         }
-        // Before calling CheckCompiledPlugins that may moves vNext to the run folder, we must ensure
-        // that there are no alive loaded plugins that would lock the run folder. 
-        if( !RelaseCurrentSingleRunning( monitor ) )
-        {
-            return null;
-        }
+        return LoadPluginFactory( monitor, forceRecompile, out toRecompile );
+    }
 
-        // We are ready to compile if needed.
-        if( !machinery.CheckCompiledPlugins( monitor, forceRecompile ) )
-        {
-            return null;
-        }
-        // If compilation succeeds, we read the <Plugins> configurations:
-        // the PluginLoader binds each primary plugin to its configuration element.
-        var pluginsConfiguration = definitionFile.ReadPluginsConfiguration( monitor );
+    bool LoadPluginFactory( IActivityMonitor monitor, bool requiresInitialCompilation, out PluginCollectorContext? toRecompile )
+    {
+        Throw.DebugAssert( !_definitionFile.IsPluginsDisabled && World.PluginLoader != null );
+        toRecompile = null;
+        // Obtains the <Plugins> configurations. It is read for the first load.
+        // The PluginLoader binds each primary plugin to its configuration element.
+        var pluginsConfiguration = _definitionFile.ReadPluginsConfiguration( monitor );
         if( pluginsConfiguration == null )
         {
-            return null;
+            return false;
         }
-        var pluginContext = new PluginCollectorContext( worldName, pluginsConfiguration );
-        var pluginFactory = World.PluginLoader( monitor, machinery.DllPath, pluginContext );
+        // There must be no alive loaded plugins now. 
+        if( !RelaseCurrentSingleRunning( monitor ) )
+        {
+            return false;
+        }
+        // First compilation if needed.
+        if( requiresInitialCompilation && !DoCompilePlugins( monitor ) )
+        {
+            return false;
+        }
+        // Loads the plugins.
+        var pluginContext = new PluginCollectorContext( _definitionFile.World, pluginsConfiguration );
+        var pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext );
         if( pluginFactory == null )
         {
-            return null;
+            return false;
         }
         // Memorizes the AssemblyLoadContext to be able to wait for its actual unload.
         _singleFactory = new WeakReference( pluginFactory, trackResurrection: true );
-        if( pluginFactory.CompilationMode != definitionFile.CompilationMode )
+        // Decide whether a recompilation is required. 
+        if( pluginFactory.CompilationMode != _definitionFile.CompilationMode )
         {
-            if( definitionFile.CompilationMode == PluginCompilationMode.None )
+            if( _definitionFile.CompilationMode == PluginCompilationMode.None )
             {
                 monitor.Trace( """
                     Deleting Compiled plugins file (CompilationMode = None).
                     CKli.Plugins will be recompiled without compiled plugins. Only reflection will be used for subsequent loads.
                     """ );
-                if( !FileHelper.DeleteFile( monitor, machinery.CKliCompiledPluginsFile ) )
+                if( !FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile ) )
                 {
-                    return null;
+                    return false;
                 }
             }
             else
@@ -174,16 +174,16 @@ public sealed partial class PluginMachinery
                 if( pluginFactory.CompilationMode == PluginCompilationMode.None )
                 {
                     monitor.Trace( $"""
-                        Generating Compiled plugins file (CompilationMode = {definitionFile.CompilationMode}).
+                        Generating Compiled plugins file (CompilationMode = {_definitionFile.CompilationMode}).
                         CKli.Plugins will be recompiled with compiled plugins.
                         """ );
-                    File.WriteAllText( machinery.CKliCompiledPluginsFile, pluginFactory.GenerateCode() );
+                    File.WriteAllText( CKliCompiledPluginsFile, pluginFactory.GenerateCode() );
                 }
                 else
                 {
                     monitor.Trace( $"""
                         CKli.Plugins is compiled in '{pluginFactory.CompilationMode}'.
-                        Recompiling it in '{definitionFile.CompilationMode}'.
+                        Recompiling it in '{_definitionFile.CompilationMode}'.
                         """ );
                 }
             }
@@ -192,17 +192,17 @@ public sealed partial class PluginMachinery
             toRecompile = pluginContext;
         }
         // The factory is available (unless we must recompile).
-        machinery._pluginFactory = pluginFactory;
-        return machinery;
+        _pluginFactory = pluginFactory;
+        return true;
     }
 
     [MethodImpl( MethodImplOptions.NoInlining )]
     internal bool Recompile( IActivityMonitor monitor, PluginCollectorContext pluginContext )
     {
         Throw.DebugAssert( World.PluginLoader != null );
-        using var _ = monitor.OpenTrace( $"Recompiling Plugins generated code." );
+        using var _ = monitor.OpenTrace( $"Recompiling CKli.Plugins and loading Plugin factory." );
         if( !RelaseCurrentSingleRunning( monitor )
-            || !CompilePlugins( monitor, vNext: false ) )
+            || !DoCompilePlugins( monitor ) )
         {
             return false;
         }
@@ -253,7 +253,7 @@ public sealed partial class PluginMachinery
         mustRecompile = false;
         try
         {
-            var d = XDocument.Load( DirectoryPackageProps );
+            var d = XDocument.Load( DirectoryPackageProps, LoadOptions.PreserveWhitespace );
             var ckliPluginsCore = d.Root?.Elements( "ItemGroup" )
                                          .Elements( "PackageVersion" )
                                          .FirstOrDefault( e => e.Attribute( "Include" )?.Value == "CKli.Plugins.Core" );
@@ -307,28 +307,6 @@ public sealed partial class PluginMachinery
         }
     }
 
-    bool CheckCompiledPlugins( IActivityMonitor monitor, bool forceRecompile )
-    {
-        // Uses File's LastWriteTime:
-        // When file doesn't exist, the LastWriteTime is 01/01/1601.
-        // By using file time, we preserve any build manually done in the regular "run" folder
-        // even if a previous change in the plugins triggered a next build in vNext.
-        if( !forceRecompile && File.GetLastWriteTimeUtc( _dllPathVNext ) > File.GetLastWriteTimeUtc( _dllPath ) )
-        {
-            monitor.Trace( $"A new version of CKli.Plugins is available. Replacing '{_runFolder}'." );
-            if( !FileHelper.DeleteFolder( monitor, _runFolder )
-                || !FileHelper.TryMoveFolder( monitor, _runFolderVNext, _runFolder ) )
-            {
-                return false;
-            }
-        }
-        else if( forceRecompile || !File.Exists( DllPath ) )
-        {
-            return CompilePlugins( monitor, vNext: false );
-        }
-        return true;
-    }
-
     void CreateSolution( IActivityMonitor monitor )
     {
         using( monitor.OpenInfo( $"Creating '{Name}' solution." ) )
@@ -348,17 +326,16 @@ public sealed partial class PluginMachinery
         }
     }
 
-    bool CompilePlugins( IActivityMonitor monitor, bool vNext )
+    bool DoCompilePlugins( IActivityMonitor monitor )
     {
         var args = new StringBuilder( "build ", 256 );
         args.Append( CKliPluginsCSProj.LastPart );
         args.Append( " --tl:off" );
         args.Append( " -c " ).Append( _definitionFile.CompilationMode == PluginCompilationMode.Debug ? "Debug" : "Release" );
-        if( vNext )
-        {
-            args.Append( " /p:ArtifactsPivots=vNext" );
-        }
-        using var gLog = monitor.OpenTrace( $"Compiling '{CKliPluginsCSProj.LastPart}'{(vNext ? " in 'vNext'" : "")}." );
+        using var gLog = monitor.OpenTrace( $"""
+            Compiling '{CKliPluginsCSProj.LastPart}'
+            dotnet {args}.
+            """ );
         int exitCode = ProcessRunner.RunProcess( monitor.ParallelLogger,
                                                  "dotnet",
                                                  args.ToString(),
@@ -372,7 +349,17 @@ public sealed partial class PluginMachinery
         return true;
     }
 
-    internal bool CreatePlugin( IActivityMonitor monitor, string shortPluginName, string fullPluginName )
+    internal bool SetPluginCompilationMode( IActivityMonitor monitor, World world, PluginCompilationMode mode )
+    {
+        Throw.DebugAssert( mode != _definitionFile.CompilationMode );
+        if( !_definitionFile.SetPluginCompilationMode( monitor, mode ) )
+        {
+            return false;
+        }
+        return OnPluginChanged( monitor, world ); 
+    }
+
+    internal bool CreatePlugin( IActivityMonitor monitor, World world, string shortPluginName, string fullPluginName )
     {
         using var gLog = monitor.OpenTrace( $"Creating plugin '{fullPluginName}'." );
         var projectPath = Root.AppendPart( fullPluginName );
@@ -387,6 +374,10 @@ public sealed partial class PluginMachinery
         if( ckliPlugins == null
             || !ckliPlugins.AddProjectReference( monitor, shortPluginName, fullPluginName ) 
             || !ckliPlugins.Save( monitor ) )
+        {
+            return false;
+        }
+        if( !_definitionFile.EnsurePluginConfiguration( monitor, shortPluginName ) )
         {
             return false;
         }
@@ -435,10 +426,11 @@ public sealed partial class PluginMachinery
             monitor.Error( $"Command 'dotnet sln add {fullPluginName}' failed." );
             return false;
         }
-        return CompilePlugins( monitor, vNext: true );
+        return OnPluginChanged( monitor, world );
     }
 
     internal bool AddOrSetPluginPackage( IActivityMonitor monitor,
+                                         World world,
                                          string shortPluginName,
                                          string fullPluginName,
                                          SVersion version,
@@ -460,27 +452,24 @@ public sealed partial class PluginMachinery
             monitor.CloseGroup( "No change, skipping plugins recompilation." );
             return true;
         }
-        if( added )
+        if( !_definitionFile.EnsurePluginConfiguration( monitor, shortPluginName ) )
         {
-            using( _definitionFile.StartEdit() )
-            {
-                _definitionFile.Plugins.Add( new XElement( shortPluginName ) );
-            }
-            if( !_definitionFile.SaveFile( monitor ) )
-            {
-                return false;
-            }
+            return false;
         }
-        return CompilePlugins( monitor, vNext: true );
+        return OnPluginChanged( monitor, world );
     }
 
-    internal bool RemovePlugin( IActivityMonitor monitor, string shortPluginName, string fullPluginName )
+    internal bool RemovePlugin( IActivityMonitor monitor, World world, string shortPluginName, string fullPluginName )
     {
         using var gLog = monitor.OpenTrace( $"Removing plugin '{fullPluginName}'." );
         var ckliPlugins = CKliPluginsProject.Create( monitor, this );
         if( ckliPlugins == null
             || !ckliPlugins.RemovePlugin( monitor, shortPluginName, fullPluginName, out var wasProjectReference )
             || !ckliPlugins.Save( monitor ) )
+        {
+            return false;
+        }
+        if( !_definitionFile.RemovePluginConfiguration( monitor, shortPluginName ) )
         {
             return false;
         }
@@ -500,7 +489,22 @@ public sealed partial class PluginMachinery
                 return false;
             }
         }
-        return CompilePlugins( monitor, vNext: true );
+        return OnPluginChanged( monitor, world );
+    }
+
+    bool OnPluginChanged( IActivityMonitor monitor, World world )
+    {
+        world.ReleasePlugins();
+        if( !LoadPluginFactory( monitor, true, out var toRecompile ) )
+        {
+            return false;
+        }
+        if( toRecompile != null
+            && !Recompile( monitor, toRecompile ) )
+        {
+            return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -520,7 +524,7 @@ public sealed partial class PluginMachinery
         Throw.DebugAssert( _nuGetConfigFileHook != null );
         try
         {
-            var d = XDocument.Load( nuGetConfigFile );
+            var d = XDocument.Load( nuGetConfigFile, LoadOptions.PreserveWhitespace );
             _nuGetConfigFileHook( monitor, d );
             d.SaveWithoutXmlDeclaration( nuGetConfigFile );
             return true;
@@ -694,7 +698,7 @@ public sealed partial class PluginMachinery
                     <PackageVersion Include="CKli.Plugins.Core" Version="{World.CKliVersion.Version}" />
                   </ItemGroup>
                 </Project>
-                
+
                 """;
 
     /// <summary>

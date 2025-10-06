@@ -33,7 +33,7 @@ public sealed class WorldEvents
     }
 
     /// <summary>
-    /// Raised when <see cref="FixLayout(IActivityMonitor, bool, out List{Repo}?)"/> has been successfully called.
+    /// Raised when <see cref="World.FixLayout(IActivityMonitor, bool, out List{Repo}?)"/> has been successfully called.
     /// </summary>
     public event Action<FixedAllLayoutEvent>? FixedLayout;
 

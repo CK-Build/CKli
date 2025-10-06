@@ -79,9 +79,6 @@ public sealed class LocalWorldName : WorldName
         }
     }
 
-    /// <summary>
-    /// Called by <see cref="World.AddRepository"/> and <see cref="CKliCommands.RepositoryAdd"/>.
-    /// </summary>
     internal bool AddRepository( IActivityMonitor monitor, Uri repositoryUri, NormalizedPath folderPath )
     {
         // Check the Uri.
@@ -169,50 +166,45 @@ public sealed class LocalWorldName : WorldName
             // The working folder is successfully cloned.
             // We can dispose the Repository and update the definition file.
         }
-        using( definitionFile.StartEdit() )
+        if( !_stack.Commit( monitor, $"Before adding repository '{folderPath.LastPart}' ({repositoryUri}) in world {FullName}." )
+            || !definitionFile.AddRepository( monitor, folderPath, subFolderPath.Parts.Skip( WorldRoot.Parts.Count ), repositoryUri ) )
         {
-            definitionFile.AddRepository( monitor, folderPath, subFolderPath.Parts.Skip( WorldRoot.Parts.Count ), repositoryUri );
+            return false;
         }
-        return SaveAndCommitDefinitionFile( monitor, "Before adding a repository.", message );
+        return _stack.Commit( monitor, $"Added repository '{folderPath.LastPart}'." );
     }
 
-    /// <summary>
-    /// Called by <see cref="World.RemoveRepository"/> and <see cref="CKliCommands.RepositoryRemove"/>.
-    /// </summary>
     internal bool RemoveRepository( IActivityMonitor monitor, string nameOrUrl )
     {
         var definitionFile = LoadDefinitionFile( monitor );
-        if( definitionFile == null ) return false;
-        var layout = definitionFile.ReadLayout( monitor );
-        if( layout == null ) return false;
+        var layout = definitionFile?.ReadLayout( monitor );
+        if( layout == null )
+        {
+            return false;
+        }
+        Throw.DebugAssert( definitionFile != null );
         foreach( var (path, uri) in layout )
         {
             if( path.LastPart.Equals( nameOrUrl, StringComparison.OrdinalIgnoreCase )
                 || nameOrUrl.Equals( uri.ToString(), StringComparison.OrdinalIgnoreCase ) )
             {
-                var message = $"Removing '{path.LastPart}' ({uri}) from world '{FullName}'.";
-                using( monitor.OpenInfo( message ) )
+                if( !_stack.Commit( monitor, $"Before removing repository '{nameOrUrl}' from world '{FullName}'." ) )
                 {
-                    using( definitionFile.StartEdit() )
-                    {
-                        if( !definitionFile.RemoveRepository( monitor, uri, removeEmptyFolder: true ) ) return false;
-                    }
-                    return FileHelper.DeleteFolder( monitor, path )
-                           && SaveAndCommitDefinitionFile( monitor, "Before removing a repository.", message );
+                    return false;
                 }
+                using( monitor.OpenInfo( $"Removing '{path.LastPart}' ({uri}) from world '{FullName}'." ) )
+                {
+                    if( !definitionFile.RemoveRepository( monitor, uri, removeEmptyFolder: true )
+                        || !FileHelper.DeleteFolder( monitor, path ) )
+                    {
+                        return false;
+                    }
+                }
+                return _stack.Commit( monitor, $"Removed repository '{path.LastPart}' ({uri})." );
             }
         }
-        monitor.Info( $"Repository '{nameOrUrl}' is not defined in world '{FullName}'." );
-        return false;
+        monitor.Warn( $"Repository '{nameOrUrl}' is not defined in world '{FullName}'." );
+        return true;
     }
 
-    internal bool SaveAndCommitDefinitionFile( IActivityMonitor monitor,
-                                               string cleanCommitMessage,
-                                               string commitMessage )
-    {
-        Throw.DebugAssert( _definitionFile != null );
-        return _stack.Commit( monitor, cleanCommitMessage )
-               && _definitionFile.SaveFile( monitor )
-               && _stack.Commit( monitor, commitMessage );
-    }
 }

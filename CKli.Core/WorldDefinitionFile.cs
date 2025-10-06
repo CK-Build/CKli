@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -112,12 +113,6 @@ public sealed class WorldDefinitionFile
             }
             return _compilationMode.Value;
         }
-
-        internal set
-        {
-            _plugins.SetAttributeValue( _xCompilationMode, value != PluginCompilationMode.Release ? value.ToString() : null );
-            _compilationMode = value;
-        }
     }
 
     /// <summary>
@@ -128,6 +123,31 @@ public sealed class WorldDefinitionFile
     public IReadOnlyDictionary<string,(XElement Config, bool IsDisabled)>? ReadPluginsConfiguration( IActivityMonitor monitor )
     {
         return _pluginsConfiguration  ??= DoReadPluginsConfiguration( monitor );
+    }
+
+    Dictionary<string, (XElement Config, bool IsDisabled)>? DoReadPluginsConfiguration( IActivityMonitor monitor )
+    {
+        bool success = true;
+        var config = new Dictionary<string, (XElement Config, bool IsDisabled)>( StringComparer.OrdinalIgnoreCase );
+        foreach( var e in _plugins.Elements() )
+        {
+            var name = e.Name.LocalName;
+            if( config.TryGetValue( name, out var exists ) )
+            {
+                monitor.Error( $"""
+                        Duplicate Plugin configuration found:
+                        {exists.Config}
+                        and:
+                        {e}
+                        """ );
+                success = false;
+            }
+            else
+            {
+                config.Add( name, (e, (bool?)e.Attribute( _xDisabled ) is true) );
+            }
+        }
+        return success ? config : null;
     }
 
     /// <summary>
@@ -175,31 +195,6 @@ public sealed class WorldDefinitionFile
         return SaveFile( monitor );
     }
 
-    Dictionary<string, (XElement Config, bool IsDisabled)>? DoReadPluginsConfiguration( IActivityMonitor monitor )
-    {
-        bool success = true;
-        var config = new Dictionary<string, (XElement Config, bool IsDisabled)>( StringComparer.OrdinalIgnoreCase );
-        foreach( var e in _plugins.Elements() )
-        {
-            var name = e.Name.LocalName;
-            if( config.TryGetValue( name, out var exists ) )
-            {
-                monitor.Error( $"""
-                        Duplicate Plugin configuration found:
-                        {exists.Config}
-                        and:
-                        {e}
-                        """ );
-                success = false;
-            }
-            else
-            {
-                config.Add( name, (e, (bool?)e.Attribute( _xDisabled ) is true) );
-            }
-        }
-        return success ? config : null;
-    }
-
     /// <summary>
     /// Shallow and quick analysis of the &lt;Folder&gt; and &lt;Repository&gt; elements that
     /// checks the unicity of "Path" and "Url" attribute.
@@ -237,6 +232,7 @@ public sealed class WorldDefinitionFile
         return sName.Length > 0 && FileUtil.IndexOfInvalidFileNameChars( sName ) < 0;
     }
 
+    // World.XifLayout uses this before multiple calls to Remove/AddRepostiory.
     internal IDisposable StartEdit()
     {
         Throw.DebugAssert( !_allowEdit );
@@ -244,16 +240,64 @@ public sealed class WorldDefinitionFile
         return Util.CreateDisposableAction( () => _allowEdit = false );
     }
 
-    internal void AddRepository( IActivityMonitor monitor, NormalizedPath path, IEnumerable<string> folders, Uri uri )
+    internal bool SetPluginCompilationMode( IActivityMonitor monitor, PluginCompilationMode mode )
+    {
+        using( StartEdit() )
+        {
+            _plugins.SetAttributeValue( _xCompilationMode, mode != PluginCompilationMode.Release ? mode.ToString() : null );
+            _compilationMode = mode;
+        }
+        return SaveFile( monitor );
+    }
+
+    internal bool EnsurePluginConfiguration( IActivityMonitor monitor, string shortPluginName )
+    {
+        var config = Plugins.Elements().FirstOrDefault( e => e.Name.LocalName.Equals( shortPluginName, StringComparison.OrdinalIgnoreCase ) );
+        if( config != null )
+        {
+            return true;
+        }
+        using( StartEdit() )
+        {
+            Plugins.Add( new XElement( shortPluginName ) );
+            _pluginsConfiguration = null;
+        }
+        return SaveFile( monitor );
+    }
+
+    internal bool RemovePluginConfiguration( IActivityMonitor monitor, string shortPluginName )
+    {
+        var config = Plugins.Elements().FirstOrDefault( e => e.Name.LocalName.Equals( shortPluginName, StringComparison.OrdinalIgnoreCase ) );
+        if( config == null )
+        {
+            return true;
+        }
+        using( StartEdit() )
+        {
+            config.Remove();
+            _pluginsConfiguration = null;
+        }
+        return SaveFile( monitor );
+    }
+
+    /// <summary>
+    /// Called by <see cref="World.AddRepository"/> and <see cref="World.XifLayout(IActivityMonitor)"/> (StartEdit is already called).
+    /// </summary>
+    internal bool AddRepository( IActivityMonitor monitor, NormalizedPath path, IEnumerable<string> folders, Uri uri )
     {
         Throw.DebugAssert( folders.All( IsValidFolderName ) );
         Throw.DebugAssert( GitRepositoryKey.CheckAndNormalizeRepositoryUrl( uri ) == uri );
-        Throw.DebugAssert( _allowEdit );
 
         // Normalizing "Repository Proxy" url.
         string urlValue = NormalizeRepositoryProxyUrl( monitor, uri );
-        XElement folder = EnsureFolder( folders, _root );
-        folder.Add( new XElement( _xRepository, new XAttribute( _xUrl, urlValue ) ) );
+        var isEditingAbove = _allowEdit;
+        using( isEditingAbove ? null : StartEdit() )
+        {
+            XElement folder = EnsureFolder( folders, _root );
+            folder.Add( new XElement( _xRepository, new XAttribute( _xUrl, urlValue ) ) );
+        }
+        return isEditingAbove || SaveFile( monitor );
+
         static XElement EnsureFolder( IEnumerable<string> folders, XElement root )
         {
             XElement existing = root;
@@ -294,9 +338,11 @@ public sealed class WorldDefinitionFile
         }
     }
 
+    /// <summary>
+    /// Called by <see cref="World.RemoveRepository"/> and <see cref="World.XifLayout(IActivityMonitor)"/> (StartEdit is already called).
+    /// </summary>
     internal bool RemoveRepository( IActivityMonitor monitor, Uri uri, bool removeEmptyFolder )
     {
-        Throw.DebugAssert( _allowEdit );
         Throw.DebugAssert( _layout != null );
 
         string urlValue = NormalizeRepositoryProxyUrl( monitor, uri );
@@ -310,20 +356,24 @@ public sealed class WorldDefinitionFile
                 """ );
             return false;
         }
-        var parent = node.Parent;
-        Throw.DebugAssert( parent != null );
-        node.Remove();
-        if( removeEmptyFolder )
+        var isEditingAbove = _allowEdit;
+        using( isEditingAbove ? null : StartEdit() )
         {
-            while( parent != _root && !parent.HasElements )
+            var parent = node.Parent;
+            Throw.DebugAssert( parent != null );
+            node.Remove();
+            if( removeEmptyFolder )
             {
-                var toRemove = parent;
-                parent = parent.Parent;
-                Throw.DebugAssert( parent != null );
-                toRemove.Remove();
+                while( parent != _root && !parent.HasElements )
+                {
+                    var toRemove = parent;
+                    parent = parent.Parent;
+                    Throw.DebugAssert( parent != null );
+                    toRemove.Remove();
+                }
             }
         }
-        return true;
+        return isEditingAbove || SaveFile( monitor );
     }
 
     string NormalizeRepositoryProxyUrl( IActivityMonitor monitor, Uri uri )
@@ -564,5 +614,4 @@ public sealed class WorldDefinitionFile
         }
 
     }
-
 }

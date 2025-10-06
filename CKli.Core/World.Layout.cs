@@ -201,10 +201,14 @@ sealed partial class World
         if( actions == null ) return false;
         if( actions.Count == 0 ) return true;
         var message = $"""
-            Updating '{_name.XmlDescriptionFilePath.LastPart}' in '{_stackRepository.GitDisplayPath}' with:
+            updating '{_name.XmlDescriptionFilePath.LastPart}' in '{_stackRepository.GitDisplayPath}' with:
             {string.Join( Environment.NewLine, actions.Select( a => a.ToString( _name.WorldRoot.Parts.Count ) ) )}
             """;
-        using var _ = monitor.OpenInfo( message );
+        using var _ = monitor.OpenInfo( $"XifLayout: {message}" );
+        if( !_stackRepository.Commit( monitor, $"Before {message}" ) )
+        {
+            return false;
+        }
         using( _definitionFile.StartEdit() )
         {
             foreach( var a in actions )
@@ -231,7 +235,11 @@ sealed partial class World
             }
             _definitionFile.RemoveEmptyFolders();
         }
-        return _name.SaveAndCommitDefinitionFile( monitor, "Before Xif.", message );
+        if( !_definitionFile.SaveFile( monitor ) )
+        {
+            return false;
+        }
+        return _stackRepository.Commit( monitor, "After XifLayout." );
     }
 
     abstract record LayoutAction( NormalizedPath Path, Uri Uri )

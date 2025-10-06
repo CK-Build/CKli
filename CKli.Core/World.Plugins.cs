@@ -22,11 +22,9 @@ public sealed partial class World
     internal bool SetPluginCompilationMode( IActivityMonitor monitor, PluginCompilationMode mode )
     {
         Throw.DebugAssert( mode != DefinitionFile.CompilationMode );
-        using( DefinitionFile.StartEdit() )
-        {
-            DefinitionFile.CompilationMode = mode;
-        }
-        return DefinitionFile.SaveFile( monitor );
+        return _pluginMachinery != null
+            ? _pluginMachinery.SetPluginCompilationMode( monitor, this, mode )
+            : _definitionFile.SetPluginCompilationMode( monitor, mode );
     }
 
     internal bool AddOrSetPluginPackage( IActivityMonitor monitor, string packageId, SVersion version )
@@ -35,7 +33,7 @@ public sealed partial class World
         {
             return false;
         }
-        if( !_pluginMachinery.AddOrSetPluginPackage( monitor, shortName, fullName, version, out bool added, out bool versionChanged ) )
+        if( !_pluginMachinery.AddOrSetPluginPackage( monitor, this, shortName, fullName, version, out bool added, out bool versionChanged ) )
         {
             _stackRepository.ResetHard( monitor );
             return false;
@@ -45,8 +43,8 @@ public sealed partial class World
             return true;
         }
         return _stackRepository.Commit( monitor, added
-                                                    ? $"After adding plugin '{fullName}' in version '{version}'."
-                                                    : $"After updating plugin '{fullName}' to version '{version}'." );
+                                                    ? $"Added plugin '{fullName}' in version '{version}'."
+                                                    : $"Updated plugin '{fullName}' to version '{version}'." );
     }
 
     internal bool CreatePlugin( IActivityMonitor monitor, string pluginName )
@@ -55,21 +53,12 @@ public sealed partial class World
         {
             return false;
         }
-        if( !_pluginMachinery.CreatePlugin( monitor, shortName, fullName ) )
+        if( !_pluginMachinery.CreatePlugin( monitor, this, shortName, fullName ) )
         {
             _stackRepository.ResetHard( monitor );
             return false;
         }
-        using( DefinitionFile.StartEdit() )
-        {
-            DefinitionFile.Plugins.Add( new XElement( shortName ) );
-        }
-        if( !DefinitionFile.SaveFile( monitor ) )
-        {
-            _stackRepository.ResetHard( monitor );
-            return false;
-        }
-        return _stackRepository.Commit( monitor, $"After creating source plugin '{fullName}'." );
+        return _stackRepository.Commit( monitor, $"Created source plugin '{fullName}'." );
     }
 
     [MemberNotNullWhen(true, nameof(_pluginMachinery))]
@@ -107,36 +96,16 @@ public sealed partial class World
         {
             return false;
         }
-        var config = DefinitionFile.Plugins.Elements().FirstOrDefault( e => e.Name.LocalName.Equals( shortName, StringComparison.OrdinalIgnoreCase ) );
-        if( config == null )
-        {
-            monitor.Warn( $"""
-                Plugin '{shortName}' not found in <Plugins /> of '{Name.XmlDescriptionFilePath}'.
-                Removing it from implementations even if it has no configuration.
-                """ );
-        }
         // Commit Stack before operations.
         if( !_stackRepository.Commit( monitor, $"Before removing plugin '{fullName}'." ) )
         {
             return false;
         }
-        if( !_pluginMachinery.RemovePlugin( monitor, shortName, fullName ) )
+        if( !_pluginMachinery.RemovePlugin( monitor, this, shortName, fullName ) )
         {
             _stackRepository.ResetHard( monitor );
             return false;
         }
-        if( config != null )
-        {
-            using( DefinitionFile.StartEdit() )
-            {
-                config.Remove();
-            }
-            if( !DefinitionFile.SaveFile( monitor ) )
-            {
-                _stackRepository.ResetHard( monitor );
-                return false;
-            }
-        }
-        return _stackRepository.Commit( monitor, $"After removing plugin '{fullName}'." );
+        return _stackRepository.Commit( monitor, $"Removed plugin '{fullName}'." );
     }
 }
