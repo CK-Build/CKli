@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -35,7 +36,90 @@ sealed partial class World
     public bool AddRepository( IActivityMonitor monitor, Uri repositoryUri, NormalizedPath folderPath )
     {
         Throw.CheckState( CanChangeLayout );
-        return _name.AddRepository( monitor, repositoryUri, folderPath );
+        // Check the Uri.
+        repositoryUri = GitRepositoryKey.CheckAndNormalizeRepositoryUrl( monitor, repositoryUri, out var repoName )!;
+        if( repositoryUri == null ) return false;
+        using var _ = monitor.OpenInfo( $"Adding '{repoName}' ({repositoryUri}) to world '{_name.FullName}'." );
+        // Check the folder path.
+        if( !folderPath.StartsWith( _name.WorldRoot, strict: false ) )
+        {
+            monitor.Error( $"Invalid folder path '{folderPath}'. It must be '{_name.WorldRoot}' or below (in a sub folder)." );
+            return false;
+        }
+        // And normalize it: it now ends with the repository name from the Uri.
+        // The sub folders path without the trailing repository name.
+        NormalizedPath subFolderPath;
+        if( folderPath.LastPart.Equals( repoName, StringComparison.OrdinalIgnoreCase ) )
+        {
+            // Normalize case and obtains the sub folder path.
+            subFolderPath = folderPath.RemoveLastPart();
+            folderPath = subFolderPath.AppendPart( repoName );
+            monitor.Warn( $"Useless '{repoName}' specified in last folder of '{folderPath}'." );
+        }
+        else
+        {
+            subFolderPath = folderPath;
+            folderPath = folderPath.AppendPart( repoName );
+        }
+        // Each path part must be a valid folder name.
+        foreach( var f in subFolderPath.Parts.Skip( _name.WorldRoot.Parts.Count ) )
+        {
+            if( !WorldDefinitionFile.IsValidFolderName( f ) )
+            {
+                monitor.Error( $"""
+                    Invalid folder path '{folderPath}'.
+                    Folder '{f}' is not a valid folder name.
+                    """ );
+                return false;
+            }
+        }
+
+        // The folder path must not be in an existing repository.
+        var layout = _definitionFile.ReadLayout( monitor );
+        if( layout == null ) return false;
+        foreach( var (path, uri) in layout )
+        {
+            if( path.StartsWith( folderPath, strict: false ) )
+            {
+                monitor.Error( $"""
+                    Invalid folder path '{folderPath}'.
+                    Cannot add a repository inside an other one: repository '{uri}' is cloned at '{path}'.
+                    """ );
+                return false;
+            }
+            if( path.LastPart.Equals( repoName, StringComparison.OrdinalIgnoreCase ) )
+            {
+                monitor.Error( $"""
+                    Cannot add repository '{repositoryUri}'.
+                    A repository with the same name exists: '{uri}' cloned at '{path}'.
+                    """ );
+                return false;
+            }
+        }
+
+        // Before updating the definition file, we must ensure that there is no existing "alien" folder...
+        if( Directory.Exists( folderPath ) )
+        {
+            monitor.Error( $"""
+                    Unable to add repository at '{folderPath}'.
+                    The folder already exixts.
+                    """ );
+            return false;
+        }
+        // ...and we must ensure that it can be cloned.
+        var gitKey = new GitRepositoryKey( _name.Stack.SecretsStore, repositoryUri, _name.Stack.IsPublic );
+        using( var libGit = GitRepository.CloneWorkingFolder( monitor, gitKey, folderPath ) )
+        {
+            if( libGit == null ) return false;
+            // The working folder is successfully cloned.
+            // We can dispose the Repository and update the definition file.
+        }
+        if( !_name.Stack.Commit( monitor, $"Before adding repository '{folderPath.LastPart}' ({repositoryUri}) in world {_name.FullName}." )
+            || !_definitionFile.AddRepository( monitor, folderPath, subFolderPath.Parts.Skip( _name.WorldRoot.Parts.Count ), repositoryUri ) )
+        {
+            return false;
+        }
+        return _name.Stack.Commit( monitor, $"Added repository '{folderPath.LastPart}'." );
     }
 
     /// <summary>
