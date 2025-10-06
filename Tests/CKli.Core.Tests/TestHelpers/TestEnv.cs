@@ -191,7 +191,7 @@ static partial class TestEnv
             // The XDocument is cloned, the original one will be restored by TearDownEnv.
             _cKliPluginsCoreVersion.ShouldNotBeNull();
             var pathDirectoryPackages = _packagedPluginsPath.AppendPart( "Directory.Packages.props" );
-            _packagedDirectoryPackagesProps = XDocument.Load( pathDirectoryPackages );
+            _packagedDirectoryPackagesProps = XDocument.Load( pathDirectoryPackages, LoadOptions.PreserveWhitespace );
 
             var clone = new XDocument( _packagedDirectoryPackagesProps );
             clone.Root.ShouldNotBeNull();

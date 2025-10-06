@@ -25,7 +25,7 @@ sealed partial class PluginMachinery
         CKliPluginsProject( PluginMachinery machinery )
         {
             _machinery = machinery;
-            _csProj = XDocument.Load( machinery.CKliPluginsCSProj );
+            _csProj = XDocument.Load( machinery.CKliPluginsCSProj, LoadOptions.PreserveWhitespace );
             Throw.CheckData( _csProj.Root != null );
             _csFirstItemGroup = _csProj.Root.Elements( "ItemGroup" ).FirstOrDefault()!;
             Throw.CheckData( _csFirstItemGroup != null );
@@ -34,7 +34,7 @@ sealed partial class PluginMachinery
             Throw.CheckData( _autoSectionEnd > 20 );
             _linePrefixLength = _autoSectionEnd - _ckliPluginsFileText.LastIndexOf( '\n', _autoSectionEnd );
             Throw.CheckData( _linePrefixLength >= 0 );
-            _directoryPackages = XDocument.Load( machinery.DirectoryPackageProps );
+            _directoryPackages = XDocument.Load( machinery.DirectoryPackageProps, LoadOptions.PreserveWhitespace );
             Throw.CheckData( _directoryPackages.Root != null );
             _dpFirstItemGroup = _directoryPackages.Root.Elements( "ItemGroup" ).FirstOrDefault()!;
             Throw.CheckData( _dpFirstItemGroup != null );
@@ -179,13 +179,13 @@ sealed partial class PluginMachinery
             try
             {
                 monitor.Trace( $"Updating file '{_machinery.CKliPluginsFile.LastPart}', deleting '{_machinery.CKliCompiledPluginsFile.LastPart}'." );
-                File.WriteAllText( _machinery.CKliPluginsFile, _ckliPluginsFileText );
-                _csProj.SaveWithoutXmlDeclaration( _machinery.CKliPluginsCSProj );
-                _directoryPackages.SaveWithoutXmlDeclaration( _machinery.DirectoryPackageProps );
                 if( !FileHelper.DeleteFile( monitor, _machinery.CKliCompiledPluginsFile ) )
                 {
                     return false;
                 }
+                File.WriteAllText( _machinery.CKliPluginsFile, _ckliPluginsFileText );
+                _csProj.SaveWithoutXmlDeclaration( _machinery.CKliPluginsCSProj );
+                _directoryPackages.SaveWithoutXmlDeclaration( _machinery.DirectoryPackageProps );
                 return true;
             }
             catch( Exception ex )
