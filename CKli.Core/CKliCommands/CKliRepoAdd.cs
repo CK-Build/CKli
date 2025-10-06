@@ -39,22 +39,17 @@ sealed class CKliRepoAdd : CommandDescription
                                Uri repositoryUrl,
                                bool allowLTS )
     {
-        if( !StackRepository.OpenFromPath( monitor, context, out var stack, skipPullStack: true ) )
+        if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
             return false;
         }
         try
         {
-            var worldName = stack.GetWorldNameFromPath( monitor, context.CurrentDirectory );
-            if( worldName == null )
+            if( !allowLTS && !world.Name.IsDefaultWorld )
             {
-                return false;
+                return RequiresAllowLTS( monitor, world.Name );
             }
-            if( !allowLTS && !worldName.IsDefaultWorld )
-            {
-                return RequiresAllowLTS( monitor, worldName );
-            }
-            return worldName.AddRepository( monitor, repositoryUrl, context.CurrentDirectory );
+            return world.AddRepository( monitor, repositoryUrl, context.CurrentDirectory );
         }
         finally
         {

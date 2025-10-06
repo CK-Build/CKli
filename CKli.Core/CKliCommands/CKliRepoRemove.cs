@@ -33,22 +33,17 @@ sealed class CKliRepoRemove : CommandDescription
                             string nameOrUrl,
                             bool allowLTS = false )
     {
-        if( !StackRepository.OpenFromPath( monitor, context, out var stack, skipPullStack: true ) )
+        if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
             return false;
         }
         try
         {
-            var worldName = stack.GetWorldNameFromPath( monitor, context.CurrentDirectory );
-            if( worldName == null )
+            if( !allowLTS && !world.Name.IsDefaultWorld )
             {
-                return false;
+                return CKliRepoAdd.RequiresAllowLTS( monitor, world.Name );
             }
-            if( !allowLTS && !worldName.IsDefaultWorld )
-            {
-                return CKliRepoAdd.RequiresAllowLTS( monitor, worldName );
-            }
-            return worldName.RemoveRepository( monitor, nameOrUrl );
+            return world.RemoveRepository( monitor, nameOrUrl );
         }
         finally
         {
