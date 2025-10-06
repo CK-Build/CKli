@@ -2,12 +2,10 @@ using CK.Core;
 using CSemVer;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.Design;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -333,18 +331,20 @@ public sealed partial class PluginMachinery
 
     void CreateSolution( IActivityMonitor monitor )
     {
-        monitor.Info( $"Creating '{Name}' solution." );
-        Directory.CreateDirectory( Root );
-        File.WriteAllText( SlnxPath, DefaultSlnFile );
-        Directory.CreateDirectory( CKliPluginsFolder );
-        File.WriteAllText( DirectoryBuildProps, string.Format( DefaultDirectoryBuildPropsPattern, Name ) );
-        File.WriteAllText( DirectoryPackageProps, DefaultDirectoryPackageProps );
-        File.WriteAllText( CKliPluginsCSProj, DefaultCKliPluginsCSProj );
-        File.WriteAllText( CKliPluginsFile, DefaultCKliPluginsFile );
-        File.WriteAllText( NuGetConfigFile, DefaultNuGetConfigFile );
-        if( _nuGetConfigFileHook != null )
+        using( monitor.OpenInfo( $"Creating '{Name}' solution." ) )
         {
-            Throw.CheckState( ApplyNuGetConfigFileHook( monitor, NuGetConfigFile ) );
+            Directory.CreateDirectory( Root );
+            File.WriteAllText( SlnxPath, DefaultSlnFile );
+            Directory.CreateDirectory( CKliPluginsFolder );
+            File.WriteAllText( DirectoryBuildProps, string.Format( DefaultDirectoryBuildPropsPattern, Name ) );
+            File.WriteAllText( DirectoryPackageProps, DefaultDirectoryPackageProps );
+            File.WriteAllText( CKliPluginsCSProj, DefaultCKliPluginsCSProj );
+            File.WriteAllText( CKliPluginsFile, DefaultCKliPluginsFile );
+            File.WriteAllText( NuGetConfigFile, DefaultNuGetConfigFile );
+            if( _nuGetConfigFileHook != null )
+            {
+                Throw.CheckState( ApplyNuGetConfigFileHook( monitor, NuGetConfigFile ) );
+            }
         }
     }
 

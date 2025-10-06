@@ -1,10 +1,6 @@
 using CK.Core;
 using CKli.Core;
-using LibGit2Sharp;
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 

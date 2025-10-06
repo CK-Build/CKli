@@ -1,5 +1,4 @@
 using CK.Core;
-using CSemVer;
 using NUnit.Framework;
 using Shouldly;
 using System.Threading.Tasks;

@@ -1,6 +1,5 @@
 using CK.Core;
 using CSemVer;
-using DiffEngine;
 using NUnit.Framework;
 using Shouldly;
 using System;
@@ -8,7 +7,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Xml;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 
@@ -31,7 +29,7 @@ static partial class TestEnv
     [OneTimeTearDown]
     public static void TearDownEnv()
     {
-        _packagedDirectoryPackagesProps?.Save( _packagedPluginsPath.AppendPart( "Directory.Packages.props" ) );
+        _packagedDirectoryPackagesProps?.SaveWithoutXmlDeclaration( _packagedPluginsPath.AppendPart( "Directory.Packages.props" ) );
     }
 
     static void Initialize()

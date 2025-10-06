@@ -1,6 +1,4 @@
 using CK.Core;
-using CK.Monitoring;
-using System.Threading;
 
 namespace CKli.Core;
 

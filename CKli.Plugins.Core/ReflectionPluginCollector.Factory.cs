@@ -1,13 +1,8 @@
 using CK.Core;
-using CKli.Plugins;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using static CK.Core.ActivityMonitor;
-using static Microsoft.IO.RecyclableMemoryStreamManager;
 
 namespace CKli.Core;
 
