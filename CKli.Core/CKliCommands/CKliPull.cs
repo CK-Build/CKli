@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliPull : CommandDescription
+sealed class CKliPull : Command
 {
     public CKliPull()
         : base( null,

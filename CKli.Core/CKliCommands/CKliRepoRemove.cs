@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliRepoRemove : CommandDescription
+sealed class CKliRepoRemove : Command
 {
     public CKliRepoRemove()
         : base( null,

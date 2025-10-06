@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliFetch : CommandDescription
+sealed class CKliFetch : Command
 {
     public CKliFetch()
         : base( null,

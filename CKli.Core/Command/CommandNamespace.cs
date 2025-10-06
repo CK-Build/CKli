@@ -11,9 +11,9 @@ namespace CKli;
 /// </summary>
 public sealed class CommandNamespace
 {
-    readonly Dictionary<string, CommandDescription?> _commands;
+    readonly Dictionary<string, Command?> _commands;
 
-    internal CommandNamespace( Dictionary<string, CommandDescription?> commands )
+    internal CommandNamespace( Dictionary<string, Command?> commands )
     {
         _commands = commands;
     }
@@ -23,17 +23,17 @@ public sealed class CommandNamespace
     /// </summary>
     /// <param name="commandPath">The command path.</param>
     /// <returns>The command if it exists, null otherwise.</returns>
-    public CommandDescription? Find( string commandPath ) => _commands.GetValueOrDefault( commandPath );
+    public Command? Find( string commandPath ) => _commands.GetValueOrDefault( commandPath );
 
 
-    internal Dictionary<string, CommandDescription?> InternalCommands => _commands;
+    internal Dictionary<string, Command?> InternalCommands => _commands;
 
     internal void Clear() => _commands.Clear();
 
-    internal List<CommandDescription> GetForHelp( string? helpPath, CommandNamespace? otherCommands )
+    internal List<Command> GetForHelp( string? helpPath, CommandNamespace? otherCommands )
     {
         // No optimization here. This is the help.
-        IEnumerable<CommandDescription> commands = _commands.Where( kv => kv.Value != null ).Select( kv => kv.Value )!;
+        IEnumerable<Command> commands = _commands.Where( kv => kv.Value != null ).Select( kv => kv.Value )!;
         if( otherCommands  != null ) commands = commands.Concat( otherCommands._commands.Where( kv => kv.Value != null ).Select( kv => kv.Value ) )!;
         if( !string.IsNullOrEmpty( helpPath ) )
         {
@@ -43,7 +43,7 @@ public sealed class CommandNamespace
         return commands.OrderBy( c => c.CommandPath ).ToList();
     }
 
-    internal bool TryFindForExecution( IActivityMonitor monitor, CommandLineArguments cmdLine, out CommandDescription? cmd, out string? helpPath )
+    internal bool TryFindForExecution( IActivityMonitor monitor, CommandLineArguments cmdLine, out Command? cmd, out string? helpPath )
     {
         LocateCommand( cmdLine, out cmd, out helpPath );
         if( cmd == null )
@@ -59,7 +59,7 @@ public sealed class CommandNamespace
         return true;
     }
 
-    void LocateCommand( CommandLineArguments cmdLine, out CommandDescription? cmd, out string? path )
+    void LocateCommand( CommandLineArguments cmdLine, out Command? cmd, out string? path )
     {
         cmd = null;
         path = null;

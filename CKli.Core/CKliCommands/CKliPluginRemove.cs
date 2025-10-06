@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliPluginRemove : CommandDescription
+sealed class CKliPluginRemove : Command
 {
     public CKliPluginRemove()
         : base( null,

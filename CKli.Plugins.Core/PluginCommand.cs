@@ -6,7 +6,7 @@ namespace CKli.Core;
 /// <summary>
 /// Base class for command implemented by plugins.
 /// </summary>
-public abstract class PluginCommand : CommandDescription
+public abstract class PluginCommand : Command
 {
     readonly string _methodName;
     readonly MethodAsyncReturn _returnType;

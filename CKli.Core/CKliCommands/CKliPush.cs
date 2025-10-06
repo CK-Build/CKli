@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliPush : CommandDescription
+sealed class CKliPush : Command
 {
     public CKliPush()
         : base( null,

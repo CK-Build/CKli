@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliLayoutXif : CommandDescription
+sealed class CKliLayoutXif : Command
 {
     public CKliLayoutXif()
         : base( null,

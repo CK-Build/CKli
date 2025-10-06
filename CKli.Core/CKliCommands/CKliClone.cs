@@ -7,7 +7,7 @@ namespace CKli.Core;
 /// <summary>
 /// Clone command.
 /// </summary>
-sealed class CKliClone : CommandDescription
+sealed class CKliClone : Command
 {
     internal CKliClone()
         : base( null,

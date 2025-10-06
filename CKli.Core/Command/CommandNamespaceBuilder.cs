@@ -10,14 +10,14 @@ namespace CKli;
 /// </summary>
 public sealed class CommandNamespaceBuilder
 {
-    readonly Dictionary<string, CommandDescription?> _commands;
+    readonly Dictionary<string, Command?> _commands;
 
     /// <summary>
     /// Initiaizes a new builder.
     /// </summary>
     public CommandNamespaceBuilder()
     {
-        _commands = new Dictionary<string, CommandDescription?>();
+        _commands = new Dictionary<string, Command?>();
     }
 
     /// <summary>
@@ -30,7 +30,7 @@ public sealed class CommandNamespaceBuilder
     /// Adds or throw on already existing command.
     /// </summary>
     /// <param name="c">The command to add.</param>
-    public void Add( CommandDescription c )
+    public void Add( Command c )
     {
         if( !TryAdd( c, out var conflict ) )
         {
@@ -44,7 +44,7 @@ public sealed class CommandNamespaceBuilder
     /// <param name="c">The command to add.</param>
     /// <param name="conflict">The non null existing command on success.</param>
     /// <returns>True on success, false otherwise.</returns>
-    public bool TryAdd( CommandDescription c, [NotNullWhen(false)]out CommandDescription? conflict )
+    public bool TryAdd( Command c, [NotNullWhen(false)]out Command? conflict )
     {
         if( _commands.TryGetValue( c.CommandPath, out conflict ) )
         {

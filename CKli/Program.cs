@@ -45,7 +45,7 @@ var monitor = new ActivityMonitor();
 
 await CKliCommands.HandleCommandAsync( monitor, CKliRootEnv.DefaultCommandContext, arguments );
 
-static void DisplayHelp( IEnumerable<CommandDescription> commands )
+static void DisplayHelp( IEnumerable<Command> commands )
 {
     Console.WriteLine( """
 

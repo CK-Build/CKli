@@ -10,7 +10,7 @@ public static class HelpDisplay
 
     }
 
-    internal static void Display( List<CommandDescription> commandDescriptions )
+    internal static void Display( List<Command> commandDescriptions )
     {
         throw new NotImplementedException();
     }

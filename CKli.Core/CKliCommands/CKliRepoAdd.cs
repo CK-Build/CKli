@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliRepoAdd : CommandDescription
+sealed class CKliRepoAdd : Command
 {
     public CKliRepoAdd()
         : base( null,

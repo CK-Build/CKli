@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliPluginCreate : CommandDescription
+sealed class CKliPluginCreate : Command
 {
     public CKliPluginCreate()
         : base( null,

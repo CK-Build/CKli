@@ -37,7 +37,7 @@ namespace CKli.Core;
 /// </list>
 /// </para>
 /// </summary>
-public abstract partial class CommandDescription
+public abstract partial class Command
 {
     readonly IPluginTypeInfo? _typeInfo;
     readonly string _commandPath;
@@ -55,7 +55,7 @@ public abstract partial class CommandDescription
     /// <param name="arguments">The required command arguments.</param>
     /// <param name="options">The options.</param>
     /// <param name="flags">The flags.</param>
-    protected CommandDescription( IPluginTypeInfo? typeInfo,
+    protected Command( IPluginTypeInfo? typeInfo,
                                   string commandPath,
                                   string description,
                                   ImmutableArray<(string Name, string Description)> arguments,
@@ -154,7 +154,7 @@ public abstract partial class CommandDescription
     /// <param name="b">The target string builder.</param>
     /// <param name="command">The command for which the command path must be written as an identifier.</param>
     /// <returns>The string builder.</returns>
-    public static StringBuilder WriteCommandPathAsIdentifier( StringBuilder b, CommandDescription command )
+    public static StringBuilder WriteCommandPathAsIdentifier( StringBuilder b, Command command )
     {
         foreach( var c in command.CommandPath )
         {

@@ -212,7 +212,7 @@ sealed partial class ReflectionPluginCollector
                 int idxType = typeInfo.Plugin.PluginTypes.IndexOf( t => t == typeInfo );
 
                 b.Append( ' ', offset ).Append( "new Cmd_" );
-                CommandDescription.WriteCommandPathAsIdentifier( b, c ).Append( $"( infos[{idxPlugin}].PluginTypes[{idxType}] )," ).AppendLine();
+                Command.WriteCommandPathAsIdentifier( b, c ).Append( $"( infos[{idxPlugin}].PluginTypes[{idxType}] )," ).AppendLine();
             }
             offset -= 4;
             b.Append( ' ', offset ).Append( "};" ).AppendLine();
@@ -221,11 +221,11 @@ sealed partial class ReflectionPluginCollector
         static void GenerateCommand( StringBuilder b, PluginCommand c )
         {
             b.Append( "sealed class Cmd_" );
-            CommandDescription.WriteCommandPathAsIdentifier( b, c ).Append( " : PluginCommand" ).AppendLine()
+            Command.WriteCommandPathAsIdentifier( b, c ).Append( " : PluginCommand" ).AppendLine()
                 .Append( '{' ).AppendLine();
             int offset = 4;
             b.Append( ' ', offset ).Append( "internal Cmd_" );
-            CommandDescription.WriteCommandPathAsIdentifier( b, c ).Append( "( IPluginTypeInfo typeInfo )" ).AppendLine();
+            Command.WriteCommandPathAsIdentifier( b, c ).Append( "( IPluginTypeInfo typeInfo )" ).AppendLine();
             offset += 4;
             b.Append( ' ', offset ).Append( ": base( typeInfo," ).AppendLine();
             offset += 8;

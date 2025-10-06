@@ -28,7 +28,7 @@ sealed partial class CommandCollector
     public void Add( IPluginTypeInfo typeInfo, MethodInfo method, string commandPath, IList<CustomAttributeData> attributes )
     {
         commandPath = NormalizePath( commandPath );
-        if( !CommandDescription.IsValidCommandPath( commandPath ) )
+        if( !Command.IsValidCommandPath( commandPath ) )
         {
             Throw.CKException( $"Invalid command path '{commandPath}'." );
         }

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliPluginDisable : CommandDescription
+sealed class CKliPluginDisable : Command
 {
     public CKliPluginDisable()
         : base( null,
