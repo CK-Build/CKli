@@ -30,10 +30,11 @@ public sealed class CommandNamespace
 
     internal void Clear() => _commands.Clear();
 
-    internal List<CommandDescription> GetForHelp( string? helpPath )
+    internal List<CommandDescription> GetForHelp( string? helpPath, CommandNamespace? otherCommands )
     {
         // No optimization here. This is the help.
         IEnumerable<CommandDescription> commands = _commands.Where( kv => kv.Value != null ).Select( kv => kv.Value )!;
+        if( otherCommands  != null ) commands = commands.Concat( otherCommands._commands.Where( kv => kv.Value != null ).Select( kv => kv.Value ) )!;
         if( !string.IsNullOrEmpty( helpPath ) )
         {
             var prefix = helpPath + ' ';

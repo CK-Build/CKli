@@ -22,7 +22,7 @@ sealed partial class CommandCollector
     public CommandCollector()
     {
         _pluginCommands = new List<PluginCommand>();
-        _commands = new CommandNamespaceBuilder( CKliCommands.Commands );
+        _commands = new CommandNamespaceBuilder();
     }
 
     public void Add( IPluginTypeInfo typeInfo, MethodInfo method, string commandPath, IList<CustomAttributeData> attributes )
@@ -31,6 +31,13 @@ sealed partial class CommandCollector
         if( !CommandDescription.IsValidCommandPath( commandPath ) )
         {
             Throw.CKException( $"Invalid command path '{commandPath}'." );
+        }
+        if( CKliCommands.Commands.Find( commandPath ) != null )
+        {
+            Throw.CKException( $"""
+                Invalid [CommandPath( "{commandPath}" )] on '{typeInfo.TypeName}.{method.Name}' method.
+                This path is an intrinsic CKli command.
+                """ );
         }
         var description = GetDescription( attributes );
         var parameters = method.GetParameters();

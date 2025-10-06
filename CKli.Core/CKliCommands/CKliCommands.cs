@@ -69,7 +69,7 @@ public static class CKliCommands
         // When TryFindForExecution returns false, the command exists but it misses one or more arguments.
         if( !_commands.TryFindForExecution( monitor, cmdLine, out var cmd, out var helpPath ) )
         {
-            HelpDisplay.Display( _commands.GetForHelp( helpPath ) );
+            HelpDisplay.Display( _commands.GetForHelp( helpPath, null ) );
             return ValueTask.FromResult( false );
         }
         // If it's a CKli command, execute it.
@@ -87,7 +87,7 @@ public static class CKliCommands
         // No current World (not in a Stack directory): we can only display help on the CKli commands.
         if( world == null )
         {
-            HelpDisplay.Display( _commands.GetForHelp( helpPath ) );
+            HelpDisplay.Display( _commands.GetForHelp( helpPath, null ) );
             return ValueTask.FromResult( false );
         }
         try
@@ -99,7 +99,7 @@ public static class CKliCommands
                 // No luck.
                 // Displays the help in the context of the World. The World's commands
                 // contain the CKli command: the help mixes the 2 kind of commands if needed.
-                HelpDisplay.Display( world.Commands.GetForHelp( helpPath ) );
+                HelpDisplay.Display( world.Commands.GetForHelp( helpPath, _commands ) );
                 return ValueTask.FromResult( false );
             }
             // We have a plugin command.

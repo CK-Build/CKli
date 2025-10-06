@@ -80,7 +80,7 @@ sealed partial class ReflectionPluginCollector
             GeneratePluginCommandsArray( b );
 
             b.Append( """
-                    var commandBuilder = new CommandNamespaceBuilder( CKliCommands.Commands );
+                    var commandBuilder = new CommandNamespaceBuilder();
                     foreach( var c in pluginCommands )
                     {
                         commandBuilder.Add( c );
