@@ -1,13 +1,10 @@
 using CK.Core;
 using CKli;
 using CKli.Core;
-using ConsoleAppFramework;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-
-ConsoleApp.Version = CSemVer.InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() ).ToString();
 
 var arguments = new CommandLineArguments( args );
 
