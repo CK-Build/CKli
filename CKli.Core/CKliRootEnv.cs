@@ -22,6 +22,7 @@ public static class CKliRootEnv
 {
     static NormalizedPath _appLocalDataPath;
     static ISecretsStore? _secretsStore;
+    static IScreen? _screen;
     static NormalizedPath _currentDirectory;
     static NormalizedPath _currentStackPath;
     static CommandCommonContext? _defaultCommandContext;
@@ -39,6 +40,8 @@ public static class CKliRootEnv
         // will be .[Public|PrivateStack]/Logs, else the log will be in _appLocalDataPath/Out-of-Stack-Logs/.
         _currentDirectory = Environment.CurrentDirectory;
         _currentStackPath = StackRepository.FindGitStackPath( _currentDirectory );
+        _screen = new ConsoleScreen();
+
         InitializeMonitoring( _currentDirectory, _currentStackPath );
         NormalizedPath configFilePath = GetConfigPath();
         try
@@ -63,7 +66,7 @@ public static class CKliRootEnv
                 }
                 else
                 {
-                    Console.WriteLine( $"""
+                    _screen.DisplayWarning( $"""
                     Invalid '{configFilePath}':
                     {lines.Concatenate( Environment.NewLine )}
                     Resetting it to default values.
@@ -79,7 +82,7 @@ public static class CKliRootEnv
         }
         catch( Exception ex )
         {
-            Console.WriteLine( $"""
+            _screen.DisplayWarning( $"""
                 Error while initializing CKliRootEnv:
                 {CKExceptionData.CreateFrom( ex ).ToString()}
                 Resetting the '{configFilePath}' to default values.
@@ -87,7 +90,7 @@ public static class CKliRootEnv
             SetAndWriteDefaultConfig();
         }
 
-        _defaultCommandContext = new CommandCommonContext( _secretsStore, _currentDirectory, _currentStackPath );
+        _defaultCommandContext = new CommandCommonContext( _screen, _secretsStore, _currentDirectory, _currentStackPath );
 
         [MemberNotNull( nameof(_secretsStore) )]
         static void SetAndWriteDefaultConfig()
@@ -150,6 +153,18 @@ public static class CKliRootEnv
         {
             CheckInitialized();
             return _appLocalDataPath;
+        }
+    }
+
+    /// <summary>
+    /// Gets the screen to use.
+    /// </summary>
+    public static IScreen Screen
+    {
+        get
+        {
+            CheckInitialized();
+            return _screen!;
         }
     }
 

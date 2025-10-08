@@ -9,13 +9,15 @@ namespace CKli.Core;
 /// </summary>
 public sealed class CommandCommonContext
 {
+    readonly IScreen _screen;
     readonly ISecretsStore _secretsStore;
     readonly NormalizedPath _currentDirectory;
     readonly NormalizedPath _currentStackPath;
 
     // CKliRootEnv.DefaultCommandContext
-    internal CommandCommonContext( ISecretsStore secretsStore, NormalizedPath currentDirectory, NormalizedPath currentStackPath )
+    internal CommandCommonContext( IScreen screen, ISecretsStore secretsStore, NormalizedPath currentDirectory, NormalizedPath currentStackPath )
     {
+        _screen = screen;
         _secretsStore = secretsStore;
         _currentDirectory = currentDirectory;
         _currentStackPath = currentStackPath;
@@ -26,11 +28,13 @@ public sealed class CommandCommonContext
     /// </summary>
     /// <param name="currentDirectory">Current directory to consider.</param>
     /// <param name="secretsStore">Optional secrets store (overrides the default <see cref="CKliRootEnv.SecretsStore"/>).</param>
-    public CommandCommonContext( NormalizedPath currentDirectory, ISecretsStore? secretsStore = null )
+    /// <param name="screen">Optional screen (overrides the default <see cref="CKliRootEnv.Screen"/>).</param>
+    public CommandCommonContext( NormalizedPath currentDirectory, ISecretsStore? secretsStore = null, IScreen? screen = null )
     {
         Throw.CheckArgument( !currentDirectory.IsEmptyPath );
         _currentDirectory = currentDirectory;
         _secretsStore = secretsStore ?? CKliRootEnv.SecretsStore;
+        _screen = screen ?? CKliRootEnv.Screen;
         _currentStackPath = StackRepository.FindGitStackPath( currentDirectory );
     }
 
@@ -51,6 +55,11 @@ public sealed class CommandCommonContext
     public ISecretsStore SecretsStore => _secretsStore;
 
     /// <summary>
+    /// Gets the screen to use.
+    /// </summary>
+    public IScreen Screen => _screen;
+
+    /// <summary>
     /// Returns a new context with an updated <see cref="CurrentDirectory"/> that is <see cref="NormalizedPath.Combine(NormalizedPath)"/>
     /// with the <paramref name="path"/>.
     /// <para>
@@ -59,5 +68,7 @@ public sealed class CommandCommonContext
     /// </summary>
     /// <param name="path">The path. Usually relative but may be absolute.</param>
     /// <returns>A new context.</returns>
-    public CommandCommonContext With( NormalizedPath path ) => path.IsEmptyPath ? this : new CommandCommonContext( _currentDirectory.Combine( path ).ResolveDots(), _secretsStore );
+    public CommandCommonContext With( NormalizedPath path ) => path.IsEmptyPath
+                                                                ? this
+                                                                : new CommandCommonContext( _currentDirectory.Combine( path ).ResolveDots(), _secretsStore, _screen );
 }

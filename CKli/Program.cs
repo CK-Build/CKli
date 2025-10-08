@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Monitoring;
 using CKli;
 using CKli.Core;
 using System;
@@ -39,8 +40,12 @@ if( arguments.EatFlag( "--version" ) )
 World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
 CKliRootEnv.Initialize();
 var monitor = new ActivityMonitor();
+monitor.Output.RegisterClient( new ScreenLogger( CKliRootEnv.Screen ) );
+CoreApplicationIdentity.Initialize();
 
 await CKliCommands.HandleCommandAsync( monitor, CKliRootEnv.DefaultCommandContext, arguments );
+
+CKliRootEnv.Screen.HideSpin();
 
 static void DisplayHelp( IEnumerable<Command> commands )
 {
