@@ -34,38 +34,42 @@ public static class CKliRootEnv
     public static void Initialize( string? instanceName = null )
     {
         Throw.CheckState( "Initialize can be called only once.", _appLocalDataPath.IsEmptyPath );
-        _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData ), instanceName != null ? "CKli" : $"CKli-{instanceName}" );
+        _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData ), instanceName == null ? "CKli" : $"CKli-{instanceName}" );
         // To handle logs, we firts must determine if we are in a Stack. If this is the case, then the Logs/ folder
-        // will be .XXXXStack/Logs, else the log will be in _appLocalDataPath/Out-of-Stack-Logs/.
+        // will be .[Public|PrivateStack]/Logs, else the log will be in _appLocalDataPath/Out-of-Stack-Logs/.
         _currentDirectory = Environment.CurrentDirectory;
         _currentStackPath = StackRepository.FindGitStackPath( _currentDirectory );
         InitializeMonitoring( _currentDirectory, _currentStackPath );
         NormalizedPath configFilePath = GetConfigPath();
         try
         {
-            var configFile = File.ReadAllText( configFilePath );
-            var lines = configFile.AsSpan().EnumerateLines();
-            if( lines.MoveNext()
-                && lines.Current.Equals( "v0", StringComparison.Ordinal )
-                && lines.MoveNext() )
+            if( !File.Exists( configFilePath ) )
             {
-                var secretsStoreTypeName = new string( lines.Current );
-                var secretsStoreType = Type.GetType( secretsStoreTypeName, throwOnError: false );
-                if( secretsStoreType == null )
-                {
-                    Console.WriteLine( $"Unable to locate type '{secretsStoreTypeName}'. Using default DotNetUserSecretsStore." );
-                    secretsStoreType = typeof( DotNetUserSecretsStore );
-                }
-                _secretsStore = (ISecretsStore)Activator.CreateInstance( secretsStoreType )!;
+                SetAndWriteDefaultConfig();
             }
             else
             {
-                Console.WriteLine( $"""
+                var lines = File.ReadAllLines( configFilePath );
+                if( lines.Length == 1 )
+                {
+                    var secretsStoreTypeName = lines[0];
+                    var secretsStoreType = Type.GetType( secretsStoreTypeName, throwOnError: false );
+                    if( secretsStoreType == null )
+                    {
+                        Console.WriteLine( $"Unable to locate type '{secretsStoreTypeName}'. Using default DotNetUserSecretsStore." );
+                        secretsStoreType = typeof( DotNetUserSecretsStore );
+                    }
+                    _secretsStore = (ISecretsStore)Activator.CreateInstance( secretsStoreType )!;
+                }
+                else
+                {
+                    Console.WriteLine( $"""
                     Invalid '{configFilePath}':
-                    {configFile}
+                    {lines.Concatenate( Environment.NewLine )}
                     Resetting it to default values.
                     """ );
-                SetAndWriteDefaultConfig();
+                    SetAndWriteDefaultConfig();
+                }
             }
         }
         catch( DirectoryNotFoundException )
@@ -106,7 +110,7 @@ public static class CKliRootEnv
                 ActivityMonitor.DefaultFilter = LogFilter.Diagnostic;
                 GrandOutput.EnsureActiveDefault( new GrandOutputConfiguration()
                 {
-                    Handlers = { new CK.Monitoring.Handlers.TextFileConfiguration { MaximumTotalKbToKeep = 2 * 1024 /*2 MBytes */ } }
+                    Handlers = { new CK.Monitoring.Handlers.TextFileConfiguration { Path = "Text", MaximumTotalKbToKeep = 2 * 1024 /*2 MBytes */ } }
                 } );
             }
             else
@@ -237,12 +241,12 @@ public static class CKliRootEnv
         using( AcquireAppMutex( monitor ) )
         {
             File.WriteAllText( GetConfigPath(), $"""
-                v0
                 {_secretsStore.GetType().GetWeakAssemblyQualifiedName()}
+
                 """ );
         }
     }
 
-    static NormalizedPath GetConfigPath() => _appLocalDataPath.AppendPart( "config.txt" );
+    static NormalizedPath GetConfigPath() => _appLocalDataPath.AppendPart( "config.v0.txt" );
 
 }

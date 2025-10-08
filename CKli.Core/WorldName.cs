@@ -149,7 +149,7 @@ public partial class WorldName : IEquatable<WorldName>
     public bool Equals( WorldName? other ) => FullName.Equals( other?.FullName, StringComparison.OrdinalIgnoreCase );
 
     /// <summary>
-    /// Validates a repository name: at least 2 characters, only ASCII characters that are letter, digits, - (minus)
+    /// Validates a repository name: at least 2 characters, only ASCII characters that are letter, digits, - (hyphen)
     /// or _ (underscore).
     /// And the first character must be a letter.
     /// </summary>
@@ -158,7 +158,7 @@ public partial class WorldName : IEquatable<WorldName>
     public static bool IsValidRepositoryName( ReadOnlySpan<char> name ) => ValidRepoName().IsMatch( name );
 
     /// <summary>
-    /// Validates a LTS name: at least 3 characters that starts with '@', only ASCII lowercase characters, digits, - (minus),
+    /// Validates a LTS name: at least 3 characters that starts with '@', only ASCII lowercase characters, digits, - (hyphen),
     /// _ (underscore) and '.' (dot).
     /// </summary>
     /// <param name="name">Name to test.</param>
