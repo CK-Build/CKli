@@ -1,6 +1,9 @@
+using System;
+using System.Collections.Generic;
+
 namespace CKli.Core;
 
-public interface IScreen
+public interface IScreen : IDisposable
 {
     void DisplayError( string message );
 
@@ -8,5 +11,6 @@ public interface IScreen
 
     void OnLogText( string text );
 
-    void HideSpin();
+    void DisplayHelp( List<CommandHelpBlock> commands, CommandLineArguments cmdLine );
+
 }

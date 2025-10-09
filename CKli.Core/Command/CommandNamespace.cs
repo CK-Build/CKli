@@ -25,12 +25,16 @@ public sealed class CommandNamespace
     /// <returns>The command if it exists, null otherwise.</returns>
     public Command? Find( string commandPath ) => _commands.GetValueOrDefault( commandPath );
 
-
-    internal Dictionary<string, Command?> InternalCommands => _commands;
-
-    internal void Clear() => _commands.Clear();
-
-    internal List<Command> GetForHelp( string? helpPath, CommandNamespace? otherCommands )
+    /// <summary>
+    /// Gets a list of <see cref="CommandHelpBlock"/> from an optional command path.
+    /// <para>
+    /// This is public mainly for tests.
+    /// </para>
+    /// </summary>
+    /// <param name="helpPath">The optional help path. When null, all commands are considered.</param>
+    /// <param name="otherCommands">Optional secondary namespace from wich commands must be merged.</param>
+    /// <returns>A list of commands that should display their definition.</returns>
+    public List<CommandHelpBlock> GetForHelp( string? helpPath, CommandNamespace? otherCommands )
     {
         // No optimization here. This is the help.
         IEnumerable<Command> commands = _commands.Where( kv => kv.Value != null ).Select( kv => kv.Value )!;
@@ -40,8 +44,12 @@ public sealed class CommandNamespace
             var prefix = helpPath + ' ';
             commands = commands.Where( c => c.CommandPath == helpPath || c.CommandPath.StartsWith( prefix ) );
         }
-        return commands.OrderBy( c => c.CommandPath ).ToList();
+        return commands.OrderBy( c => c.CommandPath ).Select( c => new CommandHelpBlock( c ) ).ToList();
     }
+
+    internal Dictionary<string, Command?> InternalCommands => _commands;
+
+    internal void Clear() => _commands.Clear();
 
     internal bool TryFindForExecution( IActivityMonitor monitor, CommandLineArguments cmdLine, out Command? cmd, out string? helpPath )
     {

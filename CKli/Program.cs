@@ -45,7 +45,7 @@ CoreApplicationIdentity.Initialize();
 
 await CKliCommands.HandleCommandAsync( monitor, CKliRootEnv.DefaultCommandContext, arguments );
 
-CKliRootEnv.Screen.HideSpin();
+CKliRootEnv.Screen.Dispose();
 
 static void DisplayHelp( IEnumerable<Command> commands )
 {

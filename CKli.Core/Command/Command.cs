@@ -56,11 +56,11 @@ public abstract partial class Command
     /// <param name="options">The options.</param>
     /// <param name="flags">The flags.</param>
     protected Command( IPluginTypeInfo? typeInfo,
-                                  string commandPath,
-                                  string description,
-                                  ImmutableArray<(string Name, string Description)> arguments,
-                                  ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
-                                  ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
+                       string commandPath,
+                       string description,
+                       ImmutableArray<(string Name, string Description)> arguments,
+                       ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
+                       ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
     {
         Throw.CheckArgument( IsValidCommandPath( commandPath ) );
         Throw.CheckNotNullArgument( description );

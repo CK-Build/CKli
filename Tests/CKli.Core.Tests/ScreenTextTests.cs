@@ -1,35 +1,21 @@
-using CK.Core;
+using LibGit2Sharp;
+using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
-namespace CKli.Core;
+namespace CKli.Core.Tests;
 
-
-sealed class ConsoleScreen : IScreen
+[TestFixture]
+public class ScreenTextTests
 {
-    static readonly char[] _spinChars = ['|', '/', '-', '\\'];
-
-    long _prevTick;
-    int _spinCount;
-    bool _hasSpin;
-
-    public ConsoleScreen()
+    [Test]
+    public void basic_Console_help_display_for_plugin_section()
     {
-        _prevTick = Environment.TickCount64;
-    }
+        var commands = CKliCommands.Commands.GetForHelp( "plugin", null );
 
-    char NextSpin()
-    {
-        if( ++_spinCount == _spinChars.Length ) _spinCount = 0;
-        return _spinChars[_spinCount];
-    }
-
-
-    public void DisplayHelp( List<CommandHelpBlock> commands, CommandLineArguments cmdLine )
-    {
-        HideSpin();
         // Layout:
         //  command path <name1> <name2>   Description
         //         <name1>                 Description
@@ -84,61 +70,6 @@ sealed class ConsoleScreen : IScreen
             b.AppendLine();
         }
         Console.Write( b.ToString() );
+
     }
-
-    public void DisplayError( string message )
-    {
-        HideSpin();
-        Console.BackgroundColor = ConsoleColor.Red;
-        Console.ForegroundColor = ConsoleColor.Black;
-        Console.Write( "Error:   " );
-        Console.BackgroundColor = ConsoleColor.Black;
-        Console.ForegroundColor = ConsoleColor.White;
-        WriteMessage( message );
-    }
-
-    public void DisplayWarning( string message )
-    {
-        HideSpin();
-        Console.BackgroundColor = ConsoleColor.Black;
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.Write( "Warning: " );
-        Console.ForegroundColor = ConsoleColor.White;
-        WriteMessage( message );
-    }
-
-    static void WriteMessage( string message )
-    {
-        var b = new StringBuilder();
-        b.AppendMultiLine( "         ", message, prefixOnFirstLine: false );
-        Console.WriteLine( b.ToString() );
-    }
-
-    public void OnLogText( string text )
-    {
-        var now = Environment.TickCount64;
-        if( now - _prevTick > 250 )
-        {
-
-            if( _hasSpin ) Console.Write( '\b' );
-            Console.Write( NextSpin() );
-            _prevTick = now;
-        }
-        _hasSpin = true;
-    }
-
-    void HideSpin()
-    {
-        if( _hasSpin )
-        {
-            Console.Write( '\b' );
-            _hasSpin = false;
-        }
-    }
-
-    public void Dispose()
-    {
-        if( _hasSpin ) Console.Write( "\b " );
-    }
-
 }
