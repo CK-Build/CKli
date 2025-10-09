@@ -155,10 +155,10 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
             }
         }
         return new Factory( _pluginInfos.DrainToImmutable(),
-                           activationList,
-                           _context,
-                           _commandCollector.BuildCommands(),
-                           _commandCollector.PluginCommands );
+                            activationList,
+                            _context,
+                            _commandCollector.BuildCommands(),
+                            _commandCollector.PluginCommands );
     }
 
     PluginType RegisterPluginType( Dictionary<Type, PluginType> plugins,
@@ -229,32 +229,31 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                                      status,
                                      activationIndex );
         // Adds to the activation list and collect commands.
-        // Disabled plugins don't expose their commands.
+        // Disabled plugins expose their commands (but they are disabled).
         if( activationIndex >= 0 )
         {
             activationList.Add( result );
-            // Discover and collects commands.
-            var members = type.GetMethods();
-            foreach( var m in members )
+        }
+        // Discover and collects commands.
+        var members = type.GetMethods();
+        foreach( var m in members )
+        {
+            string? path = null;
+            var attributes = m.GetCustomAttributesData();
+            foreach( var a in attributes )
             {
-                string? path = null;
-                var attributes = m.GetCustomAttributesData();
-                foreach( var a in attributes )
+                if( a.AttributeType == typeof( CommandPathAttribute ) )
                 {
-                    if( a.AttributeType == typeof( CommandPathAttribute ) )
-                    {
-                        path = (string)a.ConstructorArguments[0].Value!;
-                    }
+                    path = (string)a.ConstructorArguments[0].Value!;
                 }
-                if( path != null )
-                {
-                    _commandCollector.Add( result, m, path, attributes );
-                }
+            }
+            if( path != null )
+            {
+                _commandCollector.Add( result, m, path, attributes );
             }
         }
 
         plugins[type] = result;
-
 
         return result;
     }
