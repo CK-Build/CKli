@@ -19,7 +19,7 @@ sealed class CKliRepoRemove : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         string nameOrUrl = cmdLine.EatArgument();
@@ -29,7 +29,7 @@ sealed class CKliRepoRemove : Command
     }
 
     static bool RepoRemove( IActivityMonitor monitor,
-                            CommandCommonContext context,
+                            CKliEnv context,
                             string nameOrUrl,
                             bool allowLTS = false )
     {

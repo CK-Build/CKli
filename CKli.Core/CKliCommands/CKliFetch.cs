@@ -20,7 +20,7 @@ sealed class CKliFetch : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         bool all = cmdLine.EatFlag( "--all" );
@@ -29,7 +29,7 @@ sealed class CKliFetch : Command
                                      && Fetch( monitor, context, all, fromAllRemotes ) );
     }
 
-    static bool Fetch( IActivityMonitor monitor, CommandCommonContext context, bool all, bool fromAllRemotes )
+    static bool Fetch( IActivityMonitor monitor, CKliEnv context, bool all, bool fromAllRemotes )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,

@@ -28,7 +28,7 @@ sealed class CKliLog : Command
     }
 
     internal protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         var folder = cmdLine.EatFlag( Flags[0].Names );

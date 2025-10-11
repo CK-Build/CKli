@@ -20,7 +20,7 @@ sealed class CKliRepoAdd : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         string sUrl = cmdLine.EatArgument();
@@ -35,7 +35,7 @@ sealed class CKliRepoAdd : Command
     }
 
     static bool RepositoryAdd( IActivityMonitor monitor,
-                               CommandCommonContext context,
+                               CKliEnv context,
                                Uri repositoryUrl,
                                bool allowLTS )
     {

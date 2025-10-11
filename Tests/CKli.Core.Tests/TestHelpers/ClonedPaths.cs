@@ -11,7 +11,7 @@ static class ClonedPaths
 {
     static NormalizedPath _clonedPath = TestHelper.TestProjectFolder.AppendPart( "Cloned" );
 
-    public static CommandCommonContext EnsureCleanFolder( [CallerMemberName] string? name = null, bool clearStackRegistryFile = true )
+    public static CKliEnv EnsureCleanFolder( [CallerMemberName] string? name = null, bool clearStackRegistryFile = true )
     {
         var path = _clonedPath.AppendPart( name );
         if( Directory.Exists( path ) )
@@ -29,7 +29,7 @@ static class ClonedPaths
         {
             Throw.CheckState( StackRepository.ClearRegistry( TestHelper.Monitor ) );
         }
-        return new CommandCommonContext( path );
+        return new CKliEnv( path );
     }
 
     public static void DeleteFolder( string path )

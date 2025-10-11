@@ -21,7 +21,7 @@ sealed class CKliPush : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         bool all = cmdLine.EatFlag( "--all" );
@@ -32,7 +32,7 @@ sealed class CKliPush : Command
     }
 
     static bool Push( IActivityMonitor monitor,
-                      CommandCommonContext context,
+                      CKliEnv context,
                       bool all = false,
                       bool stackOnly = false,
                       bool continueOnError = false )

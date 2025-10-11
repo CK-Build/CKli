@@ -270,7 +270,7 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branches in a stack repository.</param>
     /// <returns>The resulting stack repository if found and opened successfully. May be null if not found.</returns>
     public static StackRepository? TryOpenFromPath( IActivityMonitor monitor,
-                                                    CommandCommonContext context,
+                                                    CKliEnv context,
                                                     out bool error,
                                                     bool skipPullStack = false,
                                                     string stackBranchName = "main" )
@@ -333,7 +333,7 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branches in a stack repository.</param>
     /// <returns>The resulting stack repository if found and opened successfully. May be null if not found.</returns>
     public static bool OpenFromPath( IActivityMonitor monitor,
-                                     CommandCommonContext context,
+                                     CKliEnv context,
                                      [NotNullWhen(true)] out StackRepository? stack,
                                      bool skipPullStack = false,
                                      string stackBranchName = "main" )
@@ -362,7 +362,7 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
     /// <returns>The resulting stack repository and world on success. Both are null on error of if no stack is found.</returns>
     public static (StackRepository? Stack, World? World) TryOpenWorldFromPath( IActivityMonitor monitor,
-                                                                               CommandCommonContext context,
+                                                                               CKliEnv context,
                                                                                out bool error,
                                                                                bool skipPullStack = false )
     {
@@ -395,7 +395,7 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
     /// <returns>True on success, false on error.</returns>
     public static bool OpenWorldFromPath( IActivityMonitor monitor,
-                                          CommandCommonContext context,
+                                          CKliEnv context,
                                           [NotNullWhen( true )] out StackRepository? stack,
                                           [NotNullWhen( true )] out World? world,
                                           bool skipPullStack = false )

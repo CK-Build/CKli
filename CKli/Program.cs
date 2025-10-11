@@ -4,6 +4,7 @@ using CKli;
 using CKli.Core;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
 
@@ -39,26 +40,25 @@ if( arguments.EatFlag( "--version" ) )
 // Initializes the root environment.
 World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
 CKliRootEnv.Initialize();
+CKliRootEnv.GlobalOptions = GetGlobalOptions;
+CKliRootEnv.GlobalFlags = GetGlobalFlags;
 var monitor = new ActivityMonitor();
 monitor.Output.RegisterClient( new ScreenLogger( CKliRootEnv.Screen ) );
 CoreApplicationIdentity.Initialize();
 
-await CKliCommands.HandleCommandAsync( monitor, CKliRootEnv.DefaultCommandContext, arguments );
+await CKliCommands.HandleCommandAsync( monitor, CKliRootEnv.DefaultCKliEnv, arguments );
 
 CKliRootEnv.Screen.Dispose();
 
-static void DisplayHelp( IEnumerable<Command> commands )
+static ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> GetGlobalOptions()
 {
-    Console.WriteLine( """
+    return [(["--path", "-p"], "Sets the working path. This overrides the current directory.", Multiple:false)];
+}
 
-        Global options:
-
-            --path, -p      Sets the working path. This overrides the current directory.
-
-        Global flags:
-            --debug-launch  Launches a debugger when starting.
-            --version       Displays this CKli version.
-        """ );
+static ImmutableArray<(ImmutableArray<string> Names, string Description)> GetGlobalFlags()
+{
+    return [ (["--debug-launch"], "Launches a debugger when starting."),
+             (["--version"], "Displays this CKli version.") ];
 }
 
 

@@ -135,7 +135,7 @@ public abstract partial class Command
     /// <param name="cmdLine">The matching command line.</param>
     /// <returns>True on success, false on error. Errors must be logged.</returns>
     internal protected abstract ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine );
 
 

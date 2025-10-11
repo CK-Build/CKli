@@ -25,7 +25,7 @@ sealed class ReflectionPluginCommand : PluginCommand
         _parameterCount = parameterCount;
     }
 
-    protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CommandCommonContext context, CommandLineArguments cmdLine )
+    protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
     {
         var args = new object?[_parameterCount];
         for( int i = 0; i < Arguments.Length; i++ )

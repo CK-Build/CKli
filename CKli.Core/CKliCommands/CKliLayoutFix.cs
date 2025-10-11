@@ -19,7 +19,7 @@ sealed class CKliLayoutFix : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         bool deleteAliens = cmdLine.EatFlag( "--delete-aliens" );
@@ -28,7 +28,7 @@ sealed class CKliLayoutFix : Command
     }
 
     static bool LayoutFix( IActivityMonitor monitor,
-                           CommandCommonContext context,
+                           CKliEnv context,
                            bool deleteAliens = false )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )

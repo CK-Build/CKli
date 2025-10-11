@@ -19,7 +19,7 @@ sealed class CKliPluginRemove : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         string pluginName = cmdLine.EatArgument();

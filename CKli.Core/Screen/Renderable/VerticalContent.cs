@@ -5,20 +5,20 @@ using System.Runtime.InteropServices;
 
 namespace CKli.Core;
 
-public sealed class VerticalContent : ILineRenderable
+public sealed class VerticalContent : IRenderable
 {
-    readonly ImmutableArray<ILineRenderable> _cells;
+    readonly ImmutableArray<IRenderable> _cells;
     readonly int _width;
     readonly int _height;
 
-    public VerticalContent( params ImmutableArray<ILineRenderable> cells )
+    public VerticalContent( params ImmutableArray<IRenderable> cells )
     {
         _cells = cells;
         _width = ComputeWith( cells );
         _height = ComputeHeight( cells );
     }
 
-    static int ComputeWith( ImmutableArray<ILineRenderable> cells )
+    static int ComputeWith( ImmutableArray<IRenderable> cells )
     {
         int w = 0;
         foreach( var cell in cells )
@@ -28,7 +28,7 @@ public sealed class VerticalContent : ILineRenderable
         return w;
     }
 
-    static int ComputeHeight( ImmutableArray<ILineRenderable> cells )
+    static int ComputeHeight( ImmutableArray<IRenderable> cells )
     {
         int h = 0;
         foreach( var cell in cells )
@@ -59,27 +59,27 @@ public sealed class VerticalContent : ILineRenderable
         return 0;
     }
 
-    public VerticalContent Append( ReadOnlySpan<ILineRenderable?> verticalContent )
+    public VerticalContent Append( ReadOnlySpan<IRenderable?> verticalContent )
     {
         if( verticalContent.Length == 0 ) return this;
         int flattenedLength = ComputeActualContentLength( verticalContent, out bool hasSpecial );
         if( flattenedLength == 0 ) return this;
-        var newContent = new ILineRenderable[_cells.Length + flattenedLength];
+        var newContent = new IRenderable[_cells.Length + flattenedLength];
         _cells.CopyTo( newContent, 0 );
         return FillNewContent( verticalContent, hasSpecial, newContent, _cells.Length );
     }
 
-    public VerticalContent Prepend( ReadOnlySpan<ILineRenderable?> verticalContent )
+    public VerticalContent Prepend( ReadOnlySpan<IRenderable?> verticalContent )
     {
         if( verticalContent.Length == 0 ) return this;
         int flattenedLength = ComputeActualContentLength( verticalContent, out bool hasSpecial );
         if( flattenedLength == 0 ) return this;
-        var newContent = new ILineRenderable[ flattenedLength + _cells.Length ];
+        var newContent = new IRenderable[ flattenedLength + _cells.Length ];
         _cells.CopyTo( newContent, _cells.Length );
         return FillNewContent( verticalContent, hasSpecial, newContent, 0 );
     }
 
-    internal static int ComputeActualContentLength( ReadOnlySpan<ILineRenderable?> verticalContent, out bool hasSpecial )
+    internal static int ComputeActualContentLength( ReadOnlySpan<IRenderable?> verticalContent, out bool hasSpecial )
     {
         int flattenedLength = 0;
         hasSpecial = false;
@@ -101,7 +101,7 @@ public sealed class VerticalContent : ILineRenderable
         return flattenedLength;
     }
 
-    internal static VerticalContent FillNewContent( ReadOnlySpan<ILineRenderable?> verticalContent, bool hasSpecial, ILineRenderable[] newContent, int idxCopy )
+    internal static VerticalContent FillNewContent( ReadOnlySpan<IRenderable?> verticalContent, bool hasSpecial, IRenderable[] newContent, int idxCopy )
     {
         if( hasSpecial )
         {

@@ -20,7 +20,7 @@ sealed class CKliPull : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         bool all = cmdLine.EatFlag( "--all" );
@@ -29,7 +29,7 @@ sealed class CKliPull : Command
                                      && Pull( monitor, context, all, skipPullStack ) );
 
 
-        static bool Pull( IActivityMonitor monitor, CommandCommonContext context, bool all, bool skipPullStack )
+        static bool Pull( IActivityMonitor monitor, CKliEnv context, bool all, bool skipPullStack )
         {
             if( !StackRepository.OpenWorldFromPath( monitor,
                                                     context,

@@ -3,17 +3,22 @@ using System.Buffers;
 
 namespace CKli.Core;
 
-public sealed class ContentBox : ILineRenderable
+public sealed class ContentBox : IRenderable
 {
     static ReadOnlySpan<char> _whites => [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '];
 
-    readonly ILineRenderable _content;
+    readonly IRenderable _content;
     readonly Padding _padding;
 
-    public ContentBox( ILineRenderable content, Padding padding )
+    public ContentBox( IRenderable content, Padding padding )
     {
         _content = content;
         _padding = padding;
+    }
+
+    public ContentBox( IRenderable content, int top = 0, int left = 0, int bottom = 0, int right = 0 )
+        : this( content, new Padding( top, left, bottom, right ) )
+    {
     }
 
     public int Height => _padding.Top + _content.Height + _padding.Bottom;
@@ -44,6 +49,7 @@ public sealed class ContentBox : ILineRenderable
             int rightPad = _padding.Right + _content.Width - wC;
             if( rightPad > 0 ) RenderPadding( rightPad, arg, render );
         }
+
         return width;
     }
 

@@ -19,7 +19,7 @@ sealed class CKliPluginAdd : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         string sPackage = cmdLine.EatArgument();
@@ -34,7 +34,7 @@ sealed class CKliPluginAdd : Command
     }
 
     static bool PluginAdd( IActivityMonitor monitor,
-                           CommandCommonContext context,
+                           CKliEnv context,
                            PackageInstance package,
                            bool allowLTS )
     {

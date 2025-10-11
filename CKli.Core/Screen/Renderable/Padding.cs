@@ -9,6 +9,14 @@ public readonly struct Padding : IAdditionOperators<Padding,Padding,Padding>
     public readonly byte Bottom;
     public readonly byte Right;
 
+    public Padding( int top, int left, int bottom, int right )
+    {
+        Top = (byte)int.Clamp( top, 0, 255 );
+        Left = (byte)int.Clamp( left, 0, 255 );
+        Bottom = (byte)int.Clamp( bottom, 0, 255 );
+        Right = (byte)int.Clamp( right, 0, 255 );
+    }
+
     public Padding( byte top, byte left, byte bottom, byte right )
     {
         Top = top;
@@ -23,6 +31,6 @@ public readonly struct Padding : IAdditionOperators<Padding,Padding,Padding>
         int l = left.Left + right.Left;
         int b = left.Bottom + right.Bottom;
         int r = left.Right + right.Right;
-        return new Padding( (byte)int.Clamp( t, 0, 255 ), (byte)int.Clamp( l, 0, 255 ), (byte)int.Clamp( b, 0, 255 ), (byte)int.Clamp( r, 0, 255 ) );
+        return new Padding( t, l, b, r );
     }
 }

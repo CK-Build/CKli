@@ -18,14 +18,14 @@ sealed class CKliLayoutXif : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
                                      && LayoutXif( monitor, context ) );
     }
 
-    static bool LayoutXif( IActivityMonitor monitor, CommandCommonContext context )
+    static bool LayoutXif( IActivityMonitor monitor, CKliEnv context )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {

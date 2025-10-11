@@ -1,108 +1,65 @@
 using CK.Core;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Collections.Immutable;
 using System.Text;
 
 namespace CKli.Core;
-
 
 sealed class ConsoleScreen : IScreen
 {
     static readonly char[] _spinChars = ['|', '/', '-', '\\'];
 
     long _prevTick;
+    int? _width;
     int _spinCount;
     bool _hasSpin;
 
-    public ConsoleScreen()
-    {
-        _prevTick = Environment.TickCount64;
-    }
+    public void Clear() => Console.Clear();
 
-    char NextSpin()
-    {
-        if( ++_spinCount == _spinChars.Length ) _spinCount = 0;
-        return _spinChars[_spinCount];
-    }
-
-
-    public void DisplayHelp( List<CommandHelpBlock> commands, CommandLineArguments cmdLine )
+    public void Display( IRenderable renderable )
     {
         HideSpin();
-        // Layout:
-        //  command path <name1> <name2>   Description
-        //         <name1>                 Description
-        //         <name2>                 Description
-        //      Options:                   
-        //         --opt, -o               [Multiple] Description on
-        //                                 more than one line.
-        //         --opt2                  Description
-        //      Flags:                     
-        //         --flag, -f              Description
-        // |---|--|                    |--|
-        int maxCommandPathWithArgsWitdh = 0;
-        int maxArgOptFlagsWidth = 0;
-        foreach( var c in commands )
+        Console.Write( renderable.RenderAsString() );
+    }
+
+    public int Width => _width ??= Console.IsOutputRedirected || Console.BufferWidth == 0
+                                    ? IScreen.MaxScreenWidth
+                                    : Console.BufferWidth;
+
+    public void DisplayHelp( List<CommandHelp> commands,
+                             CommandLineArguments cmdLine,
+                             ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default,
+                             ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
+    {
+        HideSpin();
+        var help = ScreenHelpers.CreateDisplayHelp( commands, cmdLine, globalOptions, globalFlags, Width );
+        Console.Write( help.RenderAsString() );
+    }
+
+    public void DisplayPluginInfo( string headerText, List<World.DisplayInfoPlugin>? infos )
+    {
+        HideSpin();
+        var display = ScreenHelpers.CreateDisplayPlugin( headerText, infos, IScreen.MaxScreenWidth );
+        Console.Write( display.RenderAsString() );
+    }
+
+    public void OnLogErrorOrWarning( LogLevel level, string message )
+    {
+        HideSpin();
+        if( level == LogLevel.Warn )
         {
-            if( c.CommandPathAndArgs.Width > maxCommandPathWithArgsWitdh ) maxCommandPathWithArgsWitdh = c.CommandPathAndArgs.Width;
-            int argOptFlagsWidth = c.Arguments.Select( o => o.Name.Width )
-                                    .Concat( c.Options.Select( o => o.Names.Width ) )
-                                    .Concat( c.Flags.Select( o => o.Names.Width ) )
-                                    .DefaultIfEmpty()
-                                    .Max();
-            if( argOptFlagsWidth > maxArgOptFlagsWidth ) maxArgOptFlagsWidth = argOptFlagsWidth;
+            Console.BackgroundColor = ConsoleColor.Black;
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write( "Error:   " );
         }
-
-        const int offsetArgTitle = 3;
-        const int offsetArg = offsetArgTitle + 2;
-        const int descriptionPadding = 4;
-
-        int descriptionOffset = Math.Max( maxCommandPathWithArgsWitdh, maxArgOptFlagsWidth + offsetArg ) + descriptionPadding;
-
-        var help = ILineRenderable.None.AddBelow(
-            commands.Select( c =>
-                c.CommandPathAndArgs.Box( right: descriptionOffset - c.CommandPathAndArgs.Width ).AddLeft( c.Description )
-                    .AddBelow( c.Arguments.Select( a => a.Name.Box( left: offsetArg, right: descriptionOffset - a.Name.Width - offsetArg ).AddLeft( a.Description ) ) )
-                    .AddBelow( c.Options.Length > 0,
-                               new WordBlock( "Options:" ).Box( left: offsetArgTitle )
-                                    .AddBelow( c.Options.Select( o => o.Names.Box( left: offsetArg, right: descriptionOffset - o.Names.Width - offsetArg )
-                                                                             .AddLeft( o.Description.AddRight( o.Multiple
-                                                                                                                ? new WordBlock( "[Multiple] " )
-                                                                                                                : null ) ) ) ) )
-                    .AddBelow( c.Flags.Length > 0,
-                               new WordBlock( "Flags:" ).Box( left: offsetArgTitle )
-                                    .AddBelow( c.Flags.Select( f => f.Names.Box( left: offsetArg, right: descriptionOffset - f.Names.Width - offsetArg )
-                                                                             .AddLeft( f.Description ) ) ) )
-                    .AddBelow( ILineRenderable.EmptyString ) )
-            );
-
-        var b = new StringBuilder();
-        for( int i = 0; i < help.Height; i++ )
+        else
         {
-            help.RenderLine( i, b, ( span, b ) => b.Append( span ) );
-            b.AppendLine();
+            Console.BackgroundColor = ConsoleColor.Red;
+            Console.ForegroundColor = ConsoleColor.Black;
+            Console.Write( "Warning: " );
         }
-        Console.Write( b.ToString() );
-    }
-
-    public void DisplayError( string message )
-    {
-        HideSpin();
-        Console.BackgroundColor = ConsoleColor.Red;
-        Console.ForegroundColor = ConsoleColor.Black;
-        Console.Write( "Error:   " );
         Console.BackgroundColor = ConsoleColor.Black;
-        Console.ForegroundColor = ConsoleColor.White;
-        WriteMessage( message );
-    }
-
-    public void DisplayWarning( string message )
-    {
-        HideSpin();
-        Console.BackgroundColor = ConsoleColor.Black;
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.Write( "Warning: " );
         Console.ForegroundColor = ConsoleColor.White;
         WriteMessage( message );
     }
@@ -114,7 +71,7 @@ sealed class ConsoleScreen : IScreen
         Console.WriteLine( b.ToString() );
     }
 
-    public void OnLogText( string text )
+    public void OnLogAny( LogLevel level, string? text, bool isOpenGroup )
     {
         var now = Environment.TickCount64;
         if( now - _prevTick > 250 )
@@ -125,6 +82,12 @@ sealed class ConsoleScreen : IScreen
             _prevTick = now;
         }
         _hasSpin = true;
+    }
+
+    char NextSpin()
+    {
+        if( ++_spinCount == _spinChars.Length ) _spinCount = 0;
+        return _spinChars[_spinCount];
     }
 
     void HideSpin()
@@ -140,5 +103,7 @@ sealed class ConsoleScreen : IScreen
     {
         if( _hasSpin ) Console.Write( "\b " );
     }
+
+    public override string ToString() => string.Empty;
 
 }

@@ -19,7 +19,7 @@ sealed class CKliPluginCreate : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         string pluginName = cmdLine.EatArgument();
@@ -28,7 +28,7 @@ sealed class CKliPluginCreate : Command
                                      && CreateOrRemovePlugin( monitor, context, pluginName, allowLTS, create: true ) );
     }
 
-    internal static bool CreateOrRemovePlugin( IActivityMonitor monitor, CommandCommonContext context, string pluginName, bool allowLTS, bool create )
+    internal static bool CreateOrRemovePlugin( IActivityMonitor monitor, CKliEnv context, string pluginName, bool allowLTS, bool create )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {

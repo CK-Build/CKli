@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Monitoring;
 using System;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
@@ -25,14 +26,15 @@ public static class CKliRootEnv
     static IScreen? _screen;
     static NormalizedPath _currentDirectory;
     static NormalizedPath _currentStackPath;
-    static CommandCommonContext? _defaultCommandContext;
+    static CKliEnv? _defaultCommandContext;
 
     /// <summary>
     /// Initializes the CKli environment. This captures the <see cref="Environment.CurrentDirectory"/> and
     /// initializes the 
     /// </summary>
     /// <param name="instanceName">Used by tests (with "Test"). Can be used with other suffix if needed.</param>
-    public static void Initialize( string? instanceName = null )
+    /// <param name="screen">Optional <see cref="StringScreen"/> to use or <see cref="NoScreen"/>.</param>
+    public static void Initialize( string? instanceName = null, IScreen? screen = null )
     {
         Throw.CheckState( "Initialize can be called only once.", _appLocalDataPath.IsEmptyPath );
         _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData ), instanceName == null ? "CKli" : $"CKli-{instanceName}" );
@@ -40,7 +42,7 @@ public static class CKliRootEnv
         // will be .[Public|PrivateStack]/Logs, else the log will be in _appLocalDataPath/Out-of-Stack-Logs/.
         _currentDirectory = Environment.CurrentDirectory;
         _currentStackPath = StackRepository.FindGitStackPath( _currentDirectory );
-        _screen = new ConsoleScreen();
+        _screen = screen ?? new ConsoleScreen();
 
         InitializeMonitoring( _currentDirectory, _currentStackPath );
         NormalizedPath configFilePath = GetConfigPath();
@@ -66,7 +68,7 @@ public static class CKliRootEnv
                 }
                 else
                 {
-                    _screen.DisplayWarning( $"""
+                    _screen.OnLogErrorOrWarning( LogLevel.Warn, $"""
                     Invalid '{configFilePath}':
                     {lines.Concatenate( Environment.NewLine )}
                     Resetting it to default values.
@@ -82,15 +84,15 @@ public static class CKliRootEnv
         }
         catch( Exception ex )
         {
-            _screen.DisplayWarning( $"""
+            _screen.OnLogErrorOrWarning( LogLevel.Warn, $"""
                 Error while initializing CKliRootEnv:
-                {CKExceptionData.CreateFrom( ex ).ToString()}
+                {CKExceptionData.CreateFrom( ex )}
                 Resetting the '{configFilePath}' to default values.
                 """ );
             SetAndWriteDefaultConfig();
         }
 
-        _defaultCommandContext = new CommandCommonContext( _screen, _secretsStore, _currentDirectory, _currentStackPath );
+        _defaultCommandContext = new CKliEnv( _screen, _secretsStore, _currentDirectory, _currentStackPath );
 
         [MemberNotNull( nameof(_secretsStore) )]
         static void SetAndWriteDefaultConfig()
@@ -206,9 +208,9 @@ public static class CKliRootEnv
     }
 
     /// <summary>
-    /// Gets the default command context.
+    /// Gets the default CKli environment.
     /// </summary>
-    public static CommandCommonContext DefaultCommandContext
+    public static CKliEnv DefaultCKliEnv
     {
         get
         {
@@ -216,6 +218,18 @@ public static class CKliRootEnv
             return _defaultCommandContext!;
         }
     }
+
+    /// <summary>
+    /// Gets or sets an optional provider for the "Global options:" help display.
+    /// This is an awful global but we don't care.
+    /// </summary>
+    public static Func<ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)>>? GlobalOptions { get; set; }
+
+    /// <summary>
+    /// Gets or sets an optional provider for the "Global flags:" help display.
+    /// This is an awful global but we don't care.
+    /// </summary>
+    public static Func<ImmutableArray<(ImmutableArray<string> Names, string Description)>>? GlobalFlags { get; set; }
 
     /// <summary>
     /// Acquires an exclusive global system lock for this environment: the key is the <see cref="AppLocalDataPath"/>.

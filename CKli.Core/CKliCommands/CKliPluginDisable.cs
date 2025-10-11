@@ -16,7 +16,7 @@ sealed class CKliPluginDisable : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         var name = cmdLine.EatArgument();

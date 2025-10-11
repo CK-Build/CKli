@@ -243,8 +243,12 @@ public sealed partial class PluginMachinery
         // This is the CKli.Loader.PluginLoadContext.Dispose().
         // It disposes its own IPluginFactory obtained from the CKli.Plugins dll and initiates
         // its own Unload.
-        _pluginFactory.Dispose();
-        _pluginFactory = null;
+        // On plugin recompilation error, this may be null.
+        if( _pluginFactory != null )
+        {
+            _pluginFactory.Dispose();
+            _pluginFactory = null;
+        }
     }
 
     bool CheckCKliPluginsCoreVersion( IActivityMonitor monitor, out bool mustRecompile )
@@ -410,7 +414,7 @@ public sealed partial class PluginMachinery
                     {
                         Throw.CheckState( PrimaryContext.PluginInfo.FullPluginName == "{{fullPluginName}}" );
                         Throw.CheckState( PrimaryContext.World == e.World );
-                        e.AddMessage( PrimaryContext, b => b.Append( "Message from '{{shortPluginName}}' plugin." ) );
+                        e.AddMessage( PrimaryContext, TextBlock.FromText( "Message from '{{shortPluginName}}' plugin." ) );
                         e.Monitor.Info( $"New '{{shortPluginName}}' in world '{e.World.Name}' plugin certainly requires some development." );
                         Console.WriteLine( $"Hello from '{{shortPluginName}}' plugin." );
                     };

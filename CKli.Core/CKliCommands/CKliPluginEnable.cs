@@ -16,7 +16,7 @@ sealed class CKliPluginEnable : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         var name = cmdLine.EatArgument();
@@ -24,7 +24,7 @@ sealed class CKliPluginEnable : Command
                                      && EnableOrDisablePlugin( monitor, context, name, enable: true ) ); 
     }
 
-    internal static bool EnableOrDisablePlugin( IActivityMonitor monitor, CommandCommonContext context, string name, bool enable )
+    internal static bool EnableOrDisablePlugin( IActivityMonitor monitor, CKliEnv context, string name, bool enable )
     {
         if( StackRepository.OpenFromPath( monitor, context, out var stack, skipPullStack: true ) )
         {

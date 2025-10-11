@@ -4,10 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace CKli.Core;
 
+/// <summary>
+/// Activity monitor client that binds a <see cref="IActivityMonitor"/> to a <see cref="IScreen"/>.
+/// </summary>
 public sealed class ScreenLogger : IActivityMonitorClient
 {
     readonly IScreen _screen;
@@ -23,31 +25,31 @@ public sealed class ScreenLogger : IActivityMonitorClient
 
     public void OnGroupClosed( IActivityLogGroup group, IReadOnlyList<ActivityLogGroupConclusion> conclusions )
     {
+        _screen.OnLogAny( LogLevel.None, null, false );
     }
 
     public void OnGroupClosing( IActivityLogGroup group, ref List<ActivityLogGroupConclusion>? conclusions )
     {
     }
 
-    public void OnOpenGroup( IActivityLogGroup group )
-    {
-        OnUnfilteredLog( ref group.Data );
-    }
+    public void OnOpenGroup( IActivityLogGroup group ) => OnLog( ref group.Data, true );
 
     public void OnTopicChanged( string newTopic, string? fileName, int lineNumber )
     {
     }
 
-    public void OnUnfilteredLog( ref ActivityMonitorLogData data )
+    public void OnUnfilteredLog( ref ActivityMonitorLogData data ) => OnLog( ref data, false );
+
+    void OnLog( ref ActivityMonitorLogData data, bool isOpenGroup )
     {
-        if( data.MaskedLevel >= LogLevel.Warn )
+        var l = data.MaskedLevel;
+        if( l >= LogLevel.Warn )
         {
-            if( data.MaskedLevel == LogLevel.Warn ) _screen.DisplayWarning( data.Text );
-            else _screen.DisplayError( data.Text );
+            _screen.OnLogErrorOrWarning( l, data.Text );
         }
         else
         {
-            _screen.OnLogText( data.Text );
+            _screen.OnLogAny( l, data.Text, isOpenGroup );
         }
     }
 }

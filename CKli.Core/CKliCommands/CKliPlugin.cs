@@ -25,7 +25,7 @@ sealed class CKliPlugin : Command
     }
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         string? sCompileMode = cmdLine.EatSingleOption( "--compile-mode" );
@@ -34,7 +34,7 @@ sealed class CKliPlugin : Command
         {
             if( !Enum.TryParse<PluginCompilationMode>( sCompileMode, ignoreCase: true, out var mode ) )
             {
-                monitor.Error( $"" );
+                monitor.Error( $"Invalid '--compile-mode'. Must be None, Debug or Release." );
             }
             compileMode = mode;
         }
@@ -43,7 +43,7 @@ sealed class CKliPlugin : Command
     }
 
     static bool Plugin( IActivityMonitor monitor,
-                        CommandCommonContext context,
+                        CKliEnv context,
                         PluginCompilationMode? compileMode )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
@@ -58,8 +58,8 @@ sealed class CKliPlugin : Command
             {
                 return false;
             }
-            bool success = world.RaisePluginInfo( monitor, out var text );
-            Console.WriteLine( text );
+            bool success = world.RaisePluginInfo( monitor, out var headerText, out var infos );
+            context.Screen.DisplayPluginInfo( headerText, infos );
             return success;
         }
         finally

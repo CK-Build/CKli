@@ -23,7 +23,7 @@ sealed class CKliClone : Command
     }
 
     internal protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CommandCommonContext context,
+                                                                    CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
         string sUrl = cmdLine.EatArgument();

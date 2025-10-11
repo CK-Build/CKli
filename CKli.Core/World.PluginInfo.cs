@@ -1,7 +1,10 @@
 using CK.Core;
+using LibGit2Sharp;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Xml.Linq;
 
 namespace CKli.Core;
 
@@ -9,39 +12,34 @@ public sealed partial class World
 {
     internal sealed class DisplayInfoPlugin
     {
-        StringBuilder? _message;
-
-        public DisplayInfoPlugin( string shortPluginName, string fullName, PluginStatus status )
+        public DisplayInfoPlugin( string shortPluginName, string fullName, PluginStatus status, XElement? configuration )
         {
             ShortName = shortPluginName;
             FullName = fullName;
             Status = status;
+            Configuration = configuration;
         }
         public string ShortName { get; }
         public string FullName { get; }
         public PluginStatus Status { get; }
-
-        public void Add( Action<StringBuilder> message )
-        {
-            _message ??= new StringBuilder();
-            message( _message );
-        }
-
-        public string? Message => _message?.ToString();
+        public XElement? Configuration { get; }
+        public IRenderable? Message { get; set; }
     }
 
     /// <summary>
-    /// Collects plugin information and outputs a textual information.
+    /// Collects plugin information produces a textual information to be displayed.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="text">The output text.</param>
+    /// <param name="headerText">The text to display (whether the plugins are disabled or not).</param>
+    /// <param name="infos">The plugin infos, null when the plugins are disabled.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool RaisePluginInfo( IActivityMonitor monitor, out string text )
+    internal bool RaisePluginInfo( IActivityMonitor monitor, out string headerText, out List<DisplayInfoPlugin>? infos )
     {
         var definitionFile = DefinitionFile;
         if( definitionFile.IsPluginsDisabled )
         {
-            text = $"""
+            infos = null;
+            headerText = $"""
                     Plugins are disabled by configuration.
                     Configurations:
                     {definitionFile.Plugins}
@@ -50,7 +48,8 @@ public sealed partial class World
         }
         if( _plugins == null )
         {
-            text = $"No configured PluginLoader. Plugins are disabled.";
+            infos = null;
+            headerText = "No configured PluginLoader. Plugins are disabled.";
             return true;
         }
         var config = definitionFile.ReadPluginsConfiguration( monitor );
@@ -59,25 +58,16 @@ public sealed partial class World
         Throw.DebugAssert( "Or we'll not be here.", config != null );
 
         // No need to optimize this.
-        var missings = config.Keys.Select( k => (ShortName: k, FullName: $"CKli.{k}.Plugin") )
-                                  .Where( e => !loaded.Any( p => p.FullPluginName == e.FullName ) )
-                                  .Select( e => new DisplayInfoPlugin( e.ShortName, e.FullName, PluginStatus.MissingImplementation ) );
-        var list = loaded.Select( p => new DisplayInfoPlugin( p.PluginName, p.FullPluginName, p.Status ) )
+        var missings = config.Select( kv => (ShortName: kv.Key, FullName: $"CKli.{kv.Key}.Plugin", Configuration: kv.Value.Config) )
+                              .Where( e => !loaded.Any( p => p.FullPluginName == e.FullName ) )
+                              .Select( e => new DisplayInfoPlugin( e.ShortName, e.FullName, PluginStatus.MissingImplementation, e.Configuration ) );
+        infos = loaded.Select( p => new DisplayInfoPlugin( p.PluginName, p.FullPluginName, p.Status, config.GetValueOrDefault( p.PluginName ).Config ) )
                          .Concat( missings )
                          .ToList();
 
+        headerText = $"{loaded.Count} loaded plugins, {config.Count} configured plugins.";
         // Even if something fails, we want to display the plugin information.
-        bool success = loaded.Count == 0
-                            ? true
-                            : _events.SafeRaiseEvent( monitor, new PluginInfoEvent( monitor, this, list ) );
-        var b = new StringBuilder();
-        b.Append( $"{loaded.Count} loaded plugins, {config.Count} configured plugins." ).AppendLine();
-        foreach( var i in list )
-        {
-            b.Append( $"{i.ShortName}, {i.Status.GetTextStatus()}, {i.Message}" ).AppendLine();
-        }
-        text = b.ToString();
-        return success;
+        return loaded.Count == 0 || _events.SafeRaiseEvent( monitor, new PluginInfoEvent( monitor, this, infos ) );
     }
 
 }

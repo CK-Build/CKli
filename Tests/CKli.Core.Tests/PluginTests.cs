@@ -3,6 +3,7 @@ using NUnit.Framework;
 using Shouldly;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace CKli.Core.Tests;
 
@@ -25,19 +26,14 @@ public class PluginTests
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
-            StackRepository.OpenWorldFromPath( TestHelper.Monitor, context, out var stack, out var world, skipPullStack: true )
-                           .ShouldBeTrue();
-            try
-            {
-                world.RaisePluginInfo( TestHelper.Monitor, out var text ).ShouldBeTrue();
-                text.ShouldContain( "1 loaded plugins, 1 configured plugins." );
-                text.ShouldContain( "Message from 'MyFirstOne' plugin." );
-                logs.ShouldContain( "New 'MyFirstOne' in world 'One' plugin certainly requires some development." );
-            }
-            finally
-            {
-                stack.Dispose();
-            }
+            // ckli plugin
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin" )).ShouldBeTrue();
+
+            logs.ShouldContain( "New 'MyFirstOne' in world 'One' plugin certainly requires some development." );
+
+            var screen = context.Screen.ToString();
+            screen.ShouldContain( "1 loaded plugins, 1 configured plugins." );
+            screen.ShouldContain( "Message from 'MyFirstOne' plugin." );
         }
 
         // ckli plugin remove MyFirstOne

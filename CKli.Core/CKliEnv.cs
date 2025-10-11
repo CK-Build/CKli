@@ -3,11 +3,11 @@ using CK.Core;
 namespace CKli.Core;
 
 /// <summary>
-/// The immutable command context reflects the <see cref="CKliRootEnv"/>: <see cref="CKliRootEnv.DefaultCommandContext"/>
-/// should almost always be used unless the default context needs to be overridden. This is the case in tests: the
-/// <see cref=""/>
+/// The immutable command context reflects the <see cref="CKliRootEnv"/>: <see cref="CKliRootEnv.DefaultCKliEnv"/>
+/// should almost always be used unless the default context needs to be overridden. This is the case in tests: 
+/// <see cref="With(NormalizedPath)"/> is used to change the <see cref="CurrentDirectory"/> (and potentially the <see cref="CurrentStackPath"/>).
 /// </summary>
-public sealed class CommandCommonContext
+public sealed class CKliEnv
 {
     readonly IScreen _screen;
     readonly ISecretsStore _secretsStore;
@@ -15,7 +15,7 @@ public sealed class CommandCommonContext
     readonly NormalizedPath _currentStackPath;
 
     // CKliRootEnv.DefaultCommandContext
-    internal CommandCommonContext( IScreen screen, ISecretsStore secretsStore, NormalizedPath currentDirectory, NormalizedPath currentStackPath )
+    internal CKliEnv( IScreen screen, ISecretsStore secretsStore, NormalizedPath currentDirectory, NormalizedPath currentStackPath )
     {
         _screen = screen;
         _secretsStore = secretsStore;
@@ -24,12 +24,12 @@ public sealed class CommandCommonContext
     }
 
     /// <summary>
-    /// Initialize a <see cref="CommandCommonContext"/> that is not the default <see cref="CKliRootEnv.DefaultCommandContext"/>. 
+    /// Initialize a <see cref="CKliEnv"/> that is not the default <see cref="CKliRootEnv.DefaultCKliEnv"/>. 
     /// </summary>
     /// <param name="currentDirectory">Current directory to consider.</param>
     /// <param name="secretsStore">Optional secrets store (overrides the default <see cref="CKliRootEnv.SecretsStore"/>).</param>
     /// <param name="screen">Optional screen (overrides the default <see cref="CKliRootEnv.Screen"/>).</param>
-    public CommandCommonContext( NormalizedPath currentDirectory, ISecretsStore? secretsStore = null, IScreen? screen = null )
+    public CKliEnv( NormalizedPath currentDirectory, ISecretsStore? secretsStore = null, IScreen? screen = null )
     {
         Throw.CheckArgument( !currentDirectory.IsEmptyPath );
         _currentDirectory = currentDirectory;
@@ -68,7 +68,7 @@ public sealed class CommandCommonContext
     /// </summary>
     /// <param name="path">The path. Usually relative but may be absolute.</param>
     /// <returns>A new context.</returns>
-    public CommandCommonContext With( NormalizedPath path ) => path.IsEmptyPath
+    public CKliEnv With( NormalizedPath path ) => path.IsEmptyPath
                                                                 ? this
-                                                                : new CommandCommonContext( _currentDirectory.Combine( path ).ResolveDots(), _secretsStore, _screen );
+                                                                : new CKliEnv( _currentDirectory.Combine( path ).ResolveDots(), _secretsStore, _screen );
 }

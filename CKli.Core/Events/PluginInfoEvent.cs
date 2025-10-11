@@ -20,8 +20,8 @@ public sealed class PluginInfoEvent : WorldEvent
     /// Adds a message to the plugin information.
     /// </summary>
     /// <param name="source">The plugin that emitted the message.</param>
-    /// <param name="message">A message builder.</param>
-    public void AddMessage( PrimaryPluginContext source, Action<StringBuilder> message )
+    /// <param name="message">A renderable message.</param>
+    public void AddMessage( PrimaryPluginContext source, IRenderable message )
     {
         var p = _display.FirstOrDefault( d => d.FullName == source.PluginInfo.FullPluginName );
         if( p == null )
@@ -29,11 +29,11 @@ public sealed class PluginInfoEvent : WorldEvent
             Monitor.Warn( $"""
                 Unable to locate source named '{source.PluginInfo.FullPluginName}' in loaded plugins.
                 PluginInfoEvent message:
-                {message}
+                {message.RenderAsString()}
                 is not collected.
                 """ );
             return;
         }
-        p.Add( message );
+        p.Message = message;
     }
 }

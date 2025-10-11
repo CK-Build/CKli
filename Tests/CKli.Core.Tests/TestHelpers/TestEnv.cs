@@ -34,6 +34,7 @@ static partial class TestEnv
 
     static void Initialize()
     {
+        CKliRootEnv.Initialize( "Test", new StringScreen() );
         World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
         InitializeRemotes();
         InitializeNuGetSource();
@@ -41,7 +42,6 @@ static partial class TestEnv
 
     static void InitializeNuGetSource()
     {
-        CKliRootEnv.Initialize( "Test" );
         if( !Directory.Exists( _nugetSourcePath ) )
         {
             Directory.CreateDirectory( _nugetSourcePath );
