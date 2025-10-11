@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Buffers;
 
@@ -9,11 +10,13 @@ public sealed class ContentBox : IRenderable
 
     readonly IRenderable _content;
     readonly Padding _padding;
+    readonly Color? _color;
 
-    public ContentBox( IRenderable content, Padding padding )
+    public ContentBox( IRenderable content, Padding padding, Color? color = null )
     {
         _content = content;
         _padding = padding;
+        _color = color;
     }
 
     public ContentBox( IRenderable content, int top = 0, int left = 0, int bottom = 0, int right = 0 )
@@ -21,9 +24,16 @@ public sealed class ContentBox : IRenderable
     {
     }
 
+    public ContentBox( IRenderable content, Color color, int top = 0, int left = 0, int bottom = 0, int right = 0 )
+        : this( content, new Padding( top, left, bottom, right ), color )
+    {
+    }
+
     public int Height => _padding.Top + _content.Height + _padding.Bottom;
 
     public int Width => _padding.Left + _content.Width + _padding.Right;
+
+    public Color? Color => _color;
 
     public ContentBox WithPadding( int top = 0, int left = 0, int bottom = 0, int right = 0 )
     {
@@ -35,32 +45,41 @@ public sealed class ContentBox : IRenderable
         return new ContentBox( _content, p );
     }
 
-
-    public int RenderLine<TArg>( int i, TArg arg, ReadOnlySpanAction<char,TArg> render )
+    public ContentBox WithColor( Color? color )
     {
+        if( _color == color ) return this;
+        return new ContentBox( _content, _padding, color );
+    }
+
+    public int RenderLine( int line, IRenderTarget target, RenderContext context )
+    {
+        Throw.DebugAssert( line >= 0 );
+        var textStyle = context.GetTextStyle( _color, out Color previousColor );
         int width = Width;
-        i -= _padding.Top;
-        if( i < 0 || i >= _content.Height ) RenderPadding( width, arg, render );
+        line -= _padding.Top;
+        if( line >= _content.Height ) RenderPadding( width, target, textStyle );
         else
         {
             // Left alignment only (currently). 
-            if( _padding.Left > 0 ) RenderPadding( _padding.Left, arg, render );
-            int wC = _content.RenderLine( i, arg, render );
+            if( _padding.Left > 0 ) RenderPadding( _padding.Left, target, textStyle );
+            int wC = _content.RenderLine( line, target, context );
             int rightPad = _padding.Right + _content.Width - wC;
-            if( rightPad > 0 ) RenderPadding( rightPad, arg, render );
+            if( rightPad > 0 ) RenderPadding( rightPad, target, textStyle );
         }
-
+        context.RestoreColor( previousColor );
         return width;
     }
 
-    static void RenderPadding<TArg>( int pad, TArg arg, ReadOnlySpanAction<char, TArg> render )
+    static void RenderPadding( int pad, IRenderTarget target, TextStyle style )
     {
         while( pad > _whites.Length )
         {
-            render( _whites, arg );
+            target.Append( _whites, style );
             pad -= _whites.Length;
         }
-        if( pad > 0 ) render( _whites.Slice( 0, pad ), arg );
+        if( pad > 0 ) target.Append( _whites.Slice( 0, pad ), style );
     }
 
 }
+
+

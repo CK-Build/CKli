@@ -99,7 +99,7 @@ sealed class ConsoleScreen : IScreen
         }
     }
 
-    public void Dispose()
+    void IScreen.Close()
     {
         if( _hasSpin ) Console.Write( "\b " );
     }

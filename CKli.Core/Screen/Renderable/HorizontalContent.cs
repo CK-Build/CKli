@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Buffers;
 using System.Collections.Immutable;
@@ -42,14 +43,15 @@ public sealed class HorizontalContent : IRenderable
 
     public int Width => _width;
 
-    public int RenderLine<TArg>( int i, TArg arg, ReadOnlySpanAction<char, TArg> render )
+    public int RenderLine( int line, IRenderTarget target, RenderContext context )
     {
+        Throw.DebugAssert( line >= 0 );
         int w = 0;
-        if( i >= 0 && i < _height )
+        if( line < _height )
         {
             foreach( var cell in _cells )
             {
-                w += cell.RenderLine( i, arg, render );
+                w += cell.RenderLine( line, target, context );
             }
         }
         return w;

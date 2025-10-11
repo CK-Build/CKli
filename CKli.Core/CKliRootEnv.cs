@@ -130,9 +130,21 @@ public static class CKliRootEnv
     }
 
     /// <summary>
+    /// Should be called before leaving the application.
+    /// </summary>
+    public static void Close()
+    {
+        CheckInitialized();
+        _screen.Close();
+        if( _secretsStore is IDisposable d ) d.Dispose();
+    }
+
+
+    /// <summary>
     /// Throws an <see cref="InvalidOperationException"/> if <see cref="Initialize(string?)"/> has not been called.
     /// </summary>
-    public static void CheckInitialized() => Throw.CheckState( "CKliRootEnv.Initialize() must have been called before.", !_appLocalDataPath.IsEmptyPath );
+    [MemberNotNull( nameof( _screen ) )]
+    public static void CheckInitialized() => Throw.CheckState( "CKliRootEnv.Initialize() must have been called before.", _screen != null );
 
     /// <summary>
     /// Gets instance name ("CKli" or "CKli-Test" for instance).

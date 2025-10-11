@@ -104,14 +104,26 @@ public class ScreenTextTests
                     .AddBelow( TextBlock.EmptyString ) )
             );
 
-        var b = new StringBuilder();
-        for( int i = 0; i < help.Height; i++ )
-        {
-            help.RenderLine( i, b, ( span, b ) => b.Append( span ) );
-            b.AppendLine();
-        }
-        Console.Write( b.ToString() );
+        string result = help.RenderAsString();
 
+        Console.Write( result );
+        result.ShouldContain( """
+            ze command <a1>              Only here to
+                                         test display (trimEnd is the default).
+               <a1>                      Argument n°1 is
+                                         required like
+                                         all arguments.
+               Options:
+                 --options, -o           [Multiple] This description should be prefixed with [Multiple].
+                 --single, -s            This description one is not multiple.
+                 --others, -o2           [Multiple] Also multiple and
+                                         on multiple
+                                         lines.
+               Flags:
+                 --flag1, -f1            Flag n°1.
+                 --flag2, -f2            Flag n°2.
+
+            """ );
     }
 
     [Test]

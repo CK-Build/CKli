@@ -42,13 +42,15 @@ World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
 CKliRootEnv.Initialize();
 CKliRootEnv.GlobalOptions = GetGlobalOptions;
 CKliRootEnv.GlobalFlags = GetGlobalFlags;
+
 var monitor = new ActivityMonitor();
 monitor.Output.RegisterClient( new ScreenLogger( CKliRootEnv.Screen ) );
 CoreApplicationIdentity.Initialize();
 
-await CKliCommands.HandleCommandAsync( monitor, CKliRootEnv.DefaultCKliEnv, arguments );
-
-CKliRootEnv.Screen.Dispose();
+Environment.ExitCode = (await CKliCommands.HandleCommandAsync( monitor, CKliRootEnv.DefaultCKliEnv, arguments ))
+                        ? 0
+                        : -1;
+CKliRootEnv.Close();
 
 static ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> GetGlobalOptions()
 {

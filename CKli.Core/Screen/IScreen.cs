@@ -9,7 +9,7 @@ namespace CKli.Core;
 /// A screen handles the console output. This interface cannot be implemented outside CKLi.Core:
 /// the only concrete screens that exist are internal except <see cref="StringScreen"/> and <see cref="NoScreen"/>.
 /// </summary>
-public interface IScreen : IDisposable
+public interface IScreen
 {
     /// <summary>
     /// A huge, default screen width. Applies when no screen width can be obtained.
@@ -60,4 +60,6 @@ public interface IScreen : IDisposable
 
 
     internal void DisplayPluginInfo( string headerText, List<World.DisplayInfoPlugin>? infos );
+
+    internal void Close();
 }

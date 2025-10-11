@@ -4,6 +4,7 @@ using System;
 using System.Buffers;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace CKli.Core;
 
@@ -11,29 +12,24 @@ public abstract class TextBlock : IRenderable
 {
     public const int MinWidth = 15;
 
-    internal string _string;
-    internal int _width;
+    readonly internal string _text;
+    readonly internal int _width;
+    readonly TextEffect _effect;
 
     public static readonly TextBlock EmptyString = new Empty();
 
-    private protected TextBlock( string text, int width )
+    private protected TextBlock( string text, int width, TextEffect effect )
     {
-        _string = text;
+        _text = text;
         _width = width;
+        _effect = effect;
     }
 
     public abstract int Height { get; }
 
     public int Width => _width;
 
-    public int RenderLine<TArg>( int i, TArg arg, ReadOnlySpanAction<char, TArg> render )
-    {
-        var t = LineAt(i);
-        render( t, arg );
-        return t.Length;
-    }
-
-    public abstract ReadOnlySpan<char> LineAt( int i );
+    public abstract int RenderLine( int line, IRenderTarget target, RenderContext context );
 
     public abstract TextBlock SetWidth( int width );
 
@@ -89,23 +85,32 @@ public abstract class TextBlock : IRenderable
 
     sealed class MonoLine : TextBlock
     {
-        static readonly SearchValues<char> _cutChars = SearchValues.Create( " ,;!?." );
+        static readonly SearchValues<char> _cutChars = SearchValues.Create( " ,;!-?." );
 
-        public MonoLine( string text, int width )
-            : base( text, width )
+        public MonoLine( string text, int width, TextEffect effect = TextEffect.Regular )
+            : base( text, width, effect )
         {
         }
 
         public override int Height => 1;
 
-        public override ReadOnlySpan<char> LineAt( int i ) => i == 0 ? _string.AsSpan( 0, _width ) : default;
+        public override int RenderLine( int line, IRenderTarget target, RenderContext context )
+        {
+            Throw.DebugAssert( line >= 0 );
+            if( line == 0 )
+            {
+                target.Append( _text.AsSpan( 0, _width ), context.GetTextStyle( _effect ) );
+                return _width;
+            }
+            return 0;
+        }
 
         public override TextBlock SetWidth( int width )
         {
             if( width < MinWidth || width >= _width ) return this;
             var rangeCollector = ImmutableArray.CreateBuilder<(int Start, int Length)>( width / 8 );
-            int w = SetWidthLine( width, rangeCollector, 0, _string.AsSpan( 0, _width ) );
-            return new LinesAdjustedWidth( this, rangeCollector.DrainToImmutable(), w );
+            int w = SetWidthLine( width, rangeCollector, 0, _text.AsSpan( 0, _width ) );
+            return new LinesAdjustedWidth( this, rangeCollector.DrainToImmutable(), w, _effect );
         }
 
         internal static int SetWidthLine( int width, ImmutableArray<(int Start, int Length)>.Builder rangeCollector, int start, ReadOnlySpan<char> line )
@@ -146,30 +151,34 @@ public abstract class TextBlock : IRenderable
             return w;
         }
 
-        public override string ToString() => _string;
+        public override string ToString() => _text;
+    }
+
+    static int RenderMultiLine( int line, string text, IRenderTarget target, ImmutableArray<(int Start, int Length)> lines, TextStyle style )
+    {
+        Throw.DebugAssert( line >= 0 );
+        if( line < lines.Length )
+        {
+            var (start, len) = lines[line];
+            target.Append( text.AsSpan( start, len ), style );
+            return len;
+        }
+        return 0;
     }
 
     sealed class MultiLine : TextBlock
     {
         readonly ImmutableArray<(int Start, int Length)> _lines;
 
-        public MultiLine( string text, ImmutableArray<(int, int)> lines, int width )
-            : base( text, width )
+        public MultiLine( string text, ImmutableArray<(int, int)> lines, int width, TextEffect effect = TextEffect.Regular )
+            : base( text, width, effect )
         {
             _lines = lines;
         }
 
         public override int Height => _lines.Length;
 
-        public override ReadOnlySpan<char> LineAt( int i )
-        {
-            if( i >= 0 && i < _lines.Length )
-            {
-                var (start, len) = _lines[i];
-                return _string.AsSpan( start, len );
-            }
-            return default;
-        }
+        public override int RenderLine( int line, IRenderTarget target, RenderContext context ) => RenderMultiLine( line, _text, target, _lines, context.GetTextStyle( _effect ) );
 
         public override TextBlock SetWidth( int width )
         {
@@ -181,7 +190,7 @@ public abstract class TextBlock : IRenderable
                 var (start, len) = _lines[i];
                 if( len > width )
                 {
-                    var w = MonoLine.SetWidthLine( width, rangeCollector, start, _string.AsSpan( start, len ) );
+                    var w = MonoLine.SetWidthLine( width, rangeCollector, start, _text.AsSpan( start, len ) );
                     if( finalWidth < w ) finalWidth = w;
                 }
                 else
@@ -189,10 +198,10 @@ public abstract class TextBlock : IRenderable
                     if( finalWidth < len ) finalWidth = len;
                 }
             }
-            return new LinesAdjustedWidth( this, rangeCollector.DrainToImmutable(), finalWidth );
+            return new LinesAdjustedWidth( this, rangeCollector.DrainToImmutable(), finalWidth, _effect );
         }
 
-        public override string ToString() => _string;
+        public override string ToString() => _text;
     }
 
     sealed class LinesAdjustedWidth : TextBlock
@@ -200,8 +209,8 @@ public abstract class TextBlock : IRenderable
         readonly TextBlock _origin;
         readonly ImmutableArray<(int Start, int Length)> _lines;
 
-        public LinesAdjustedWidth( TextBlock origin, ImmutableArray<(int Start, int Length)> lines, int width )
-            : base( origin._string, width )
+        public LinesAdjustedWidth( TextBlock origin, ImmutableArray<(int Start, int Length)> lines, int width, TextEffect effect )
+            : base( origin._text, width, effect )
         {
             _origin = origin;
             _lines = lines;
@@ -209,15 +218,7 @@ public abstract class TextBlock : IRenderable
 
         public override int Height => _lines.Length;
 
-        public override ReadOnlySpan<char> LineAt( int i )
-        {
-            if( i >= 0 && i < _lines.Length )
-            {
-                var (start, len) = _lines[i];
-                return _string.AsSpan( start, len );
-            }
-            return default;
-        }
+        public override int RenderLine( int line, IRenderTarget target, RenderContext context ) => RenderMultiLine( line, _text, target, _lines, context.GetTextStyle( _effect ) );
 
         public override TextBlock SetWidth( int width ) => _origin.SetWidth( width );
     }
@@ -225,13 +226,13 @@ public abstract class TextBlock : IRenderable
     sealed class Empty : TextBlock
     {
         public Empty()
-            : base( string.Empty, 0 )
+            : base( string.Empty, 0, TextEffect.Ignore )
         {
         }
 
         public override int Height => 1;
 
-        public override ReadOnlySpan<char> LineAt( int i ) => default;
+        public override int RenderLine( int line, IRenderTarget target, RenderContext context ) => 0;
 
         public override TextBlock SetWidth( int width ) => this;
     }

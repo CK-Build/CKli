@@ -15,8 +15,7 @@ public interface IRenderable
 
     int Width { get; }
 
-    // Temporary.
-    int RenderLine<TArg>( int i, TArg arg, ReadOnlySpanAction<char, TArg> render );
+    int RenderLine( int line, IRenderTarget target, RenderContext context );
 
     public static readonly IRenderable None = new RenderableUnit();
 
@@ -26,23 +25,30 @@ public interface IRenderable
 
         public int Width => 0;
 
-        public int RenderLine<TArg>( int i, TArg arg, ReadOnlySpanAction<char, TArg> render ) => 0;
+        public int RenderLine( int line, IRenderTarget target, RenderContext context ) => 0;
     }
 }
 
 public static class RenderableExtensions
 {
-    public static StringBuilder Render( this IRenderable r, StringBuilder b )
+    public static void Render( this IRenderable r, IRenderTarget target )
     {
+        var context = new RenderContext( r );
         for( int i = 0; i < r.Height; i++ )
         {
-            r.RenderLine( i, b, ( span, b ) => b.Append( span ) );
-            b.AppendLine();
+            r.RenderLine( i, target, context );
+            target.EndOfLine();
+            context.EndOfLine();
         }
+    }
+
+    public static StringBuilder RenderAsString( this IRenderable r, StringBuilder b )
+    {
+        Render( r, new StringScreen.Renderer( b ) );
         return b;
     }
 
-    public static string RenderAsString( this IRenderable r ) => r.Render( new StringBuilder() ).ToString();
+    public static string RenderAsString( this IRenderable r ) => r.RenderAsString( new StringBuilder() ).ToString();
 
     public static IRenderable Box( this IRenderable r, int top = 0, int left = 0, int bottom = 0, int right = 0 )
     {

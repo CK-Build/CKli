@@ -27,7 +27,7 @@ public sealed class NoScreen : IScreen
     {
     }
 
-    public void Dispose()
+    void IScreen.Close()
     {
     }
 

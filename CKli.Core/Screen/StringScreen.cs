@@ -37,16 +37,16 @@ public sealed class StringScreen : IScreen
     public void DisplayHelp( List<CommandHelp> commands, CommandLineArguments cmdLine, ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default, ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
     {
         var help = ScreenHelpers.CreateDisplayHelp( commands, cmdLine, globalOptions, globalFlags, IScreen.MaxScreenWidth );
-        help.Render( _buffer );
+        help.RenderAsString( _buffer );
     }
 
     void IScreen.DisplayPluginInfo( string headerText, List<World.DisplayInfoPlugin>? infos )
     {
         var display = ScreenHelpers.CreateDisplayPlugin( headerText, infos, IScreen.MaxScreenWidth );
-        display.Render( _buffer );
+        display.RenderAsString( _buffer );
     }
 
-    public void Dispose()
+    void IScreen.Close()
     {
     }
 
@@ -56,4 +56,19 @@ public sealed class StringScreen : IScreen
     /// <returns>The screen content.</returns>
     public override string ToString() => _buffer.ToString();
 
+    internal sealed class Renderer : IRenderTarget
+    {
+        readonly StringBuilder _b;
+
+        public Renderer( StringBuilder b )
+        {
+            _b = b;
+        }
+
+        public void Append( ReadOnlySpan<char> s, TextStyle style ) => _b.Append( s );
+
+        public void EndOfLine() => _b.AppendLine();
+
+        public override string ToString() => _b.ToString();
+    }
 }
