@@ -77,68 +77,6 @@ public readonly struct TextStyle : IEquatable<TextStyle>
                                                             ? With( other.Effect )
                                                             : other;
 
-    TextStyle CompleteWithLiftInvert( TextStyle other )
-    {
-        // Stupid case. May be a Throw.CheckArgument but let's be nice.
-        if( other.IgnoreAll ) return this;
-
-        // If we don't exit early with this or other, these are the final results.
-        Color finalColor;
-        int effect;
-
-        if( IgnoreColor )
-        {
-            if( IgnoreEffect )
-            {
-                return other;
-            }
-            // If the other also ignores its color, we could return this but
-            // doing so will forget to combine the invert effect. We can only
-            // return this if the other ignores both (done above).
-            // With 2 ignored colors we retain the other one (and keep the fact that
-            // the color is eventually ignored).
-            effect = _effect;
-            if( !other.IgnoreColor ) effect |= _colorBit;
-            if( IsInvert )
-            {
-                if( other.IsInvert )
-                {
-                    Throw.DebugAssert( "If inverting, then the effect applies.", !other.IgnoreEffect );
-                    finalColor = other.NonInvertedColor;
-                    effect &= ~(int)TextEffect.Invert;
-                }
-                else
-                {
-                    finalColor = other.Color.Invert();
-                }
-            }
-            else
-            {
-                if( other.IsInvert )
-                {
-                    Throw.DebugAssert( !other.IgnoreEffect );
-                    finalColor = other.Color;
-                    effect |= (int)TextEffect.Invert;
-                }
-                else
-                {
-                    finalColor = other.Color;
-                }
-            }
-        }
-        else
-        {
-            // Our color is set. If we also have the effect, we're done.
-            // We are also done if the other ignores its effect.
-            if( !IgnoreEffect || other.IgnoreEffect ) return this;
-
-            effect = other._effect | _colorBit;
-            finalColor = _color;
-            if( other.IsInvert ) finalColor = finalColor.Invert();
-        }
-        return new TextStyle( effect, finalColor );
-    }
-
     public bool Equals( TextStyle other ) => _color == other._color && _effect == other._effect;
 
     public override bool Equals( object? obj ) => obj is TextStyle s && Equals( s );

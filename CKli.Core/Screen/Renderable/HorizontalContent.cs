@@ -48,7 +48,7 @@ public sealed class HorizontalContent : IRenderable
         Throw.DebugAssert( line >= 0 );
         if( line < _height )
         {
-            return new Renderer( previous, _width, previous.CreateRendererGroup( Width, _cells, line ) );
+            return new Renderer( previous, _width, previous.CreateRendererGroup( _cells, line ) );
         }
         return previous;
     }
