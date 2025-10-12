@@ -58,24 +58,24 @@ static class ScreenHelpers
 
         var help = IRenderable.None.AddBelow(
             commands.Select( c =>
-                c.CommandPathAndArgs.Box( right: descriptionOffset - c.CommandPathAndArgs.Width ).AddRight( c.Description.SetWidth( descriptionMaxLength ) )
+                c.CommandPathAndArgs.Box( right: descriptionOffset - c.CommandPathAndArgs.Width ).AddRight( c.Description.SetTextWidth( descriptionMaxLength ) )
                     .AddBelow( c.Arguments.Select( a => a.Name.Box( left: offsetArgTitle, right: descriptionOffset - a.Name.Width - offsetArgTitle )
-                                                              .AddRight( a.Description.SetWidth( descriptionMaxLength ) ) ) )
+                                                              .AddRight( a.Description.SetTextWidth( descriptionMaxLength ) ) ) )
                     .AddBelow( c.Options.Length > 0,
                                TextBlock.FromText( "Options:" ).Box( left: offsetArgTitle )
                                     .AddBelow( c.Options.Select( o => o.Names.Box( left: offsetArg, right: descriptionOffset - o.Names.Width - offsetArg )
-                                                                             .AddRight( o.Description.SetWidth( descriptionMaxLength ) ) ) ) )
+                                                                             .AddRight( o.Description.SetTextWidth( descriptionMaxLength ) ) ) ) )
                     .AddBelow( c.Flags.Length > 0,
                                TextBlock.FromText( "Flags:" ).Box( left: offsetArgTitle )
                                     .AddBelow( c.Flags.Select( f => f.Names.Box( left: offsetArg, right: descriptionOffset - f.Names.Width - offsetArg )
-                                                                             .AddRight( f.Description.SetWidth( descriptionMaxLength ) ) ) ) )
+                                                                             .AddRight( f.Description.SetTextWidth( descriptionMaxLength ) ) ) ) )
                     .AddBelow( TextBlock.EmptyString ) ),
                globalOptions.IsDefaultOrEmpty
                 ? null
                 : TextBlock.FromText( "Global options:" )
                       .AddBelow( CommandHelp.ToRenderableOptions( globalOptions )
                                     .Select( o => o.Names.Box( left: offsetArg, right: descriptionOffset - o.Names.Width - offsetArg )
-                                                                .AddRight( o.Description.SetWidth( descriptionMaxLength ) ) ),
+                                                                .AddRight( o.Description.SetTextWidth( descriptionMaxLength ) ) ),
                                   TextBlock.EmptyString
                                 ),
                 globalFlags.IsDefaultOrEmpty
@@ -83,7 +83,7 @@ static class ScreenHelpers
                 : TextBlock.FromText( "Global flags:" )
                       .AddBelow( CommandHelp.ToRenderableFlags( globalFlags )
                                     .Select( f => f.Names.Box( left: offsetArg, right: descriptionOffset - f.Names.Width - offsetArg )
-                                                                             .AddRight( f.Description.SetWidth( descriptionMaxLength ) ) ) )
+                                                                             .AddRight( f.Description.SetTextWidth( descriptionMaxLength ) ) ) )
 
             );
         return help;

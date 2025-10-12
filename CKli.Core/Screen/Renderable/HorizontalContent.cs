@@ -43,18 +43,35 @@ public sealed class HorizontalContent : IRenderable
 
     public int Width => _width;
 
-    public int RenderLine( int line, IRenderTarget target, RenderContext context )
+    public SegmentRenderer CollectRenderer( int line, SegmentRenderer previous )
     {
         Throw.DebugAssert( line >= 0 );
-        int w = 0;
         if( line < _height )
         {
-            foreach( var cell in _cells )
+            return new Renderer( previous, _width, previous.CreateRendererGroup( Width, _cells, line ) );
+        }
+        return previous;
+    }
+
+    sealed class Renderer : SegmentRenderer
+    {
+        readonly SegmentRenderer _head;
+
+        public Renderer( SegmentRenderer parent, int length, SegmentRenderer head )
+            : base( parent, length )
+        {
+            _head = head;
+        }
+
+        protected override void Render( IRenderTarget target )
+        {
+            var s = _head.Next;
+            while( s != null )
             {
-                w += cell.RenderLine( line, target, context );
+                s.Render();
+                s = s.Next;
             }
         }
-        return w;
     }
 
     public HorizontalContent Append( ReadOnlySpan<IRenderable?> horizontalContent )

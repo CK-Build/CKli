@@ -43,22 +43,22 @@ public sealed class VerticalContent : IRenderable
 
     public int Width => _width;
 
-    public int RenderLine( int line, IRenderTarget target, RenderContext context )
+    public SegmentRenderer CollectRenderer( int line, SegmentRenderer previous )
     {
         Throw.DebugAssert( line >= 0 );
-        if( line >= 0 && line < _height )
+        if( line < _height )
         {
             foreach( var cell in _cells )
             {
                 int next = line - cell.Height;
                 if( next < 0 )
                 {
-                    return cell.RenderLine( line, target, context );
+                    return cell.CollectRenderer( line, previous );
                 }
                 line = next;
             }
         }
-        return 0;
+        return previous;
     }
 
     public VerticalContent Append( ReadOnlySpan<IRenderable?> verticalContent )

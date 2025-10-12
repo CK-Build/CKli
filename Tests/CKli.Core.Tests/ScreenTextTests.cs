@@ -13,6 +13,35 @@ namespace CKli.Core.Tests;
 [TestFixture]
 public class ScreenTextTests
 {
+    [Test]
+    public void simple_line_test()
+    {
+        {
+            var line = TextBlock.FromText( "Hello" ).AddRight( TextBlock.FromText( "world" ) );
+            line.RenderAsString().ShouldBe( """
+                Helloworld
+
+                """ );
+        }
+        {
+            var line = TextBlock.FromText( "Hello" ).Box( left: 1, right: 1 ).AddRight( TextBlock.FromText( "world" ) );
+            line.RenderAsString().ShouldBe( """
+                 Hello world
+
+                """ );
+        }
+        {
+            var line = TextBlock.FromText( "Hello" ).Box( left: 1, right: 1 )
+                            .AddRight( TextBlock.FromText( "world" ).Box( right: 2, left: 2 ) )
+                            .AddRight( TextBlock.FromText( "!" ) );
+            line.RenderAsString().ShouldBe( """
+                 Hello   world  !
+
+                """ );
+        }
+    }
+
+
     sealed class ZCommand : Command
     {
         public ZCommand()
@@ -131,7 +160,7 @@ public class ScreenTextTests
     {
         {
             var t = TextBlock.FromText( "0 1 2 3 4 5 6 7 8 9 A B C D E F G H I J K L M N O P Q R S T U V W X Y Z" );
-            var tMin = t.SetWidth( TextBlock.MinWidth );
+            var tMin = t.SetTextWidth( TextBlock.MinWidth );
             tMin.Width.ShouldBe( TextBlock.MinWidth );
             tMin.Height.ShouldBe( 5 );
             tMin.RenderAsString().ShouldBe( """
@@ -145,7 +174,7 @@ public class ScreenTextTests
         }
         {
             var t = TextBlock.FromText( "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" );
-            var tMin = t.SetWidth( TextBlock.MinWidth );
+            var tMin = t.SetTextWidth( TextBlock.MinWidth );
             tMin.Width.ShouldBe( TextBlock.MinWidth );
             tMin.Height.ShouldBe( 3 );
             tMin.RenderAsString().ShouldBe( """
@@ -157,7 +186,7 @@ public class ScreenTextTests
         }
         { 
             var t = TextBlock.FromText( "La liberté des uns s'arrête où commence celle des autres." );
-            var tMin = t.SetWidth( TextBlock.MinWidth );
+            var tMin = t.SetTextWidth( TextBlock.MinWidth );
             tMin.Width.ShouldBe( TextBlock.MinWidth );
             tMin.Height.ShouldBe( 4 );
             tMin.RenderAsString().ShouldBe( """
@@ -167,11 +196,11 @@ public class ScreenTextTests
                 des autres.
 
                 """ );
-            var tMin1 = t.SetWidth( TextBlock.MinWidth + 1 );
+            var tMin1 = t.SetTextWidth( TextBlock.MinWidth + 1 );
             tMin1.RenderAsString().ShouldBe( tMin.RenderAsString() );
-            var tMin2 = tMin1.SetWidth( TextBlock.MinWidth + 2 );
+            var tMin2 = tMin1.SetTextWidth( TextBlock.MinWidth + 2 );
             tMin2.RenderAsString().ShouldBe( tMin.RenderAsString() );
-            var tMin3 = tMin2.SetWidth( TextBlock.MinWidth + 3 );
+            var tMin3 = tMin2.SetTextWidth( TextBlock.MinWidth + 3 );
             tMin3.Height.ShouldBe( 4 );
             tMin3.RenderAsString().ShouldBe( """
                 La liberté des uns
@@ -180,7 +209,7 @@ public class ScreenTextTests
                 autres.
 
                 """ );
-            var tMin10 = tMin2.SetWidth( TextBlock.MinWidth + 10 );
+            var tMin10 = tMin2.SetTextWidth( TextBlock.MinWidth + 10 );
             tMin10.Height.ShouldBe( 3 );
             tMin10.RenderAsString().ShouldBe( """
                 La liberté des uns
@@ -189,7 +218,7 @@ public class ScreenTextTests
 
                 """ );
 
-            var tMin11 = tMin2.SetWidth( TextBlock.MinWidth + 11 );
+            var tMin11 = tMin2.SetTextWidth( TextBlock.MinWidth + 11 );
             tMin11.Height.ShouldBe( 3 );
             tMin11.RenderAsString().ShouldBe( """
                 La liberté des uns
@@ -199,4 +228,5 @@ public class ScreenTextTests
                 """ );
         }
     }
+
 }
