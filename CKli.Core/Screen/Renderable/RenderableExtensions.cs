@@ -7,6 +7,8 @@ namespace CKli.Core;
 
 public static class RenderableExtensions
 {
+    public static void Render( this IRenderable r, IRenderTarget target ) => SegmentRenderer.Render( r, target );
+
     public static StringBuilder RenderAsString( this IRenderable r, StringBuilder b )
     {
         SegmentRenderer.Render( r, new StringScreen.Renderer( b ) );
@@ -24,6 +26,26 @@ public static class RenderableExtensions
         return new ContentBox( r,
                                paddingTop, paddingLeft, paddingBottom, paddingRight,
                                marginTop, marginLeft, marginBottom, marginRight );
+    }
+
+    public static IRenderable Box( this IRenderable r,
+                                   TextStyle style,
+                                   int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
+                                   int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
+    {
+        return ((ContentBox)Box( r, paddingTop, paddingLeft, paddingBottom, paddingRight,
+                                    marginTop, marginLeft, marginBottom, marginRight )).WithStyle( style );
+    }
+
+    public static IRenderable Box( this IRenderable r,
+                                   Color color,
+                                   TextEffect effect = TextEffect.Regular,
+                                   int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
+                                   int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
+    {
+        return Box( r, new TextStyle( color, effect ),
+                       paddingTop, paddingLeft, paddingBottom, paddingRight,
+                       marginTop, marginLeft, marginBottom, marginRight );
     }
 
     public static IRenderable AddLeft( this IRenderable r, bool condition, params ReadOnlySpan<IRenderable?> horizontalContent )

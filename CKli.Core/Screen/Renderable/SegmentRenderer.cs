@@ -25,8 +25,7 @@ public class SegmentRenderer
     SegmentRenderer( IRenderTarget target )
     {
         _target = target;
-        // The first child that specifies styles will complete it.
-        _style = TextStyle.None;
+        _style = TextStyle.Default;
         _parentStyle = TextStyle.Default;
     }
 
@@ -55,24 +54,6 @@ public class SegmentRenderer
         }
         _length = length;
         parent._contentLength += length;
-
-        // If the parent style is not fully defined, completes it with the style of this child.
-        // This acts as a "lift" of the first exisitng style to, potentially, the whole renderable
-        // structure...
-        // Is this a good idea?
-        // It is that approach or falling back to the TextStyle.Default eveywhere...
-        if( !style.IgnoreAll && !parent._style.IgnoreNothing )
-        {
-            var s = style;
-            var p = parent;
-            do
-            {
-                s = p._style.CompleteWith( s );
-                p._style = s;
-                p = p._parent;
-            }
-            while( p != null && !p._style.IgnoreNothing );
-        }
         _parentStyle = parent._style;
         _style = _parentStyle.OverrideWith( style );
     }
@@ -144,13 +125,15 @@ public class SegmentRenderer
     /// <param name="target">The rendering target.</param>
     protected virtual void Render() => RenderContent();
 
-    public static void Render( IRenderable r, IRenderTarget target )
+    internal static void Render( IRenderable r, IRenderTarget target )
     {
+        target.BeginUpdate();
         for( int line = 0; line < r.Height; line++ )
         {
             RenderLine( r, target, line, r.Height );
             target.EndOfLine();
         }
+        target.EndUpdate();
     }
 
     static void RenderLine( IRenderable r, IRenderTarget target, int line, int height )

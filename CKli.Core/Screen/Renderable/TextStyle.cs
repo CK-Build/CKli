@@ -18,9 +18,9 @@ public readonly struct TextStyle : IEquatable<TextStyle>
     public static readonly TextStyle None = default;
 
     /// <summary>
-    /// Default is white regular text on black background.
+    /// Default is gray regular text on black background.
     /// </summary>
-    public static readonly TextStyle Default = new TextStyle( ConsoleColor.White, ConsoleColor.Black, TextEffect.Regular );
+    public static readonly TextStyle Default = new TextStyle( ConsoleColor.Gray, ConsoleColor.Black, TextEffect.Regular );
 
     public TextStyle( Color color, TextEffect effect = TextEffect.Ignore )
     {
