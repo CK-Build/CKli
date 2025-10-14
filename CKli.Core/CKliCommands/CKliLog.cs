@@ -4,6 +4,7 @@ using System.Buffers;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -38,41 +39,22 @@ sealed class CKliLog : Command
         }
         Throw.DebugAssert( LogFile.RootLogPath != null && LogFile.RootLogPath[^1] == Path.DirectorySeparatorChar );
 
-        bool success = true;
-        var textFolder = LogFile.RootLogPath + "Text/";
+        bool success = RemoveStupidLogFile( monitor, out string textFolder, out string? firstLogFilePath );
         try
         {
             if( folder )
             {
-                success = OpenLogFolder( monitor, textFolder );
+                success &= OpenLogFolder( monitor, textFolder );
             }
             else
             {
-                byte[] filterBuffer = ArrayPool<byte>.Shared.Rent( 8192 );
-                try
+                if( firstLogFilePath != null )
                 {
-                    bool foundFile = false;
-                    foreach( var f in Directory.EnumerateFiles( textFolder, "*.log" ).OrderDescending() )
-                    {
-                        if( HasSuccessfulCKliLogMarker( monitor, f, filterBuffer ) )
-                        {
-                            success |= FileHelper.DeleteFile( monitor, f );
-                        }
-                        else
-                        {
-                            foundFile = true;
-                            success = OpenLogFile( monitor, f );
-                            break;
-                        }
-                    }
-                    if( !foundFile )
-                    {
-                        monitor.Warn( $"No log file found in folder '{textFolder}'." );
-                    }
+                    success &= OpenLogFile( monitor, firstLogFilePath );
                 }
-                finally
+                else
                 {
-                    ArrayPool<byte>.Shared.Return( filterBuffer );
+                    monitor.Warn( $"No log file found in folder '{textFolder}'." );
                 }
             }
         }
@@ -86,6 +68,39 @@ sealed class CKliLog : Command
             monitor.UnfilteredLog( LogLevel.Info | LogLevel.IsFiltered, null, _successfulLogMarker, null );
         }
         return ValueTask.FromResult( success );
+    }
+
+    static bool RemoveStupidLogFile( IActivityMonitor monitor, out string textFolder, out string? firstLogFilePath )
+    {
+        textFolder = LogFile.RootLogPath + "Text/";
+        firstLogFilePath = null;
+        byte[] filterBuffer = ArrayPool<byte>.Shared.Rent( 8192 );
+        bool success = true;
+        try
+        {
+            foreach( var f in Directory.EnumerateFiles( textFolder, "*.log" ).OrderDescending() )
+            {
+                if( HasSuccessfulCKliLogMarker( monitor, f, filterBuffer ) )
+                {
+                    success &= FileHelper.DeleteFile( monitor, f );
+                }
+                else
+                {
+                    firstLogFilePath = f;
+                    break;
+                }
+            }
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While discovering logs in '{textFolder}'.", ex );
+            success = false;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return( filterBuffer );
+        }
+        return success;
     }
 
     static bool HasSuccessfulCKliLogMarker( IActivityMonitor monitor, string path, byte[] buffer )
