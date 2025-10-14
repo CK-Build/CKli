@@ -210,6 +210,22 @@ public sealed class CommandLineArguments
     }
 
     /// <summary>
+    /// Closes this command line and returns a string that are the remaining arguments to use
+    /// to call a <see cref="ProcessRunner.RunProcess(IParallelLogger, string, string, string, Dictionary{string, string}?)"/>.
+    /// <para>
+    /// This cannot fail (the <paramref name="arguments"/> may be empty).
+    /// </para>
+    /// </summary>
+    /// <param name="arguments">The arguments to use to start an external process.</param>
+    public void CloseWithRemainingAsProcessStartArgs( out string arguments )
+    {
+        CheckOpened();
+        arguments = ArgumentEscaper.EscapeAndConcatenateArgArrayForProcessStart( _args );
+        _args.Clear();
+        _remainingArguments = [];
+    }
+
+    /// <summary>
     /// Sets the found command (if any) and eats the first <paramref name="pathCount"/> arguments.
     /// </summary>
     /// <param name="found">The found command.</param>
