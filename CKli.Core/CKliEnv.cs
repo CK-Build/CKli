@@ -5,7 +5,7 @@ namespace CKli.Core;
 /// <summary>
 /// The immutable command context reflects the <see cref="CKliRootEnv"/>: <see cref="CKliRootEnv.DefaultCKliEnv"/>
 /// should almost always be used unless the default context needs to be overridden. This is the case in tests: 
-/// <see cref="With(NormalizedPath)"/> is used to change the <see cref="CurrentDirectory"/> (and potentially the <see cref="CurrentStackPath"/>).
+/// <see cref="ChangeDirectory(NormalizedPath)"/> is used to change the <see cref="CurrentDirectory"/> (and potentially the <see cref="CurrentStackPath"/>).
 /// </summary>
 public sealed class CKliEnv
 {
@@ -62,13 +62,10 @@ public sealed class CKliEnv
     /// <summary>
     /// Returns a new context with an updated <see cref="CurrentDirectory"/> that is <see cref="NormalizedPath.Combine(NormalizedPath)"/>
     /// with the <paramref name="path"/>.
-    /// <para>
-    /// The name "With" is a reminder that, as this is an immutable object, the resulting context is the returned value.
-    /// </para>
     /// </summary>
     /// <param name="path">The path. Usually relative but may be absolute.</param>
     /// <returns>A new context.</returns>
-    public CKliEnv With( NormalizedPath path ) => path.IsEmptyPath
+    public CKliEnv ChangeDirectory( NormalizedPath path ) => path.IsEmptyPath
                                                                 ? this
                                                                 : new CKliEnv( _currentDirectory.Combine( path ).ResolveDots(), _secretsStore, _screen );
 }
