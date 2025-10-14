@@ -7,54 +7,93 @@ using System.Diagnostics.CodeAnalysis;
 namespace CKli.Core;
 
 /// <summary>
-/// Template method that provides a <see cref="FinalStyle"/> to <see cref="Render(IRenderTarget)"/>.
+/// Template method that provides a <see cref="FinalStyle"/> to <see cref="Render()"/>.
 /// </summary>
 public class SegmentRenderer
 {
-    readonly SegmentRenderer? _prev;
+    readonly SegmentRenderer? _parent;
+    SegmentRenderer? _firstChild;
+    SegmentRenderer? _lastChild;
+    SegmentRenderer? _next;
     readonly IRenderTarget _target;
     readonly int _length;
-    SegmentRenderer? _next;
+    int _contentLength;
+    TextStyle _parentStyle;
     TextStyle _style;
-    bool _isRendered;
 
     // Root renderer.
-    SegmentRenderer( IRenderTarget target, TextStyle style )
+    SegmentRenderer( IRenderTarget target )
     {
         _target = target;
-        _style = style;
+        // The first child that specifies styles will complete it.
+        _style = TextStyle.None;
+        _parentStyle = TextStyle.Default;
     }
 
     /// <summary>
-    /// Initializes a new segment renderer.
+    /// Initializes a new segment renderer without content.
     /// </summary>
-    /// <param name="previous">The previous renderer.</param>
-    /// <param name="length">The number of characters that must be rendered (most often the <see cref="IRenderable.Width"/>).</param>
-    /// <param name="style">The text style to apply.</param>
-    protected SegmentRenderer( SegmentRenderer previous, int length, TextStyle style = default )
+    /// <param name="parent">The parent renderer.</param>
+    /// <param name="length">
+    /// The number of characters that must be rendered. This is most often the <see cref="IRenderable.Width"/>
+    /// but can be the length of a smaller line in a multi line content.
+    /// </param>
+    /// <param name="style">Optional text style to apply.</param>
+    protected SegmentRenderer( SegmentRenderer parent, int length, TextStyle style = default )
     {
-        _prev = previous;
-        previous._next = this;
-        _target = previous._target;
+        _parent = parent;
+        _target = parent._target;
+        if( _parent._lastChild == null )
+        {
+            _parent._firstChild = this;
+            _parent._lastChild = this;
+        }
+        else
+        {
+            _parent._lastChild._next = this;
+            _parent._lastChild = this;
+        }
         _length = length;
+        parent._contentLength += length;
 
-        if( !style.IgnoreAll && !previous._style.IgnoreNothing )
+        // If the parent style is not fully defined, completes it with the style of this child.
+        // This acts as a "lift" of the first exisitng style to, potentially, the whole renderable
+        // structure...
+        // Is this a good idea?
+        // It is that approach or falling back to the TextStyle.Default eveywhere...
+        if( !style.IgnoreAll && !parent._style.IgnoreNothing )
         {
             var s = style;
-            var p = previous;
+            var p = parent;
             do
             {
                 s = p._style.CompleteWith( s );
                 p._style = s;
-                p = p._prev;
+                p = p._parent;
             }
             while( p != null && !p._style.IgnoreNothing );
         }
-        _style = previous._style.OverrideWith( style );
+        _parentStyle = parent._style;
+        _style = _parentStyle.OverrideWith( style );
     }
 
-    [MemberNotNullWhen( false, nameof(_prev) )]
-    bool IsRoot => _prev == null;
+    /// <summary>
+    /// Initializes a new segment renderer that has a content.
+    /// </summary>
+    /// <param name="parent">The parent renderer.</param>
+    /// <param name="length">
+    /// The number of characters that must be rendered. This is most often the <see cref="IRenderable.Width"/>
+    /// but can be the length of a smaller line in a multi line content.
+    /// </param>
+    /// <param name="content">The content.</param>
+    /// <param name="line">The rendered line number.</param>
+    /// <param name="actualHeight">The actual height.</param>
+    /// <param name="style">Optional text style to apply.</param>
+    public SegmentRenderer( SegmentRenderer parent, int length, IRenderable content, int line, int actualHeight, TextStyle style = default )
+        : this( parent, length, style )
+    {
+        content.BuildSegmentTree( line, this, actualHeight );
+    }
 
     /// <summary>
     /// Gets the segment length.
@@ -62,105 +101,62 @@ public class SegmentRenderer
     public int Length => _length;
 
     /// <summary>
+    /// Gets the actual content length. Padding aligns this content length with <see cref="Length"/>.
+    /// </summary>
+    public int ContentLength => _contentLength;
+
+    /// <summary>
     /// Gets the final text style to apply.
     /// </summary>
     public TextStyle FinalStyle => _style;
 
     /// <summary>
-    /// Gets the next segment.
+    /// Gets the text style of the parent. Used by margins.
     /// </summary>
-    public SegmentRenderer? Next => _next;
+    public TextStyle ParentFinalStyle => _parentStyle;
 
     /// <summary>
-    /// Gets whether this segment has already been rendered.
-    /// When true, <see cref="Render"/> is a no-op.
+    /// Rendering target.
     /// </summary>
-    public bool IsRendered => _isRendered;
+    public IRenderTarget Target => _target;
 
     /// <summary>
-    /// Renders this segment. A segment can be rendered once and only once, only
-    /// the first call calls the protected <see cref="Render(IRenderTarget)"/>, subsequent
-    /// calls do nothing.
+    /// Renders the content if any.
     /// </summary>
-    public void Render()
+    public void RenderContent()
     {
-        if( !_isRendered  )
+        var c = _firstChild;
+        while( c != null )
         {
-            _isRendered = true;
-            Render( _target );
+            c.Render();
+            c = c._next;
         }
     }
 
     /// <summary>
     /// The method to implement.
-    /// Default implementation does nothing: <see cref="Empty(SegmentRenderer, TextStyle)"/> uses this.
+    /// Default implementation calls <see cref="RenderContent()"/> that does nothing if there is no content.
     /// <para>
-    /// Implementations should use <see cref="FinalStyle"/>, <see cref="Length"/> and <see cref="Next"/>.
+    /// Implementations should use <see cref="FinalStyle"/>, <see cref="Length"/>, <see cref="ContentLength"/> and
+    /// <see cref="RenderContent"/> to render in <see cref="Target"/>.
     /// </para>
     /// </summary>
     /// <param name="target">The rendering target.</param>
-    protected virtual void Render( IRenderTarget target )
-    {
-    }
-
-
-    /// <summary>
-    /// Creates a group of renderers. Used by <see cref="HorizontalContent"/> but can be used by more complex layout.
-    /// </summary>
-    /// <param name="cells">Renderables to encapsulate.</param>
-    /// <param name="line">The line number to render.</param>
-    /// <returns>A group of renderer.</returns>
-    public SegmentRenderer CreateRendererGroup( ImmutableArray<IRenderable> cells, int line ) => new RendererGroup( _target, _style, cells, line );
-
-    sealed class RendererGroup : SegmentRenderer
-    {
-        public RendererGroup( IRenderTarget target, TextStyle style, ImmutableArray<IRenderable> cells, int line )
-            : base( target, style )
-        {
-            SegmentRenderer head = this;
-            foreach( var cell in cells )
-            {
-                head = cell.CollectRenderer( line, head );
-            }
-        }
-
-        protected override void Render( IRenderTarget target )
-        {
-            var s = Next;
-            while( s != null )
-            {
-                s.Render();
-                s = s.Next;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Creates an empty segment. Used by empty string or asa pure text style setter.
-    /// </summary>
-    /// <param name="previous">The previous segment.</param>
-    /// <param name="style">Optional style.</param>
-    /// <returns>The empty segment renderer.</returns>
-    public static SegmentRenderer Empty( SegmentRenderer previous, TextStyle style = default ) => new SegmentRenderer( previous, 0, style );
+    protected virtual void Render() => RenderContent();
 
     public static void Render( IRenderable r, IRenderTarget target )
     {
         for( int line = 0; line < r.Height; line++ )
         {
-            RenderLine( r, target, line );
+            RenderLine( r, target, line, r.Height );
             target.EndOfLine();
         }
     }
 
-    static void RenderLine( IRenderable r, IRenderTarget target, int line )
+    static void RenderLine( IRenderable r, IRenderTarget target, int line, int height )
     {
-        var head = new SegmentRenderer( target, TextStyle.None );
-        r.CollectRenderer( line, head );
-        var s = head.Next;
-        while( s != null )
-        {
-            s.Render();
-            s = s._next;
-        }
+        var head = new SegmentRenderer( target );
+        r.BuildSegmentTree( line, head, height );
+        head.Render();
     }
 }

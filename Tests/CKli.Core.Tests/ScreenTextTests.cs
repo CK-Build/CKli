@@ -1,12 +1,9 @@
 using CK.Core;
-using LibGit2Sharp;
 using NUnit.Framework;
+using Shouldly;
 using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
+using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
 
@@ -24,15 +21,15 @@ public class ScreenTextTests
                 """ );
         }
         {
-            var line = TextBlock.FromText( "Hello" ).Box( left: 1, right: 1 ).AddRight( TextBlock.FromText( "world" ) );
+            var line = TextBlock.FromText( "Hello" ).Box( paddingLeft: 1, paddingRight: 1 ).AddRight( TextBlock.FromText( "world" ) );
             line.RenderAsString().ShouldBe( """
                  Hello world
 
                 """ );
         }
         {
-            var line = TextBlock.FromText( "Hello" ).Box( left: 1, right: 1 )
-                            .AddRight( TextBlock.FromText( "world" ).Box( right: 2, left: 2 ) )
+            var line = TextBlock.FromText( "Hello" ).Box( paddingLeft: 1, paddingRight: 1 )
+                            .AddRight( TextBlock.FromText( "world" ).Box( paddingLeft: 2, paddingRight: 2 ) )
                             .AddRight( TextBlock.FromText( "!" ) );
             line.RenderAsString().ShouldBe( """
                  Hello   world  !
@@ -41,118 +38,42 @@ public class ScreenTextTests
         }
     }
 
-
-    sealed class ZCommand : Command
-    {
-        public ZCommand()
-            : base( null,
-                    "ze command",
-                    """
-                    Only here to
-                    test display (trimEnd is the default).
-
-
-
-
-                    """,
-                    arguments: [("a1", """
-                        Argument n°1 is
-                        required like
-                        all arguments. 
-                        """)],
-                    options: [
-                        (["--options", "-o"], "This description should be prefixed with [Multiple].", Multiple: true),
-                        (["--single", "-s"], "This description one is not multiple.", Multiple: false),
-                        (["--others", "-o2"], """
-                        Also multiple and
-                        on multiple
-                        lines.
-                        """, Multiple: true),
-                        ],
-                    flags: [
-                        (["--flag1", "-f1"], "Flag n°1."),
-                        (["--flag2", "-f2"], "Flag n°2.")
-                        ] )
-        {
-        }
-
-        protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
-        {
-            return ValueTask.FromResult( true );
-        }
-    }
-
     [Test]
-    public void basic_Console_help_display_for_plugin_section()
+    public void simple_2_lines_test()
     {
-        var commands = CKliCommands.Commands.GetForHelp( "plugin", null ).Append( new CommandHelp( new ZCommand() ) );
-
-        // Layout:
-        //  command path <name1> <name2>   Description
-        //      <name1>                    Description
-        //      <name2>                    Description
-        //      Options:                   
-        //         --opt, -o               [Multiple] Description on
-        //                                 more than one line.
-        //         --opt2                  Description
-        //      Flags:                     
-        //         --flag, -f              Description
-        // |---|--|                    |--|
-        int maxCommandPathWithArgsWitdh = 0;
-        int maxArgOptFlagsWidth = 0;
-        foreach( var c in commands )
         {
-            if( c.CommandPathAndArgs.Width > maxCommandPathWithArgsWitdh ) maxCommandPathWithArgsWitdh = c.CommandPathAndArgs.Width;
-            int argOptFlagsWidth = c.Arguments.Select( o => o.Name.Width )
-                                    .Concat( c.Options.Select( o => o.Names.Width ) )
-                                    .Concat( c.Flags.Select( o => o.Names.Width ) )
-                                    .DefaultIfEmpty()
-                                    .Max();
-            if( argOptFlagsWidth > maxArgOptFlagsWidth ) maxArgOptFlagsWidth = argOptFlagsWidth;
+            var line = TextBlock.FromText( "Message:" )
+                        .AddBelow( TextBlock.FromText( "Hello world!" ).Box( marginLeft: 3 ) );
+            line.RenderAsString().ShouldBe( """
+                Message:
+                   Hello world!
+
+                """ );
         }
+        {
+            var line = TextBlock.FromText( "Message:" )
+                        .AddBelow( TextBlock.FromText( "Hello world!" ).Box( paddingLeft: 3 ) );
+            line.RenderAsString().ShouldBe( """
+                Message:
+                   Hello world!
 
-        const int offsetArgTitle = 3;
-        const int offsetArg = offsetArgTitle + 2;
-        const int descriptionPadding = 3;
+                """ );
+        }
+        {
+            var line = TextBlock.FromText( """
 
-        int descriptionOffset = Math.Max( maxCommandPathWithArgsWitdh, maxArgOptFlagsWidth + offsetArg ) + descriptionPadding;
 
-        var help = IRenderable.None.AddBelow(
-            commands.Select( c =>
-                c.CommandPathAndArgs.Box( right: descriptionOffset - c.CommandPathAndArgs.Width ).AddRight( c.Description )
-                    .AddBelow( c.Arguments.Select( a => a.Name.Box( left: offsetArgTitle, right: descriptionOffset - a.Name.Width - offsetArgTitle )
-                                                              .AddRight( a.Description ) ) )
-                    .AddBelow( c.Options.Length > 0,
-                               TextBlock.FromText( "Options:" ).Box( left: offsetArgTitle )
-                                    .AddBelow( c.Options.Select( o => o.Names.Box( left: offsetArg, right: descriptionOffset - o.Names.Width - offsetArg )
-                                                                             .AddRight( o.Description ) ) ) )
-                    .AddBelow( c.Flags.Length > 0,
-                               TextBlock.FromText( "Flags:" ).Box( left: offsetArgTitle )
-                                    .AddBelow( c.Flags.Select( f => f.Names.Box( left: offsetArg, right: descriptionOffset - f.Names.Width - offsetArg )
-                                                                             .AddRight( f.Description ) ) ) )
-                    .AddBelow( TextBlock.EmptyString ) )
-            );
+                  text
+                is trimmed  
 
-        string result = help.RenderAsString();
 
-        Console.Write( result );
-        result.ShouldContain( """
-            ze command <a1>              Only here to
-                                         test display (trimEnd is the default).
-               <a1>                      Argument n°1 is
-                                         required like
-                                         all arguments.
-               Options:
-                 --options, -o           [Multiple] This description should be prefixed with [Multiple].
-                 --single, -s            This description one is not multiple.
-                 --others, -o2           [Multiple] Also multiple and
-                                         on multiple
-                                         lines.
-               Flags:
-                 --flag1, -f1            Flag n°1.
-                 --flag2, -f2            Flag n°2.
+                """ );
+            line.RenderAsString().ShouldBe( """
+                text
+                is trimmed
 
-            """ );
+                """ );
+        }
     }
 
     [Test]
@@ -227,6 +148,115 @@ public class ScreenTextTests
 
                 """ );
         }
+    }
+
+    [Test]
+    public void CommandLineArguments_remaining_args()
+    {
+        var cmdLine = new CommandLineArguments( [ "some", "a",
+                                                  "-fX",
+                                                  "-f1",
+                                                  "-o1", "O1",
+                                                  "alien",
+                                                  "-om", "OM1", "OM2",
+                                                  "-os", "OS",
+                                                  "--fY",
+                                                  "-o1", "O1TOOmuch",
+                                                  "alien",
+                                                  "-om", "OM3",
+                                                  "-unk" ] );
+        cmdLine.EatArgument().ShouldBe( "some" );
+        cmdLine.EatArgument().ShouldBe( "a" );
+        cmdLine.EatSingleOption( "-os" ).ShouldBe( "OS" );
+        cmdLine.EatSingleOption( "-o1" ).ShouldBe( "O1" );
+        cmdLine.EatMultipleOption( "-om" ).ShouldBe( ["OM1", "OM2", "OM3"] );
+        cmdLine.EatFlag( "-f1" ).ShouldBeTrue();
+
+        cmdLine.Close( TestHelper.Monitor ).ShouldBe( false );
+        var header = ScreenHelpers.CreateDisplayHelpHeader( cmdLine );
+        string result = header.RenderAsString();
+
+        Console.Write( result );
+        result.ShouldBe( """
+                    Arguments: some a -fX -f1 -o1 O1 alien -om OM1 OM2 -os OS --fY -o1 O1TOOmuch alien -om OM3 -unk
+                                      └─┘            └───┘                    └──┘ └─┘ └───────┘ └───┘         └──┘
+
+                    
+                    """ );
+
+    }
+
+    sealed class ZCommand : Command
+    {
+        public ZCommand()
+            : base( null,
+                    "ze command",
+                    """
+
+                       Only here to
+                    test display.
+                    (text is trimmed.)   
+
+
+
+
+                    """,
+                    arguments: [("a1", """
+                        Argument n°1 is
+                        required like
+                        all arguments. 
+                        """)],
+                    options: [
+                        (["--options", "-o"], "This description should be prefixed with [Multiple].", Multiple: true),
+                        (["--single", "-s"], "This description one is not multiple.", Multiple: false),
+                        (["--others", "-o2"], """
+                        Also multiple and
+                        on multiple
+                        lines.
+                        """, Multiple: true),
+                        ],
+                    flags: [
+                        (["--flag1", "-f1"], "Flag n°1."),
+                        (["--flag2", "-f2"], "Flag n°2.")
+                        ] )
+        {
+        }
+
+        protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
+        {
+            return ValueTask.FromResult( true );
+        }
+    }
+
+    [Test]
+    public void basic_Console_help_display_for_plugin_section()
+    {
+        var commands = CKliCommands.Commands.GetForHelp( "plugin", null );
+        commands.Add( new CommandHelp( new ZCommand() ) );
+
+        var help = ScreenHelpers.CreateDisplayHelp( commands, new CommandLineArguments( [] ), default, default, IScreen.MaxScreenWidth );
+
+        string result = help.RenderAsString();
+
+        Console.Write( result );
+        result.ShouldContain( """
+            > ze command <a1>              Only here to
+            │                              test display.
+            │                              (text is trimmed.)
+            │    <a1>                      Argument n°1 is
+            │                              required like
+            │                              all arguments.
+            │    Options:
+            │      --options, -o           [Multiple] This description should be prefixed with [Multiple].
+            │      --single, -s            This description one is not multiple.
+            │      --others, -o2           [Multiple] Also multiple and
+            │                              on multiple
+            │                              lines.
+            │    Flags:
+            │      --flag1, -f1            Flag n°1.
+            │      --flag2, -f2            Flag n°2.
+
+            """ );
     }
 
 }

@@ -1,7 +1,9 @@
 using System;
+using System.Diagnostics;
 
 namespace CKli.Core;
 
+[DebuggerDisplay( "{ForeColor}/{BackColor}" )]
 public readonly struct Color : IEquatable<Color>
 {
     readonly byte _color;

@@ -27,7 +27,7 @@ public class CommandHelp
             args[i] = (TextBlock.FromText( $"<{a.Name}>" ), TextBlock.FromText( a.Description ));
         }
         _arguments = ImmutableCollectionsMarshal.AsImmutableArray( args );
-        _commandPathAndArgs = _commandPath.AddRight( _arguments.Select( a => a.Name.Box( left: 1 ) ) );
+        _commandPathAndArgs = _commandPath.AddRight( _arguments.Select( a => a.Name.Box( paddingLeft: 1 ) ) );
         // Options.
         _options = ToRenderableOptions( c.Options );
         // Flags.

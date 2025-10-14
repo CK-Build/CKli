@@ -38,7 +38,7 @@ sealed class CKliPlugin : Command
             }
             compileMode = mode;
         }
-        return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
+        return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && Plugin( monitor, context, compileMode ) );
     }
 

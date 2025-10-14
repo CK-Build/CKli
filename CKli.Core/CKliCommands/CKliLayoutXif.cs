@@ -21,7 +21,7 @@ sealed class CKliLayoutXif : Command
                                                                     CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
-        return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
+        return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && LayoutXif( monitor, context ) );
     }
 

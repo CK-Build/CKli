@@ -2,7 +2,9 @@ using CK.Core;
 using CommunityToolkit.HighPerformance;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace CKli.Core;
 
@@ -11,8 +13,12 @@ namespace CKli.Core;
 /// </summary>
 public sealed class CommandLineArguments
 {
+    readonly ImmutableArray<string> _initial;
     readonly List<string> _args;
     readonly bool _hasHelp;
+    Command? _foundCommand;
+    HashSet<string>? _optionOrFlagNames;
+    ImmutableArray<(string Argument, bool Remaining)> _remainingArguments;
 
     /// <summary>
     /// Initializes a new <see cref="CommandLineArguments"/> from the initial process arguments.
@@ -20,6 +26,7 @@ public sealed class CommandLineArguments
     /// <param name="arguments">The initial arguments.</param>
     public CommandLineArguments( string[] arguments )
     {
+        _initial = [..arguments];
         _args = arguments.ToList();
         _hasHelp = EatFlag( "--help", "-h", "-?" );
     }
@@ -40,11 +47,28 @@ public sealed class CommandLineArguments
     public int RemainingCount => _args.Count;
 
     /// <summary>
-    /// Extracts the next required argument.
+    /// Gets the found command set once by <see cref="SetFoundCommand(Command)"/>.
     /// </summary>
-    /// <returns>The next agument.</returns>
+    public Command? FoundCommand => _foundCommand;
+
+    /// <summary>
+    /// Gets the initial arguments.
+    /// </summary>
+    public ImmutableArray<string> InitialArguments => _initial;
+
+    /// <summary>
+    /// Gets whether <see cref="Close(IActivityMonitor, out ImmutableArray{ValueTuple{string, bool}})"/> has been called.
+    /// </summary>
+    public bool IsClosed => !_remainingArguments.IsDefault;
+
+    /// <summary>
+    /// Extracts the next required argument. <see cref="RemainingCount"/> must be positive otherwise
+    /// an <see cref="InvalidOperationException"/> is thrown.
+    /// </summary>
+    /// <returns>The next argument.</returns>
     public string EatArgument()
     {
+        CheckOpened();
         Throw.CheckState( "There is no more expected arguments.", _args.Count > 0 );
         var s = _args[0];
         _args.RemoveAt( 0 );
@@ -58,14 +82,21 @@ public sealed class CommandLineArguments
     /// <returns>The option value or null if not found.</returns>
     public string? EatSingleOption( params IEnumerable<string> names )
     {
+        CheckOpened();
+        return DoEatSingleOption( names, out _ );
+    }
+
+    string? DoEatSingleOption( IEnumerable<string> names, out int idx )
+    {
+        idx = -1;
         foreach( var n in names )
         {
-            int idx = _args.IndexOf( n );
+            idx = _args.IndexOf( n );
             if( idx >= 0 && ++idx < _args.Count )
             {
                 var s = _args[idx];
                 _args.RemoveAt( idx );
-                _args.RemoveAt( idx - 1 );
+                _args.RemoveAt( --idx );
                 return s;
             }
         }
@@ -73,27 +104,51 @@ public sealed class CommandLineArguments
     }
 
     /// <summary>
-    /// Extracts an option values.
+    /// Extracts a multiple optional values.
     /// </summary>
     /// <param name="names"></param>
     /// <param name="names">The option names.</param>
     /// <returns>The option values or null if not found.</returns>
     public string[]? EatMultipleOption( params IEnumerable<string> names )
     {
-        var s1 = EatSingleOption( names );
+        CheckOpened();
+        var s1 = DoEatSingleOption( names, out int idx );
         if( s1 == null ) return null;
-
-        var s2 = EatSingleOption( names );
-        if( s2 == null ) return [s1];
-
-        List<string> collector = [s1, s2];
-        var more = EatSingleOption( names );
-        while( more != null )
+        var result = new List<string>() { s1 };
+        for(; ; )
         {
-            collector.Add( more );
-            more = EatSingleOption( names );
+            while( idx >= 0 && idx < _args.Count )
+            {
+                var candidate = _args[idx];
+                if( IsKnownOptionOrFlagName( candidate ) )
+                {
+                    break;
+                }
+                result.Add( candidate );
+                _args.RemoveAt( idx );
+            }
+            s1 = DoEatSingleOption( names, out idx );
+            if( s1 == null ) break;
+            result.Add( s1 );
         }
-        return collector.ToArray();
+        return result.ToArray();
+    }
+
+    bool IsKnownOptionOrFlagName( string candidate )
+    {
+        if( _foundCommand != null )
+        {
+            // When the command is known, we filter the exact expected options and flag names:
+            // an option value CAN be "--something" (or "-s"). It is up to the command handler to
+            // accept or reject this input.
+            _optionOrFlagNames ??= new HashSet<string>( _foundCommand.Options.SelectMany( o => o.Names )
+                                                                             .Concat( _foundCommand.Flags.SelectMany( f => f.Names ) ) );
+            return _optionOrFlagNames.Contains( candidate );
+        }
+        // We dont' know the command. Use the hyphen as a discriminator.
+        // This doesn't really matter: when the command is not found, arguments analysis is not done:
+        // this is mainly for coherenrency (and to ease test: no command needed).
+        return candidate[0] == '-';
     }
 
     /// <summary>
@@ -103,36 +158,83 @@ public sealed class CommandLineArguments
     /// <returns>True if the flag was specified, false otherwise.</returns>
     public bool EatFlag( params IEnumerable<string> names )
     {
+        CheckOpened();
         bool result = false;
         foreach( var n in names )
         {
-            result |= _args.Remove( n );
+            int idx = _args.IndexOf( n );
+            if( idx >= 0 )
+            {
+                _args.RemoveAt( idx );
+                result = true;
+            }
         }
         return result;
+    }
+
+    void CheckOpened() => Throw.CheckState( !IsClosed );
+
+    /// <summary>
+    /// Gets the initial arguments with remaining ones or an empty array on success.
+    /// <para>
+    /// Must be called after <see cref="Close(IActivityMonitor)"/> otherwise an <see cref="InvalidOperationException"/> is thrown.
+    /// </para>
+    /// </summary>
+    /// <returns></returns>
+    public ImmutableArray<(string Argument, bool Remaining)> GetRemainingArguments()
+    {
+        Throw.CheckState( IsClosed );
+        return _remainingArguments;
     }
 
     /// <summary>
     /// Must be called after having eaten all the expected arguments, options and flags.
     /// The command must not be executed if this returns false.
+    /// <para>
+    /// This can be safely called multiple time.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The required monitor to signal the error.</param>
     /// <returns>True if the command line is empty, false otherwise.</returns>
-    public bool CheckNoRemainingArguments( IActivityMonitor monitor )
+    public bool Close( IActivityMonitor monitor )
     {
+        if( !_remainingArguments.IsDefault ) return _remainingArguments.IsEmpty;
         if( _args.Count > 0 )
         {
             monitor.Error( $"Unexpected arguments: '{_args.Concatenate("', '")}'." );
+            _remainingArguments = ComputeRemainingArguments();
             return false;
         }
+        _remainingArguments = [];
         return true;
     }
 
-    internal ReadOnlySpan<string> Remaining => _args.AsSpan();
-
-    internal void EatPath( int pathCount )
+    /// <summary>
+    /// Sets the found command (if any) and eats the first <paramref name="pathCount"/> arguments.
+    /// </summary>
+    /// <param name="found">The found command.</param>
+    internal void SetFoundCommand( Command? found, int pathCount )
     {
-        Throw.DebugAssert( pathCount >= 0 && pathCount <= _args.Count );
+        Throw.CheckState( FoundCommand == null );
+        CheckOpened();
         _args.RemoveRange( 0, pathCount );
+        _foundCommand = found;
+    }
+
+    ImmutableArray<(string Argument, bool Remaining)> ComputeRemainingArguments()
+    {
+        var all = _initial.Select( n => (Argument: n, Remaining: false) ).ToArray();
+        foreach( var a in _args )
+        {
+            int idx = _initial.LastIndexOf( a );
+            Throw.DebugAssert( idx >= 0 );
+            while( all[idx].Remaining )
+            {
+                idx = _initial.LastIndexOf( a, idx - 1 );
+            }
+            all[idx].Remaining = true;
+        }
+        return ImmutableCollectionsMarshal.AsImmutableArray( all );
     }
 
 }

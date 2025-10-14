@@ -125,10 +125,13 @@ public abstract partial class Command
     public override string ToString() => $"[CKli] {_commandPath}";
 
     /// <summary>
-    /// Command handler implementation. <paramref name="cmdLine"/> is ready to be consumed (and must be
-    /// consumed). <see cref="CommandLineArguments.CheckNoRemainingArguments(IActivityMonitor)"/> must be called
-    /// before executing the command. The number of required <see cref="Arguments"/> is guaranteed to exist (but may be
-    /// options or flags, this has to be handled).
+    /// Command handler implementation. <paramref name="cmdLine"/> is ready to be consumed, the number of
+    /// required <see cref="Arguments"/> is guaranteed to exist in the <paramref name="cmdLine"/> (and must be
+    /// consumed).
+    /// <para>
+    /// <see cref="CommandLineArguments.Close(IActivityMonitor)"/> must ALWAYS be called
+    /// before executing the command and the execution skipped if it returned false.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">The basic command context.</param>

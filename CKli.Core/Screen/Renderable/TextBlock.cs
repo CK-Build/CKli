@@ -14,6 +14,9 @@ public abstract class TextBlock : IRenderable
     readonly internal int _width;
     readonly TextStyle _style;
 
+    /// <summary>
+    /// An empty singleton empty block: typically used as a new line.
+    /// </summary>
     public static readonly TextBlock EmptyString = new Empty();
 
     private protected TextBlock( string text, int width, TextStyle style )
@@ -27,7 +30,15 @@ public abstract class TextBlock : IRenderable
 
     public int Width => _width;
 
-    public abstract SegmentRenderer CollectRenderer( int line, SegmentRenderer previous );
+    public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
+    {
+        // Texts have no notion of context. Lines are drawn where they are told to draw,
+        // padding and margins are not their concern (it's the Box responsibility): we
+        // ignore the actualHeight.
+        BuildSegmentTree( line, parent );
+    }
+
+    protected abstract void BuildSegmentTree( int line, SegmentRenderer parent );
 
     public abstract TextBlock SetTextWidth( int width );
 
@@ -35,22 +46,24 @@ public abstract class TextBlock : IRenderable
     /// Creates a mono or multi line block of text.
     /// </summary>
     /// <param name="text">The raw text.</param>
+    /// <param name="style">Optional text style.</param>
     /// <returns>The renderable.</returns>
     [return: NotNullIfNotNull( nameof( text ) )]
-    public static TextBlock? FromText( string? text )
+    public static TextBlock? FromText( string? text, TextStyle style = default )
     {
         if( text == null ) return null;
         var sText = text.AsSpan();
-        sText = sText.Trim();
+        sText = sText.TrimStart();
+        int start = text.Length - sText.Length;
+        sText = sText.TrimEnd();
         if( sText.Length == 0 ) return EmptyString;
         var lineCount = sText.Count( '\n' ) + 1;
         if( lineCount == 1 )
         {
-            return new MonoLine( text, sText.Length );
+            return new MonoLine( text, sText.Length, style );
         }
         int witdh = 0;
         var b = ImmutableArray.CreateBuilder<(int, int)>( lineCount );
-        int start = 0;
         int idx = sText.IndexOf( "\n" );
         do
         {
@@ -77,7 +90,7 @@ public abstract class TextBlock : IRenderable
         }
         while( idx >= 0 );
         b.Add( (start, sText.Length) );
-        return new MultiLine( text, b.MoveToImmutable(), witdh );
+        return new MultiLine( text, b.MoveToImmutable(), witdh, style );
 
     }
 
@@ -85,8 +98,8 @@ public abstract class TextBlock : IRenderable
     {
         static readonly SearchValues<char> _cutChars = SearchValues.Create( " ,;!-?." );
 
-        public MonoLine( string text, int width, TextEffect effect = TextEffect.Regular )
-            : base( text, width, new TextStyle( effect ) )
+        public MonoLine( string text, int width, TextStyle style )
+            : base( text, width, style )
         {
         }
 
@@ -138,60 +151,50 @@ public abstract class TextBlock : IRenderable
             return w;
         }
 
-        public override SegmentRenderer CollectRenderer( int line, SegmentRenderer previous )
+        protected override void BuildSegmentTree( int line, SegmentRenderer parent )
         {
             Throw.DebugAssert( line >= 0 );
             if( line == 0 )
             {
-                return new Renderer( previous, _width, _style, _text );
+                _ = new Renderer( parent, _width, _style, _text );
             }
-            return SegmentRenderer.Empty( previous );
         }
 
         sealed class Renderer( SegmentRenderer previous, int length, TextStyle style, string text ) : SegmentRenderer( previous, length, style )
         {
-            protected override void Render( IRenderTarget target ) => target.Append( text.AsSpan( 0, Length ), FinalStyle );
+            protected override void Render() => Target.Append( text.AsSpan( 0, Length ), FinalStyle );
         }
 
         public override string ToString() => _text;
     }
 
 
-    sealed class MultiLineRenderer( SegmentRenderer previous, TextStyle style, string text, (int Start, int Length) range ) : SegmentRenderer( previous, range.Length, style )
+    sealed class MultiLineRenderer( SegmentRenderer previous, TextStyle style, string text, (int Start, int Length) range )
+        : SegmentRenderer( previous, range.Length, style )
     {
-        protected override void Render( IRenderTarget target ) => target.Append( text.AsSpan( range.Start, range.Length ), FinalStyle );
+        protected override void Render() => Target.Append( text.AsSpan( range.Start, range.Length ), FinalStyle );
 
-        public static SegmentRenderer Create( SegmentRenderer previous,
-                                              int line,
-                                              string text,
-                                              ImmutableArray<(int Start, int Length)> lines,
-                                              TextStyle style )
+        public static void Create( SegmentRenderer parent,
+                                   int line,
+                                   string text,
+                                   ImmutableArray<(int Start, int Length)> lines,
+                                   TextStyle style )
         {
             Throw.DebugAssert( line >= 0 );
             if( line < lines.Length )
             {
-                return new MultiLineRenderer( previous, style, text, lines[line] );
+                _ = new MultiLineRenderer( parent, style, text, lines[line] );
             }
-            return Empty( previous );
         }
     }
 
-    sealed class MultiLine : TextBlock
+    sealed class MultiLine( string text, ImmutableArray<(int, int)> lines, int width, TextStyle style ) : TextBlock( text, width, style )
     {
-        readonly ImmutableArray<(int Start, int Length)> _lines;
-
-        public MultiLine( string text, ImmutableArray<(int, int)> lines, int width, TextEffect effect = TextEffect.Regular )
-            : base( text, width, new TextStyle( effect ) )
-        {
-            _lines = lines;
-        }
+        readonly ImmutableArray<(int Start, int Length)> _lines = lines;
 
         public override int Height => _lines.Length;
 
-        public override SegmentRenderer CollectRenderer( int line, SegmentRenderer previous )
-        {
-            return MultiLineRenderer.Create( previous, line, _text, _lines, _style );
-        }
+        protected override void BuildSegmentTree( int line, SegmentRenderer parent ) => MultiLineRenderer.Create( parent, line, _text, _lines, _style );
 
         public override TextBlock SetTextWidth( int width )
         {
@@ -231,10 +234,7 @@ public abstract class TextBlock : IRenderable
 
         public override int Height => _lines.Length;
 
-        public override SegmentRenderer CollectRenderer( int line, SegmentRenderer previous )
-        {
-            return MultiLineRenderer.Create( previous, line, _text, _lines, _style );
-        }
+        protected override void BuildSegmentTree( int line, SegmentRenderer previous ) => MultiLineRenderer.Create( previous, line, _text, _lines, _style );
 
         public override TextBlock SetTextWidth( int width ) => _origin.SetTextWidth( width );
     }
@@ -248,7 +248,7 @@ public abstract class TextBlock : IRenderable
 
         public override int Height => 1;
 
-        public override SegmentRenderer CollectRenderer( int line, SegmentRenderer previous ) => SegmentRenderer.Empty( previous );
+        protected override void BuildSegmentTree( int line, SegmentRenderer parent ) { }
 
         public override TextBlock SetTextWidth( int width ) => this;
     }

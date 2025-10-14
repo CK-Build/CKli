@@ -256,6 +256,23 @@ sealed partial class ReflectionPluginCollector
             b.Append( ' ', offset ).Append( "protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )" )
                                    .AppendLine();
             b.Append( ' ', offset ).Append( '{' ).AppendLine();
+            offset += 4;
+
+            for( int i = 0; i < c.Arguments.Length; i++ )
+            {
+                b.Append( ' ', offset ).Append( "var a" ).Append( i ).Append( " = cmdLine.EatArgument();" ).AppendLine();
+            }
+            for( int i = 0; i < c.Options.Length; i++ )
+            {
+                b.Append( ' ', offset ).Append( "var o" ).Append( i ).Append( " = cmdLine.Eat" )
+                                       .Append( c.Options[i].Multiple ? "Multiple" : "Single" )
+                                       .Append( "Option( Options[" ).Append( i ).Append( "].Names );" ).AppendLine();
+            }
+            for( int i = 0; i < c.Flags.Length; i++ )
+            {
+                b.Append( ' ', offset ).Append( "var f" ).Append( i ).Append( " = cmdLine.EatFlag( Flags[" ).Append( i ).Append( "].Names );" ).AppendLine();
+            }
+            b.Append( ' ', offset ).Append( "if( !cmdLine.Close( monitor ) ) return ValueTask.FromResult( false );" ).AppendLine();
 
             b.Append( ' ', offset ).Append( "return " );
             switch( c.ReturnType )
@@ -275,6 +292,7 @@ sealed partial class ReflectionPluginCollector
                     b.Append( " );" );
                     break;
             }
+            offset -= 4;
             b.AppendLine().Append( ' ', offset ).Append( '}' ).AppendLine();
 
             b.Append( '}' ).AppendLine();
@@ -313,20 +331,15 @@ sealed partial class ReflectionPluginCollector
                 b.Append( ' ', offset ).Append( "monitor" );
                 for( int i = 0; i < c.Arguments.Length; i++ )
                 {
-                    b.Append( ',' ).AppendLine();
-                    b.Append( ' ', offset ).Append( "cmdLine.EatArgument()" );
+                    b.Append( ", a" ).Append( i );
                 }
                 for( int i = 0; i < c.Options.Length; i++ )
                 {
-                    b.Append( ',' ).AppendLine();
-                    b.Append( ' ', offset ).Append( "cmdLine.Eat" )
-                                           .Append( c.Options[i].Multiple ? "Multiple" : "Single" )
-                                           .Append( "Option( Options[" ).Append( i ).Append( "].Names )" );
+                    b.Append( ", o" ).Append( i );
                 }
                 for( int i = 0; i < c.Flags.Length; i++ )
                 {
-                    b.Append( ',' ).AppendLine();
-                    b.Append( ' ', offset ).Append( "cmdLine.EatFlag( Flags[" ).Append( i ).Append( "].Names )" );
+                    b.Append( ", f" ).Append( i );
                 }
                 b.Append( " )" );
             }

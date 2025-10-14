@@ -1,9 +1,11 @@
 using CK.Core;
 using CK.Monitoring;
 using System;
+using System.Diagnostics;
 
 namespace CKli.Core;
 
+[DebuggerDisplay( "{Color}-{Effect}" )]
 public readonly struct TextStyle : IEquatable<TextStyle>
 {
     const int _colorBit = 1 << 7;
@@ -86,4 +88,6 @@ public readonly struct TextStyle : IEquatable<TextStyle>
     public static bool operator ==( TextStyle left, TextStyle right ) => left.Equals( right );
 
     public static bool operator !=( TextStyle left, TextStyle right ) => !(left == right);
+
+
 }

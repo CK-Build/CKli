@@ -27,7 +27,7 @@ sealed class CKliPush : Command
         bool all = cmdLine.EatFlag( "--all" );
         bool stackOnly = cmdLine.EatFlag( "--stack-only" );
         bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
-        return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
+        return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && Push( monitor, context, all, stackOnly, continueOnError ) );
     }
 

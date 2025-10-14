@@ -43,6 +43,7 @@ sealed class ReflectionPluginCommand : PluginCommand
         {
             args[i + Arguments.Length + Options.Length] = cmdLine.EatFlag( Flags[i].Names );
         }
+        if( !cmdLine.Close( monitor ) ) return ValueTask.FromResult( false );
         switch( ReturnType )
         {
             case MethodAsyncReturn.None:

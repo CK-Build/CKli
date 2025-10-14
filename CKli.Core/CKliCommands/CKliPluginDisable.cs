@@ -20,7 +20,7 @@ sealed class CKliPluginDisable : Command
                                                                     CommandLineArguments cmdLine )
     {
         var name = cmdLine.EatArgument();
-        return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
+        return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && CKliPluginEnable.EnableOrDisablePlugin( monitor, context, name, enable: false ) ); 
     }
 }

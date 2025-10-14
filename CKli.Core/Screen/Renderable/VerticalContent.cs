@@ -43,9 +43,12 @@ public sealed class VerticalContent : IRenderable
 
     public int Width => _width;
 
-    public SegmentRenderer CollectRenderer( int line, SegmentRenderer previous )
+    public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
     {
+        Throw.CheckArgument( line >= 0 && line < actualHeight && actualHeight >= Height );
         Throw.DebugAssert( line >= 0 );
+        // There is currently no "VJustify". It could be bottom/top/center/distribute.
+        // We ignore the actualHeight.
         if( line < _height )
         {
             foreach( var cell in _cells )
@@ -53,12 +56,12 @@ public sealed class VerticalContent : IRenderable
                 int next = line - cell.Height;
                 if( next < 0 )
                 {
-                    return cell.CollectRenderer( line, previous );
+                    cell.BuildSegmentTree( line, parent, cell.Height );
+                    return;
                 }
                 line = next;
             }
         }
-        return previous;
     }
 
     public VerticalContent Append( ReadOnlySpan<IRenderable?> verticalContent )

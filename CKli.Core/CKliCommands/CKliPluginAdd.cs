@@ -29,7 +29,7 @@ sealed class CKliPluginAdd : Command
             return ValueTask.FromResult( false );
         }
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
-        return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
+        return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && PluginAdd( monitor, context, package, allowLTS ) );
     }
 

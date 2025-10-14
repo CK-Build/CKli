@@ -25,7 +25,7 @@ sealed class CKliFetch : Command
     {
         bool all = cmdLine.EatFlag( "--all" );
         bool fromAllRemotes = cmdLine.EatFlag( "--from-all-remotes" );
-        return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
+        return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && Fetch( monitor, context, all, fromAllRemotes ) );
     }
 

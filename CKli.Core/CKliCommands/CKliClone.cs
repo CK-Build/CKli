@@ -34,7 +34,7 @@ sealed class CKliClone : Command
         }
         bool p = cmdLine.EatFlag( "--private" );
         bool a = cmdLine.EatFlag( "--allow-duplicate" );
-        if( !cmdLine.CheckNoRemainingArguments( monitor ) )
+        if( !cmdLine.Close( monitor ) )
         {
             return ValueTask.FromResult( false );
         }

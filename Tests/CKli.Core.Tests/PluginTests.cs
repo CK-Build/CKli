@@ -32,8 +32,15 @@ public class PluginTests
             logs.ShouldContain( "New 'MyFirstOne' in world 'One' plugin certainly requires some development." );
 
             var screen = context.Screen.ToString();
-            screen.ShouldContain( "1 loaded plugins, 1 configured plugins." );
-            screen.ShouldContain( "Message from 'MyFirstOne' plugin." );
+            screen.ShouldContain( """
+                1 loaded plugins, 1 configured plugins.
+
+                > MyFirstOne     <MyFirstOne />
+                │    Available   
+                │ Message:
+                │    Message from 'MyFirstOne' plugin.
+
+                """ );
         }
 
         // ckli plugin remove MyFirstOne

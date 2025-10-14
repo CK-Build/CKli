@@ -51,27 +51,26 @@ public sealed class CommandNamespace
 
     internal void Clear() => _commands.Clear();
 
-    internal bool TryFindForExecution( IActivityMonitor monitor, CommandLineArguments cmdLine, out Command? cmd, out string? helpPath )
+    internal bool TryFindForExecution( IActivityMonitor monitor, CommandLineArguments cmdLine, out string? helpPath )
     {
-        LocateCommand( cmdLine, out cmd, out helpPath );
-        if( cmd == null )
+        LocateCommand( cmdLine, out helpPath );
+        if( cmdLine.FoundCommand == null )
         {
-            cmd = null;
             return true;
         }
-        if( cmd.Arguments.Length > cmdLine.RemainingCount )
+        if( cmdLine.FoundCommand.Arguments.Length > cmdLine.RemainingCount )
         {
-            monitor.Error( $"Command '{cmd.CommandPath}' requires {cmd.Arguments.Length} arguments." );
+            monitor.Error( $"Command '{cmdLine.FoundCommand.CommandPath}' requires {cmdLine.FoundCommand.Arguments.Length} arguments." );
             return false;
         }
         return true;
     }
 
-    void LocateCommand( CommandLineArguments cmdLine, out Command? cmd, out string? path )
+    void LocateCommand( CommandLineArguments cmdLine, out string? path )
     {
-        cmd = null;
+        Command? cmd = null;
         path = null;
-        var sArgs = cmdLine.Remaining;
+        var sArgs = cmdLine.InitialArguments;
         if( sArgs.Length == 0 ) return;
 
         int pathCount = 0;
@@ -92,7 +91,7 @@ public sealed class CommandNamespace
             b.Append( ' ' ).Append( sArgs[pathCount] );
             nextPath = b.ToString();
         }
-        cmdLine.EatPath( pathCount );
+        cmdLine.SetFoundCommand( cmd, pathCount );
     }
 
 }

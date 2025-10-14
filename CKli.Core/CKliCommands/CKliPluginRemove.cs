@@ -24,7 +24,7 @@ sealed class CKliPluginRemove : Command
     {
         string pluginName = cmdLine.EatArgument();
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
-        return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
+        return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && CKliPluginCreate.CreateOrRemovePlugin( monitor, context, pluginName, allowLTS, create: false ) );
     }
 

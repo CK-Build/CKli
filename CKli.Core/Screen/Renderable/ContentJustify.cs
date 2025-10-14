@@ -8,6 +8,9 @@ namespace CKli.Core;
 [Flags]
 public enum ContentJustify
 {
+    /// <summary>
+    /// No justification. 
+    /// </summary>
     None = 0,
 
     /// <summary>
@@ -23,7 +26,7 @@ public enum ContentJustify
     /// <summary>
     /// Horizontal center alignment (both <see cref="HLeft"/> and <see cref="HRight"/> are set).
     /// </summary>
-    HCenter = VTop | VBottom,
+    HCenter = HLeft | HRight,
 
     /// <summary>
     /// Vertical top alignment (or centered when <see cref="VBottom"/> is also set).

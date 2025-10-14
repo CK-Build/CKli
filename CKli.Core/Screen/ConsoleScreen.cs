@@ -51,13 +51,13 @@ sealed class ConsoleScreen : IScreen
         {
             Console.BackgroundColor = ConsoleColor.Black;
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write( "Error:   " );
+            Console.Write( "Warning: " );
         }
         else
         {
             Console.BackgroundColor = ConsoleColor.Red;
             Console.ForegroundColor = ConsoleColor.Black;
-            Console.Write( "Warning: " );
+            Console.Write( "Error: " );
         }
         Console.BackgroundColor = ConsoleColor.Black;
         Console.ForegroundColor = ConsoleColor.White;

@@ -24,7 +24,7 @@ sealed class CKliRepoRemove : Command
     {
         string nameOrUrl = cmdLine.EatArgument();
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
-        return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
+        return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && RepoRemove( monitor, context, nameOrUrl, allowLTS ) );
     }
 

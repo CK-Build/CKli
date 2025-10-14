@@ -25,7 +25,7 @@ sealed class CKliPull : Command
     {
         bool all = cmdLine.EatFlag( "--all" );
         bool skipPullStack = cmdLine.EatFlag( "--skip-pull-stack" );
-        return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
+        return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && Pull( monitor, context, all, skipPullStack ) );
 
 

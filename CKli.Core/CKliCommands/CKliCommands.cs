@@ -68,13 +68,13 @@ public static class CKliCommands
         // one cannot mix the 2 kind of commands: some CKli commands loads the current Stack and World if
         // needed, we cannot pre-load the current World here.
         // When TryFindForExecution returns false, the command exists but it misses one or more arguments.
-        if( !_commands.TryFindForExecution( monitor, cmdLine, out var cmd, out var helpPath ) )
+        if( !_commands.TryFindForExecution( monitor, cmdLine, out var helpPath ) )
         {
             context.Screen.DisplayHelp( _commands.GetForHelp( helpPath, null ), cmdLine );
             return ValueTask.FromResult( false );
         }
         // If it's a CKli command, execute it or, if the --help has bee requested, display the help.
-        if( cmd != null )
+        if( cmdLine.FoundCommand != null )
         {
             if( cmdLine.HasHelp )
             {
@@ -84,7 +84,7 @@ public static class CKliCommands
                                             CKliRootEnv.GlobalFlags?.Invoke() ?? default );
                 return ValueTask.FromResult( true );
             }
-            return cmd.HandleCommandAsync( monitor, context, cmdLine );
+            return ExecuteAsync( monitor, context, cmdLine );
         }
         // Not a CKli command. Opens the current World and tries to find a plugin command.
         var (stack, world) = StackRepository.TryOpenWorldFromPath( monitor, context, out bool error, skipPullStack: true );
@@ -105,8 +105,8 @@ public static class CKliCommands
         try
         {
             // We are in a World.
-            if( !world.Commands.TryFindForExecution( monitor, cmdLine, out cmd, out helpPath )
-                || cmd == null )
+            if( !world.Commands.TryFindForExecution( monitor, cmdLine, out helpPath )
+                || cmdLine.FoundCommand == null )
             {
                 // No luck.
                 // Displays the help in the context of the World. The World's commands
@@ -118,7 +118,7 @@ public static class CKliCommands
                 return ValueTask.FromResult( false );
             }
             // We have a plugin command.
-            Throw.DebugAssert( "This cannot be a CKli command: we'd have located it initially.", cmd.PluginTypeInfo != null );
+            Throw.DebugAssert( "This cannot be a CKli command: we'd have located it initially.", cmdLine.FoundCommand.PluginTypeInfo != null );
             if( cmdLine.HasHelp )
             {
                 // If the --help has bee requested, displys the help.
@@ -129,12 +129,12 @@ public static class CKliCommands
                                             CKliRootEnv.GlobalFlags?.Invoke() ?? default );
                 return ValueTask.FromResult( true );
             }
-            if( cmd.IsDisabled )
+            if( cmdLine.FoundCommand.IsDisabled )
             {
-                monitor.Error( $"Command '{cmd.CommandPath}' exists but its type '{cmd.PluginTypeInfo.TypeName}' is disabled in plugin '{cmd.PluginTypeInfo.Plugin.FullPluginName}'." );
+                monitor.Error( $"Command '{cmdLine.FoundCommand.CommandPath}' exists but its type '{cmdLine.FoundCommand.PluginTypeInfo.TypeName}' is disabled in plugin '{cmdLine.FoundCommand.PluginTypeInfo.Plugin.FullPluginName}'." );
                 return ValueTask.FromResult( false );
             }
-            return cmd.HandleCommandAsync( monitor, context, cmdLine );
+            return ExecuteAsync( monitor, context, cmdLine );
         }
         finally
         {
@@ -142,4 +142,29 @@ public static class CKliCommands
         }
     }
 
+    static async ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
+    {
+        Throw.DebugAssert( cmdLine.FoundCommand != null );
+        var success = await cmdLine.FoundCommand.HandleCommandAsync( monitor, context, cmdLine );
+        if( success && !cmdLine.IsClosed )
+        {
+            monitor.Error( $"""
+                The command '{cmdLine.FoundCommand.CommandPath}' implementation in '{cmdLine.FoundCommand.PluginTypeInfo?.TypeName ?? "CKli"}' is buggy.
+                The command line MUST be closed before executing the command.
+                """ );
+            return false;
+        }
+        if( cmdLine.IsClosed && cmdLine.RemainingCount > 0 )
+        {
+            if( success )
+            {
+                monitor.Error( $"""
+                    The command '{cmdLine.FoundCommand.CommandPath}' implementation in '{cmdLine.FoundCommand.PluginTypeInfo?.TypeName ?? "CKli"}' is buggy.
+                    Arguments remains in the command line but the command handler returned true.
+                    """ );
+            }
+            context.Screen.DisplayHelp( [new CommandHelp( cmdLine.FoundCommand )], cmdLine, default, default );
+        }
+        return success;
+    }
 }

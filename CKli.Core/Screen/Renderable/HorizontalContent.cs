@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Buffers;
 using System.Collections.Immutable;
+using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 
 namespace CKli.Core;
@@ -43,33 +44,19 @@ public sealed class HorizontalContent : IRenderable
 
     public int Width => _width;
 
-    public SegmentRenderer CollectRenderer( int line, SegmentRenderer previous )
+    public ImmutableArray<IRenderable> Cells => _cells;
+
+    public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
     {
-        Throw.DebugAssert( line >= 0 );
+        Throw.CheckArgument( line >= 0 && line < actualHeight );
         if( line < _height )
         {
-            return new Renderer( previous, _width, previous.CreateRendererGroup( _cells, line ) );
-        }
-        return previous;
-    }
-
-    sealed class Renderer : SegmentRenderer
-    {
-        readonly SegmentRenderer _head;
-
-        public Renderer( SegmentRenderer parent, int length, SegmentRenderer head )
-            : base( parent, length )
-        {
-            _head = head;
-        }
-
-        protected override void Render( IRenderTarget target )
-        {
-            var s = _head.Next;
-            while( s != null )
+            foreach( var cell in _cells )
             {
-                s.Render();
-                s = s.Next;
+                // This is currently the only place where the actualHeight is relevant:
+                // children now know their vertical playground that is the max(Height) of
+                // their siblings.
+                cell.BuildSegmentTree( line, parent, actualHeight );
             }
         }
     }

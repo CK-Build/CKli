@@ -32,7 +32,7 @@ sealed class CKliLog : Command
                                                                     CommandLineArguments cmdLine )
     {
         var folder = cmdLine.EatFlag( Flags[0].Names );
-        if( !cmdLine.CheckNoRemainingArguments( monitor ) )
+        if( !cmdLine.Close( monitor ) )
         {
             return ValueTask.FromResult( false );
         }

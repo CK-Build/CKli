@@ -15,10 +15,15 @@ public static class RenderableExtensions
 
     public static string RenderAsString( this IRenderable r ) => r.RenderAsString( new StringBuilder() ).ToString();
 
-    public static IRenderable Box( this IRenderable r, int top = 0, int left = 0, int bottom = 0, int right = 0 )
+    public static IRenderable Box( this IRenderable r,
+                                   int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
+                                   int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
     {
-        if( r is ContentBox b ) return b.WithPadding( top, left, bottom, right );
-        return new ContentBox( r, new Padding( (byte)top, (byte)left, (byte)bottom, (byte)right ) );
+        if( r is ContentBox b ) return b.WithPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
+                                        .WithMargin( marginTop, marginLeft, marginBottom, marginRight );
+        return new ContentBox( r,
+                               paddingTop, paddingLeft, paddingBottom, paddingRight,
+                               marginTop, marginLeft, marginBottom, marginRight );
     }
 
     public static IRenderable AddLeft( this IRenderable r, bool condition, params ReadOnlySpan<IRenderable?> horizontalContent )

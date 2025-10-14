@@ -30,7 +30,7 @@ sealed class CKliRepoAdd : Command
             return ValueTask.FromResult( false );
         }
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
-        return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
+        return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && RepositoryAdd( monitor, context, uri, allowLTS ) );
     }
 

@@ -5,13 +5,25 @@ namespace CKli.Core;
 
 public interface IRenderable
 {
-    int Height { get; }
-
+    /// <summary>
+    /// Gets the width in characters of this renderable.
+    /// </summary>
     int Width { get; }
 
-    SegmentRenderer CollectRenderer( int line, SegmentRenderer previous );
+    /// <summary>
+    /// Gets the height in characters of this renderable.
+    /// </summary>
+    int Height { get; }
 
-    public static readonly IRenderable None = new RenderableUnit();
+    /// <summary>
+    /// Builds the segment renderer for the provided <paramref name="line"/>.
+    /// </summary>
+    /// <param name="line">The line number: between 0 and <paramref name="actualHeight"/>.</param>
+    /// <param name="parent">The parent renderer.</param>
+    /// <param name="actualHeight">Height to consider. Always greater than or equal to <see cref="Height"/>.</param>
+    void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight );
+
+    public static readonly IRenderable Unit = new RenderableUnit();
 
     private sealed class RenderableUnit : IRenderable
     {
@@ -19,7 +31,7 @@ public interface IRenderable
 
         public int Width => 0;
 
-        public SegmentRenderer CollectRenderer( int line, SegmentRenderer previous ) => previous;
+        public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight ) { }
     }
 
 }

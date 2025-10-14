@@ -23,7 +23,7 @@ sealed class CKliLayoutFix : Command
                                                                     CommandLineArguments cmdLine )
     {
         bool deleteAliens = cmdLine.EatFlag( "--delete-aliens" );
-        return ValueTask.FromResult( cmdLine.CheckNoRemainingArguments( monitor )
+        return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && LayoutFix( monitor, context, deleteAliens ) );
     }
 

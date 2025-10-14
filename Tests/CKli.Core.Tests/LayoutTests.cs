@@ -25,6 +25,11 @@ public class LayoutTests
         File.Exists( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeTrue( "CKt-Core is in the stack." );
         File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No yet." );
 
+        // ckli repo add file:///.../CKt-ActivityMonitor -?
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo", "add", remotes.GetUriFor( "CKt-ActivityMonitor" ), "-?" )).ShouldBeTrue();
+        File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No yet, Just the help." );
+
+
         // ckli repo add file:///.../CKt-ActivityMonitor
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo", "add", remotes.GetUriFor( "CKt-ActivityMonitor" ) )).ShouldBeTrue();
         File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Here it is." );
