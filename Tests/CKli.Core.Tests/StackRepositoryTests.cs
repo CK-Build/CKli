@@ -58,25 +58,25 @@ public class StackRepositoryTests
         error.ShouldBeFalse( "but this is not an error." );
 
 
-        var cRoot = context.With( "CKt" );
+        var cRoot = context.ChangeDirectory( "CKt" );
         var fromRoot = StackRepository.TryOpenFromPath( TestHelper.Monitor, cRoot, out error, skipPullStack: true )
                                       .ShouldNotBeNull();
         error.ShouldBeFalse();
         fromRoot.Dispose();
 
-        var cSubDir = context.With( "CKt/CK-Core-Projects" );
+        var cSubDir = context.ChangeDirectory( "CKt/CK-Core-Projects" );
         var fromSubDir = StackRepository.TryOpenFromPath( TestHelper.Monitor, cSubDir, out error, skipPullStack: true )
                                         .ShouldNotBeNull();
         error.ShouldBeFalse();
         fromSubDir.Dispose();
 
-        var cRepo = context.With( "CKt/CK-Core-Projects/CKt-Core" );
+        var cRepo = context.ChangeDirectory( "CKt/CK-Core-Projects/CKt-Core" );
         var fromRepo = StackRepository.TryOpenFromPath( TestHelper.Monitor, cRepo, out error, skipPullStack: true )
                                       .ShouldNotBeNull();
         error.ShouldBeFalse();
         fromRepo.Dispose();
 
-        var cInsideRepo = context.With( "CKt/CK-Core-Projects/CKt-Core/Tests" );
+        var cInsideRepo = context.ChangeDirectory( "CKt/CK-Core-Projects/CKt-Core/Tests" );
         var fromInsideRepo = StackRepository.TryOpenFromPath( TestHelper.Monitor, cInsideRepo, out error, skipPullStack: true )
                                             .ShouldNotBeNull();
         error.ShouldBeFalse();
@@ -105,28 +105,28 @@ public class StackRepositoryTests
         world.ShouldBeNull( "No world either." );
         error.ShouldBeFalse( "But this is not an error." );
 
-        var inCKt = context.With( "CKt" );
+        var inCKt = context.ChangeDirectory( "CKt" );
         (stack, world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor, inCKt, out error, skipPullStack: true );
         stack.ShouldNotBeNull();
         world.ShouldNotBeNull();
         error.ShouldBeFalse();
         stack.Dispose();
 
-        var inCKtProject = context.With( "CKt/CK-Core-Projects" );
+        var inCKtProject = context.ChangeDirectory( "CKt/CK-Core-Projects" );
         (stack, world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor, inCKtProject, out error, skipPullStack: true );
         stack.ShouldNotBeNull();
         world.ShouldNotBeNull();
         error.ShouldBeFalse();
         stack.Dispose();
 
-        var inCKtProjectCore = context.With( "CKt/CK-Core-Projects/CKt-Core" );
+        var inCKtProjectCore = context.ChangeDirectory( "CKt/CK-Core-Projects/CKt-Core" );
         (stack, world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor, inCKtProjectCore, out error, skipPullStack: true );
         stack.ShouldNotBeNull();
         world.ShouldNotBeNull();
         error.ShouldBeFalse();
         stack.Dispose();
 
-        var inCKtProjectCoreTests = context.With( "CKt/CK-Core-Projects/CKt-Core/Tests" );
+        var inCKtProjectCoreTests = context.ChangeDirectory( "CKt/CK-Core-Projects/CKt-Core/Tests" );
         (stack, world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor, inCKtProjectCoreTests, out error, skipPullStack: true );
         stack.ShouldNotBeNull();
         world.ShouldNotBeNull();
@@ -158,28 +158,28 @@ public class StackRepositoryTests
         stack.ShouldBe( null );
         world.ShouldBeNull();
 
-        var inCKt = context.With( "CKt" );
+        var inCKt = context.ChangeDirectory( "CKt" );
         StackRepository.OpenWorldFromPath( TestHelper.Monitor, inCKt, out stack, out world, skipPullStack: true )
             .ShouldBeTrue();
         stack.ShouldNotBeNull();
         world.ShouldNotBeNull();
         stack.Dispose();
 
-        var inCKtProject = context.With( "CKt/CK-Core-Projects" );
+        var inCKtProject = context.ChangeDirectory( "CKt/CK-Core-Projects" );
         StackRepository.OpenWorldFromPath( TestHelper.Monitor, inCKtProject, out stack, out world, skipPullStack: true )
             .ShouldBeTrue();
         stack.ShouldNotBeNull();
         world.ShouldNotBeNull();
         stack.Dispose();
 
-        var inCKtProjectCore = context.With( "CKt/CK-Core-Projects/CKt-Core" );
+        var inCKtProjectCore = context.ChangeDirectory( "CKt/CK-Core-Projects/CKt-Core" );
         StackRepository.OpenWorldFromPath( TestHelper.Monitor, inCKtProjectCore, out stack, out world, skipPullStack: true )
             .ShouldBeTrue();
         stack.ShouldNotBeNull();
         world.ShouldNotBeNull();
         stack.Dispose();
 
-        var inCKtProjectCoreTests = context.With( "CKt/CK-Core-Projects/CKt-Core/Tests" );
+        var inCKtProjectCoreTests = context.ChangeDirectory( "CKt/CK-Core-Projects/CKt-Core/Tests" );
         StackRepository.OpenWorldFromPath( TestHelper.Monitor, inCKtProjectCoreTests, out stack, out world, skipPullStack: true )
             .ShouldBeTrue();
         stack.ShouldNotBeNull();
@@ -196,7 +196,7 @@ public class StackRepositoryTests
         // ckli clone file:///.../CKt-Stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
         // cd CKt
-        context = context.With( "CKt" );
+        context = context.ChangeDirectory( "CKt" );
 
         using( TestHelper.Monitor.OpenInfo( "Add the CKt-ActivityMonitor repository at the root and close the stack." ) )
         {
@@ -254,9 +254,9 @@ public class StackRepositoryTests
         var root = ClonedPaths.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "CKt" );
 
-        var initialPath = root.With( "Initial" );
-        var duplicate1 = root.With( "Duplicate1" );
-        var duplicate2 = root.With( "Duplicate2" );
+        var initialPath = root.ChangeDirectory( "Initial" );
+        var duplicate1 = root.ChangeDirectory( "Duplicate1" );
+        var duplicate2 = root.ChangeDirectory( "Duplicate2" );
 
         // ckli clone file:///.../CKt-Stack -p Initial
         (await CKliCommands.ExecAsync( TestHelper.Monitor, initialPath, "clone", remotes.StackUri )).ShouldBeTrue();

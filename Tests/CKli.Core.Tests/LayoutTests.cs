@@ -1,3 +1,4 @@
+using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;
 using System.IO;
@@ -20,7 +21,7 @@ public class LayoutTests
         // ckli clone file:///.../CKt-Stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
         // cd CKt
-        context = context.With( "CKt" );
+        context = context.ChangeDirectory( "CKt" );
 
         File.Exists( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeTrue( "CKt-Core is in the stack." );
         File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No yet." );
@@ -57,7 +58,7 @@ public class LayoutTests
         // ckli clone file:///.../CKt-Stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
         // cd CKt
-        context = context.With( "CKt" );
+        context = context.ChangeDirectory( "CKt" );
 
         File.Exists( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeTrue( "CKt-Core is in the stack." );
         File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No yet." );

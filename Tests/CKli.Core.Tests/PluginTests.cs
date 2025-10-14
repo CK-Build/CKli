@@ -19,7 +19,7 @@ public class PluginTests
         // ckli clone file:///.../One-Stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
         // cd One
-        context = context.With( "One" );
+        context = context.ChangeDirectory( "One" );
 
         // ckli plugin create MyFirstOne
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "create", "MyFirstOne" )).ShouldBeTrue();
@@ -65,7 +65,7 @@ public class PluginTests
         // ckli clone file:///.../One-Stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
         // cd One
-        context = context.With( "One" );
+        context = context.ChangeDirectory( "One" );
 
         // ckli plugin add CommandSample@version
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "add", $"CommandSample@{TestEnv.CKliPluginsCoreVersion}" )).ShouldBeTrue();
