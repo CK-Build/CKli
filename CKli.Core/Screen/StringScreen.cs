@@ -27,7 +27,7 @@ public sealed class StringScreen : IScreen
 
     public void OnLogErrorOrWarning( LogLevel level, string message )
     {
-        _buffer.Append( level == LogLevel.Warn ? "Warning: " : "Error : " ).Append( message ).AppendLine();
+        _buffer.Append( level == LogLevel.Warn ? "Warning: " : "Error: " ).Append( message ).AppendLine();
     }
 
     void IScreen.OnLogAny( LogLevel level, string? text, bool isOpenGroup )
@@ -60,14 +60,15 @@ public sealed class StringScreen : IScreen
     {
         readonly StringBuilder _b;
 
-        public Renderer( StringBuilder b )
-        {
-            _b = b;
-        }
+        public Renderer( StringBuilder b ) => _b = b;
 
         public void Append( ReadOnlySpan<char> s, TextStyle style ) => _b.Append( s );
 
         public void EndOfLine() => _b.AppendLine();
+
+        public void BeginUpdate() { }
+
+        public void EndUpdate() { }
 
         public override string ToString() => _b.ToString();
     }

@@ -34,7 +34,8 @@ public static class ScreenHelpers
                                                                             : r.Argument,
                                                                          r.Remaining
                                                                              ? new TextStyle( TextEffect.Invert )
-                                                                             : default ).Box( marginLeft: 1 ) ) )
+                                                                             : new TextStyle( new Color( ConsoleColor.DarkGreen, ConsoleColor.Black ) ) )
+                                                               .Box( marginLeft: 1, color: new Color( ConsoleColor.DarkRed, ConsoleColor.Black ) ) ) )
                         .AddBelow( TextBlock.EmptyString );
         }
 

@@ -4,7 +4,9 @@ using System;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CKli.Core;
 
@@ -29,20 +31,21 @@ public static class CKliRootEnv
     static CKliEnv? _defaultCommandContext;
 
     /// <summary>
-    /// Initializes the CKli environment. This captures the <see cref="Environment.CurrentDirectory"/> and
-    /// initializes the 
+    /// Initializes the CKli environment.
     /// </summary>
     /// <param name="instanceName">Used by tests (with "Test"). Can be used with other suffix if needed.</param>
     /// <param name="screen">Optional <see cref="StringScreen"/> to use or <see cref="NoScreen"/>.</param>
     public static void Initialize( string? instanceName = null, IScreen? screen = null )
     {
         Throw.CheckState( "Initialize can be called only once.", _appLocalDataPath.IsEmptyPath );
-        _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData ), instanceName == null ? "CKli" : $"CKli-{instanceName}" );
+        _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData ),
+                                          instanceName == null ? "CKli" : $"CKli-{instanceName}" );
         // To handle logs, we firts must determine if we are in a Stack. If this is the case, then the Logs/ folder
         // will be .[Public|PrivateStack]/Logs, else the log will be in _appLocalDataPath/Out-of-Stack-Logs/.
         _currentDirectory = Environment.CurrentDirectory;
         _currentStackPath = StackRepository.FindGitStackPath( _currentDirectory );
-        _screen = screen ?? new ConsoleScreen();
+
+        _screen = screen ?? CreateConsole();
 
         InitializeMonitoring( _currentDirectory, _currentStackPath );
         NormalizedPath configFilePath = GetConfigPath();
@@ -94,7 +97,7 @@ public static class CKliRootEnv
 
         _defaultCommandContext = new CKliEnv( _screen, _secretsStore, _currentDirectory, _currentStackPath );
 
-        [MemberNotNull( nameof(_secretsStore) )]
+        [MemberNotNull( nameof( _secretsStore ) )]
         static void SetAndWriteDefaultConfig()
         {
             _secretsStore = new DotNetUserSecretsStore();
@@ -127,16 +130,34 @@ public static class CKliRootEnv
                         """ );
             }
         }
+
+        static IScreen CreateConsole()
+        {
+            bool ansiConsole = !Environment.GetEnvironmentVariables().Contains( "NO_COLOR" );
+            uint? originalConsoleMode = null;
+            if( ansiConsole )
+            {
+                (ansiConsole, originalConsoleMode) = AnsiDetector.TryEnableAnsiColorCodes();
+            }
+            IScreen s = ansiConsole ? new AnsiScreen( originalConsoleMode ) : new NoColorScreen();
+            return s;
+        }
     }
 
     /// <summary>
     /// Should be called before leaving the application.
     /// </summary>
-    public static void Close()
+    public static async Task CloseAsync()
     {
         CheckInitialized();
         _screen.Close();
         if( _secretsStore is IDisposable d ) d.Dispose();
+        var defaultOutput = GrandOutput.Default;
+        if( defaultOutput != null )
+        {
+            await defaultOutput.DisposeAsync();
+
+        }
     }
 
 

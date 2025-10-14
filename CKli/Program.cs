@@ -1,12 +1,11 @@
 using CK.Core;
-using CK.Monitoring;
 using CKli;
 using CKli.Core;
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 var arguments = new CommandLineArguments( args );
 
@@ -44,13 +43,16 @@ CKliRootEnv.GlobalOptions = GetGlobalOptions;
 CKliRootEnv.GlobalFlags = GetGlobalFlags;
 
 var monitor = new ActivityMonitor();
+monitor.Info( $"Executing '{arguments.InitialArguments.Concatenate( " " )}'." );
+
 monitor.Output.RegisterClient( new ScreenLogger( CKliRootEnv.Screen ) );
 CoreApplicationIdentity.Initialize();
 
 Environment.ExitCode = (await CKliCommands.HandleCommandAsync( monitor, CKliRootEnv.DefaultCKliEnv, arguments ))
                         ? 0
                         : -1;
-CKliRootEnv.Close();
+
+await CKliRootEnv.CloseAsync();
 
 static ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> GetGlobalOptions()
 {
