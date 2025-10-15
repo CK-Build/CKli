@@ -71,7 +71,7 @@ public static class ScreenHelpers
         // |     Flags:                     
         // |        --flag, -f              Description
         // 
-        // |---|--|                    |--|
+        //   |---|--|                    |--|
         const int offsetArgTitle = 3;
         const int offsetArg = offsetArgTitle + 2;
         const int descriptionPadding = 3;
@@ -90,8 +90,9 @@ public static class ScreenHelpers
         }
 
         int descriptionOffset = Math.Max( maxCommandPathWithArgsWitdh, maxArgOptFlagsWidth + offsetArg ) + descriptionPadding;
+        // Collapsable width is 2.
+        int descriptionMaxLength = maxWidth - descriptionOffset - 2;
         // If the screen is too narrow, give up any wrapping.
-        int descriptionMaxLength = maxWidth - descriptionOffset;
         if( descriptionMaxLength < TextBlock.MinWidth ) descriptionMaxLength = 0;
 
         var help = header.AddBelow(

@@ -58,7 +58,7 @@ public sealed class CommandNamespace
         {
             return true;
         }
-        if( cmdLine.FoundCommand.Arguments.Length > cmdLine.RemainingCount )
+        if( !cmdLine.HasHelp && cmdLine.FoundCommand.Arguments.Length > cmdLine.RemainingCount )
         {
             monitor.Error( $"Command '{cmdLine.FoundCommand.CommandPath}' requires {cmdLine.FoundCommand.Arguments.Length} arguments." );
             return false;

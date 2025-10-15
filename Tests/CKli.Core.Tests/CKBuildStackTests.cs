@@ -1,5 +1,7 @@
 using NUnit.Framework;
 using Shouldly;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 
@@ -9,11 +11,16 @@ namespace CKli.Core.Tests;
 public class CKBuildStackTests
 {
     [Test]
-    public async Task Clone_and_DotNet_build_and_test_Async()
+    public async Task Clone_with_diff_casing_and_DotNet_build_and_test_Async()
     {
         var context = ClonedPaths.EnsureCleanFolder();
-        // ckli clone https://github.com/CK-Build/CK-Build-Stack
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", "https://github.com/CK-Build/CK-Build-Stack" )).ShouldBeTrue();
+
+        // ckli clone https://github.com/CK-Build/ck-bUILD-stack
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", "https://github.com/CK-Build/ck-bUILD-stack" )).ShouldBeTrue();
+
+        Directory.EnumerateDirectories( context.CurrentDirectory )
+            .Select( path => Path.GetFileName( path ) )
+            .ShouldContain( "CK-Build", "The folder name has been fixed." );
 
         // cd CK-Build
         context = context.ChangeDirectory( "CK-Build" );

@@ -68,23 +68,23 @@ public static class CKliCommands
         // First, tries to locate a CKli intrinsic command and handles it independently when found:
         // one cannot mix the 2 kind of commands: some CKli commands loads the current Stack and World if
         // needed, we cannot pre-load the current World here.
-        // When TryFindForExecution returns false, the command exists but it misses one or more arguments.
-        if( !_commands.TryFindForExecution( monitor, cmdLine, out var helpPath ) )
+        // When TryFindForExecution returns false, the command exists but it misses one or more arguments
+        // and an error has been emitted: display the help.
+        // If it's a CKli command (cmdLine.FoundCommand != null) and the --help has bee requested,
+        // also display the help.
+
+        if( !_commands.TryFindForExecution( monitor, cmdLine, out var helpPath )
+            || (cmdLine.FoundCommand != null && cmdLine.HasHelp) )
         {
-            context.Screen.DisplayHelp( _commands.GetForHelp( helpPath, null ), cmdLine );
-            return ValueTask.FromResult( false );
+            context.Screen.DisplayHelp( _commands.GetForHelp( helpPath, null ),
+                                        cmdLine,
+                                        CKliRootEnv.GlobalOptions?.Invoke() ?? default,
+                                        CKliRootEnv.GlobalFlags?.Invoke() ?? default );
+            return ValueTask.FromResult( true );
         }
-        // If it's a CKli command, execute it or, if the --help has bee requested, display the help.
+        // If it's a CKli command, we can now execute it.
         if( cmdLine.FoundCommand != null )
         {
-            if( cmdLine.HasHelp )
-            {
-                context.Screen.DisplayHelp( _commands.GetForHelp( helpPath, null ),
-                                            cmdLine,
-                                            CKliRootEnv.GlobalOptions?.Invoke() ?? default,
-                                            CKliRootEnv.GlobalFlags?.Invoke() ?? default );
-                return ValueTask.FromResult( true );
-            }
             return ExecuteAsync( monitor, context, cmdLine );
         }
         // Not a CKli command. Opens the current World and tries to find a plugin command.
@@ -107,29 +107,21 @@ public static class CKliCommands
         {
             // We are in a World.
             if( !world.Commands.TryFindForExecution( monitor, cmdLine, out helpPath )
-                || cmdLine.FoundCommand == null )
+                || cmdLine.FoundCommand == null
+                || cmdLine.HasHelp )
             {
-                // No luck.
+                // No luck or the --help is requested.
                 // Displays the help in the context of the World. The World's commands
-                // contain the CKli command: the help mixes the 2 kind of commands if needed.
+                // contain the CKli command: the help mixes the 2 kind of commands if
+                // needed (based on the helpPath).
                 context.Screen.DisplayHelp( world.Commands.GetForHelp( helpPath, _commands ),
                                             cmdLine,
                                             CKliRootEnv.GlobalOptions?.Invoke() ?? default,
                                             CKliRootEnv.GlobalFlags?.Invoke() ?? default );
-                return ValueTask.FromResult( false );
+                return ValueTask.FromResult( cmdLine.HasHelp );
             }
-            // We have a plugin command.
+            // We have a plugin command (and no --help).
             Throw.DebugAssert( "This cannot be a CKli command: we'd have located it initially.", cmdLine.FoundCommand.PluginTypeInfo != null );
-            if( cmdLine.HasHelp )
-            {
-                // If the --help has bee requested, displys the help.
-                // No need to lookup the CKli command here: we have a plugin command.
-                context.Screen.DisplayHelp( world.Commands.GetForHelp( helpPath, null ),
-                                            cmdLine,
-                                            CKliRootEnv.GlobalOptions?.Invoke() ?? default,
-                                            CKliRootEnv.GlobalFlags?.Invoke() ?? default );
-                return ValueTask.FromResult( true );
-            }
             if( cmdLine.FoundCommand.IsDisabled )
             {
                 monitor.Error( $"Command '{cmdLine.FoundCommand.CommandPath}' exists but its type '{cmdLine.FoundCommand.PluginTypeInfo.TypeName}' is disabled in plugin '{cmdLine.FoundCommand.PluginTypeInfo.Plugin.FullPluginName}'." );
@@ -149,6 +141,8 @@ public static class CKliCommands
         var success = await cmdLine.FoundCommand.HandleCommandAsync( monitor, context, cmdLine );
         if( success && !cmdLine.IsClosed )
         {
+            // The command line has not been but the command handler returned true, it is buggy.
+            // We return false (even if the handler claimed to be successful).
             monitor.Error( $"""
                 The command '{cmdLine.FoundCommand.CommandPath}' implementation in '{cmdLine.FoundCommand.PluginTypeInfo?.TypeName ?? "CKli"}' is buggy.
                 The command line MUST be closed before executing the command.
@@ -157,6 +151,8 @@ public static class CKliCommands
         }
         if( cmdLine.IsClosed && cmdLine.RemainingCount > 0 )
         {
+            // The command line has been closed and there are remaining arguments.
+            // If the command handler returned true, it is buggy.
             if( success )
             {
                 monitor.Error( $"""
@@ -164,7 +160,26 @@ public static class CKliCommands
                     Arguments remains in the command line but the command handler returned true.
                     """ );
             }
+            // This displays the lovely header with remaining arguments.
             context.Screen.DisplayHelp( [new CommandHelp( cmdLine.FoundCommand )], cmdLine, default, default );
+        }
+        else if( !success && !cmdLine.IsClosed )
+        {
+            // The command failed and the command line has not been closed: this indicates a bad argument/option value
+            // so we display the command help.
+            // Before we must clear any remaining aruments otherwise we may display
+            // a misleading remaining arguments message.
+            cmdLine.CloseAndForgetRemaingArguments();
+            context.Screen.DisplayHelp( [new CommandHelp( cmdLine.FoundCommand )], cmdLine, default, default );
+        }
+        // Not very elegant trick to cleanup 'ckli log' log files.
+        if( success && cmdLine.FoundCommand is CKliLog )
+        {
+            CKliRootEnv.OnSuccessfulCKliLogCommand();
+        }
+        else
+        {
+            CKliRootEnv.OnAnyOtherCommandAndSuccess();
         }
         return success;
     }

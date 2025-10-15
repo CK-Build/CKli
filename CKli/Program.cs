@@ -52,7 +52,7 @@ Environment.ExitCode = (await CKliCommands.HandleCommandAsync( monitor, CKliRoot
                         ? 0
                         : -1;
 
-await CKliRootEnv.CloseAsync();
+await CKliRootEnv.CloseAsync( monitor, arguments );
 
 static ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> GetGlobalOptions()
 {

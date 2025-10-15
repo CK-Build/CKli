@@ -70,6 +70,11 @@ sealed class CKliLog : Command
         return ValueTask.FromResult( success );
     }
 
+    internal static bool RemoveStupidLogFile( IActivityMonitor monitor )
+    {
+        return RemoveStupidLogFile( monitor, out _, out _ );
+    }
+
     static bool RemoveStupidLogFile( IActivityMonitor monitor, out string textFolder, out string? firstLogFilePath )
     {
         textFolder = LogFile.RootLogPath + "Text/";

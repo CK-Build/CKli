@@ -219,8 +219,17 @@ public sealed class CommandLineArguments
     /// <param name="arguments">The arguments to use to start an external process.</param>
     public void CloseWithRemainingAsProcessStartArgs( out string arguments )
     {
-        CheckOpened();
         arguments = ArgumentEscaper.EscapeAndConcatenateArgArrayForProcessStart( _args );
+        CloseAndForgetRemaingArguments();
+    }
+
+    /// <summary>
+    /// Called when a command failed without having closed the arguments.
+    /// This displays the command help (without remaining arguments).
+    /// </summary>
+    internal void CloseAndForgetRemaingArguments()
+    {
+        CheckOpened();
         _args.Clear();
         _remainingArguments = [];
     }

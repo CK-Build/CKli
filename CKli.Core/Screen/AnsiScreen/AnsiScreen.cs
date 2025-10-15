@@ -49,7 +49,6 @@ sealed partial class AnsiScreen : IScreen
     {
         try
         {
-            // This f*c%$ doesn't work: this seems to return the number of characters when the window is maximized...
             return Console.IsOutputRedirected || Console.BufferWidth == 0
                         ? IScreen.MaxScreenWidth
                         : Console.BufferWidth;

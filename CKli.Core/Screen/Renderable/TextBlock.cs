@@ -89,6 +89,7 @@ public abstract class TextBlock : IRenderable
             idx = sText.IndexOf( "\n" );
         }
         while( idx >= 0 );
+        if( sText.Length > witdh ) witdh = sText.Length;
         b.Add( (start, sText.Length) );
         return new MultiLine( text, b.MoveToImmutable(), witdh, style );
 

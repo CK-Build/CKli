@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -245,7 +246,7 @@ public sealed partial class StackRepository : IDisposable
         var originUrl = git.OriginUrl;
         if( originUrl.IsFile )
         {
-            var p  = new NormalizedPath( originUrl.LocalPath );
+            var p = new NormalizedPath( originUrl.LocalPath );
             if( p.Parts.Count > 1 )
             {
                 _localProxyRepositoriesPath = p.RemoveLastPart();
@@ -292,14 +293,16 @@ public sealed partial class StackRepository : IDisposable
             var url = git.OriginUrl;
             if( CheckOriginUrlStackSuffix( monitor, ref url, out var stackNameFromUrl ) )
             {
-                if( stackRoot.LastPart == stackNameFromUrl )
+                if( stackRoot.LastPart.Equals( stackNameFromUrl, StringComparison.OrdinalIgnoreCase ) )
                 {
-                    // Use the same reference for non duplicate: ReferenceEquals is used.
+                    // Use the same reference for non duplicate: ReferenceEquals is used
+                    // and the actual name of the Stack is the folder name with the right case
+                    // that has been fixed by the Clone.
                     stackNameFromUrl = stackRoot.LastPart;
                 }
-                else if( stackRoot.LastPart != DuplicatePrefix + stackNameFromUrl )
+                else if( !stackRoot.LastPart.Equals( DuplicatePrefix + stackNameFromUrl, StringComparison.OrdinalIgnoreCase ) )
                 {
-                    monitor.Error( $"Stack folder '{stackRoot.LastPart}' must be '{stackNameFromUrl}' (or '{DuplicatePrefix}{stackNameFromUrl}') since repository Url is '{git.OriginUrl}'." );
+                    monitor.Error( $"Stack folder '{stackRoot.LastPart}' must be '{stackNameFromUrl}' or '{DuplicatePrefix}{stackNameFromUrl}' (case insensitive) since repository Url is '{git.OriginUrl}'." );
                     error = true;
                 }
                 if( !error && git.SetCurrentBranch( monitor, stackBranchName, skipPullStack ) )
@@ -334,7 +337,7 @@ public sealed partial class StackRepository : IDisposable
     /// <returns>The resulting stack repository if found and opened successfully. May be null if not found.</returns>
     public static bool OpenFromPath( IActivityMonitor monitor,
                                      CKliEnv context,
-                                     [NotNullWhen(true)] out StackRepository? stack,
+                                     [NotNullWhen( true )] out StackRepository? stack,
                                      bool skipPullStack = false,
                                      string stackBranchName = "main" )
     {
@@ -445,7 +448,10 @@ public sealed partial class StackRepository : IDisposable
         Throw.CheckNotNullArgument( secretsStore );
         Throw.CheckNotNullArgument( url );
         Throw.CheckNotNullArgument( stackBranchName );
-        if( !parentPath.IsRooted || parentPath.Parts.Count < 2 || parentPath.LastPart == PublicStackName || parentPath.LastPart == PrivateStackName )
+        if( !parentPath.IsRooted
+            || parentPath.Parts.Count < 2
+            || parentPath.LastPart.Equals( PublicStackName, StringComparison.OrdinalIgnoreCase )
+            || parentPath.LastPart.Equals( PrivateStackName, StringComparison.OrdinalIgnoreCase ) )
         {
             monitor.Error( $"Invalid path '{parentPath}': it must be rooted and not end with {PublicStackName} or {PrivateStackName}." );
         }
@@ -487,20 +493,51 @@ public sealed partial class StackRepository : IDisposable
         }
 
         // The NormalizedPath keeps (MUST keep!) the LastPart reference.
+        // This invariant is... strange but it forces the code above and below to be rigorous.
         Throw.DebugAssert( "IsDuplicate uses ReferenceEquals.",
             (ReferenceEquals( stackRoot.LastPart, stackFolderName ) && stackFolderName != stackNameFromUrl)
             || (ReferenceEquals( stackRoot.LastPart, stackNameFromUrl ) && stackFolderName == stackNameFromUrl) );
 
         NormalizedPath gitPath = stackRoot.AppendPart( isPublic ? PublicStackName : PrivateStackName );
 
+        var stackGitKey = new GitRepositoryKey( secretsStore, url, isPublic );
         var git = GitRepository.Clone( monitor,
-                                       new GitRepositoryKey( secretsStore, url, isPublic ),
+                                       stackGitKey,
                                        gitPath,
                                        gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ) );
         if( git != null )
         {
-            if( git.SetCurrentBranch( monitor, stackBranchName ) )
+            // Before doing anything else, we read the definition file and extract the actual
+            // world name with the right casing. If case differ, the git handle is disposed,
+            // the folder name is fixed and a new git handle is acquired.
+            if( git.SetCurrentBranch( monitor, stackBranchName )
+                && GetActualStackName( monitor, git, stackNameFromUrl, out var actualStackName ) )
             {
+                if( actualStackName != stackNameFromUrl )
+                {
+                    using( monitor.OpenWarn( $"""
+                        Stack name is actually '{actualStackName}' (not '{stackNameFromUrl}').
+                        Renaming the Stack folder name to be '{actualStackName}'.
+                        """ ) )
+                    {
+                        git.Dispose();
+                        var isDuplicate = stackFolderName != stackNameFromUrl;
+                        var newStackFolderName = isDuplicate ? DuplicatePrefix + actualStackName : actualStackName;
+                        var newStackRoot = stackRoot.RemoveLastPart().AppendPart( newStackFolderName );
+                        if( !FileHelper.TryMoveFolder( monitor, stackRoot, newStackRoot ) )
+                        {
+                            return null;
+                        }
+                        stackFolderName = newStackFolderName;
+                        stackRoot = newStackRoot;
+                        gitPath = stackRoot.AppendPart( isPublic ? PublicStackName : PrivateStackName );
+                        stackNameFromUrl = actualStackName;
+
+                        Throw.DebugAssert( "We kept the 'IsDuplicate uses ReferenceEquals' invariant.",
+                            (ReferenceEquals( stackRoot.LastPart, stackFolderName ) && stackFolderName != stackNameFromUrl)
+                            || (ReferenceEquals( stackRoot.LastPart, stackNameFromUrl ) && stackFolderName == stackNameFromUrl) );
+                    }
+                }
                 SetupNewLocalDirectory( gitPath );
                 Registry.RegisterNewStack( monitor, gitPath, url );
                 var result = new StackRepository( git, stackRoot, secretsStore, stackNameFromUrl );
@@ -532,6 +569,44 @@ public sealed partial class StackRepository : IDisposable
 
                     """ );
             }
+        }
+    }
+
+    static bool GetActualStackName( IActivityMonitor monitor, GitRepository gitStack, string stackNameFromUrl, [NotNullWhen(true)]out string? actualStackName )
+    {
+        actualStackName = null;
+        var definitionFilePath = gitStack.WorkingFolder.AppendPart( $"{stackNameFromUrl}.xml" );
+        if( !File.Exists( definitionFilePath ) )
+        {
+            monitor.Error( $"The expected default World definition file '{stackNameFromUrl}.xml' is missing at the root of the Stack repository." );
+            return false;
+        }
+        try
+        {
+            using var r = XmlReader.Create( definitionFilePath );
+            while( !r.IsStartElement() && r.Read() ) ;
+            if( !r.IsStartElement() || r.Name.Length < 2 || r.Name.Contains( ':' ) )
+            {
+                monitor.Error( $"Unable to find a named root element in default World definition file '{stackNameFromUrl}.xml'." );
+                return false;
+            }
+            actualStackName = r.Name;
+            if( stackNameFromUrl != actualStackName
+                && !stackNameFromUrl.Equals( actualStackName, StringComparison.OrdinalIgnoreCase ) )
+            {
+                monitor.Error( $"""
+                    The url '{gitStack.OriginUrl}' contains a Stack named '{actualStackName}'.
+                    Names can differ in casing but no more than that: this Stack repository is not valid.
+                    """ );
+                return false;
+
+            }
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"Error while reading default World definition file '{stackNameFromUrl}.xml'.", ex );
+            return false;
         }
     }
 
@@ -610,7 +685,7 @@ public sealed partial class StackRepository : IDisposable
         stackUrl = GitRepositoryKey.CheckAndNormalizeRepositoryUrl( monitor, stackUrl, out stackNameFromUrl );
         if( stackUrl == null ) return false;
         Throw.DebugAssert( stackNameFromUrl != null );
-        if( stackNameFromUrl.EndsWith( "-Stack" ) && stackNameFromUrl.Length >= 8 )
+        if( stackNameFromUrl.EndsWith( "-Stack", StringComparison.OrdinalIgnoreCase ) && stackNameFromUrl.Length >= 8 )
         {
             stackNameFromUrl = stackNameFromUrl.Substring( 0, stackNameFromUrl.Length - 6 );
             return true;

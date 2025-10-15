@@ -29,6 +29,7 @@ public static class CKliRootEnv
     static NormalizedPath _currentDirectory;
     static NormalizedPath _currentStackPath;
     static CKliEnv? _defaultCommandContext;
+    static bool? _shouldDeletePureCKliLogFile;
 
     /// <summary>
     /// Initializes the CKli environment.
@@ -38,7 +39,7 @@ public static class CKliRootEnv
     public static void Initialize( string? instanceName = null, IScreen? screen = null )
     {
         Throw.CheckState( "Initialize can be called only once.", _appLocalDataPath.IsEmptyPath );
-        _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData ),
+        _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create ),
                                           instanceName == null ? "CKli" : $"CKli-{instanceName}" );
         // To handle logs, we firts must determine if we are in a Stack. If this is the case, then the Logs/ folder
         // will be .[Public|PrivateStack]/Logs, else the log will be in _appLocalDataPath/Out-of-Stack-Logs/.
@@ -146,8 +147,10 @@ public static class CKliRootEnv
 
     /// <summary>
     /// Should be called before leaving the application.
+    /// This dispose the GrandOutput.Default and removes 'ckli log' or 'ckli -?' text
+    /// log files.
     /// </summary>
-    public static async Task CloseAsync()
+    public static async Task CloseAsync( IActivityMonitor monitor, CommandLineArguments arguments )
     {
         CheckInitialized();
         _screen.Close();
@@ -156,9 +159,22 @@ public static class CKliRootEnv
         if( defaultOutput != null )
         {
             await defaultOutput.DisposeAsync();
-
+            // We have a choice here:
+            // By checking is true, we remove the log file if ONLY 'ckli log' has been called.
+            // By checking is not false (ie. true or null), we remove a log file when no command
+            // has been executed: calls to help or to command with argument errors are not logged.
+            // Currently we chose to forget help only, keeping command argument errors.
+            if( _shouldDeletePureCKliLogFile is true
+                || (_shouldDeletePureCKliLogFile is not false && arguments.HasHelp) )
+            {
+                CKliLog.RemoveStupidLogFile( monitor );
+            }
         }
     }
+
+    internal static void OnSuccessfulCKliLogCommand() => _shouldDeletePureCKliLogFile ??= true;
+
+    internal static void OnAnyOtherCommandAndSuccess() => _shouldDeletePureCKliLogFile = false;
 
 
     /// <summary>

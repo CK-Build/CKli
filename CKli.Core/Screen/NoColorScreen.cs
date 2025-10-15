@@ -60,8 +60,6 @@ sealed class NoColorScreen : IScreen
     {
         try
         {
-            // It f*c%$ doesn't work: this seems to return the number of characters
-            // when the window is maximized...
             return Console.IsOutputRedirected || Console.BufferWidth == 0
                         ? IScreen.MaxScreenWidth
                         : Console.BufferWidth;

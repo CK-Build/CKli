@@ -20,6 +20,11 @@ You should install it globally by running:
 ```powershell
 dotnet tool install CKli -g
 ```
+And update it with:
+
+```powershell
+dotnet tool update <PACKAGE_ID> -g
+```
 
 ### Run CKli
 
@@ -65,6 +70,13 @@ instead of `.PublicStack/`.
 `--allow-duplicate` must be specified if the same Stack has already been cloned
 and is available on the local system. In such case, the Stack's folder name will be
 `Duplicate-Of-XXX/` instead of `XXX/`.
+
+### `log --folder`
+Opens the last log file. When `--folder` (or `-f`) is specified, the folder is opened instead
+of the last log file.
+
+The `Log/` folder is `%LocalAppData%/CKli/Out-of-Stack-Logs/` when CKli doesn't start is a Stack folder, otherwise
+each Stack keeps its own logs in their `.PublicStack/Logs` (or `.PrivateStack/Logs`). 
 
 ### `pull -all --skip-pull-stack`
 Resynchronizes the current Repo or World from the remotes.
@@ -134,6 +146,19 @@ external and optional plugins can be used.
 
 Plugins are written in .NET and distributed as NuGet packages or can be source code directly
 in the Stack repository.
+
+### `plugin --compile-mode`
+
+Provides informations on installed plugins and their state.
+
+`--compile-mode` is an advanced option to be used when developping plugins. Plugins are discovered
+once (after a creation, an install or a removal) via reflection and then compiled in `Release`
+with generated code that replaces all the reflection.
+
+A regular load is just an `Assembly.Load` (in a collectible `AssemblyLoadContext`) and a call to an
+initialization function that initializes the graph of objetc (command handlers, Plugin description, etc.).
+
+In very specific scenario (developping, debugging), it is possible to set the compile 
 
 ### `plugin create <name> --allow-lts`
 Creates a new source based plugin project in the current World.
