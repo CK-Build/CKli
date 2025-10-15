@@ -5,7 +5,7 @@ using System.Diagnostics;
 
 namespace CKli.Core;
 
-[DebuggerDisplay( "{Color}-{Effect}" )]
+[DebuggerDisplay( "{ToString(),nq}" )]
 public readonly struct TextStyle : IEquatable<TextStyle>
 {
     const int _colorBit = 1 << 7;
@@ -60,15 +60,15 @@ public readonly struct TextStyle : IEquatable<TextStyle>
                                                     : new TextStyle( (int)effect | (_effect & 0x80), NonInvertedColor );
 
     public TextStyle With( Color color, bool? ignoreColor ) => new TextStyle( ignoreColor switch {
-                                                                                    true => _effect | _colorBit,
-                                                                                    false => _effect & ~_colorBit,
+                                                                                    true => _effect & ~_colorBit,
+                                                                                    false => _effect | _colorBit,
                                                                                     _ => _effect
                                                                                 },
                                                                                 color );
     public TextStyle OverrideWith( TextStyle other ) => other.IgnoreColor
                                                         ? With( other.Effect )
                                                         : other.IgnoreEffect
-                                                            ? With( other.Color, other.IgnoreColor )
+                                                            ? With( other.Color, false )
                                                             : other;
 
     public TextStyle CompleteWith( TextStyle other ) => IgnoreColor
@@ -88,6 +88,8 @@ public readonly struct TextStyle : IEquatable<TextStyle>
     public static bool operator ==( TextStyle left, TextStyle right ) => left.Equals( right );
 
     public static bool operator !=( TextStyle left, TextStyle right ) => !(left == right);
+
+    public override string ToString() => $"{(IgnoreColor ? "?" : Color.ToString())}-{(IgnoreEffect ? "?" : Effect)}";
 
 
 }

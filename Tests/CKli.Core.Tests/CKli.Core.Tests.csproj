@@ -19,7 +19,9 @@
     <ProjectReference Include="..\..\CKli.Loader\CKli.Loader.csproj" />
   </ItemGroup>
 
-  <!-- Consider the Remotes, Cloned and PackagedPlugins folders as pure content: their .csproj are ignored by the build system. -->
+  <!-- Consider the Remotes, Cloned and PackagedPlugins folders as pure
+       content: their .csproj are ignored by the build system.
+  -->
   <ItemGroup>
     <Content Include="$(Content);Remotes\**;Cloned\**;PackagedPlugins\**" />
   </ItemGroup>

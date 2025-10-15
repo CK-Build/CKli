@@ -10,6 +10,19 @@ namespace CKli.Core.Tests;
 [TestFixture]
 public class ScreenTextTests
 {
+
+    [Test]
+    public void TextStyle_test()
+    {
+        {
+            var parentStyle = new TextStyle( ConsoleColor.DarkRed, ConsoleColor.Black, TextEffect.Regular );
+            var style = new TextStyle( ConsoleColor.DarkGreen, ConsoleColor.Black, default );
+            var finalStyle = parentStyle.OverrideWith( style );
+            finalStyle.Color.ShouldBe( style.Color );
+            finalStyle.Effect.ShouldBe( parentStyle.Effect );
+        }
+    }
+
     [Test]
     public void simple_line_test()
     {

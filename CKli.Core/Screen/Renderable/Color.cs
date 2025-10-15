@@ -3,7 +3,10 @@ using System.Diagnostics;
 
 namespace CKli.Core;
 
-[DebuggerDisplay( "{ForeColor}/{BackColor}" )]
+/// <summary>
+/// Combines a <see cref="ForeColor"/> and a <see cref="BackColor"/> into one byte.
+/// </summary>
+[DebuggerDisplay( "{ToString(),nq}" )]
 public readonly struct Color : IEquatable<Color>
 {
     readonly byte _color;
@@ -30,4 +33,6 @@ public readonly struct Color : IEquatable<Color>
 
     public static bool operator ==( Color left, Color right ) => left.Equals( right );
     public static bool operator !=( Color left, Color right ) => !(left == right);
+
+    public override string ToString() => $"{ForeColor}/{BackColor}";
 }

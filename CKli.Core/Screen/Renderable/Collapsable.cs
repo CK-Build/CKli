@@ -9,11 +9,6 @@ public sealed class Collapsable : IRenderable
     readonly IRenderable _content;
     readonly TextStyle _style;
 
-    public Collapsable( IRenderable content )
-        : this( content, new TextStyle( TextEffect.Invert ) )
-    {
-    }
-
     public Collapsable( IRenderable content, TextStyle style = default )
     {
         _content = content;

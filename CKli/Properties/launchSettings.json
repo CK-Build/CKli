@@ -12,6 +12,10 @@
       "commandName": "Project",
       "commandLineArgs": "clone -h"
     },
+    "test": {
+      "commandName": "Project",
+      "commandLineArgs": "clone http://some not here"
+    },
     "clone CK-Build -p C:/Dev3": {
       "commandName": "Project",
       "commandLineArgs": "clone https://github.com/CK-Build/CK-Build-Stack -p \"C:\\Dev3\" --debug-launch"

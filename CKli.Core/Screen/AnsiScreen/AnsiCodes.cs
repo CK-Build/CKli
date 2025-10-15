@@ -3,13 +3,6 @@ using System.Runtime.InteropServices;
 
 namespace CKli.Core;
 
-public enum CursorRelativeSpan
-{
-    After,
-    Before,
-    Both
-}
-
 /// <summary>
 /// A collection of standard ANSI/VT100 control codes.
 /// </summary>
@@ -101,7 +94,7 @@ internal static class AnsiCodes
     /// </summary>
     /// <param name="show">False to hide the cursor.</param>
     /// <returns>The Ansi string.</returns>
-    public static string ShowCursor( bool show = true ) => show ? "\x1b[?25h" : "\x1b[?25l";
+    public static string ShowCursor( bool show = true ) => show ? "\u001b[?25h" : "\u001b[?25l";
 
     /// <summary>
     /// Saves the cursor position. Can be restored by <see cref=""/>
@@ -135,20 +128,27 @@ internal static class AnsiCodes
     /// </summary>
     /// <param name="color">The color to set.</param>
     /// <returns>The Ansi string.</returns>
-    public static string SetForeColor( ConsoleColor color ) => $"\x1b[{(int)color.FromConsole()}m";
+    public static string SetForeColor( ConsoleColor color ) => $"\u001b[{(int)color.FromConsole()}m";
 
     /// <summary>
     /// Sets the background color.
     /// </summary>
     /// <param name="color">The color to set.</param>
     /// <returns>The Ansi string.</returns>
-    public static string SetBackColor( ConsoleColor color ) => $"\x1b[{10 + (int)color.FromConsole()}m";
+    public static string SetBackColor( ConsoleColor color ) => $"\u001b[{10 + (int)color.FromConsole()}m";
+
+    /// <summary>
+    /// Sets the background color.
+    /// </summary>
+    /// <param name="color">The color to set.</param>
+    /// <returns>The Ansi string.</returns>
+    public static string SetColor( Color color ) => $"\u001b[{(int)color.ForeColor.FromConsole()},{10 + (int)color.BackColor.FromConsole()}m";
 
     /// <summary>
     /// Resets the colors to the default foreground and background colors. 
     /// </summary>
     /// <returns>The Ansi string.</returns>
-    public static string ResetColors() => "\u001b[39m\u001b[49m";
+    public static string ResetColors() => "\u001b[39,49m";
 
     /// <summary>
     /// Sets or clears bold mode. 
@@ -163,15 +163,95 @@ internal static class AnsiCodes
     public static string SetUnderline( bool underline = true ) => underline ? "\u001b[4m" : "\u001b[24m";
 
     /// <summary>
+    /// Sets or clears strikethrough mode. 
+    /// </summary>
+    /// <returns>The Ansi string.</returns>
+    public static string SetStrikethrough( bool underline = true ) => underline ? "\u001b[9m" : "\u001b[29m";
+
+    /// <summary>
+    /// Sets or clears italic mode. 
+    /// </summary>
+    /// <returns>The Ansi string.</returns>
+    public static string SetItalic( bool underline = true ) => underline ? "\u001b[3m" : "\u001b[23m";
+
+    /// <summary>
+    /// Sets or clears blink mode. 
+    /// </summary>
+    /// <returns>The Ansi string.</returns>
+    public static string SetBlink( bool underline = true ) => underline ? "\u001b[3m" : "\u001b[23m";
+
+    /// <summary>
     /// Set progress state to a busy spinner (does nothing by returning an empty string if this
     /// is not supported on the current platform).
     /// </summary>
-    public static string SetProgressIndicator() => _supportsProgressReporting ? "\x1b]9;4;3;\x1b\\" : "";
+    public static string SetProgressIndicator() => _supportsProgressReporting ? "\u001b]9;4;3;\u001b\\" : "";
 
     /// <summary>
     /// Remove progress state, restoring taskbar status to normal (does nothing by returning an empty string if this
     /// is not supported on the current platform).
     /// </summary>
-    public static string RemoveProgressIndicator() => _supportsProgressReporting ? "\x1b]9;4;0;\x1b\\" : "";
+    public static string RemoveProgressIndicator() => _supportsProgressReporting ? "\u001b]9;4;0;\u001b\\" : "";
+
+    /// <summary>
+    /// Writes the Control Sequence Introducer: '\u001b' and '['.
+    /// </summary>
+    /// <param name="b">The target span.</param>
+    /// <returns>The forwarded head.</returns>
+    public static Span<char> WriteCSI( Span<char> b ) => Write( b, '\u001b', '[' );
+
+    public static Span<char> WriteColor( Span<char> b, ConsoleColor c, bool background )
+    {
+        AnsiColor aC = c.FromConsole();
+        var (h, l) = Math.DivRem( (int)aC, 10 );
+        if( background )
+        {
+            if( h == 9 )
+            {
+                return Write( b, '1', '0', (char)('0' + l) );
+            }
+            ++h;
+        }
+        return Write( b, (char)('0' + h), (char)('0' + l) );
+    }
+
+    public static Span<char> WriteCommand( Span<char> b, char cmd ) => Write( b, cmd );
+
+    public static Span<char> WriteRegular( Span<char> b ) => Write( b, '0' );
+
+    public static Span<char> WriteSemiColon( Span<char> b ) => Write( b, ';' );
+
+    public static Span<char> WriteBold( Span<char> b, bool active ) => active ? Write( b, '1' ) : Write( b, '2', '2' );
+
+    public static Span<char> WriteUnderline( Span<char> b, bool active ) => WriteStdDecoration( b, active, '4' );
+
+    public static Span<char> WriteStrikeThrough( Span<char> b, bool active ) => WriteStdDecoration( b, active, '9' );
+
+    public static Span<char> WriteItalic( Span<char> b, bool active ) => WriteStdDecoration( b, active, '3' );
+
+    public static Span<char> WriteBlink( Span<char> b, bool active ) => WriteStdDecoration( b, active, '5' );
+
+    static Span<char> Write( Span<char> b, char c )
+    {
+        b[0] = c;
+        return b.Slice( 1 );
+    }
+
+    static Span<char> Write( Span<char> b, char c1, char c2 )
+    {
+        b[0] = c1;
+        b[1] = c2;
+        return b.Slice( 2 );
+    }
+
+    static Span<char> Write( Span<char> b, char c1, char c2, char c3 )
+    {
+        b[0] = c1;
+        b[1] = c2;
+        b[2] = c3;
+        return b.Slice( 3 );
+    }
+
+    static Span<char> WriteStdDecoration( Span<char> b, bool active, char d ) => active ? Write( b, d ) : Write( b, '2', d );
+
 
 }
