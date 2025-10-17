@@ -99,10 +99,10 @@ public sealed partial class ContentBox
     {
         while( pad > _whites.Length )
         {
-            target.Append( _whites, style );
+            target.Write( _whites, style );
             pad -= _whites.Length;
         }
-        if( pad > 0 ) target.Append( _whites.Slice( 0, pad ), style );
+        if( pad > 0 ) target.Write( _whites.Slice( 0, pad ), style );
     }
 
 }

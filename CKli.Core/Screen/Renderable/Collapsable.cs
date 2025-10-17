@@ -19,6 +19,16 @@ public sealed class Collapsable : IRenderable
 
     public int Width => 2 + _content.Width;
 
+    public IRenderable Content => _content;
+
+    public TextStyle Style => _style;
+
+    public Collapsable WithStyle( TextStyle style ) => new Collapsable( _content, style );
+
+    public Collapsable WithContent( IRenderable content ) => new Collapsable( content, _style );
+
+    public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
+
     public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
     {
         Throw.CheckArgument( line >= 0 && line < actualHeight && actualHeight >= Height );
@@ -40,7 +50,7 @@ public sealed class Collapsable : IRenderable
     {
         protected override void Render()
         {
-            Target.Append( "> ", style );
+            Target.Write( "> ", style );
             RenderContent();
         }
     }
@@ -50,7 +60,7 @@ public sealed class Collapsable : IRenderable
     {
         protected override void Render()
         {
-            Target.Append( "│ ", style );
+            Target.Write( "│ ", style );
             RenderContent();
         }
     }

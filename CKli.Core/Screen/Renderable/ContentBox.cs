@@ -9,6 +9,8 @@ public sealed partial class ContentBox : IRenderable
     readonly Filler _padding;
     readonly Filler _margin;
     readonly TextStyle _style;
+    readonly int _width;
+    readonly int _height;
 
     public ContentBox( IRenderable content, Filler padding, Filler margin, TextStyle style = default )
     {
@@ -16,6 +18,8 @@ public sealed partial class ContentBox : IRenderable
         _padding = padding;
         _margin = margin;
         _style = style;
+        _height = _margin.Top + _padding.Top + _content.Height + _padding.Bottom + _margin.Bottom;
+        _width = _margin.Left + _padding.Left + _content.Width + _padding.Right + _margin.Right;
     }
 
     public ContentBox( IRenderable content,
@@ -38,15 +42,19 @@ public sealed partial class ContentBox : IRenderable
     {
     }
 
-    public int Height => _margin.Top + _padding.Top + _content.Height + _padding.Bottom + _margin.Bottom;
+    public int Height => _height;
 
-    public int Width => _margin.Left + _padding.Left + _content.Width + _padding.Right + _margin.Right;
+    public int Width => _width;
 
     public TextStyle Style => _style;
 
     public Filler Padding => _padding;
 
     public Filler Margin => _margin;
+
+    public IRenderable Content => _content;
+
+    public ContentBox WithContent( IRenderable content ) => new ContentBox( content, _padding, _margin, _style );
 
     public ContentBox WithPadding( int top = 0, int left = 0, int bottom = 0, int right = 0 )
     {
@@ -69,6 +77,8 @@ public sealed partial class ContentBox : IRenderable
     }
 
     public ContentBox WithStyle( TextStyle style ) => _style == style ? this : new ContentBox( _content, _padding, _margin, style );
+
+    public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
 
 }
 

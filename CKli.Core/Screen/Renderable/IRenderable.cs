@@ -23,6 +23,13 @@ public interface IRenderable
     /// <param name="actualHeight">Height to consider. Always greater than or equal to <see cref="Height"/>.</param>
     void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight );
 
+    /// <summary>
+    /// Support for visitor pattern.
+    /// </summary>
+    /// <param name="visitor">The visitor.</param>
+    /// <returns>The result of the visit.</returns>
+    IRenderable Accept( RenderableVisitor visitor );
+
     public static readonly IRenderable Unit = new RenderableUnit();
 
     private sealed class RenderableUnit : IRenderable
@@ -32,6 +39,8 @@ public interface IRenderable
         public int Width => 0;
 
         public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight ) { }
+
+        public IRenderable Accept( RenderableVisitor visitor ) => this;
     }
 
 }

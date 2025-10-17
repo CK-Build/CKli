@@ -15,8 +15,8 @@ public sealed class VerticalContent : IRenderable
     public VerticalContent( params ImmutableArray<IRenderable> cells )
     {
         _cells = cells;
-        _width = ComputeWith( cells );
         _height = ComputeHeight( cells );
+        _width = _height > 0 ? ComputeWith( cells ) : 0;
     }
 
     static int ComputeWith( ImmutableArray<IRenderable> cells )
@@ -42,6 +42,10 @@ public sealed class VerticalContent : IRenderable
     public int Height => _height;
 
     public int Width => _width;
+
+    public ImmutableArray<IRenderable> Cells => _cells;
+
+    public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
 
     public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
     {

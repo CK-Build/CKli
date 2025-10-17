@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Buffers;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 
@@ -17,7 +18,7 @@ public sealed class HorizontalContent : IRenderable
     {
         _cells = cells;
         _width = ComputeWith( cells );
-        _height = ComputeHeight( cells );
+        _height = _width > 0 ? ComputeHeight( cells ) : 0;
     }
 
     static int ComputeWith( ImmutableArray<IRenderable> cells )
@@ -82,6 +83,8 @@ public sealed class HorizontalContent : IRenderable
         return FillNewContent( horizontalContent, hasSpecial, a, 0 );
     }
 
+    public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
+
     internal static int ComputeActualContentLength( ReadOnlySpan<IRenderable?> horizontalContent, out bool hasSpecial )
     {
         int flattenedLength = 0;
@@ -129,6 +132,5 @@ public sealed class HorizontalContent : IRenderable
         }
         return new HorizontalContent( ImmutableCollectionsMarshal.AsImmutableArray( newContent ) );
     }
-
 
 }
