@@ -4,19 +4,20 @@ using System.Threading.Tasks;
 namespace CKli.Core;
 
 /// <summary>
-/// Dotnet command.
+/// Executes an external process on each Repo of the current World.
 /// </summary>
-sealed class CKliDotNet : Command
+sealed class CKliExec : Command
 {
-    internal CKliDotNet()
+    internal CKliExec()
         : base( null,
-                "dotnet",
+                "exec",
                 """
-                Executes dotnet command line on each Repo.
-                The remaining aguments are directly the one of the .NET CLI. See https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet. 
+                Executes an external process on each Repo (the working directory is the repository working folder).
+                After the required <process-name> argument, the remaining arguments are the process arguments, for example: 'ckli exec dotnet test'.
                 """,
-                [], [],
-                [(["--continue-on-error"], "Continue despite of dotnet process returning a non 0 exit code.")] )
+                [("process-name","Name of the process to run.")],
+                [],
+                [(["--continue-on-error"], "Continue despite of the process returning a non 0 exit code.")] )
     {
     }
 
@@ -24,12 +25,18 @@ sealed class CKliDotNet : Command
                                                                     CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
+        string processName = cmdLine.EatArgument();
+        if( string.IsNullOrWhiteSpace( processName ) )
+        {
+            monitor.Error( $"Invalid process name '{processName}'." );
+            return ValueTask.FromResult( false );
+        }
         bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
         cmdLine.CloseWithRemainingAsProcessStartArgs( out var arguments );
-        return ValueTask.FromResult( DoRun( monitor, context, continueOnError, arguments ) );
+        return ValueTask.FromResult( DoRun( monitor, context, continueOnError, processName, arguments ) );
     }
 
-    static bool DoRun( IActivityMonitor monitor, CKliEnv context, bool continueOnError, string arguments )
+    static bool DoRun( IActivityMonitor monitor, CKliEnv context, bool continueOnError, string processName, string arguments )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -44,12 +51,12 @@ sealed class CKliDotNet : Command
             }
             foreach( var repo in repos )
             {
-                using( monitor.OpenTrace( $"Executing 'dotnet {arguments}' in '{repo.DisplayPath}'." ) )
+                using( monitor.OpenTrace( $"Executing '{processName} {arguments}' in '{repo.DisplayPath}'." ) )
                 {
-                    var exitCode = ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", arguments, repo.WorkingFolder, null );
+                    var exitCode = ProcessRunner.RunProcess( ActivityMonitor.StaticLogger, processName, arguments, repo.WorkingFolder, null );
                     if( exitCode != 0 )
                     {
-                        var msg = $"dotnet failed in '{repo.DisplayPath}' with exit code {exitCode}. Use 'ckli log' to see the logs.";
+                        var msg = $"'{processName}' failed in Repo '{repo.DisplayPath}' with exit code {exitCode}. Use 'ckli log' to see the logs.";
                         if( continueOnError )
                         {
                             monitor.Warn( msg );

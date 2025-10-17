@@ -18,7 +18,7 @@ public static class CKliCommands
         var c = new CommandNamespaceBuilder();
         c.Add( new CKliLog() );
         c.Add( new CKliClone() );
-        c.Add( new CKliDotNet() );
+        c.Add( new CKliExec() );
         c.Add( new CKliPull() );
         c.Add( new CKliFetch() );
         c.Add( new CKliPush() );
