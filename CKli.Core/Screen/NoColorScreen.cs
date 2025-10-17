@@ -24,7 +24,7 @@ sealed class NoColorScreen : IScreen
             }
         }
 
-        public void Append( ReadOnlySpan<char> text, TextStyle style )
+        public void Write( ReadOnlySpan<char> text, TextStyle style )
         {
             if( _updateCount != 0 )
             {
@@ -36,7 +36,7 @@ sealed class NoColorScreen : IScreen
             }
         }
 
-        public void EndOfLine() => Append( Environment.NewLine, TextStyle.None );
+        public void EndOfLine() => Write( Environment.NewLine, TextStyle.None );
     }
 
     readonly RenderTarget _target;
@@ -85,7 +85,7 @@ sealed class NoColorScreen : IScreen
         display.Render( _target );
     }
 
-    public void OnLogErrorOrWarning( LogLevel level, string message )
+    public void OnLogErrorOrWarning( LogLevel level, string message, bool isOpenGroup )
     {
         if( level == LogLevel.Warn )
         {
@@ -100,7 +100,7 @@ sealed class NoColorScreen : IScreen
         Console.Out.WriteLine( b.ToString() );
     }
 
-    public void OnLogAny( LogLevel level, string? text, bool isOpenGroup )
+    public void OnLogOther( LogLevel level, string? text, bool isOpenGroup )
     {
     }
 

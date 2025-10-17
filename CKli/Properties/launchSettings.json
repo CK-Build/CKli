@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "C:\\Dev3": {
+    "C:\\Dev3 (cmd)": {
       "environmentVariables": {
         "PATH": "C:\\Dev\\CKli\\CKli\\bin\\Debug\\net8.0;%PATH%"
       },
@@ -8,25 +8,13 @@
       "executablePath": "cmd",
       "workingDirectory": "C:\\Dev3"
     },
-    "clone -h": {
-      "commandName": "Project",
-      "commandLineArgs": "clone -h"
-    },
-    "test": {
-      "commandName": "Project",
-      "commandLineArgs": "clone http://some not here"
-    },
-    "clone CK-Build -p C:/Dev3": {
-      "commandName": "Project",
-      "commandLineArgs": "clone https://github.com/CK-Build/CK-Build-Stack -p \"C:\\Dev3\" --debug-launch"
-    },
-    "clone CK -p C:/Dev3": {
-      "commandName": "Project",
-      "commandLineArgs": "clone https://github.com/signature-opensource/CK-Stack -p C:\\Dev3"
-    },
-    "clone CK-Build -p C:/Dev3 --allow-duplicate": {
-      "commandName": "Project",
-      "commandLineArgs": "clone https://github.com/CK-Build/CK-Build-Stack -p C:/Dev3 --allow-duplicate"
+    "C:\\Dev3 (ps)": {
+      "environmentVariables": {
+        "PATH": "C:\\Dev\\CKli\\CKli\\bin\\Debug\\net8.0;%PATH%"
+      },
+      "commandName": "Executable",
+      "executablePath": "powershell",
+      "workingDirectory": "C:\\Dev3"
     }
   }
 }

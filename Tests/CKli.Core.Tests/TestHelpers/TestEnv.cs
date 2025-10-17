@@ -34,7 +34,7 @@ static partial class TestEnv
 
     static void Initialize()
     {
-        CKliRootEnv.Initialize( "Test", new StringScreen() );
+        CKliRootEnv.Initialize( "Test", screen: new StringScreen() );
         World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
         InitializeRemotes();
         InitializeNuGetSource();

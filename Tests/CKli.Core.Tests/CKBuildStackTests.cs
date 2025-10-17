@@ -26,10 +26,10 @@ public class CKBuildStackTests
         context = context.ChangeDirectory( "CK-Build" );
 
         // ckli dotnet build /p:Version=1.1.1
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "dotnet", "build", "/p:Version=1.1.1" )).ShouldBeTrue();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "exec", "dotnet", "build", "/p:Version=1.1.1" )).ShouldBeTrue();
 
         // ckli dotnet test --no-restore --no-build
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "dotnet", "test", "--no-restore", "--no-build" )).ShouldBeTrue();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "exec", "dotnet", "test", "--no-restore", "--no-build" )).ShouldBeTrue();
 
     }
 }

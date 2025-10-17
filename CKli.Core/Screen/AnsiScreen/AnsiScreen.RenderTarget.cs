@@ -6,23 +6,21 @@ namespace CKli.Core;
 
 sealed partial class AnsiScreen
 {
+    delegate void CoreTextWriter( ReadOnlySpan<char> text );
+
     sealed class RenderTarget : IRenderTarget
     {
-        delegate void WriteText( ReadOnlySpan<char> text );
-
         readonly StringBuilder _buffer;
-        readonly TextWriter _out;
-        readonly WriteText _buffered;
-        readonly WriteText _unbuffered;
+        readonly CoreTextWriter _buffered;
+        readonly CoreTextWriter _unbuffered;
         int _updateCount;
         TextStyle _current;
 
-        public RenderTarget( TextWriter outW )
+        public RenderTarget( CoreTextWriter writer )
         {
             _buffer = new StringBuilder();
-            _out = outW;
             _buffered = text => _buffer.Append( text );
-            _unbuffered = text => _out.Write( text );
+            _unbuffered = writer;
         }
 
         public void BeginUpdate() => _updateCount++;
@@ -31,84 +29,46 @@ sealed partial class AnsiScreen
         {
             if( --_updateCount == 0 )
             {
-                _out.Write( _buffer.ToString() );
+                _unbuffered( _buffer.ToString() );
                 _buffer.Clear();
             }
         }
 
-        WriteText Writer => _updateCount > 0 ? _buffered : _unbuffered;
+        CoreTextWriter Writer => _updateCount > 0 ? _buffered : _unbuffered;
 
-        public void Append( ReadOnlySpan<char> text, TextStyle style )
+        public void Write( ReadOnlySpan<char> text ) => Writer( text );
+
+        public void Write( ReadOnlySpan<char> text, TextStyle style )
         {
             var w = Writer;
             if( _current != style )
             {
                 var c = _current.OverrideWith( style );
-                WriteDiff( w, _current, c );
-                _current = c;
+                if( _current != c )
+                {
+                    WriteDiff( w, _current, c );
+                    _current = c;
+                }
             }
             w( text );
+
+            static void WriteDiff( CoreTextWriter writer, TextStyle current, TextStyle style )
+            {
+                Span<char> styleBuffer = stackalloc char[64];
+                var w = new FixedBufferWriter( styleBuffer );
+                w.AppendCSITextStyleDiff( current, style );
+                writer( w.Text );
+            }
         }
 
-        void WriteDiff( WriteText w, TextStyle current, TextStyle style )
+        public void EndOfLine()
         {
-            Span<char> chars = stackalloc char[64];
-            var head = AnsiCodes.WriteCSI( chars );
-            if( current.Color != style.Color && !style.IgnoreColor )
-            {
-                if( current.Color.ForeColor != style.Color.ForeColor )
-                {
-                    head = AnsiCodes.WriteColor( head, style.Color.ForeColor, false );
-                }
-                if( current.Color.BackColor != style.Color.BackColor )
-                {
-                    if( head.Length > 2 ) head = AnsiCodes.WriteSemiColon( head );
-                    head = AnsiCodes.WriteColor( head, style.Color.BackColor, true );
-                }
-            }
-            if( current.Effect != style.Effect && style.Effect != TextEffect.Ignore )
-            {
-                if( style.Effect == TextEffect.Regular )
-                {
-                    if( head.Length > 2 ) head = AnsiCodes.WriteSemiColon( head );
-                    head = AnsiCodes.WriteRegular( head );
-                }
-                else
-                {
-                    if( (current.Effect & TextEffect.Bold) != (style.Effect & TextEffect.Bold) )
-                    {
-                        if( head.Length > 2 ) head = AnsiCodes.WriteSemiColon( head );
-                        head = AnsiCodes.WriteBold( head, (style.Effect & TextEffect.Bold) != 0 );
-                    }
-                    if( (current.Effect & TextEffect.Italic) != (style.Effect & TextEffect.Italic) )
-                    {
-                        if( head.Length > 2 ) head = AnsiCodes.WriteSemiColon( head );
-                        head = AnsiCodes.WriteItalic( head, (style.Effect & TextEffect.Italic) != 0 );
-                    }
-                    if( (current.Effect & TextEffect.Underline) != (style.Effect & TextEffect.Underline) )
-                    {
-                        if( head.Length > 2 ) head = AnsiCodes.WriteSemiColon( head );
-                        head = AnsiCodes.WriteUnderline( head, (style.Effect & TextEffect.Underline) != 0 );
-                    }
-                    if( (current.Effect & TextEffect.Strikethrough) != (style.Effect & TextEffect.Strikethrough) )
-                    {
-                        if( head.Length > 2 ) head = AnsiCodes.WriteSemiColon( head );
-                        head = AnsiCodes.WriteStrikeThrough( head, (style.Effect & TextEffect.Strikethrough) != 0 );
-                    }
-                    if( (current.Effect & TextEffect.Blink) != (style.Effect & TextEffect.Blink) )
-                    {
-                        if( head.Length > 2 ) head = AnsiCodes.WriteSemiColon( head );
-                        head = AnsiCodes.WriteBlink( head, (style.Effect & TextEffect.Blink) != 0 );
-                    }
-                }
-            }
-            if( head.Length > 2 ) head = AnsiCodes.WriteCommand( head, 'm' );
-
-            var writeLen = chars.Length - head.Length;
-            if( writeLen > 0 ) w( chars.Slice( 0, writeLen ) );
+            Span<char> b = stackalloc char[64];
+            var w = new FixedBufferWriter( b );
+            w.AppendCSIStyle( TextStyle.Default.Color, TextEffect.Regular );
+            w.Append( '\n' );
+            Write( w.Text );
         }
-
-        public void EndOfLine() => Append( Environment.NewLine, TextStyle.Default );
     }
 
 }

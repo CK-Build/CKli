@@ -41,8 +41,8 @@ public interface IScreen
     /// </para>
     /// </summary>
     /// <param name="level">The level.</param>
-    /// <param name="message">The message.</param>
-    void OnLogErrorOrWarning( LogLevel level, string message );
+    /// <param name="text">The message.</param>
+    void OnLogErrorOrWarning( LogLevel level, string text, bool isOpenGroup = false );
 
     /// <summary>
     /// All screens returns an empty string except <see cref="StringScreen"/> that returns
@@ -51,7 +51,7 @@ public interface IScreen
     /// <returns>A non null string.</returns>
     string ToString();
 
-    internal void OnLogAny( LogLevel level, string? text, bool isOpenGroup );
+    internal void OnLogOther( LogLevel level, string? text, bool isOpenGroup );
 
     internal void DisplayHelp( List<CommandHelp> commands,
                                CommandLineArguments cmdLine,

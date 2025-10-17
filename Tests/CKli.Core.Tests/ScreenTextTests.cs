@@ -94,7 +94,7 @@ public class ScreenTextTests
     {
         TextBlock.MinWidth.ShouldBe( 15 );
         {
-            var t = TextBlock.FromText( "0 1 2 3 4 5 6 7 8 9 A B C D E F G H I J K L M N O P Q R S T U V W X Y Z" );
+            var t = TextBlock.FromText( "            0 1 2 3 4 5 6 7 8 9 A B C D E F G H I J K L M N O P Q R S T U V W X Y Z               " );
             var tMin = t.SetTextWidth( TextBlock.MinWidth );
             tMin.Width.ShouldBe( TextBlock.MinWidth );
             tMin.Height.ShouldBe( 5 );
@@ -162,6 +162,27 @@ public class ScreenTextTests
 
                 """ );
         }
+        {
+            var t = TextBlock.FromText( """
+                                A
+                                B            
+
+                                C       
+
+
+                """ );
+            var tMin = t.SetTextWidth( TextBlock.MinWidth );
+            tMin.ShouldBeSameAs( t );
+            t.RenderAsString().ShouldBe( """
+                A
+                B
+
+                C
+
+                """ );
+
+        }
+
     }
 
     [Test]

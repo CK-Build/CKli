@@ -35,17 +35,16 @@ if( arguments.EatFlag( "--version" ) )
     var info = CSemVer.InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() );
     Console.WriteLine( $"CKli - {info.Version} - {info.OriginalInformationalVersion}." );
 }
-
 // Initializes the root environment.
 World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
-CKliRootEnv.Initialize();
+CKliRootEnv.Initialize( arguments: arguments );
 CKliRootEnv.GlobalOptions = GetGlobalOptions;
 CKliRootEnv.GlobalFlags = GetGlobalFlags;
 
 var monitor = new ActivityMonitor();
+monitor.Output.RegisterClient( new ScreenLogger( CKliRootEnv.Screen ) );
 monitor.Info( $"Executing '{arguments.InitialArguments.Concatenate( " " )}'." );
 
-monitor.Output.RegisterClient( new ScreenLogger( CKliRootEnv.Screen ) );
 CoreApplicationIdentity.Initialize();
 
 Environment.ExitCode = (await CKliCommands.HandleCommandAsync( monitor, CKliRootEnv.DefaultCKliEnv, arguments ))
@@ -59,10 +58,19 @@ static ImmutableArray<(ImmutableArray<string> Names, string Description, bool Mu
     return [(["--path", "-p"], "Sets the working path. This overrides the current directory.", Multiple:false)];
 }
 
-static ImmutableArray<(ImmutableArray<string> Names, string Description)> GetGlobalFlags()
-{
-    return [ (["--debug-launch"], "Launches a debugger when starting."),
-             (["--version"], "Displays this CKli version.") ];
-}
+static ImmutableArray<(ImmutableArray<string> Names, string Description)> GetGlobalFlags() => [
+        (["--version"], "Displays this CKli version."),
+        (["--screen"], """
+                        Change the screen display. Can be:
+                        - none: No display at all.
+                        - no-color (or no_color): Basic display, no animation.
+                        - force-ansi: Always consider an Ansi terminal.
+
+                        If a non empty "NO_COLOR" exists in the environment variables, it is honored.
+                        See https://no-color.org/.
+                        Any other values are ignored: the default detection is applied.
+             """),
+        (["--debug-launch"], "Launches a debugger when starting.")
+    ];
 
 

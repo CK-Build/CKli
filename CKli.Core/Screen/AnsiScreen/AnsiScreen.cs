@@ -21,10 +21,8 @@ sealed partial class AnsiScreen : IScreen
     readonly RenderTarget _target;
     readonly uint? _originalConsoleMode;
     readonly Encoding _originalOutputEncoding;
-    long _prevTick;
-    int? _width;
-    int _spinCount;
-    bool _hasSpin;
+    readonly Animation _animation;
+    int _width;
 
     public AnsiScreen( uint? originalConsoleMode )
     {
@@ -32,18 +30,21 @@ sealed partial class AnsiScreen : IScreen
         _originalOutputEncoding = Console.OutputEncoding;
         Console.OutputEncoding = Encoding.UTF8;
 
-        _target = new RenderTarget( Console.Out );
+        _target = new RenderTarget( Console.Out.Write );
+
+        _width = GetWindowWidth();
+        _animation = new Animation( _target, _width );
     }
 
     public void Clear() => Console.Clear();
 
     public void Display( IRenderable renderable )
     {
-        HideSpin();
+        _animation.Hide();
         renderable.Render( _target );
     }
 
-    public int Width => _width ??= GetWindowWidth();
+    public int Width => _width;
 
     static int GetWindowWidth()
     {
@@ -64,36 +65,37 @@ sealed partial class AnsiScreen : IScreen
                              ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default,
                              ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
     {
-        HideSpin();
+        _animation.Hide();
         var help = ScreenHelpers.CreateDisplayHelp( commands, cmdLine, globalOptions, globalFlags, Width );
         help.Render( _target );
     }
 
     public void DisplayPluginInfo( string headerText, List<World.DisplayInfoPlugin>? infos )
     {
-        HideSpin();
+        _animation.Hide();
         var display = ScreenHelpers.CreateDisplayPlugin( headerText, infos, Width );
         display.Render( _target );
     }
 
-    public void OnLogErrorOrWarning( LogLevel level, string message )
+    public void OnLogErrorOrWarning( LogLevel level, string message, bool isOpenGroup )
     {
-        HideSpin();
+        _animation.Hide();
         var h = level == LogLevel.Warn ? _warningHead : _errorHead;
         h.AddRight( TextBlock.FromText( message, TextStyle.Default ) ).Render( _target );
+        if( isOpenGroup ) _animation.OpenGroup( level, message );
+        else _animation.Line( level, message );
     }
 
-    public void OnLogAny( LogLevel level, string? text, bool isOpenGroup )
+    public void OnLogOther( LogLevel level, string? text, bool isOpenGroup )
     {
-    }
-
-    void HideSpin()
-    {
+        if( text == null ) _animation.CloseGroup();
+        else if( isOpenGroup ) _animation.OpenGroup( level, text );
+        else _animation.Line( level, text );
     }
 
     void IScreen.Close()
     {
-        HideSpin();
+        _animation.Dispose();
         Console.OutputEncoding = _originalOutputEncoding;
         AnsiDetector.RestoreConsoleMode( _originalConsoleMode );
     }

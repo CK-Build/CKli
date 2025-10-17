@@ -22,7 +22,7 @@ public static class ProcessRunner
     /// <param name="workingDirectory">Working directory.</param>
     /// <param name="environmentVariables">Optional environment variables to configure.</param>
     /// <returns>The exit status code.</returns>
-    public static int RunProcess( IParallelLogger logger,
+    public static int RunProcess( IActivityLineEmitter logger,
                                   string fileName,
                                   string arguments,
                                   string workingDirectory,
@@ -44,7 +44,7 @@ public static class ProcessRunner
     /// <param name="environmentVariables">Optional environment variables to configure.</param>
     /// <param name="timemout">Timeout in milliseconds.</param>
     /// <returns>The exit status code.</returns>
-    public static int? RunProcess( IParallelLogger logger,
+    public static int? RunProcess( IActivityLineEmitter logger,
                                    string fileName,
                                    string arguments,
                                    string workingDirectory,
@@ -62,7 +62,7 @@ public static class ProcessRunner
         return exited ? process.ExitCode : null;
     }
 
-    static Process DoRun( IParallelLogger logger,
+    static Process DoRun( IActivityLineEmitter logger,
                           string fileName,
                           string arguments,
                           string workingDirectory,

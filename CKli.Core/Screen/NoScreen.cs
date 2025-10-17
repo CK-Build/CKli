@@ -15,9 +15,9 @@ public sealed class NoScreen : IScreen
 
     public int Width => IScreen.MaxScreenWidth;
 
-    public void OnLogErrorOrWarning( LogLevel level, string message ) { }
+    public void OnLogErrorOrWarning( LogLevel level, string message, bool isOpenGroup ) { }
 
-    void IScreen.OnLogAny( LogLevel level, string? text, bool isOpenGroup ) { }
+    void IScreen.OnLogOther( LogLevel level, string? text, bool isOpenGroup ) { }
 
     public void DisplayHelp( List<CommandHelp> commands, CommandLineArguments cmdLine, ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default, ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
     {

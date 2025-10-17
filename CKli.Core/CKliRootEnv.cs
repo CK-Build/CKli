@@ -1,9 +1,12 @@
 using CK.Core;
 using CK.Monitoring;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,8 +38,9 @@ public static class CKliRootEnv
     /// Initializes the CKli environment.
     /// </summary>
     /// <param name="instanceName">Used by tests (with "Test"). Can be used with other suffix if needed.</param>
+    /// <param name="arguments">Optional arguments. when provided, this handles the <c>--screen</c> option.</param>
     /// <param name="screen">Optional <see cref="StringScreen"/> to use or <see cref="NoScreen"/>.</param>
-    public static void Initialize( string? instanceName = null, IScreen? screen = null )
+    public static void Initialize( string? instanceName = null, CommandLineArguments? arguments = null, IScreen? screen = null )
     {
         Throw.CheckState( "Initialize can be called only once.", _appLocalDataPath.IsEmptyPath );
         _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create ),
@@ -46,7 +50,7 @@ public static class CKliRootEnv
         _currentDirectory = Environment.CurrentDirectory;
         _currentStackPath = StackRepository.FindGitStackPath( _currentDirectory );
 
-        _screen = screen ?? CreateConsole();
+        _screen = screen ?? CreateScreen( arguments );
 
         InitializeMonitoring( _currentDirectory, _currentStackPath );
         NormalizedPath configFilePath = GetConfigPath();
@@ -132,15 +136,31 @@ public static class CKliRootEnv
             }
         }
 
-        static IScreen CreateConsole()
+        static IScreen CreateScreen( CommandLineArguments? arguments )
         {
-            bool ansiConsole = !Environment.GetEnvironmentVariables().Contains( "NO_COLOR" );
+            bool forceAnsi = false;
+            var optScreen = arguments?.EatSingleOption( "--screen" );
+            if( optScreen != null )
+            {
+                if( optScreen.Equals( "no-color", StringComparison.OrdinalIgnoreCase )
+                    || optScreen.Equals( "no_color", StringComparison.OrdinalIgnoreCase ) )
+                {
+                    return new NoColorScreen();
+                }
+                if( optScreen.Equals( "none", StringComparison.OrdinalIgnoreCase ) )
+                {
+                    return new NoScreen();
+                }
+                forceAnsi = optScreen.Equals( "force-ansi", StringComparison.OrdinalIgnoreCase );
+            }
+            // Applying https://no-color.org/
+            bool ansiConsole = forceAnsi || string.IsNullOrEmpty( Environment.GetEnvironmentVariable( "NO_COLOR" ) );
             uint? originalConsoleMode = null;
             if( ansiConsole )
             {
                 (ansiConsole, originalConsoleMode) = AnsiDetector.TryEnableAnsiColorCodes();
             }
-            IScreen s = ansiConsole ? new AnsiScreen( originalConsoleMode ) : new NoColorScreen();
+            IScreen s = forceAnsi || ansiConsole ? new AnsiScreen( originalConsoleMode ) : new NoColorScreen();
             return s;
         }
     }
@@ -175,7 +195,6 @@ public static class CKliRootEnv
     internal static void OnSuccessfulCKliLogCommand() => _shouldDeletePureCKliLogFile ??= true;
 
     internal static void OnAnyOtherCommandAndSuccess() => _shouldDeletePureCKliLogFile = false;
-
 
     /// <summary>
     /// Throws an <see cref="InvalidOperationException"/> if <see cref="Initialize(string?)"/> has not been called.

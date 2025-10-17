@@ -211,7 +211,7 @@ public sealed class CommandLineArguments
 
     /// <summary>
     /// Closes this command line and returns a string that are the remaining arguments to use
-    /// to call a <see cref="ProcessRunner.RunProcess(IParallelLogger, string, string, string, Dictionary{string, string}?)"/>.
+    /// to call a <see cref="ProcessRunner.RunProcess(IActivityLineEmitter, string, string, string, Dictionary{string, string}?)"/>.
     /// <para>
     /// This cannot fail (the <paramref name="arguments"/> may be empty).
     /// </para>

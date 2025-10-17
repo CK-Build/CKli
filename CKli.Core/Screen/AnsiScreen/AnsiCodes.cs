@@ -1,3 +1,5 @@
+using CK.Core;
+using LibGit2Sharp;
 using System;
 using System.Runtime.InteropServices;
 
@@ -154,7 +156,7 @@ internal static class AnsiCodes
     /// Sets or clears bold mode. 
     /// </summary>
     /// <returns>The Ansi string.</returns>
-    public static string SetBold( bool bold = true ) => bold ? "\u001b[1m" : "\u001b[21m";
+    public static string SetBold( bool bold = true ) => bold ? "\u001b[1m" : "\u001b[22m";
 
     /// <summary>
     /// Sets or clears underlined mode. 
@@ -195,11 +197,177 @@ internal static class AnsiCodes
     /// <summary>
     /// Writes the Control Sequence Introducer: '\u001b' and '['.
     /// </summary>
-    /// <param name="b">The target span.</param>
-    /// <returns>The forwarded head.</returns>
-    public static Span<char> WriteCSI( Span<char> b ) => Write( b, '\u001b', '[' );
+    /// <param name="w">This writer.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public static bool AppendCSI( ref this FixedBufferWriter w ) => w.Append( '\u001b', '[' );
 
-    public static Span<char> WriteColor( Span<char> b, ConsoleColor c, bool background )
+    /// <summary>
+    /// Writes the foreground and background colors and optionally a text effect.
+    /// </summary>
+    /// <param name="w">This writer.</param>
+    /// <param name="c">The color.</param>
+    /// <param name="effect">The effect to apply.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public static bool AppendCSIStyle( ref this FixedBufferWriter w, Color c, TextEffect effect = TextEffect.Ignore )
+    {
+        int saved = w.WrittenLength;
+        if( w.AppendCSI()
+            // Must come first: setting effect emits a 0 to reset the effect but
+            // that also resets the colors.
+            && (effect == TextEffect.Ignore
+                || (w.AppendEffectArguments( effect ) && w.Append( ';' ) ))
+            && w.AppendColorArgument( c.ForeColor, false )
+            && w.Append( ';' )
+            && w.AppendColorArgument( c.BackColor, true )
+            && w.Append( 'm' ) )
+        {
+            return true;
+        }
+        w.Truncate( saved );
+        return false;
+    }
+
+    public static bool AppendCSIMoveToColumn( ref this FixedBufferWriter w, int columnCount )
+    {
+        int saved = w.WrittenLength;
+        if( w.AppendCSI()
+            && w.Append( columnCount )
+            && w.Append( "G" ) )
+        {
+            return true;
+        }
+        w.Truncate( saved );
+        return false;
+
+    }
+
+    /// <summary>
+    /// Writes a <see cref="TextEffect"/> that must not be <see cref="TextEffect.Ignore"/> otherwise an <see cref="ArgumentException"/>
+    /// is thrown (if we accept ignore, the caller will not know if she must append a semicolon or not). 
+    /// </summary>
+    /// <param name="w">This writer.</param>
+    /// <param name="effect">The effect to apply.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public static bool AppendEffectArguments( ref this FixedBufferWriter w, TextEffect effect )
+    {
+        Throw.CheckArgument( effect != TextEffect.Ignore );
+        int saved = w.WrittenLength;
+        if( w.AppendRegularTextArgument()
+            && (effect == TextEffect.Regular
+                || (
+                     ((effect & TextEffect.Bold) == 0) || (w.Append(';') && w.AppendBoldTextArgument( true ))
+                     && ((effect & TextEffect.Italic) == 0) || (w.Append( ';' ) && w.AppendItalicTextArgument( true ))
+                     && ((effect & TextEffect.Underline) == 0) || (w.Append( ';' ) && w.AppendUnderlineTextArgument( true ))
+                     && ((effect & TextEffect.Strikethrough) == 0) || (w.Append( ';' ) && w.AppendStrikeThroughTextArgument( true ))
+                     && ((effect & TextEffect.Blink) == 0) || (w.Append( ';' ) && w.AppendBlinkTextArgument( true ))
+                   )) )
+        {
+            return true;
+        }
+        w.Truncate( saved );
+        return false;
+    }
+
+
+    public static bool AppendCSITextStyleDiff( ref this FixedBufferWriter w, TextStyle current, TextStyle style )
+    {
+        int saved = w.WrittenLength;
+        if( !w.AppendCSI() ) return false;
+        int startContent = saved + 2;
+        if( current.Color != style.Color && !style.IgnoreColor )
+        {
+            if( current.Color.ForeColor != style.Color.ForeColor )
+            {
+                w.AppendColorArgument( style.Color.ForeColor, false );
+            }
+            if( current.Color.BackColor != style.Color.BackColor )
+            {
+                if( w.WrittenLength > startContent ) w.Append( ';' );
+                w.AppendColorArgument( style.Color.BackColor, true );
+            }
+        }
+        if( current.Effect != style.Effect && style.Effect != TextEffect.Ignore )
+        {
+            if( style.Effect == TextEffect.Regular )
+            {
+                if( w.WrittenLength > startContent ) w.Append( ';' );
+                w.AppendRegularTextArgument();
+            }
+            else
+            {
+                if( (current.Effect & TextEffect.Bold) != (style.Effect & TextEffect.Bold) )
+                {
+                    if( w.WrittenLength > startContent ) w.Append( ';' );
+                    w.AppendBoldTextArgument( (style.Effect & TextEffect.Bold) != 0 );
+                }
+                if( (current.Effect & TextEffect.Italic) != (style.Effect & TextEffect.Italic) )
+                {
+                    if( w.WrittenLength > startContent ) w.Append( ';' );
+                    w.AppendItalicTextArgument( (style.Effect & TextEffect.Italic) != 0 );
+                }
+                if( (current.Effect & TextEffect.Underline) != (style.Effect & TextEffect.Underline) )
+                {
+                    if( w.WrittenLength > startContent ) w.Append( ';' );
+                    w.AppendUnderlineTextArgument( (style.Effect & TextEffect.Underline) != 0 );
+                }
+                if( (current.Effect & TextEffect.Strikethrough) != (style.Effect & TextEffect.Strikethrough) )
+                {
+                    if( w.WrittenLength > startContent ) w.Append( ';' );
+                    w.AppendStrikeThroughTextArgument( (style.Effect & TextEffect.Strikethrough) != 0 );
+                }
+                if( (current.Effect & TextEffect.Blink) != (style.Effect & TextEffect.Blink) )
+                {
+                    if( w.WrittenLength > startContent ) w.Append( ';' );
+                    w.AppendBlinkTextArgument( (style.Effect & TextEffect.Blink) != 0 );
+                }
+            }
+        }
+        if( w.WrittenLength > startContent )
+        {
+            if( w.Append( 'm' ) ) return true;
+            w.Truncate( saved );
+            return false;
+        }
+        // No diff. This should have been tested before calling this. 
+        w.Truncate( saved );
+        return true;
+    }
+
+    /// <summary>
+    /// Erases the current line. The cursor remains where it is.
+    /// </summary>
+    /// <param name="w">The writer.</param>
+    /// <param name="span">Specifies which part of the line must be erased.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public static bool AppendCSIEraseLine( ref this FixedBufferWriter w, CursorRelativeSpan span = CursorRelativeSpan.Both )
+    {
+        int saved = w.WrittenLength;
+        if( !w.AppendCSI() || !w.Append( (char)('0' + span) ) || !w.Append( 'K' ) )
+        {
+            w.Truncate( saved );
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Erases the current line and set the cursor on the first column (n°1 - this is one based).
+    /// </summary>
+    /// <param name="w">The writer.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public static bool AppendCSIEraseLineAndMoveToFirstColumn( ref this FixedBufferWriter w )
+    {
+        Throw.DebugAssert( (int)CursorRelativeSpan.Both == 2 );
+        int saved = w.WrittenLength;
+        if( !w.AppendCSI() || !w.Append( '2', 'K' ) || !w.AppendCSI() || !w.Append( '1', 'G' ) )
+        {
+            w.Truncate( saved );
+            return false;
+        }
+        return true;
+    }
+
+    public static bool AppendColorArgument( ref this FixedBufferWriter w, ConsoleColor c, bool background )
     {
         AnsiColor aC = c.FromConsole();
         var (h, l) = Math.DivRem( (int)aC, 10 );
@@ -207,51 +375,24 @@ internal static class AnsiCodes
         {
             if( h == 9 )
             {
-                return Write( b, '1', '0', (char)('0' + l) );
+                return w.Append( '1', '0', (char)('0' + l) );
             }
             ++h;
         }
-        return Write( b, (char)('0' + h), (char)('0' + l) );
+        return w.Append( (char)('0' + h), (char)('0' + l) );
     }
 
-    public static Span<char> WriteCommand( Span<char> b, char cmd ) => Write( b, cmd );
+    public static bool AppendRegularTextArgument( ref this FixedBufferWriter w ) => w.Append( '0' );
 
-    public static Span<char> WriteRegular( Span<char> b ) => Write( b, '0' );
+    public static bool AppendBoldTextArgument( ref this FixedBufferWriter w, bool active ) => active ? w.Append( '1' ) : w.Append( '2', '2' );
 
-    public static Span<char> WriteSemiColon( Span<char> b ) => Write( b, ';' );
+    public static bool AppendUnderlineTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '4' );
 
-    public static Span<char> WriteBold( Span<char> b, bool active ) => active ? Write( b, '1' ) : Write( b, '2', '2' );
+    public static bool AppendStrikeThroughTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '9' );
 
-    public static Span<char> WriteUnderline( Span<char> b, bool active ) => WriteStdDecoration( b, active, '4' );
+    public static bool AppendItalicTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '3' );
 
-    public static Span<char> WriteStrikeThrough( Span<char> b, bool active ) => WriteStdDecoration( b, active, '9' );
+    public static bool AppendBlinkTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '5' );
 
-    public static Span<char> WriteItalic( Span<char> b, bool active ) => WriteStdDecoration( b, active, '3' );
-
-    public static Span<char> WriteBlink( Span<char> b, bool active ) => WriteStdDecoration( b, active, '5' );
-
-    static Span<char> Write( Span<char> b, char c )
-    {
-        b[0] = c;
-        return b.Slice( 1 );
-    }
-
-    static Span<char> Write( Span<char> b, char c1, char c2 )
-    {
-        b[0] = c1;
-        b[1] = c2;
-        return b.Slice( 2 );
-    }
-
-    static Span<char> Write( Span<char> b, char c1, char c2, char c3 )
-    {
-        b[0] = c1;
-        b[1] = c2;
-        b[2] = c3;
-        return b.Slice( 3 );
-    }
-
-    static Span<char> WriteStdDecoration( Span<char> b, bool active, char d ) => active ? Write( b, d ) : Write( b, '2', d );
-
-
+    static bool AppendStdDecoration( ref FixedBufferWriter w, bool active, char d ) => active ? w.Append( d ) : w.Append( '2', d );
 }
