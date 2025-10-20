@@ -26,6 +26,7 @@ public static class CKliCommands
         c.Add( new CKliPush() );
         c.Add( new CKliLayoutFix() );
         c.Add( new CKliLayoutXif() );
+        c.Add( new CKliRepo() );
         c.Add( new CKliRepoAdd() );
         c.Add( new CKliRepoRemove() );
         c.Add( new CKliPlugin() );
