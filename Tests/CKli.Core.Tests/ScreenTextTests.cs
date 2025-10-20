@@ -1,4 +1,5 @@
 using CK.Core;
+using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;
 using System;
@@ -12,14 +13,63 @@ public class ScreenTextTests
 {
 
     [Test]
-    public void TextStyle_test()
+    public void TextStyle_override_test()
     {
+        var parentStyle = new TextStyle( ConsoleColor.DarkRed, ConsoleColor.Black, TextEffect.Regular );
+        var style = new TextStyle( ConsoleColor.DarkGreen, ConsoleColor.Black, default );
+        var finalStyle = parentStyle.OverrideWith( style );
+        finalStyle.Color.ShouldBe( style.Color );
+        finalStyle.Effect.ShouldBe( parentStyle.Effect );
+    }
+
+    [Test]
+    public void ContentAlign_test()
+    {
+        var text = StringScreenType.Default.Text( """
+                Hello world,
+
+                I'm glad to be there...
+                But...
+                I'm sad that Trump's here.
+                """ );
+
         {
-            var parentStyle = new TextStyle( ConsoleColor.DarkRed, ConsoleColor.Black, TextEffect.Regular );
-            var style = new TextStyle( ConsoleColor.DarkGreen, ConsoleColor.Black, default );
-            var finalStyle = parentStyle.OverrideWith( style );
-            finalStyle.Color.ShouldBe( style.Color );
-            finalStyle.Effect.ShouldBe( parentStyle.Effect );
+            var bUnk = text.Box( ContentAlign.Unknwon );
+            var bLeft = text.Box( ContentAlign.HLeft );
+            string result = """
+                Hello world,··············
+                ··························
+                I'm glad to be there...···
+                But...····················
+                I'm sad that Trump's here.
+
+                """.Replace( '·', ' ' );
+            bUnk.RenderAsString().ShouldBe( result );
+            bLeft.RenderAsString().ShouldBe( result );
+        }
+        {
+            var bRight = text.Box( ContentAlign.HRight );
+            bRight.RenderAsString().ShouldBe( """
+                ··············Hello world,
+                ··························
+                ···I'm glad to be there...
+                ····················But...
+                I'm sad that Trump's here.
+
+                """.Replace( '·', ' ' )
+                );
+        }
+        {
+            var bCenter = text.Box( ContentAlign.HCenter );
+            bCenter.RenderAsString().ShouldBe( """
+                ·······Hello world,·······
+                ··························
+                ·I'm glad to be there...··
+                ··········But...··········
+                I'm sad that Trump's here.
+
+                """.Replace( '·', ' ' )
+                );
         }
     }
 

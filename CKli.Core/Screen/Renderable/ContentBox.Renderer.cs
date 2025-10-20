@@ -26,7 +26,18 @@ public sealed partial class ContentBox
                 var lineBelow = line - _content.Height;
                 if( lineBelow < 0 )
                 {
-                    _ = new LeftAlignRenderer( parent, Width, _content, line, actualHeight, _style, _padding, _margin );
+                    if( _align.IsRight() )
+                    {
+                        _ = new RightAlignRenderer( parent, Width, _content, line, actualHeight, _style, _padding, _margin );
+                    }
+                    else if( _align.IsCenter() )
+                    {
+                        _ = new CenterAlignRenderer( parent, Width, _content, line, actualHeight, _style, _padding, _margin );
+                    }
+                    else
+                    {
+                        _ = new LeftAlignRenderer( parent, Width, _content, line, actualHeight, _style, _padding, _margin );
+                    }
                 }
                 else
                 {
@@ -84,10 +95,10 @@ public sealed partial class ContentBox
         {
             if( margin.Left > 0 ) RenderPadding( margin.Left, Target, ParentFinalStyle );
             int pad = Length - ContentLength - margin.Left - margin.Right;
-            int padLeft = padding.Left + pad >> 1;
+            int padLeft = padding.Left + (pad >> 1);
             if( padLeft > 0 ) RenderPadding( padLeft, Target, FinalStyle );
             RenderContent();
-            int padRight = pad >> 1 + (pad & 1) + padding.Right;
+            int padRight = (pad >> 1) + (pad & 1) + padding.Right;
             if( padRight > 0 ) RenderPadding( padRight, Target, FinalStyle );
             if( margin.Right > 0 ) RenderPadding( margin.Right, Target, ParentFinalStyle );
         }

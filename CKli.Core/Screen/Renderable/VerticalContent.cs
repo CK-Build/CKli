@@ -55,7 +55,7 @@ public sealed class VerticalContent : IRenderable
     {
         Throw.CheckArgument( line >= 0 && line < actualHeight && actualHeight >= Height );
         Throw.DebugAssert( line >= 0 );
-        // There is currently no "VJustify". It could be bottom/top/center/distribute.
+        // There is currently no "VJustify". It could be bottom/top/middle/distribute.
         // We ignore the actualHeight.
         if( line < _height )
         {
