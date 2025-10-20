@@ -28,9 +28,9 @@ public class CKBuildStackTests
         // ckli branch
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "branch" )).ShouldBeTrue();
         ((StringScreen)context.Screen).ToString().ShouldBe( """
-             CSemVer-Net  master  ↑0↓0
-             SGV-Net  master  ↑0↓0
-             Cake/CodeCake  master  ↑0↓0
+             CSemVer-Net master ↑0↓0
+             SGV-Net master ↑0↓0
+             Cake/CodeCake master ↑0↓0
 
             """ );
 
