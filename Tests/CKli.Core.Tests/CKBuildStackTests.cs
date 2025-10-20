@@ -30,7 +30,7 @@ public class CKBuildStackTests
         ((StringScreen)context.Screen).ToString().ShouldBe( """
              CSemVer-Net  master  ↑0↓0
              SGV-Net  master  ↑0↓0
-             CodeCake  master  ↑0↓0
+             Cake/CodeCake  master  ↑0↓0
 
             """ );
 

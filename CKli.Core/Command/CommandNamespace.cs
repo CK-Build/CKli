@@ -92,7 +92,10 @@ public sealed class CommandNamespace
             b.Append( ' ' ).Append( sArgs[pathCount] );
             nextPath = b.ToString();
         }
-        cmdLine.SetFoundCommand( cmd, pathCount );
+        if( cmd != null )
+        {
+            cmdLine.SetFoundCommand( cmd, pathCount );
+        }
     }
 
 }

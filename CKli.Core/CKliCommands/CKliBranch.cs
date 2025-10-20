@@ -54,7 +54,7 @@ sealed class CKliBranch : Command
 
     static IRenderable ToRenderable( ScreenType screenType, Repo repo )
     {
-        IRenderable r = screenType.Text( repo.WorkingFolder.LastPart );
+        IRenderable r = screenType.Text( repo.DisplayPath ).HyperLink( new System.Uri( $"file:///{repo.WorkingFolder}" ) );
         var status = repo.GitStatus;
         if( status.IsDirty ) r = r.Box( marginRight: 1 ).AddLeft( screenType.Text( "⋆" ) );
         else r = r.Box( marginLeft: 1, marginRight: 1 );

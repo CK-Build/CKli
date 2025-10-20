@@ -229,7 +229,7 @@ sealed partial class World
                 Throw.DebugAssert( "Since we must Clone, the cached repository is missing.", world._cachedRepositories[c.Uri.ToString()] == null );
                 Throw.DebugAssert( "Since we must Clone, the cached repository is missing.", world._cachedRepositories[c.Path] == null );
                 var gitKey = new GitRepositoryKey( world._stackRepository.SecretsStore, c.Uri, world._stackRepository.IsPublic );
-                var cloned = GitRepository.Clone( monitor, gitKey, c.Path, c.Path.LastPart );
+                var cloned = GitRepository.Clone( monitor, gitKey, c.Path, c.Path.RemoveFirstPart( world.Name.WorldRoot.Parts.Count ) );
                 if( cloned == null )
                 {
                     success = false;

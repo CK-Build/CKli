@@ -1,6 +1,5 @@
 using CK.Core;
 using LibGit2Sharp;
-using System;
 
 namespace CKli.Core;
 
@@ -67,5 +66,3 @@ public sealed class Collapsable : IRenderable
         }
     }
 }
-
-

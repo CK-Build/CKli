@@ -13,14 +13,16 @@ sealed partial class AnsiScreen
         readonly StringBuilder _buffer;
         readonly CoreTextWriter _buffered;
         readonly CoreTextWriter _unbuffered;
+        readonly ScreenType _screenType;
         int _updateCount;
         TextStyle _current;
 
-        public RenderTarget( CoreTextWriter writer )
+        public RenderTarget( CoreTextWriter writer, ScreenType screenType )
         {
             _buffer = new StringBuilder();
             _buffered = text => _buffer.Append( text );
             _unbuffered = writer;
+            _screenType = screenType;
         }
 
         public void BeginUpdate() => _updateCount++;
@@ -35,6 +37,8 @@ sealed partial class AnsiScreen
         }
 
         CoreTextWriter Writer => _updateCount > 0 ? _buffered : _unbuffered;
+
+        public ScreenType ScreenType => _screenType;
 
         public void Write( ReadOnlySpan<char> text ) => Writer( text );
 

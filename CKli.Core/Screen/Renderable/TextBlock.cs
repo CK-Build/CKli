@@ -166,18 +166,17 @@ public abstract class TextBlock : IRenderable
             Throw.DebugAssert( line >= 0 );
             if( line == 0 )
             {
-                _ = new Renderer( parent, _width, _style, _text );
+                _ = new Renderer( parent, _width, _style, _start, _text );
             }
         }
 
-        sealed class Renderer( SegmentRenderer previous, int length, TextStyle style, string text ) : SegmentRenderer( previous, length, style )
+        sealed class Renderer( SegmentRenderer previous, int length, TextStyle style, int start, string text ) : SegmentRenderer( previous, length, style )
         {
-            protected override void Render() => Target.Write( text.AsSpan( 0, Length ), FinalStyle );
+            protected override void Render() => Target.Write( text.AsSpan( start, Length ), FinalStyle );
         }
 
         public override string ToString() => _text;
     }
-
 
     sealed class MultiLineRenderer( SegmentRenderer previous, TextStyle style, string text, (int Start, int Length) range )
         : SegmentRenderer( previous, range.Length, style )

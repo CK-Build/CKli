@@ -109,6 +109,8 @@ sealed class NoColorScreen : IScreen
             }
         }
 
+        public ScreenType ScreenType => StringScreenType.Default;
+
         public void EndOfLine() => Write( Environment.NewLine, TextStyle.None );
     }
 

@@ -45,7 +45,7 @@ public sealed class NoScreen : IScreen
     sealed class NoScreenType : ScreenType
     {
         public NoScreenType()
-            : base( false )
+            : base( false, false )
         {
         }
     }

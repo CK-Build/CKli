@@ -1,24 +1,43 @@
 using CK.Core;
-using CommunityToolkit.HighPerformance;
-using System;
-using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.Core;
 
+public enum HyperLinkStyle
+{
+    Default = 0,
+
+    UnderlinedText,
+
+    UnderlinedLink,
+
+
+
+}
+
 public abstract class ScreenType
 {
-    readonly bool _isInteractive;
     readonly IRenderable _unit;
     TextBlock? _emptyString;
+    readonly bool _isInteractive;
+    readonly bool _hasAnsiLink;
 
-    protected ScreenType( bool isInteractive )
+    protected ScreenType( bool isInteractive, bool hasAnsiLink )
     {
         _isInteractive = isInteractive;
+        _hasAnsiLink = hasAnsiLink;
         _unit = new RenderableUnit( this );
     }
 
+    /// <summary>
+    /// Gets whether the screen is in interactive mode.
+    /// </summary>
     public bool IsInteractive => _isInteractive;
+
+    /// <summary>
+    /// Gets whether the screen supports Ansi link display.
+    /// </summary>
+    public bool HasAnsiLink => _hasAnsiLink;
 
     /// <summary>
     /// Gets the unit for renderables.

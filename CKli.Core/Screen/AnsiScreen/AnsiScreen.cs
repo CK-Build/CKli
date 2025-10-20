@@ -35,7 +35,7 @@ sealed partial class AnsiScreen : IScreen
         Console.OutputEncoding = Encoding.UTF8;
 
         _screenType = new AnsiScreenType( isInteractive );
-        _target = new RenderTarget( Console.Out.Write );
+        _target = new RenderTarget( Console.Out.Write, _screenType );
         _width = GetWindowWidth();
         _animation = new Animation( _target, _width );
     }
@@ -112,7 +112,7 @@ sealed partial class AnsiScreen : IScreen
     sealed class AnsiScreenType : ScreenType
     {
         public AnsiScreenType( bool isInteractive )
-            : base( isInteractive )
+            : base( isInteractive, true )
         {
         }
     }

@@ -108,15 +108,17 @@ public static class CKliCommands
         try
         {
             // We are in a World.
-            if( !world.Commands.TryFindForExecution( monitor, cmdLine, out helpPath )
+            if( !world.Commands.TryFindForExecution( monitor, cmdLine, out var worldHelpPath )
                 || cmdLine.FoundCommand == null
                 || cmdLine.HasHelp )
             {
                 // No luck or the --help is requested.
                 // Displays the help in the context of the World. The World's commands
                 // contain the CKli command: the help mixes the 2 kind of commands if
-                // needed (based on the helpPath).
-                context.Screen.DisplayHelp( world.Commands.GetForHelp( context.Screen.ScreenType, helpPath, _commands ),
+                // needed (based on the helpPath). If this second TryFindForExecution call
+                // returned an help path, it should be the same or a better help path than
+                // the one from only the CKli commands: use it.
+                context.Screen.DisplayHelp( world.Commands.GetForHelp( context.Screen.ScreenType, worldHelpPath ?? helpPath, _commands ),
                                             cmdLine,
                                             CKliRootEnv.GlobalOptions?.Invoke() ?? default,
                                             CKliRootEnv.GlobalFlags?.Invoke() ?? default );

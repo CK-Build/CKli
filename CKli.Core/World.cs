@@ -386,7 +386,11 @@ public sealed partial class World
         Repo? repo = null;
         if( Directory.Exists( p ) )
         {
-            var repository = GitRepository.Open( monitor, _stackRepository.SecretsStore, p, p.LastPart, _stackRepository.IsPublic );
+            var repository = GitRepository.Open( monitor,
+                                                 _stackRepository.SecretsStore,
+                                                 p,
+                                                 p.RemoveFirstPart( _name.WorldRoot.Parts.Count ),
+                                                 _stackRepository.IsPublic );
             if( repository != null )
             {
                 repo = CreateRepo( index, repository );
@@ -402,7 +406,11 @@ public sealed partial class World
                 if( FixLayout( monitor, deleteAliens: false, out _ )
                     && (repo = _cachedRepositories[p]) == null )
                 {
-                    var repository = GitRepository.Open( monitor, _stackRepository.SecretsStore, p, p.LastPart, _stackRepository.IsPublic );
+                    var repository = GitRepository.Open( monitor,
+                                                         _stackRepository.SecretsStore,
+                                                         p,
+                                                         p.RemoveFirstPart( _name.WorldRoot.Parts.Count ),
+                                                         _stackRepository.IsPublic );
                     if( repository != null )
                     {
                         repo = CreateRepo( index, repository );

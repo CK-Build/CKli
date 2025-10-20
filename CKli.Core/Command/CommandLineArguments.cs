@@ -241,12 +241,12 @@ public sealed class CommandLineArguments
     }
 
     /// <summary>
-    /// Sets the found command (if any) and eats the first <paramref name="pathCount"/> arguments.
+    /// Sets the found command and eats the first <paramref name="pathCount"/> arguments.
     /// </summary>
     /// <param name="found">The found command.</param>
-    internal void SetFoundCommand( Command? found, int pathCount )
+    internal void SetFoundCommand( Command found, int pathCount )
     {
-        Throw.CheckState( FoundCommand == null );
+        Throw.DebugAssert( FoundCommand == null );
         CheckOpened();
         _args.RemoveRange( 0, pathCount );
         _foundCommand = found;

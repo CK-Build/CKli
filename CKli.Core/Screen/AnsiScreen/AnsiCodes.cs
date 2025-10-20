@@ -10,6 +10,10 @@ namespace CKli.Core;
 /// </summary>
 internal static class AnsiCodes
 {
+    public const string HyperLinkPrefix = "\u001b]8;;";
+    public const string HyperLinkInfix = "\u001b\\";
+    public const string HyperLinkSuffix = "\u001b]8;;\u001b\\";
+
     /// <summary>
     /// Progress state (busy spinner) is not available on all platforms.
     /// <para>
@@ -111,21 +115,6 @@ internal static class AnsiCodes
     public static string RestoreCursorPosition() => "\x1b[u";
 
     /// <summary>
-    /// Renders an hyperlink.
-    /// </summary>
-    /// <param name="text">The link text.</param>
-    /// <param name="url">The target url.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string Hyperlink( string text, string url ) => "\u001b]8;;{url}\x1b\\{text}\u001b]8;;\u001b\\";
-
-    /// <summary>
-    /// Renders an hyperlink.
-    /// </summary>
-    /// <param name="url">The target url.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string Hyperlink( string url ) => Hyperlink( url, url );
-
-    /// <summary>
     /// Sets the foreground color.
     /// </summary>
     /// <param name="color">The color to set.</param>
@@ -140,9 +129,9 @@ internal static class AnsiCodes
     public static string SetBackColor( ConsoleColor color ) => $"\u001b[{10 + (int)color.FromConsole()}m";
 
     /// <summary>
-    /// Sets the background color.
+    /// Sets the colors.
     /// </summary>
-    /// <param name="color">The color to set.</param>
+    /// <param name="color">The colors to set.</param>
     /// <returns>The Ansi string.</returns>
     public static string SetColor( Color color ) => $"\u001b[{(int)color.ForeColor.FromConsole()},{10 + (int)color.BackColor.FromConsole()}m";
 
@@ -200,6 +189,27 @@ internal static class AnsiCodes
     /// <param name="w">This writer.</param>
     /// <returns>True on success, false otherwise.</returns>
     public static bool AppendCSI( ref this FixedBufferWriter w ) => w.Append( '\u001b', '[' );
+
+    /// <summary>
+    /// Writes an hyperlink.
+    /// </summary>
+    /// <param name="text">The link text.</param>
+    /// <param name="url">The target url.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public static bool AppendHyperLink( ref this FixedBufferWriter w, ReadOnlySpan<char> text, ReadOnlySpan<char> url )
+    {
+        var saved = w.WrittenLength;
+        if( w.Append( HyperLinkPrefix )
+            && w.Append( url )
+            && w.Append( HyperLinkInfix )
+            && w.Append( text )
+            && w.Append( HyperLinkSuffix ) )
+        {
+            return true;
+        }
+        w.Truncate( saved );
+        return false;
+    }
 
     /// <summary>
     /// Writes the foreground and background colors and optionally a text effect.

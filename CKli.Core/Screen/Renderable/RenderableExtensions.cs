@@ -17,6 +17,13 @@ public static class RenderableExtensions
 
     public static string RenderAsString( this IRenderable r ) => r.RenderAsString( new StringBuilder() ).ToString();
 
+    public static IRenderable HyperLink( this IRenderable r, Uri target )
+    {
+        return r is HyperLink h
+                ? h.WithTarget( target )
+                : new HyperLink( r, target );
+    }
+
     public static IRenderable Box( this IRenderable r,
                                    int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
                                    int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )

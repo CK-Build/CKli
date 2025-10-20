@@ -5,47 +5,57 @@ namespace CKli.Core;
 
 public sealed class HyperLink : IRenderable
 {
-    readonly ScreenType _screenType;
-    readonly string _text;
-    readonly string _link;
+    readonly IRenderable _content;
+    readonly Uri _target;
 
-    public HyperLink( ScreenType screenType, string text, string link )
+    public HyperLink( IRenderable content, Uri target )
     {
-        CheckLinkOrText( text );
-        CheckLinkOrText( link );
-        _screenType = screenType;
-        _text = text;
-        _link = link;
+        _content = content;
+        _target = target;
     }
 
-    static void CheckLinkOrText( string s )
-    {
-        var linkOrText = s.AsSpan();
-        Throw.CheckArgument( linkOrText.Length > 0 && linkOrText.Trim().Length == s.Length );
-    }
+    public ScreenType ScreenType => _content.ScreenType;
 
-    public HyperLink( ScreenType screenType, string url )
-        : this( screenType, url, url )
-    {
-    }
+    public int Height => _content.Height;
 
-    public ScreenType ScreenType => _screenType;
+    public int Width => _content.Width;
 
-    public int Width => throw new NotImplementedException();
+    public IRenderable Content => _content;
 
-    public int Height => 1;
+    public Uri Target => _target;
 
-    public bool HasText => !ReferenceEquals( _text, _link );
+    public HyperLink WithTarget( Uri target ) => new HyperLink( _content, target );
 
-    public string Text => _text;
-
-    public string Link => _link;
+    public HyperLink WithContent( IRenderable content ) => new HyperLink( content, _target );
 
     public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
 
     public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
     {
-        throw new NotImplementedException();
+        Throw.CheckArgument( line >= 0 && line < actualHeight && actualHeight >= Height );
+        if( line < actualHeight )
+        {
+            if( ScreenType.HasAnsiLink )
+            {
+                _ = new HyperLinkRenderer( parent, Width, _content, line, actualHeight, _target );
+            }
+            else
+            {
+                _ = new SegmentRenderer( parent, Width, _content, line, actualHeight );
+            }
+        }
+    }
+
+    sealed class HyperLinkRenderer( SegmentRenderer parent, int length, IRenderable content, int line, int actualHeight, Uri target )
+        : SegmentRenderer( parent, length, content, line, actualHeight )
+    {
+        protected override void Render()
+        {
+            Target.Write( AnsiCodes.HyperLinkPrefix, default );
+            Target.Write( target.ToString(), default );
+            Target.Write( AnsiCodes.HyperLinkInfix, default );
+            RenderContent();
+            Target.Write( AnsiCodes.HyperLinkSuffix, default );
+        }
     }
 }
-

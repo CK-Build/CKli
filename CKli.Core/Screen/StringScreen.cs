@@ -72,6 +72,8 @@ public sealed class StringScreen : IScreen
 
         public void EndUpdate() { }
 
+        public ScreenType ScreenType => StringScreenType.Default;
+
         public override string ToString() => _b.ToString();
     }
 

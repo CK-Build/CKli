@@ -77,5 +77,9 @@ public abstract class RenderableVisitor
         return newContent == c.Content ? c : c.WithContent( newContent );
     }
 
-    public virtual IRenderable Visit( HyperLink l ) => l;
+    public virtual IRenderable Visit( HyperLink c )
+    {
+        var newContent = c.Content.Accept( this );
+        return newContent == c.Content ? c : c.WithContent( newContent );
+    }
 }
