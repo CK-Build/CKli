@@ -16,6 +16,11 @@ public interface IRenderable
     int Height { get; }
 
     /// <summary>
+    /// Gets the screen type.
+    /// </summary>
+    ScreenType ScreenType { get; }
+
+    /// <summary>
     /// Builds the segment renderer for the provided <paramref name="line"/>.
     /// </summary>
     /// <param name="line">The line number: between 0 and <paramref name="actualHeight"/>.</param>
@@ -29,18 +34,5 @@ public interface IRenderable
     /// <param name="visitor">The visitor.</param>
     /// <returns>The result of the visit.</returns>
     IRenderable Accept( RenderableVisitor visitor );
-
-    public static readonly IRenderable Unit = new RenderableUnit();
-
-    private sealed class RenderableUnit : IRenderable
-    {
-        public int Height => 0;
-
-        public int Width => 0;
-
-        public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight ) { }
-
-        public IRenderable Accept( RenderableVisitor visitor ) => this;
-    }
 
 }

@@ -3,6 +3,7 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using LogLevel = CK.Core.LogLevel;
@@ -117,6 +118,12 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
         /// Gets whether this status is the <c>default</c>, unitialized value.
         /// </summary>
         public bool IsDefault => CurrentBranchName == null;
+
+        /// <summary>
+        /// Gets whether the <see cref="CurrentBranchName"/> is tracked.
+        /// </summary>
+        [MemberNotNullWhen( true, nameof( CommitAhead ), nameof( CommitBehind ) )]
+        public bool IsTracked => CommitAhead.HasValue;
     }
 
     /// <summary>

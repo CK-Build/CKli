@@ -20,23 +20,24 @@ public static class ScreenHelpers
     /// Public for tests.
     /// </para>
     /// </summary>
+    /// <param name="screenType">The screen type.</param>
     /// <param name="cmdLine">The command line that should have renamint arguments.</param>
-    /// <returns>The renderable. May be <see cref="IRenderable.Unit"/>.</returns>
-    public static IRenderable CreateDisplayHelpHeader( CommandLineArguments cmdLine )
+    /// <returns>The renderable. May be <see cref="ScreenType.Unit"/>.</returns>
+    public static IRenderable CreateDisplayHelpHeader( ScreenType screenType, CommandLineArguments cmdLine )
     {
-        IRenderable header = IRenderable.Unit;
+        IRenderable header = screenType.Unit;
         if( !cmdLine.HasHelp && cmdLine.RemainingCount > 0 )
         {
             var args = cmdLine.GetRemainingArguments();
-            header = TextBlock.FromText( "Arguments:" ).Box()
-                        .AddRight( args.Select( r => TextBlock.FromText( r.Remaining
+            header = screenType.Text( "Arguments:" ).Box()
+                        .AddRight( args.Select( r => screenType.Text( r.Remaining
                                                                             ? $"{r.Argument}{Environment.NewLine}└{new string( '─', r.Argument.Length-2)}┘"
                                                                             : r.Argument,
-                                                                         r.Remaining
-                                                                             ? new TextStyle( TextEffect.Invert )
-                                                                             : new TextStyle( new Color( ConsoleColor.DarkGreen, ConsoleColor.Black ) ) )
+                                                                      r.Remaining
+                                                                            ? new TextStyle( TextEffect.Invert )
+                                                                            : new TextStyle( new Color( ConsoleColor.DarkGreen, ConsoleColor.Black ) ) )
                                                                .Box( marginLeft: 1, color: new Color( ConsoleColor.DarkRed, ConsoleColor.Black ) ) ) )
-                        .AddBelow( TextBlock.EmptyString );
+                        .AddBelow( screenType.EmptyString );
         }
 
         return header;
@@ -48,17 +49,21 @@ public static class ScreenHelpers
     /// <remarks>
     /// Public for tests.
     /// </remarks>
+    /// <param name="screenType">The screen type.</param>
     /// <param name="commands">The command helps to display.</param>
     /// <param name="cmdLine">The current command line.</param>
     /// <param name="globalOptions">The global options.</param>
     /// <param name="globalFlags">The global flags.</param>
-    public static IRenderable CreateDisplayHelp( List<CommandHelp> commands,
+    public static IRenderable CreateDisplayHelp( ScreenType screenType,
+                                                 List<CommandHelp> commands,
                                                  CommandLineArguments cmdLine,
                                                  ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions,
                                                  ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags,
                                                  int maxWidth )
     {
-        IRenderable header = commands.Count == 1 ? CreateDisplayHelpHeader( cmdLine ) : IRenderable.Unit;
+        IRenderable header = commands.Count == 1
+                                ? CreateDisplayHelpHeader( screenType, cmdLine )
+                                : screenType.Unit;
 
         // Layout:
         // > command path <name1> <name2>   Description
@@ -97,19 +102,19 @@ public static class ScreenHelpers
 
         var help = header.AddBelow(
             commands.Select( c => new Collapsable( RenderCommand( c, offsetArgTitle, offsetArg, descriptionOffset, descriptionMaxLength ) )
-                                        .AddBelow( TextBlock.EmptyString ) ),
+                                        .AddBelow( screenType.EmptyString ) ),
                globalOptions.IsDefaultOrEmpty
                 ? null
-                : TextBlock.FromText( "Global options:" )
-                      .AddBelow( CommandHelp.ToRenderableOptions( globalOptions )
+                : screenType.Text( "Global options:" )
+                      .AddBelow( CommandHelp.ToRenderableOptions( screenType, globalOptions )
                                     .Select( o => o.Names.Box( paddingLeft: offsetArg, paddingRight: descriptionOffset - o.Names.Width - offsetArg )
                                                                 .AddRight( o.Description.SetTextWidth( descriptionMaxLength ) ) ),
-                                  TextBlock.EmptyString
-                                ),
+                                 screenType.EmptyString
+                               ),
                 globalFlags.IsDefaultOrEmpty
                 ? null
-                : TextBlock.FromText( "Global flags:" )
-                      .AddBelow( CommandHelp.ToRenderableFlags( globalFlags )
+                : screenType.Text( "Global flags:" )
+                      .AddBelow( CommandHelp.ToRenderableFlags( screenType, globalFlags )
                                     .Select( f => f.Names.Box( paddingLeft: offsetArg, paddingRight: descriptionOffset - f.Names.Width - offsetArg )
                                                                              .AddRight( f.Description.SetTextWidth( descriptionMaxLength ) ) ) )
 
@@ -123,18 +128,18 @@ public static class ScreenHelpers
                             .AddBelow( c.Arguments.Select( a => a.Name.Box( paddingLeft: offsetArgTitle, paddingRight: descriptionOffset - a.Name.Width - offsetArgTitle )
                                                                       .AddRight( a.Description.SetTextWidth( descriptionMaxLength ) ) ) )
                             .AddBelow( c.Options.Length > 0,
-                                       TextBlock.FromText( "Options:" ).Box( paddingLeft: offsetArgTitle )
+                                       c.ScreenType.Text( "Options:" ).Box( paddingLeft: offsetArgTitle )
                                             .AddBelow( c.Options.Select( o => o.Names.Box( paddingLeft: offsetArg, paddingRight: descriptionOffset - o.Names.Width - offsetArg )
                                                                                      .AddRight( o.Description.SetTextWidth( descriptionMaxLength ) ) ) ) )
                             .AddBelow( c.Flags.Length > 0,
-                                       TextBlock.FromText( "Flags:" ).Box( paddingLeft: offsetArgTitle )
+                                       c.ScreenType.Text( "Flags:" ).Box( paddingLeft: offsetArgTitle )
                                             .AddBelow( c.Flags.Select( f => f.Names.Box( paddingLeft: offsetArg, paddingRight: descriptionOffset - f.Names.Width - offsetArg )
                                                                                      .AddRight( f.Description.SetTextWidth( descriptionMaxLength ) ) ) ) );
     }
 
-    internal static IRenderable CreateDisplayPlugin( string headerText, List<World.DisplayInfoPlugin>? infos, int maxWidth )
+    internal static IRenderable CreateDisplayPlugin( ScreenType screenType, string headerText, List<World.DisplayInfoPlugin>? infos, int maxWidth )
     {
-        IRenderable display = TextBlock.FromText( headerText );
+        IRenderable display = screenType.Text( headerText );
         if( infos != null )
         {
             // Layout:
@@ -145,14 +150,14 @@ public static class ScreenHelpers
             // |    <Message>
 
             display = display.AddBelow(
-                TextBlock.EmptyString,
+                screenType.EmptyString,
                 infos.Select(
                     i => new Collapsable(
-                            new ContentBox( TextBlock.FromText( i.ShortName )
-                                            .AddBelow( TextBlock.FromText( i.Status.GetTextStatus() ).Box( paddingLeft: 3 ) ), paddingRight: 3 )
-                            .AddRight( TextBlock.FromText( i.Configuration?.ToString() ) )
+                            new ContentBox( screenType.Text( i.ShortName )
+                                            .AddBelow( screenType.Text( i.Status.GetTextStatus() ).Box( paddingLeft: 3 ) ), paddingRight: 3 )
+                            .AddRight( screenType.Text( i.Configuration?.ToString() ) )
                             .AddBelow( i.Message != null
-                                        ? TextBlock.FromText( "Message:" ).AddBelow( i.Message.Box( paddingLeft: 3 ) )
+                                        ? screenType.Text( "Message:" ).AddBelow( i.Message.Box( paddingLeft: 3 ) )
                                         : null ) ) )
                 );
         }

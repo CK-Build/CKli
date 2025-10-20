@@ -6,6 +6,7 @@ namespace CKli.Core;
 
 public class CommandHelp
 {
+    readonly ScreenType _screenType;
     readonly Command _command;
     readonly TextBlock _commandPath;
     readonly IRenderable _commandPathAndArgs;
@@ -14,47 +15,28 @@ public class CommandHelp
     readonly ImmutableArray<(TextBlock Names, TextBlock Description)> _options;
     readonly ImmutableArray<(TextBlock Names, TextBlock Description)> _flags;
 
-    public CommandHelp( Command c )
+    public CommandHelp( ScreenType screenType, Command c )
     {
+        _screenType = screenType;
         _command = c;
-        _commandPath = TextBlock.FromText( c.CommandPath );
-        _description = TextBlock.FromText( c.Description );
+        _commandPath = screenType.Text( c.CommandPath );
+        _description = screenType.Text( c.Description );
         // Arguments.
         var args = new (TextBlock, TextBlock)[c.Arguments.Length];
         for( int i = 0; i < args.Length; i++ )
         {
             var a = c.Arguments[i];
-            args[i] = (TextBlock.FromText( $"<{a.Name}>" ), TextBlock.FromText( a.Description ));
+            args[i] = (screenType.Text( $"<{a.Name}>" ), screenType.Text( a.Description ));
         }
         _arguments = ImmutableCollectionsMarshal.AsImmutableArray( args );
         _commandPathAndArgs = _commandPath.AddRight( _arguments.Select( a => a.Name.Box( paddingLeft: 1 ) ) );
         // Options.
-        _options = ToRenderableOptions( c.Options );
+        _options = ToRenderableOptions( screenType, c.Options );
         // Flags.
-        _flags = ToRenderableFlags( c.Flags );
+        _flags = ToRenderableFlags( screenType, c.Flags );
     }
 
-    public static ImmutableArray<(TextBlock Names, TextBlock Description)> ToRenderableFlags( ImmutableArray<(ImmutableArray<string> Names, string Description)> flags1 )
-    {
-        var flags = new (TextBlock, TextBlock)[flags1.Length];
-        for( int i = 0; i < flags.Length; i++ )
-        {
-            var f = flags1[i];
-            flags[i] = (TextBlock.FromText( string.Join( ", ", f.Names ) ), TextBlock.FromText( f.Description ));
-        }
-        return ImmutableCollectionsMarshal.AsImmutableArray( flags );
-    }
-
-    public static ImmutableArray<(TextBlock Names, TextBlock Description)> ToRenderableOptions( ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options )
-    {
-        var aOpts = new (TextBlock, TextBlock)[options.Length];
-        for( int i = 0; i < aOpts.Length; i++ )
-        {
-            var o = options[i];
-            aOpts[i] = (TextBlock.FromText( string.Join( ", ", o.Names ) ), TextBlock.FromText( o.Multiple ? "[Multiple] " + o.Description : o.Description ) );
-        }
-        return ImmutableCollectionsMarshal.AsImmutableArray( aOpts );
-    }
+    public ScreenType ScreenType => _screenType;
 
     public Command Command => _command;
 
@@ -69,5 +51,29 @@ public class CommandHelp
     public ImmutableArray<(TextBlock Names, TextBlock Description)> Options => _options;
 
     public ImmutableArray<(TextBlock Names, TextBlock Description)> Flags => _flags;
+
+    public static ImmutableArray<(TextBlock Names, TextBlock Description)> ToRenderableFlags( ScreenType screenType,
+                                                                                              ImmutableArray<(ImmutableArray<string> Names, string Description)> fDesc )
+    {
+        var flags = new (TextBlock, TextBlock)[fDesc.Length];
+        for( int i = 0; i < flags.Length; i++ )
+        {
+            var f = fDesc[i];
+            flags[i] = (screenType.Text( string.Join( ", ", f.Names ) ), screenType.Text( f.Description ));
+        }
+        return ImmutableCollectionsMarshal.AsImmutableArray( flags );
+    }
+
+    public static ImmutableArray<(TextBlock Names, TextBlock Description)> ToRenderableOptions( ScreenType screenType,
+                                                                                               ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> oDesc )
+    {
+        var aOpts = new (TextBlock, TextBlock)[oDesc.Length];
+        for( int i = 0; i < aOpts.Length; i++ )
+        {
+            var o = oDesc[i];
+            aOpts[i] = (screenType.Text( string.Join( ", ", o.Names ) ), screenType.Text( o.Multiple ? "[Multiple] " + o.Description : o.Description ) );
+        }
+        return ImmutableCollectionsMarshal.AsImmutableArray( aOpts );
+    }
 
 }

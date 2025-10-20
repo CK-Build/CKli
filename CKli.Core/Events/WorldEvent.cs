@@ -23,6 +23,11 @@ public abstract class WorldEvent : EventMonitoredArgs
     public World World => _world;
 
     /// <summary>
+    /// Gets the screen type.
+    /// </summary>
+    public ScreenType ScreenType => _world.ScreenType;
+
+    /// <summary>
     /// Gets or sets whether the handle of the event failed.
     /// Defaults to true.
     /// <para>

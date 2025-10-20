@@ -6,25 +6,24 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.Core;
 
+
 public abstract class TextBlock : IRenderable
 {
     public const int MinWidth = 15;
-
     readonly internal string _text;
+    readonly ScreenType _screenType;
     readonly internal int _width;
     readonly TextStyle _style;
 
-    /// <summary>
-    /// An empty singleton empty block: typically used as a new line.
-    /// </summary>
-    public static readonly TextBlock EmptyString = new Empty();
-
-    private protected TextBlock( string text, int width, TextStyle style )
+    private protected TextBlock( ScreenType screenType, string text, int width, TextStyle style )
     {
+        _screenType = screenType;
         _text = text;
         _width = width;
         _style = style;
     }
+
+    public ScreenType ScreenType => _screenType;
 
     public abstract int Height { get; }
 
@@ -47,22 +46,23 @@ public abstract class TextBlock : IRenderable
     /// <summary>
     /// Creates a mono or multi line block of text.
     /// </summary>
+    /// <param name="screenType">The screen type.</param>
     /// <param name="text">The raw text.</param>
     /// <param name="style">Optional text style.</param>
     /// <returns>The renderable.</returns>
     [return: NotNullIfNotNull( nameof( text ) )]
-    public static TextBlock? FromText( string? text, TextStyle style = default )
+    public static TextBlock? FromText( ScreenType screenType, string? text, TextStyle style = default )
     {
         if( text == null ) return null;
         var sText = text.AsSpan();
         sText = sText.TrimStart();
         int start = text.Length - sText.Length;
         sText = sText.TrimEnd();
-        if( sText.Length == 0 ) return EmptyString;
+        if( sText.Length == 0 ) return screenType.EmptyString;
         var lineCount = sText.Count( '\n' ) + 1;
         if( lineCount == 1 )
         {
-            return new MonoLine( text, start, sText.Length, style );
+            return new MonoLine( screenType, text, start, sText.Length, style );
         }
         int witdh = 0;
         var b = ImmutableArray.CreateBuilder<(int, int)>( lineCount );
@@ -98,7 +98,7 @@ public abstract class TextBlock : IRenderable
         len = idx - trimS;
         if( len > witdh ) witdh = len;
         b.Add( (start + trimS, len) );
-        return new MultiLine( text, b.MoveToImmutable(), witdh, style );
+        return new MultiLine( screenType, text, b.MoveToImmutable(), witdh, style );
     }
 
     sealed class MonoLine : TextBlock
@@ -107,8 +107,8 @@ public abstract class TextBlock : IRenderable
 
         readonly int _start;
 
-        public MonoLine( string text, int start, int length, TextStyle style )
-            : base( text, length, style )
+        public MonoLine( ScreenType screenType, string text, int start, int length, TextStyle style )
+            : base( screenType, text, length, style )
         {
             _start = start;
         }
@@ -198,7 +198,8 @@ public abstract class TextBlock : IRenderable
         }
     }
 
-    sealed class MultiLine( string text, ImmutableArray<(int, int)> lines, int width, TextStyle style ) : TextBlock( text, width, style )
+    sealed class MultiLine( ScreenType screenType, string text, ImmutableArray<(int, int)> lines, int width, TextStyle style )
+        : TextBlock( screenType, text, width, style )
     {
         readonly ImmutableArray<(int Start, int Length)> _lines = lines;
 
@@ -236,7 +237,7 @@ public abstract class TextBlock : IRenderable
         readonly ImmutableArray<(int Start, int Length)> _lines;
 
         public LinesAdjustedWidth( TextBlock origin, ImmutableArray<(int Start, int Length)> lines, int width, TextStyle style )
-            : base( origin._text, width, style )
+            : base( origin._screenType, origin._text, width, style )
         {
             _origin = origin;
             _lines = lines;
@@ -249,18 +250,5 @@ public abstract class TextBlock : IRenderable
         public override TextBlock SetTextWidth( int width ) => _origin.SetTextWidth( width );
     }
 
-    sealed class Empty : TextBlock
-    {
-        public Empty()
-            : base( string.Empty, 0, TextStyle.None )
-        {
-        }
-
-        public override int Height => 1;
-
-        protected override void BuildSegmentTree( int line, SegmentRenderer parent ) { }
-
-        public override TextBlock SetTextWidth( int width ) => this;
-    }
 }
 

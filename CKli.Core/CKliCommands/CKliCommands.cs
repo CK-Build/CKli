@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -18,6 +19,7 @@ public static class CKliCommands
         var c = new CommandNamespaceBuilder();
         c.Add( new CKliLog() );
         c.Add( new CKliClone() );
+        c.Add( new CKliBranch() );
         c.Add( new CKliExec() );
         c.Add( new CKliPull() );
         c.Add( new CKliFetch() );
@@ -76,7 +78,7 @@ public static class CKliCommands
         if( !_commands.TryFindForExecution( monitor, cmdLine, out var helpPath )
             || (cmdLine.FoundCommand != null && cmdLine.HasHelp) )
         {
-            context.Screen.DisplayHelp( _commands.GetForHelp( helpPath, null ),
+            context.Screen.DisplayHelp( _commands.GetForHelp( context.Screen.ScreenType, helpPath, null ),
                                         cmdLine,
                                         CKliRootEnv.GlobalOptions?.Invoke() ?? default,
                                         CKliRootEnv.GlobalFlags?.Invoke() ?? default );
@@ -97,7 +99,7 @@ public static class CKliCommands
         // No current World (not in a Stack directory): we can only display help on the CKli commands.
         if( world == null )
         {
-            context.Screen.DisplayHelp( _commands.GetForHelp( helpPath, null ),
+            context.Screen.DisplayHelp( _commands.GetForHelp( context.Screen.ScreenType, helpPath, null ),
                                         cmdLine,
                                         CKliRootEnv.GlobalOptions?.Invoke() ?? default,
                                         CKliRootEnv.GlobalFlags?.Invoke() ?? default );
@@ -114,7 +116,7 @@ public static class CKliCommands
                 // Displays the help in the context of the World. The World's commands
                 // contain the CKli command: the help mixes the 2 kind of commands if
                 // needed (based on the helpPath).
-                context.Screen.DisplayHelp( world.Commands.GetForHelp( helpPath, _commands ),
+                context.Screen.DisplayHelp( world.Commands.GetForHelp( context.Screen.ScreenType, helpPath, _commands ),
                                             cmdLine,
                                             CKliRootEnv.GlobalOptions?.Invoke() ?? default,
                                             CKliRootEnv.GlobalFlags?.Invoke() ?? default );
@@ -138,7 +140,20 @@ public static class CKliCommands
     static async ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
     {
         Throw.DebugAssert( cmdLine.FoundCommand != null );
-        var success = await cmdLine.FoundCommand.HandleCommandAsync( monitor, context, cmdLine );
+        bool success;
+        try
+        {
+            success = await cmdLine.FoundCommand.HandleCommandAsync( monitor, context, cmdLine );
+        }
+        catch( Exception ex )
+        {
+            using( monitor.OpenError( $"Unexpected error in command '{cmdLine.InitialAsStringArguments}'." ) )
+            {
+                monitor.Error( ex );
+            }
+            return false;
+        }
+
         if( success && !cmdLine.IsClosed )
         {
             // The command line has not been but the command handler returned true, it is buggy.
@@ -161,7 +176,7 @@ public static class CKliCommands
                     """ );
             }
             // This displays the lovely header with remaining arguments.
-            context.Screen.DisplayHelp( [new CommandHelp( cmdLine.FoundCommand )], cmdLine, default, default );
+            context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
         }
         else if( !success && !cmdLine.IsClosed )
         {
@@ -170,7 +185,7 @@ public static class CKliCommands
             // Before we must clear any remaining aruments otherwise we may display
             // a misleading remaining arguments message.
             cmdLine.CloseAndForgetRemaingArguments();
-            context.Screen.DisplayHelp( [new CommandHelp( cmdLine.FoundCommand )], cmdLine, default, default );
+            context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
         }
         // Not very elegant trick to cleanup 'ckli log' log files.
         if( success && cmdLine.FoundCommand is CKliLog )

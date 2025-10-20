@@ -42,6 +42,8 @@ public sealed partial class ContentBox : IRenderable
     {
     }
 
+    public ScreenType ScreenType => _content.ScreenType;
+
     public int Height => _height;
 
     public int Width => _width;

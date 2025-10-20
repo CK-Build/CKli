@@ -37,8 +37,8 @@ public abstract class RenderableVisitor
         return b == null
                 ? h
                 : b.Count == 0
-                    ? IRenderable.Unit
-                    : new HorizontalContent( b.DrainToImmutable() );
+                    ? h.ScreenType.Unit
+                    : new HorizontalContent( h.ScreenType, b.DrainToImmutable() );
     }
 
     public virtual IRenderable Visit( VerticalContent v )
@@ -65,8 +65,8 @@ public abstract class RenderableVisitor
         return b == null
                 ? v
                 : b.Count == 0
-                    ? IRenderable.Unit
-                    : new VerticalContent( b.DrainToImmutable() );
+                    ? v.ScreenType.Unit
+                    : new VerticalContent( v.ScreenType, b.DrainToImmutable() );
     }
 
     public virtual IRenderable Visit( TextBlock t ) => t;
@@ -76,4 +76,6 @@ public abstract class RenderableVisitor
         var newContent = c.Content.Accept( this );
         return newContent == c.Content ? c : c.WithContent( newContent );
     }
+
+    public virtual IRenderable Visit( HyperLink l ) => l;
 }

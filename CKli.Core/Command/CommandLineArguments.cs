@@ -16,6 +16,7 @@ public sealed class CommandLineArguments
     readonly ImmutableArray<string> _initial;
     readonly List<string> _args;
     readonly bool _hasHelp;
+    string? _initialAsStringArguments;
     Command? _foundCommand;
     HashSet<string>? _optionOrFlagNames;
     ImmutableArray<(string Argument, bool Remaining)> _remainingArguments;
@@ -60,6 +61,11 @@ public sealed class CommandLineArguments
     /// Gets whether <see cref="Close(IActivityMonitor, out ImmutableArray{ValueTuple{string, bool}})"/> has been called.
     /// </summary>
     public bool IsClosed => !_remainingArguments.IsDefault;
+
+    /// <summary>
+    /// Gets the <see cref="InitialArguments"/> as a string with escaped arguments.
+    /// </summary>
+    public string InitialAsStringArguments => _initialAsStringArguments ??= ArgumentEscaper.EscapeAndConcatenateArgArrayForProcessStart( _initial );
 
     /// <summary>
     /// Extracts the next required argument. <see cref="RemainingCount"/> must be positive otherwise

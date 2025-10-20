@@ -9,6 +9,15 @@ namespace CKli.Core;
 /// </summary>
 public sealed class NoScreen : IScreen
 {
+    readonly NoScreenType _screenType;
+
+    public NoScreen()
+    {
+        _screenType = new NoScreenType();
+    }
+
+    public ScreenType ScreenType => _screenType;
+
     public void Clear() {}
 
     public void Display( IRenderable renderable ) { }
@@ -32,5 +41,14 @@ public sealed class NoScreen : IScreen
     }
 
     public override string ToString() => string.Empty;
+
+    sealed class NoScreenType : ScreenType
+    {
+        public NoScreenType()
+            : base( false )
+        {
+        }
+    }
+
 
 }

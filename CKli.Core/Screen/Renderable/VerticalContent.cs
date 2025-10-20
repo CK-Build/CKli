@@ -9,11 +9,13 @@ namespace CKli.Core;
 public sealed class VerticalContent : IRenderable
 {
     readonly ImmutableArray<IRenderable> _cells;
+    readonly ScreenType _screenType;
     readonly int _width;
     readonly int _height;
 
-    public VerticalContent( params ImmutableArray<IRenderable> cells )
+    public VerticalContent( ScreenType screenType, params ImmutableArray<IRenderable> cells )
     {
+        _screenType = screenType;
         _cells = cells;
         _height = ComputeHeight( cells );
         _width = _height > 0 ? ComputeWith( cells ) : 0;
@@ -38,6 +40,8 @@ public sealed class VerticalContent : IRenderable
         }
         return h;
     }
+
+    public ScreenType ScreenType => _screenType;
 
     public int Height => _height;
 
@@ -75,7 +79,7 @@ public sealed class VerticalContent : IRenderable
         if( flattenedLength == 0 ) return this;
         var newContent = new IRenderable[_cells.Length + flattenedLength];
         _cells.CopyTo( newContent, 0 );
-        return FillNewContent( verticalContent, hasSpecial, newContent, _cells.Length );
+        return FillNewContent( _screenType, verticalContent, hasSpecial, newContent, _cells.Length );
     }
 
     public VerticalContent Prepend( ReadOnlySpan<IRenderable?> verticalContent )
@@ -84,8 +88,8 @@ public sealed class VerticalContent : IRenderable
         int flattenedLength = ComputeActualContentLength( verticalContent, out bool hasSpecial );
         if( flattenedLength == 0 ) return this;
         var newContent = new IRenderable[ flattenedLength + _cells.Length ];
-        _cells.CopyTo( newContent, _cells.Length );
-        return FillNewContent( verticalContent, hasSpecial, newContent, 0 );
+        _cells.CopyTo( newContent, flattenedLength );
+        return FillNewContent( _screenType, verticalContent, hasSpecial, newContent, 0 );
     }
 
     internal static int ComputeActualContentLength( ReadOnlySpan<IRenderable?> verticalContent, out bool hasSpecial )
@@ -110,7 +114,11 @@ public sealed class VerticalContent : IRenderable
         return flattenedLength;
     }
 
-    internal static VerticalContent FillNewContent( ReadOnlySpan<IRenderable?> verticalContent, bool hasSpecial, IRenderable[] newContent, int idxCopy )
+    internal static VerticalContent FillNewContent( ScreenType screenType,
+                                                    ReadOnlySpan<IRenderable?> verticalContent,
+                                                    bool hasSpecial,
+                                                    IRenderable[] newContent,
+                                                    int idxCopy )
     {
         if( hasSpecial )
         {
@@ -133,7 +141,7 @@ public sealed class VerticalContent : IRenderable
         {
             verticalContent.CopyTo( newContent.AsSpan( idxCopy )! );
         }
-        return new VerticalContent( ImmutableCollectionsMarshal.AsImmutableArray( newContent ) );
+        return new VerticalContent( screenType, ImmutableCollectionsMarshal.AsImmutableArray( newContent ) );
     }
 
 }

@@ -2,8 +2,6 @@ using CK.Core;
 using System;
 using System.Buffers;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 
 namespace CKli.Core;
@@ -11,11 +9,13 @@ namespace CKli.Core;
 public sealed class HorizontalContent : IRenderable
 {
     readonly ImmutableArray<IRenderable> _cells;
+    readonly ScreenType _screenType;
     readonly int _width;
     readonly int _height;
 
-    public HorizontalContent( params ImmutableArray<IRenderable> cells )
+    public HorizontalContent( ScreenType screenType, params ImmutableArray<IRenderable> cells )
     {
+        _screenType = screenType;
         _cells = cells;
         _width = ComputeWith( cells );
         _height = _width > 0 ? ComputeHeight( cells ) : 0;
@@ -40,6 +40,8 @@ public sealed class HorizontalContent : IRenderable
         }
         return h;
     }
+
+    public ScreenType ScreenType => _screenType;
 
     public int Height => _height;
 
@@ -70,7 +72,7 @@ public sealed class HorizontalContent : IRenderable
 
         var a = new IRenderable[ _cells.Length + flattenedLength];
         _cells.CopyTo( a, 0 );
-        return FillNewContent( horizontalContent, hasSpecial, a, _cells.Length );
+        return FillNewContent( _screenType, horizontalContent, hasSpecial, a, _cells.Length );
     }
 
     public HorizontalContent Prepend( ReadOnlySpan<IRenderable?> horizontalContent )
@@ -79,8 +81,8 @@ public sealed class HorizontalContent : IRenderable
         int flattenedLength = ComputeActualContentLength( horizontalContent, out bool hasSpecial );
         if( flattenedLength == 0 ) return this;
         var a = new IRenderable[ flattenedLength + _cells.Length ];
-        _cells.CopyTo( a, _cells.Length );
-        return FillNewContent( horizontalContent, hasSpecial, a, 0 );
+        _cells.CopyTo( a, flattenedLength );
+        return FillNewContent( _screenType, horizontalContent, hasSpecial, a, 0 );
     }
 
     public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
@@ -107,7 +109,11 @@ public sealed class HorizontalContent : IRenderable
         return flattenedLength;
     }
 
-    internal static HorizontalContent FillNewContent( ReadOnlySpan<IRenderable?> horizontalContent, bool hasSpecial, IRenderable[] newContent, int idxCopy )
+    internal static HorizontalContent FillNewContent( ScreenType screenType,
+                                                      ReadOnlySpan<IRenderable?> horizontalContent,
+                                                      bool hasSpecial,
+                                                      IRenderable[] newContent,
+                                                      int idxCopy )
     {
         if( hasSpecial )
         {
@@ -130,7 +136,7 @@ public sealed class HorizontalContent : IRenderable
         {
             horizontalContent.CopyTo( newContent.AsSpan(idxCopy)! );
         }
-        return new HorizontalContent( ImmutableCollectionsMarshal.AsImmutableArray( newContent ) );
+        return new HorizontalContent( screenType, ImmutableCollectionsMarshal.AsImmutableArray( newContent ) );
     }
 
 }

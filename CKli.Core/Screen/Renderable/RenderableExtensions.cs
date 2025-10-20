@@ -58,7 +58,7 @@ public static class RenderableExtensions
         if( skipThis ) --flattenedLength;
         var a = new IRenderable[flattenedLength + 1];
         a[^1] = r;
-        return HorizontalContent.FillNewContent( horizontalContent, hasSpecial, a, 0 );
+        return HorizontalContent.FillNewContent( r.ScreenType, horizontalContent, hasSpecial, a, 0 );
     }
     public static IRenderable AddLeft( this IRenderable r, params ReadOnlySpan<IRenderable?> horizontalContent ) => AddLeft( r, true, horizontalContent );
 
@@ -80,7 +80,7 @@ public static class RenderableExtensions
         if( skipThis ) --flattenedLength;
         var a = new IRenderable[1 + flattenedLength];
         a[0] = r;
-        return HorizontalContent.FillNewContent( horizontalContent, hasSpecial, a, skipThis ? 0 : 1 );
+        return HorizontalContent.FillNewContent( r.ScreenType, horizontalContent, hasSpecial, a, skipThis ? 0 : 1 );
     }
 
     public static IRenderable AddRight( this IRenderable r, params ReadOnlySpan<IRenderable?> horizontalContent ) => AddRight( r, true, horizontalContent );
@@ -103,7 +103,7 @@ public static class RenderableExtensions
         if( skipThis ) --flattenedLength;
         var a = new IRenderable[1 + flattenedLength];
         a[0] = r;
-        return VerticalContent.FillNewContent( verticalContent, hasSpecial, a, skipThis ? 0 : 1 );
+        return VerticalContent.FillNewContent( r.ScreenType, verticalContent, hasSpecial, a, skipThis ? 0 : 1 );
     }
 
     public static IRenderable AddBelow( this IRenderable r, params ReadOnlySpan<IRenderable?> verticalContent ) => AddBelow( r, true, verticalContent );

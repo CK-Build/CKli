@@ -12,9 +12,14 @@ namespace CKli.Core;
 public interface IScreen
 {
     /// <summary>
-    /// A huge, default screen width. Applies when no screen width can be obtained.
+    /// Default screen width. Applies when no screen width can be obtained.
     /// </summary>
-    public const int MaxScreenWidth = 2 << 23;
+    public const int MaxScreenWidth = short.MaxValue;
+
+    /// <summary>
+    /// Gets the screen type.
+    /// </summary>
+    ScreenType ScreenType { get; }
 
     /// <summary>
     /// Clears the screen.

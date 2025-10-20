@@ -372,7 +372,7 @@ public sealed partial class StackRepository : IDisposable
         var stack = TryOpenFromPath( monitor, context, out error, skipPullStack );
         if( stack != null )
         {
-            var w = World.Create( monitor, stack, context.CurrentDirectory );
+            var w = World.Create( monitor, context.Screen.ScreenType, stack, context.CurrentDirectory );
             if( w == null )
             {
                 error = true;
@@ -414,7 +414,7 @@ public sealed partial class StackRepository : IDisposable
             monitor.Error( $"No stack found for path '{context.CurrentDirectory}'." );
             return false;
         }
-        world = World.Create( monitor, stack, context.CurrentDirectory );
+        world = World.Create( monitor, context.Screen.ScreenType, stack, context.CurrentDirectory );
         if( world == null )
         {
             stack.Dispose();

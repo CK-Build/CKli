@@ -31,10 +31,11 @@ public sealed class CommandNamespace
     /// This is public mainly for tests.
     /// </para>
     /// </summary>
+    /// <param name="screenType">The screen type.</param>
     /// <param name="helpPath">The optional help path. When null, all commands are considered.</param>
     /// <param name="otherCommands">Optional secondary namespace from wich commands must be merged.</param>
     /// <returns>A list of commands that should display their definition.</returns>
-    public List<CommandHelp> GetForHelp( string? helpPath, CommandNamespace? otherCommands )
+    public List<CommandHelp> GetForHelp( ScreenType screenType, string? helpPath, CommandNamespace? otherCommands )
     {
         // No optimization here. This is the help.
         IEnumerable<Command> commands = _commands.Where( kv => kv.Value != null ).Select( kv => kv.Value )!;
@@ -44,7 +45,7 @@ public sealed class CommandNamespace
             var prefix = helpPath + ' ';
             commands = commands.Where( c => c.CommandPath == helpPath || c.CommandPath.StartsWith( prefix ) );
         }
-        return commands.OrderBy( c => c.CommandPath ).Select( c => new CommandHelp( c ) ).ToList();
+        return commands.OrderBy( c => c.CommandPath ).Select( c => new CommandHelp( screenType, c ) ).ToList();
     }
 
     internal Dictionary<string, Command?> InternalCommands => _commands;

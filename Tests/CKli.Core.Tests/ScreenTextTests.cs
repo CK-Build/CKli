@@ -27,23 +27,23 @@ public class ScreenTextTests
     public void simple_line_test()
     {
         {
-            var line = TextBlock.FromText( "Hello" ).AddRight( TextBlock.FromText( "world" ) );
+            var line = StringScreenType.Default.Text( "Hello" ).AddRight( StringScreenType.Default.Text( "world" ) );
             line.RenderAsString().ShouldBe( """
                 Helloworld
 
                 """ );
         }
         {
-            var line = TextBlock.FromText( "Hello" ).Box( paddingLeft: 1, paddingRight: 1 ).AddRight( TextBlock.FromText( "world" ) );
+            var line = StringScreenType.Default.Text( "Hello" ).Box( paddingLeft: 1, paddingRight: 1 ).AddRight( StringScreenType.Default.Text( "world" ) );
             line.RenderAsString().ShouldBe( """
                  Hello world
 
                 """ );
         }
         {
-            var line = TextBlock.FromText( "Hello" ).Box( paddingLeft: 1, paddingRight: 1 )
-                            .AddRight( TextBlock.FromText( "world" ).Box( paddingLeft: 2, paddingRight: 2 ) )
-                            .AddRight( TextBlock.FromText( "!" ) );
+            var line = StringScreenType.Default.Text( "Hello" ).Box( paddingLeft: 1, paddingRight: 1 )
+                            .AddRight( StringScreenType.Default.Text( "world" ).Box( paddingLeft: 2, paddingRight: 2 ) )
+                            .AddRight( StringScreenType.Default.Text( "!" ) );
             line.RenderAsString().ShouldBe( """
                  Hello   world  !
 
@@ -55,8 +55,8 @@ public class ScreenTextTests
     public void simple_2_lines_test()
     {
         {
-            var line = TextBlock.FromText( "Message:" )
-                        .AddBelow( TextBlock.FromText( "Hello world!" ).Box( marginLeft: 3 ) );
+            var line = StringScreenType.Default.Text( "Message:" )
+                        .AddBelow( StringScreenType.Default.Text( "Hello world!" ).Box( marginLeft: 3 ) );
             line.RenderAsString().ShouldBe( """
                 Message:
                    Hello world!
@@ -64,8 +64,8 @@ public class ScreenTextTests
                 """ );
         }
         {
-            var line = TextBlock.FromText( "Message:" )
-                        .AddBelow( TextBlock.FromText( "Hello world!" ).Box( paddingLeft: 3 ) );
+            var line = StringScreenType.Default.Text( "Message:" )
+                        .AddBelow( StringScreenType.Default.Text( "Hello world!" ).Box( paddingLeft: 3 ) );
             line.RenderAsString().ShouldBe( """
                 Message:
                    Hello world!
@@ -73,7 +73,7 @@ public class ScreenTextTests
                 """ );
         }
         {
-            var line = TextBlock.FromText( """
+            var line = StringScreenType.Default.Text( """
 
 
                   text
@@ -94,7 +94,7 @@ public class ScreenTextTests
     {
         TextBlock.MinWidth.ShouldBe( 15 );
         {
-            var t = TextBlock.FromText( "            0 1 2 3 4 5 6 7 8 9 A B C D E F G H I J K L M N O P Q R S T U V W X Y Z               " );
+            var t = StringScreenType.Default.Text( "            0 1 2 3 4 5 6 7 8 9 A B C D E F G H I J K L M N O P Q R S T U V W X Y Z               " );
             var tMin = t.SetTextWidth( TextBlock.MinWidth );
             tMin.Width.ShouldBe( TextBlock.MinWidth );
             tMin.Height.ShouldBe( 5 );
@@ -108,7 +108,7 @@ public class ScreenTextTests
                 """ );
         }
         {
-            var t = TextBlock.FromText( "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" );
+            var t = StringScreenType.Default.Text( "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" );
             var tMin = t.SetTextWidth( TextBlock.MinWidth );
             tMin.Width.ShouldBe( TextBlock.MinWidth );
             tMin.Height.ShouldBe( 3 );
@@ -120,7 +120,7 @@ public class ScreenTextTests
                 """ );
         }
         { 
-            var t = TextBlock.FromText( "La liberté des uns s'arrête où commence celle des autres." );
+            var t = StringScreenType.Default.Text( "La liberté des uns s'arrête où commence celle des autres." );
             var tMin = t.SetTextWidth( TextBlock.MinWidth );
             tMin.Width.ShouldBe( TextBlock.MinWidth );
             tMin.Height.ShouldBe( 4 );
@@ -163,7 +163,7 @@ public class ScreenTextTests
                 """ );
         }
         {
-            var t = TextBlock.FromText( """
+            var t = StringScreenType.Default.Text( """
                                 A
                                 B            
 
@@ -208,7 +208,7 @@ public class ScreenTextTests
         cmdLine.EatFlag( "-f1" ).ShouldBeTrue();
 
         cmdLine.Close( TestHelper.Monitor ).ShouldBe( false );
-        var header = ScreenHelpers.CreateDisplayHelpHeader( cmdLine );
+        var header = ScreenHelpers.CreateDisplayHelpHeader( StringScreenType.Default, cmdLine );
         string result = header.RenderAsString();
 
         Console.Write( result );
@@ -266,10 +266,12 @@ public class ScreenTextTests
     [Test]
     public void basic_Console_help_display_for_plugin_section()
     {
-        var commands = CKliCommands.Commands.GetForHelp( "plugin", null );
-        commands.Add( new CommandHelp( new ZCommand() ) );
+        var commands = CKliCommands.Commands.GetForHelp( StringScreenType.Default, "plugin", null );
+        commands.Add( new CommandHelp( StringScreenType.Default, new ZCommand() ) );
 
-        var help = ScreenHelpers.CreateDisplayHelp( commands, new CommandLineArguments( [] ), default, default, IScreen.MaxScreenWidth );
+        var help = ScreenHelpers.CreateDisplayHelp( StringScreenType.Default,
+                                                    commands,
+                                                    new CommandLineArguments( [] ), default, default, IScreen.MaxScreenWidth );
 
         string result = help.RenderAsString();
 

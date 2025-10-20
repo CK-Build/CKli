@@ -38,6 +38,7 @@ public sealed partial class World
     }
 
     readonly StackRepository _stackRepository;
+    readonly ScreenType _screenType;
     readonly LocalWorldName _name;
     readonly WorldDefinitionFile _definitionFile;
     readonly WorldEvents _events;
@@ -56,12 +57,14 @@ public sealed partial class World
     Repo? _firstRepo;
 
     World( StackRepository stackRepository,
+           ScreenType screenType,
            LocalWorldName name,
            WorldDefinitionFile definitionFile,
            IReadOnlyList<(NormalizedPath Path, Uri Uri)> layout,
            PluginMachinery? pluginMachinery )
     {
         _stackRepository = stackRepository;
+        _screenType = screenType;
         _name = name;
         _definitionFile = definitionFile;
         _layout = layout;
@@ -85,7 +88,10 @@ public sealed partial class World
     /// Only called by the StackRepository.
     /// Fails if the world layout cannot be loaded or plugins initialization fails (null is returned).
     /// </summary>
-    internal static World? Create( IActivityMonitor monitor, StackRepository stackRepository, NormalizedPath path )
+    internal static World? Create( IActivityMonitor monitor,
+                                   ScreenType screenType,
+                                   StackRepository stackRepository,
+                                   NormalizedPath path )
     {
         var worldName = stackRepository.GetWorldNameFromPath( monitor, path );
         var definitionFile = worldName?.LoadDefinitionFile( monitor );
@@ -114,7 +120,7 @@ public sealed partial class World
                             ? "Plugins are disabled because there is no configured World.PluginLoader."
                             : $"Plugins are globally disabled by configuration in '{worldName.FullName}.xml'." );
         }
-        var w = new World( stackRepository, worldName, definitionFile, layout, machinery );
+        var w = new World( stackRepository, screenType, worldName, definitionFile, layout, machinery );
         if( machinery != null
             && !w.AcquirePlugins( monitor ) )
         {
@@ -168,6 +174,11 @@ public sealed partial class World
     /// Gets the stack that defines this world.
     /// </summary>
     public StackRepository StackRepository => _stackRepository;
+
+    /// <summary>
+    /// Gets the screen type.
+    /// </summary>
+    public ScreenType ScreenType => _screenType;
 
     /// <summary>
     /// Gets the world name.

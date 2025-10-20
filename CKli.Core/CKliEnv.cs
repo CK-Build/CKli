@@ -60,6 +60,11 @@ public sealed class CKliEnv
     public IScreen Screen => _screen;
 
     /// <summary>
+    /// Gets the renderable unit (from the <see cref="ScreenType"/>).
+    /// </summary>
+    public IRenderable RenderableUnit => _screen.ScreenType.Unit;
+
+    /// <summary>
     /// Returns a new context with an updated <see cref="CurrentDirectory"/> that is <see cref="NormalizedPath.Combine(NormalizedPath)"/>
     /// with the <paramref name="path"/>.
     /// </summary>

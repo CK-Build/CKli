@@ -414,7 +414,7 @@ public sealed partial class PluginMachinery
                     {
                         Throw.CheckState( PrimaryContext.PluginInfo.FullPluginName == "{{fullPluginName}}" );
                         Throw.CheckState( PrimaryContext.World == e.World );
-                        e.AddMessage( PrimaryContext, TextBlock.FromText( "Message from '{{shortPluginName}}' plugin." ) );
+                        e.AddMessage( PrimaryContext, e.ScreenType.Text( "Message from '{{shortPluginName}}' plugin." ) );
                         e.Monitor.Info( $"New '{{shortPluginName}}' in world '{e.World.Name}' plugin certainly requires some development." );
                         Console.WriteLine( $"Hello from '{{shortPluginName}}' plugin." );
                     };

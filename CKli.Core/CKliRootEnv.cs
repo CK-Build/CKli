@@ -160,7 +160,7 @@ public static class CKliRootEnv
             {
                 (ansiConsole, originalConsoleMode) = AnsiDetector.TryEnableAnsiColorCodes();
             }
-            IScreen s = forceAnsi || ansiConsole ? new AnsiScreen( originalConsoleMode ) : new NoColorScreen();
+            IScreen s = forceAnsi || ansiConsole ? new AnsiScreen( originalConsoleMode, false ) : new NoColorScreen();
             return s;
         }
     }

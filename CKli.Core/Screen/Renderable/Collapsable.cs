@@ -15,6 +15,8 @@ public sealed class Collapsable : IRenderable
         _style = style;
     }
 
+    public ScreenType ScreenType => _content.ScreenType;
+
     public int Height => _content.Height;
 
     public int Width => 2 + _content.Width;
