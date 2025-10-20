@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 
 namespace CKli.Core;
@@ -5,6 +6,7 @@ namespace CKli.Core;
 /// <summary>
 /// A Filler applies to <see cref="ContentBox.Padding"/> and <see cref="ContentBox.Margin"/>.
 /// </summary>
+[DebuggerDisplay( "{Top},{Left},{Bottom},{Right}" )]
 public readonly struct Filler : IAdditionOperators<Filler,Filler,Filler>
 {
     public readonly byte Top;

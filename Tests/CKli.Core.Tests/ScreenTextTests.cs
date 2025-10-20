@@ -23,7 +23,7 @@ public class ScreenTextTests
     }
 
     [Test]
-    public void ContentAlign_test()
+    public void ContentAlign_Horizontal_test()
     {
         var text = StringScreenType.Default.Text( """
                 Hello world,
@@ -70,6 +70,121 @@ public class ScreenTextTests
 
                 """.Replace( '·', ' ' )
                 );
+        }
+    }
+
+    [Test]
+    public void ContentAlign_Vertical_test()
+    {
+        var text = StringScreenType.Default.Text( """
+                Hello world,
+
+                I'm glad to be there...
+                But...
+                I'm sad that Trump's here.
+                """ );
+        var bigCell = StringScreenType.Default.Text( """
+                |1
+                |2
+                |3
+                |4
+                |5
+                |6
+                |7
+                |8
+                |9
+                |10
+                """ );
+        {
+            //var lineUnk = text.Box().AddRight( bigCell );
+            //var lineTop = text.Box( ContentAlign.VTop ).AddRight( bigCell );
+            //string result = """
+            //    Hello world,··············|1
+            //    ··························|2
+            //    I'm glad to be there...···|3
+            //    But...····················|4
+            //    I'm sad that Trump's here.|5
+            //    ··························|6
+            //    ··························|7
+            //    ··························|8
+            //    ··························|9
+            //    ··························|10
+
+            //    """.Replace( '·', ' ' );
+            //lineUnk.RenderAsString().ShouldBe( result );
+            //lineTop.RenderAsString().ShouldBe( result );
+        }
+        // VBottom: bigCell (no box) - text
+        {
+            var lineBottom = text.Box( ContentAlign.VBottom ).AddLeft( bigCell );
+            string result = """
+                |1··························
+                |2··························
+                |3··························
+                |4··························
+                |5··························
+                |6Hello world,··············
+                |7··························
+                |8I'm glad to be there...···
+                |9But...····················
+                |10I'm sad that Trump's here.
+
+                """.Replace( '·', ' ' );
+            lineBottom.RenderAsString().ShouldBe( result );
+        }
+        // VBottom: bigCell (box) - text
+        {
+            var lineBottom = text.Box( ContentAlign.VBottom ).AddLeft( bigCell.Box() );
+            string result = """
+                |1 ··························
+                |2 ··························
+                |3 ··························
+                |4 ··························
+                |5 ··························
+                |6 Hello world,··············
+                |7 ··························
+                |8 I'm glad to be there...···
+                |9 But...····················
+                |10I'm sad that Trump's here.
+
+                """.Replace( '·', ' ' );
+            lineBottom.RenderAsString().ShouldBe( result );
+        }
+        // VBottom: bigCell (box margin right 1) - text
+        {
+            var lineBottom = text.Box( ContentAlign.VBottom ).AddLeft( bigCell.Box( marginRight: 1 ) );
+            string result = """
+                |1  ··························
+                |2  ··························
+                |3  ··························
+                |4  ··························
+                |5  ··························
+                |6  Hello world,··············
+                |7  ··························
+                |8  I'm glad to be there...···
+                |9  But...····················
+                |10 I'm sad that Trump's here.
+
+                """.Replace( '·', ' ' );
+            lineBottom.RenderAsString().ShouldBe( result );
+        }
+        // VMiddle: bigCell (box margin right 1) - text
+        {
+            var lineBottom = text.Box( ContentAlign.VMiddle ).AddLeft( bigCell.Box( marginRight: 1 ) );
+            string result = """
+                |1  ··························
+                |2  ··························
+                |3  Hello world,··············
+                |4  ··························
+                |5  I'm glad to be there...···
+                |6  But...····················
+                |7  I'm sad that Trump's here.
+                |8  ··························
+                |9  ··························
+                |10 ··························
+
+                """.Replace( '·', ' ' );
+            lineBottom.RenderAsString().ShouldBe( result );
         }
     }
 

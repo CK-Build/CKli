@@ -9,7 +9,14 @@ public sealed partial class ContentBox
     {
         Throw.CheckArgument( line >= 0 && line < actualHeight && actualHeight >= Height );
         Throw.DebugAssert( line >= 0 );
-        line -= _margin.Top;
+        int topMargin = _margin.Top;
+        int deltaH = actualHeight - Height;
+        if( deltaH != 0 )
+        {
+            if( _align.IsBottom() ) topMargin += actualHeight - Height;
+            else if( _align.IsMiddle() ) topMargin += (actualHeight - Height) >> 1;
+        }
+        line -= topMargin;
         if( line < 0 )
         {
             _ = new PaddingRenderer( parent, Width, parent.FinalStyle );
@@ -68,7 +75,7 @@ public sealed partial class ContentBox
             if( margin.Left > 0 ) RenderPadding( margin.Left, Target, ParentFinalStyle );
             if( padding.Left > 0 ) RenderPadding( padding.Left, Target, FinalStyle );
             RenderContent();
-            int rightPad = Length - ContentLength - padding.Left - margin.Left;
+            int rightPad = Length - ContentLength - padding.Left - margin.Left - margin.Right;
             if( rightPad > 0 ) RenderPadding( rightPad, Target, FinalStyle );
             if( margin.Right > 0 ) RenderPadding( margin.Right, Target, ParentFinalStyle );
         }
@@ -80,7 +87,7 @@ public sealed partial class ContentBox
         protected override void Render()
         {
             if( margin.Left > 0 ) RenderPadding( margin.Left, Target, ParentFinalStyle );
-            int leftPad = padding.Left + Length - ContentLength - margin.Left;
+            int leftPad = padding.Left + Length - ContentLength - margin.Left - margin.Right;
             if( leftPad > 0 ) RenderPadding( leftPad, Target, FinalStyle );
             RenderContent();
             if( padding.Right > 0 ) RenderPadding( padding.Right, Target, FinalStyle );
