@@ -1,5 +1,6 @@
 using CK.Core;
 using LibGit2Sharp;
+using System;
 
 namespace CKli.Core;
 
@@ -19,6 +20,8 @@ public sealed class Collapsable : IRenderable
     public int Height => _content.Height;
 
     public int Width => 2 + _content.Width;
+
+    public int MinWidth => 2 + _content.MinWidth;
 
     public IRenderable Content => _content;
 

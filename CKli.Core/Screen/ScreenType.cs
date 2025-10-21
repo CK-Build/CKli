@@ -69,6 +69,8 @@ public abstract class ScreenType
 
         public int Width => 0;
 
+        public int MinWidth => 0;
+
         public ScreenType ScreenType { get; }
 
         public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight ) { }

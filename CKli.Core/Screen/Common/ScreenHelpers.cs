@@ -98,7 +98,7 @@ public static class ScreenHelpers
         // Collapsable width is 2.
         int descriptionMaxLength = maxWidth - descriptionOffset - 2;
         // If the screen is too narrow, give up any wrapping.
-        if( descriptionMaxLength < TextBlock.MinWidth ) descriptionMaxLength = 0;
+        if( descriptionMaxLength < TextBlock.MinimalWidth ) descriptionMaxLength = 0;
 
         var help = header.AddBelow(
             commands.Select( c => new Collapsable( RenderCommand( c, offsetArgTitle, offsetArg, descriptionOffset, descriptionMaxLength ) )

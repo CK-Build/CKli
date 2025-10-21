@@ -11,6 +11,11 @@ public interface IRenderable
     int Width { get; }
 
     /// <summary>
+    /// Gets the minimal possible width for this renderable.
+    /// </summary>
+    int MinWidth { get; }
+
+    /// <summary>
     /// Gets the height in characters of this renderable.
     /// </summary>
     int Height { get; }

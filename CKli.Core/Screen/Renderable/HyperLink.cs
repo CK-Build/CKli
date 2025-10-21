@@ -20,6 +20,8 @@ public sealed class HyperLink : IRenderable
 
     public int Width => _content.Width;
 
+    public int MinWidth => _content.MinWidth;
+
     public IRenderable Content => _content;
 
     public Uri Target => _target;

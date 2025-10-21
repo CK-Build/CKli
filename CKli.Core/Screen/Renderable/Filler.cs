@@ -9,20 +9,20 @@ namespace CKli.Core;
 [DebuggerDisplay( "{Top},{Left},{Bottom},{Right}" )]
 public readonly struct Filler : IAdditionOperators<Filler,Filler,Filler>
 {
-    public readonly byte Top;
-    public readonly byte Left;
-    public readonly byte Bottom;
-    public readonly byte Right;
+    public readonly short Top;
+    public readonly short Left;
+    public readonly short Bottom;
+    public readonly short Right;
 
     public Filler( int top = 0, int left = 0, int bottom = 0, int right = 0 )
     {
-        Top = (byte)int.Clamp( top, 0, 255 );
-        Left = (byte)int.Clamp( left, 0, 255 );
-        Bottom = (byte)int.Clamp( bottom, 0, 255 );
-        Right = (byte)int.Clamp( right, 0, 255 );
+        Top = (short)int.Clamp( top, 0, short.MaxValue );
+        Left = (short)int.Clamp( left, 0, short.MaxValue );
+        Bottom = (short)int.Clamp( bottom, 0, short.MaxValue );
+        Right = (short)int.Clamp( right, 0, short.MaxValue );
     }
 
-    public Filler( byte top, byte left, byte bottom, byte right )
+    public Filler( short top, short left, short bottom, short right )
     {
         Top = top;
         Left = left;

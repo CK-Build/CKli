@@ -6,10 +6,10 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.Core;
 
-
 public abstract class TextBlock : IRenderable
 {
-    public const int MinWidth = 15;
+    public const int MinimalWidth = 10;
+
     readonly internal string _text;
     readonly ScreenType _screenType;
     readonly internal int _width;
@@ -27,7 +27,16 @@ public abstract class TextBlock : IRenderable
 
     public abstract int Height { get; }
 
+    /// <summary>
+    /// Gets the width of this text block.
+    /// </summary>
     public int Width => _width;
+
+    /// <summary>
+    /// Gets the <see cref="MinimalWidth"/> arbitrary minimal width of a text block
+    /// ot the actual <see cref="Width"/> if it is shorter.
+    /// </summary>
+    public int MinWidth => Math.Min( _width, MinimalWidth );
 
     public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
 

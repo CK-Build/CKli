@@ -28,8 +28,8 @@ public static class RenderableExtensions
                                    int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
                                    int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
     {
-        if( r is ContentBox b ) return b.WithPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
-                                        .WithMargin( marginTop, marginLeft, marginBottom, marginRight );
+        if( r is ContentBox b ) return b.AddPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
+                                        .AddMargin( marginTop, marginLeft, marginBottom, marginRight );
         return new ContentBox( r,
                                paddingTop, paddingLeft, paddingBottom, paddingRight,
                                marginTop, marginLeft, marginBottom, marginRight );
@@ -40,8 +40,8 @@ public static class RenderableExtensions
                                    int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
                                    int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
     {
-        if( r is ContentBox b ) return b.WithPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
-                                        .WithMargin( marginTop, marginLeft, marginBottom, marginRight )
+        if( r is ContentBox b ) return b.AddPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
+                                        .AddMargin( marginTop, marginLeft, marginBottom, marginRight )
                                         .WithStyle( style );
         return new ContentBox( r, paddingTop, paddingLeft, paddingBottom, paddingRight,
                                   marginTop, marginLeft, marginBottom, marginRight,
@@ -53,8 +53,8 @@ public static class RenderableExtensions
                                    int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
                                    int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
     {
-        if( r is ContentBox b ) return b.WithPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
-                                        .WithMargin( marginTop, marginLeft, marginBottom, marginRight )
+        if( r is ContentBox b ) return b.AddPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
+                                        .AddMargin( marginTop, marginLeft, marginBottom, marginRight )
                                         .WithAlign( align );
         return new ContentBox( r, paddingTop, paddingLeft, paddingBottom, paddingRight,
                                   marginTop, marginLeft, marginBottom, marginRight,

@@ -12,21 +12,24 @@ public sealed class VerticalContent : IRenderable
     readonly ScreenType _screenType;
     readonly int _width;
     readonly int _height;
+    readonly int _minWidth;
 
     public VerticalContent( ScreenType screenType, params ImmutableArray<IRenderable> cells )
     {
         _screenType = screenType;
         _cells = cells;
         _height = ComputeHeight( cells );
-        _width = _height > 0 ? ComputeWith( cells ) : 0;
+        _width = _height > 0 ? ComputeWidth( cells, out _minWidth ) : 0;
     }
 
-    static int ComputeWith( ImmutableArray<IRenderable> cells )
+    static int ComputeWidth( ImmutableArray<IRenderable> cells, out int minWidth )
     {
+        minWidth = 0;
         int w = 0;
         foreach( var cell in cells )
         {
             if( w < cell.Width ) w = cell.Width;
+            if( minWidth < cell.MinWidth ) minWidth = cell.MinWidth;
         }
         return w;
     }
@@ -46,6 +49,8 @@ public sealed class VerticalContent : IRenderable
     public int Height => _height;
 
     public int Width => _width;
+
+    public int MinWidth => _minWidth;
 
     public ImmutableArray<IRenderable> Cells => _cells;
 

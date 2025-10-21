@@ -257,11 +257,10 @@ public class ScreenTextTests
     [Test]
     public void TextBlock_witdh_adjustement()
     {
-        TextBlock.MinWidth.ShouldBe( 15 );
         {
             var t = StringScreenType.Default.Text( "            0 1 2 3 4 5 6 7 8 9 A B C D E F G H I J K L M N O P Q R S T U V W X Y Z               " );
-            var tMin = t.SetTextWidth( TextBlock.MinWidth );
-            tMin.Width.ShouldBe( TextBlock.MinWidth );
+            var tMin = t.SetTextWidth( 15 );
+            tMin.Width.ShouldBe( 15 );
             tMin.Height.ShouldBe( 5 );
             tMin.RenderAsString().ShouldBe( """
                 0 1 2 3 4 5 6 7
@@ -274,8 +273,8 @@ public class ScreenTextTests
         }
         {
             var t = StringScreenType.Default.Text( "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" );
-            var tMin = t.SetTextWidth( TextBlock.MinWidth );
-            tMin.Width.ShouldBe( TextBlock.MinWidth );
+            var tMin = t.SetTextWidth( 15 );
+            tMin.Width.ShouldBe( 15 );
             tMin.Height.ShouldBe( 3 );
             tMin.RenderAsString().ShouldBe( """
                 0123456789ABCDE
@@ -286,8 +285,8 @@ public class ScreenTextTests
         }
         { 
             var t = StringScreenType.Default.Text( "La liberté des uns s'arrête où commence celle des autres." );
-            var tMin = t.SetTextWidth( TextBlock.MinWidth );
-            tMin.Width.ShouldBe( TextBlock.MinWidth );
+            var tMin = t.SetTextWidth( 15 );
+            tMin.Width.ShouldBe( 15 );
             tMin.Height.ShouldBe( 4 );
             tMin.RenderAsString().ShouldBe( """
                 La liberté des
@@ -296,11 +295,11 @@ public class ScreenTextTests
                 des autres.
 
                 """ );
-            var tMin1 = t.SetTextWidth( TextBlock.MinWidth + 1 );
+            var tMin1 = t.SetTextWidth( 15 + 1 );
             tMin1.RenderAsString().ShouldBe( tMin.RenderAsString() );
-            var tMin2 = tMin1.SetTextWidth( TextBlock.MinWidth + 2 );
+            var tMin2 = tMin1.SetTextWidth( 15 + 2 );
             tMin2.RenderAsString().ShouldBe( tMin.RenderAsString() );
-            var tMin3 = tMin2.SetTextWidth( TextBlock.MinWidth + 3 );
+            var tMin3 = tMin2.SetTextWidth( 15 + 3 );
             tMin3.Height.ShouldBe( 4 );
             tMin3.RenderAsString().ShouldBe( """
                 La liberté des uns
@@ -309,7 +308,7 @@ public class ScreenTextTests
                 autres.
 
                 """ );
-            var tMin10 = tMin2.SetTextWidth( TextBlock.MinWidth + 10 );
+            var tMin10 = tMin2.SetTextWidth( 15 + 10 );
             tMin10.Height.ShouldBe( 3 );
             tMin10.RenderAsString().ShouldBe( """
                 La liberté des uns
@@ -318,7 +317,7 @@ public class ScreenTextTests
 
                 """ );
 
-            var tMin11 = tMin2.SetTextWidth( TextBlock.MinWidth + 11 );
+            var tMin11 = tMin2.SetTextWidth( 15 + 11 );
             tMin11.Height.ShouldBe( 3 );
             tMin11.RenderAsString().ShouldBe( """
                 La liberté des uns
@@ -336,7 +335,7 @@ public class ScreenTextTests
 
 
                 """ );
-            var tMin = t.SetTextWidth( TextBlock.MinWidth );
+            var tMin = t.SetTextWidth( 15 );
             tMin.ShouldBeSameAs( t );
             t.RenderAsString().ShouldBe( """
                 A
