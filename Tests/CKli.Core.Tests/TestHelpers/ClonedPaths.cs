@@ -16,10 +16,8 @@ static class ClonedPaths
         var path = _clonedPath.AppendPart( name );
         if( Directory.Exists( path ) )
         {
-            foreach( var d in Directory.EnumerateDirectories( path ) )
-            {
-                DeleteFolder( d );
-            }
+            RemoveAllReadOnlyAttribute( path );
+            TestHelper.CleanupFolder( path, ensureFolderAvailable: false );
         }
         else
         {
@@ -30,6 +28,20 @@ static class ClonedPaths
             Throw.CheckState( StackRepository.ClearRegistry( TestHelper.Monitor ) );
         }
         return new CKliEnv( path );
+
+        static void RemoveAllReadOnlyAttribute( string folder )
+        {
+            var options = new EnumerationOptions
+            {
+                IgnoreInaccessible = false,
+                RecurseSubdirectories = true,
+                AttributesToSkip = FileAttributes.System
+            };
+            foreach( var f in Directory.EnumerateFiles( folder, "*", options ) )
+            {
+                File.SetAttributes( f, FileAttributes.Normal );
+            }
+        }
     }
 
     public static void DeleteFolder( string path )
