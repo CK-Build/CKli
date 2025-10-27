@@ -16,6 +16,24 @@ public interface IRenderable
     int MinWidth { get; }
 
     /// <summary>
+    /// Gets the nominal width of this renderable.
+    /// This is the unconstrained, "natural" width.
+    /// <para>
+    /// "Natural" doesn't necessarily means "ideal": a very long
+    /// line of text can be more readable when rendered on multiple
+    /// lines.
+    /// </para>
+    /// </summary>
+    int NominalWidth { get; }
+
+    /// <summary>
+    /// Sets this renderable width.
+    /// </summary>
+    /// <param name="width">The width to set.</param>
+    /// <returns>The renderable (may be this one).</returns>
+    IRenderable SetWidth( int width );
+
+    /// <summary>
     /// Gets the height in characters of this renderable.
     /// </summary>
     int Height { get; }
@@ -39,5 +57,4 @@ public interface IRenderable
     /// <param name="visitor">The visitor.</param>
     /// <returns>The result of the visit.</returns>
     IRenderable Accept( RenderableVisitor visitor );
-
 }

@@ -71,7 +71,11 @@ public abstract class ScreenType
 
         public int MinWidth => 0;
 
+        public int NominalWidth => 0;
+
         public ScreenType ScreenType { get; }
+
+        public IRenderable SetWidth( int width ) => this;
 
         public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight ) { }
 
@@ -89,7 +93,7 @@ public abstract class ScreenType
 
         protected override void BuildSegmentTree( int line, SegmentRenderer parent ) { }
 
-        public override TextBlock SetTextWidth( int width ) => this;
+        public override IRenderable SetWidth( int width ) => this;
     }
 
 }

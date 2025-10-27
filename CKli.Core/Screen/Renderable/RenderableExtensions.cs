@@ -1,32 +1,85 @@
 using CK.Core;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Text;
 
 namespace CKli.Core;
 
+/// <summary>
+/// Extends <see cref="IRenderable"/>.
+/// </summary>
 public static class RenderableExtensions
 {
+    /// <summary>
+    /// Renders this into the provided <see cref="IRenderTarget"/>.
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="target">The target renderer.</param>
     public static void Render( this IRenderable r, IRenderTarget target ) => SegmentRenderer.Render( r, target );
 
+    /// <summary>
+    /// Renders this into the provided string builder.
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="b">The target builder.</param>
+    /// <returns>The builder.</returns>
     public static StringBuilder RenderAsString( this IRenderable r, StringBuilder b )
     {
         SegmentRenderer.Render( r, new StringScreen.Renderer( b ) );
         return b;
     }
 
+    /// <summary>
+    /// Renders this as a string.
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <returns>The rendered string.</returns>
     public static string RenderAsString( this IRenderable r ) => r.RenderAsString( new StringBuilder() ).ToString();
 
-    public static IRenderable HyperLink( this IRenderable r, Uri target )
+    /// <summary>
+    /// Wraps this renderable into an hyper link.
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="target">The target url.</param>
+    /// <returns>An hyperlink around this renderable.</returns>
+    public static HyperLink HyperLink( this IRenderable r, Uri target )
     {
         return r is HyperLink h
                 ? h.WithTarget( target )
                 : new HyperLink( r, target );
     }
 
-    public static IRenderable Box( this IRenderable r,
-                                   int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
-                                   int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
+    /// <summary>
+    /// Tries to apply a table layout to this renderable.
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="columns">The optional columns definition.</param>
+    /// <returns>A table layout is possible.</returns>
+    public static IRenderable TableLayout( this IRenderable r, params ImmutableArray<ColumnDefinition> columns )
+    {
+        return r is TableLayout t
+                ? Core.TableLayout.Create( t.Rows, columns )
+                : Core.TableLayout.Create( r, columns );
+    }
+
+    /// <summary>
+    /// Applies padding and margin to this renderable by creating a new <see cref="ContentBox"/>
+    /// around this renderable.
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="paddingTop">Optional top padding.</param>
+    /// <param name="paddingLeft">Optional left padding.</param>
+    /// <param name="paddingBottom">Optional bottom padding.</param>
+    /// <param name="paddingRight">Optional right padding.</param>
+    /// <param name="marginTop">Optional top margin.</param>
+    /// <param name="marginLeft">Optional left margin.</param>
+    /// <param name="marginBottom">Optional bottom margin.</param>
+    /// <param name="marginRight">Optional right margin.</param>
+    /// <returns>A content box.</returns>
+    public static ContentBox Box( this IRenderable r,
+                                  int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
+                                  int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
     {
         if( r is ContentBox b ) return b.AddPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
                                         .AddMargin( marginTop, marginLeft, marginBottom, marginRight );
@@ -35,23 +88,57 @@ public static class RenderableExtensions
                                marginTop, marginLeft, marginBottom, marginRight );
     }
 
-    public static IRenderable Box( this IRenderable r,
-                                   TextStyle style,
-                                   int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
-                                   int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
+    /// <summary>
+    /// Applies <see cref="TextStyle"/>, padding, margin and/or <see cref="ContentAlign"/> to this renderable by
+    /// creating a new <see cref="ContentBox"/> around this renderable.
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="style">Style to apply.</param>
+    /// <param name="paddingTop">Optional top padding.</param>
+    /// <param name="paddingLeft">Optional left padding.</param>
+    /// <param name="paddingBottom">Optional bottom padding.</param>
+    /// <param name="paddingRight">Optional right padding.</param>
+    /// <param name="marginTop">Optional top margin.</param>
+    /// <param name="marginLeft">Optional left margin.</param>
+    /// <param name="marginBottom">Optional bottom margin.</param>
+    /// <param name="marginRight">Optional right margin.</param>
+    /// <param name="align">Optional alignment to apply.</param>
+    /// <returns>A content box.</returns>
+    public static ContentBox Box( this IRenderable r,
+                                  TextStyle style,
+                                  int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
+                                  int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0,
+                                  ContentAlign align = default )
     {
         if( r is ContentBox b ) return b.AddPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
                                         .AddMargin( marginTop, marginLeft, marginBottom, marginRight )
-                                        .WithStyle( style );
+                                        .WithStyle( style )
+                                        .WithAlign( align );
         return new ContentBox( r, paddingTop, paddingLeft, paddingBottom, paddingRight,
                                   marginTop, marginLeft, marginBottom, marginRight,
-                                  style: style );
+                                  style: style,
+                                  align: align );
     }
 
-    public static IRenderable Box( this IRenderable r,
-                                   ContentAlign align,
-                                   int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
-                                   int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
+    /// <summary>
+    /// Applies <see cref="ContentAlign"/>, padding and/or margin to this renderable by
+    /// creating a new <see cref="ContentBox"/> around this renderable.
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="align">Alignment to apply.</param>
+    /// <param name="paddingTop">Optional top padding.</param>
+    /// <param name="paddingLeft">Optional left padding.</param>
+    /// <param name="paddingBottom">Optional bottom padding.</param>
+    /// <param name="paddingRight">Optional right padding.</param>
+    /// <param name="marginTop">Optional top margin.</param>
+    /// <param name="marginLeft">Optional left margin.</param>
+    /// <param name="marginBottom">Optional bottom margin.</param>
+    /// <param name="marginRight">Optional right margin.</param>
+    /// <returns>A content box.</returns>
+    public static ContentBox Box( this IRenderable r,
+                                  ContentAlign align,
+                                  int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
+                                  int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
     {
         if( r is ContentBox b ) return b.AddPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
                                         .AddMargin( marginTop, marginLeft, marginBottom, marginRight )
@@ -61,20 +148,45 @@ public static class RenderableExtensions
                                   align: align );
     }
 
-    public static IRenderable Box( this IRenderable r,
-                                   Color color,
-                                   TextEffect effect = TextEffect.Regular,
-                                   int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
-                                   int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
+    /// <summary>
+    /// Applies <see cref="TextStyle"/>, padding and/or margin to this renderable by
+    /// creating a new <see cref="ContentBox"/> around this renderable.
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="color">Text color to apply.</param>
+    /// <param name="effect">Text effect to apply.</param>
+    /// <param name="paddingTop">Optional top padding.</param>
+    /// <param name="paddingLeft">Optional left padding.</param>
+    /// <param name="paddingBottom">Optional bottom padding.</param>
+    /// <param name="paddingRight">Optional right padding.</param>
+    /// <param name="marginTop">Optional top margin.</param>
+    /// <param name="marginLeft">Optional left margin.</param>
+    /// <param name="marginBottom">Optional bottom margin.</param>
+    /// <param name="marginRight">Optional right margin.</param>
+    /// <returns>A content box.</returns>
+    public static ContentBox Box( this IRenderable r,
+                                  Color color,
+                                  TextEffect effect = TextEffect.Regular,
+                                  int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
+                                  int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
     {
         return Box( r, new TextStyle( color, effect ),
                        paddingTop, paddingLeft, paddingBottom, paddingRight,
                        marginTop, marginLeft, marginBottom, marginRight );
     }
 
-    public static IRenderable AddLeft( this IRenderable r, bool condition, params ReadOnlySpan<IRenderable?> horizontalContent )
+    /// <summary>
+    /// Creates a <see cref="HorizontalContent"/> ending with this renderable.
+    /// <para>
+    /// The returned result may be this one if <paramref name="horizontalContent"/> is empty.
+    /// </para>
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="horizontalContent">Any number of renderables that must appear before this one.</param>
+    /// <returns>The renderable.</returns>
+    public static IRenderable AddLeft( this IRenderable r, params ReadOnlySpan<IRenderable?> horizontalContent )
     {
-        if( !condition || horizontalContent.Length == 0 ) return r;
+        if( horizontalContent.Length == 0 ) return r;
         if( r is HorizontalContent h ) return h.Prepend( horizontalContent );
         int flattenedLength = VerticalContent.ComputeActualContentLength( horizontalContent, out bool hasSpecial );
         if( flattenedLength == 0 ) return r;
@@ -84,19 +196,28 @@ public static class RenderableExtensions
         a[^1] = r;
         return HorizontalContent.FillNewContent( r.ScreenType, horizontalContent, hasSpecial, a, 0 );
     }
-    public static IRenderable AddLeft( this IRenderable r, params ReadOnlySpan<IRenderable?> horizontalContent ) => AddLeft( r, true, horizontalContent );
 
+    /// <inheritdoc cref="AddLeft(IRenderable, ReadOnlySpan{IRenderable?})"/>
     public static IRenderable AddLeft( this IRenderable r, params IEnumerable<IRenderable?> horizontalContent ) => AddLeft( r, [.. horizontalContent] );
 
-    public static IRenderable AddLeft( this IRenderable r, params IEnumerable<object?> horizontalContent ) => AddLeft( r, true, Flatten( horizontalContent ) );
+    /// <inheritdoc cref="AddLeft(IRenderable, ReadOnlySpan{IRenderable?})"/>
+    /// <remarks>
+    /// The content is automatically flattened.
+    /// </remarks>
+    public static IRenderable AddLeft( this IRenderable r, params IEnumerable<object?> horizontalContent ) => AddLeft( r, Flatten( horizontalContent ) );
 
-    public static IRenderable AddLeft( this IRenderable r, bool condition, params IEnumerable<IRenderable?> horizontalContent ) => AddLeft( r, condition, [.. horizontalContent] );
-
-    public static IRenderable AddLeft( this IRenderable r, bool condition, params IEnumerable<object?> horizontalContent ) => AddLeft( r, condition, Flatten( horizontalContent ) );
-
-    public static IRenderable AddRight( this IRenderable r, bool condition, params ReadOnlySpan<IRenderable?> horizontalContent )
+    /// <summary>
+    /// Creates a <see cref="HorizontalContent"/> starting with this renderable.
+    /// <para>
+    /// The returned result may be this one if <paramref name="horizontalContent"/> is empty.
+    /// </para>
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="horizontalContent">Any number of renderables that must appear after this one.</param>
+    /// <returns>The renderable.</returns>
+    public static IRenderable AddRight( this IRenderable r, params ReadOnlySpan<IRenderable?> horizontalContent )
     {
-        if( !condition || horizontalContent.Length == 0 ) return r;
+        if( horizontalContent.Length == 0 ) return r;
         if( r is HorizontalContent h ) return h.Append( horizontalContent );
         int flattenedLength = VerticalContent.ComputeActualContentLength( horizontalContent, out bool hasSpecial );
         if( flattenedLength == 0 ) return r;
@@ -107,19 +228,27 @@ public static class RenderableExtensions
         return HorizontalContent.FillNewContent( r.ScreenType, horizontalContent, hasSpecial, a, skipThis ? 0 : 1 );
     }
 
-    public static IRenderable AddRight( this IRenderable r, params ReadOnlySpan<IRenderable?> horizontalContent ) => AddRight( r, true, horizontalContent );
-
+    /// <inheritdoc cref="AddRight(IRenderable, ReadOnlySpan{IRenderable?})"/>
     public static IRenderable AddRight( this IRenderable r, params IEnumerable<IRenderable?> horizontalContent ) => AddRight( r, [.. horizontalContent] );
 
-    public static IRenderable AddRight( this IRenderable r, params IEnumerable<object?> horizontalContent ) => AddRight( r, true, Flatten( horizontalContent ) );
+    /// <inheritdoc cref="AddRight(IRenderable, ReadOnlySpan{IRenderable?})"/>
+    /// <remarks>
+    /// The content is automatically flattened.
+    /// </remarks>
+    public static IRenderable AddRight( this IRenderable r, params IEnumerable<object?> horizontalContent ) => AddRight( r, Flatten( horizontalContent ) );
 
-    public static IRenderable AddRight( this IRenderable r, bool condition, params IEnumerable<IRenderable?> horizontalContent ) => AddRight( r, condition, [.. horizontalContent] );
-
-    public static IRenderable AddRight( this IRenderable r, bool condition, params IEnumerable<object?> horizontalContent ) => AddRight( r, condition, Flatten( horizontalContent ) );
-
-    public static IRenderable AddBelow( this IRenderable r, bool condition, params ReadOnlySpan<IRenderable?> verticalContent )
+    /// <summary>
+    /// Creates a <see cref="VerticalContent"/> starting with this renderable.
+    /// <para>
+    /// The returned result may be this one if <paramref name="verticalContent"/> is empty.
+    /// </para>
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="verticalContent">Any number of renderables that must appear below this one.</param>
+    /// <returns>The renderable.</returns>
+    public static IRenderable AddBelow( this IRenderable r, params ReadOnlySpan<IRenderable?> verticalContent )
     {
-        if( !condition || verticalContent.Length == 0 ) return r;
+        if( verticalContent.Length == 0 ) return r;
         if( r is VerticalContent v ) return v.Append( verticalContent );
         int flattenedLength = VerticalContent.ComputeActualContentLength( verticalContent, out bool hasSpecial );
         if( flattenedLength == 0 ) return r;
@@ -130,15 +259,14 @@ public static class RenderableExtensions
         return VerticalContent.FillNewContent( r.ScreenType, verticalContent, hasSpecial, a, skipThis ? 0 : 1 );
     }
 
-    public static IRenderable AddBelow( this IRenderable r, params ReadOnlySpan<IRenderable?> verticalContent ) => AddBelow( r, true, verticalContent );
-
+    /// <inheritdoc cref="AddBelow(IRenderable, ReadOnlySpan{IRenderable?})"/>
     public static IRenderable AddBelow( this IRenderable r, params IEnumerable<IRenderable?> verticalContent ) => AddBelow( r, [.. verticalContent] );
 
-    public static IRenderable AddBelow( this IRenderable r, params IEnumerable<object?> verticalContent ) => AddBelow( r, true, Flatten( verticalContent ) );
-
-    public static IRenderable AddBelow( this IRenderable r, bool condition, params IEnumerable<IRenderable?> verticalContent ) => AddBelow( r, condition, [.. verticalContent] );
-
-    public static IRenderable AddBelow( this IRenderable r, bool condition, params IEnumerable<object?> verticalContent ) => AddBelow( r, condition, Flatten( verticalContent ) );
+    /// <inheritdoc cref="AddBelow(IRenderable, ReadOnlySpan{IRenderable?})"/>
+    /// <remarks>
+    /// The content is automatically flattened.
+    /// </remarks>
+    public static IRenderable AddBelow( this IRenderable r, params IEnumerable<object?> verticalContent ) => AddBelow( r, Flatten( verticalContent ) );
 
     static IEnumerable<IRenderable> Flatten( IEnumerable<object?> objects )
     {
@@ -158,7 +286,7 @@ public static class RenderableExtensions
             }
             else if( o != null )
             {
-                Throw.ArgumentException( $"Invalid object type '{o.GetType()}' in enumeration: must be ILineRenderable, IEnumerable<ILineRenderable>, IEnumerable<object> (or null)." );
+                Throw.ArgumentException( $"Invalid object type '{o.GetType()}' in enumeration: must be IRenderable, IEnumerable<IRenderable>, IEnumerable<object> (or null)." );
             }
         }
     }

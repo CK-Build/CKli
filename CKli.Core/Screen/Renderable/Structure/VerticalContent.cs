@@ -1,6 +1,5 @@
 using CK.Core;
 using System;
-using System.Buffers;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 
@@ -13,23 +12,26 @@ public sealed class VerticalContent : IRenderable
     readonly int _width;
     readonly int _height;
     readonly int _minWidth;
+    readonly int _nominalWidth;
 
     public VerticalContent( ScreenType screenType, params ImmutableArray<IRenderable> cells )
     {
         _screenType = screenType;
         _cells = cells;
         _height = ComputeHeight( cells );
-        _width = _height > 0 ? ComputeWidth( cells, out _minWidth ) : 0;
+        _width = _height > 0 ? ComputeWidth( cells, out _minWidth, out _nominalWidth ) : 0;
     }
 
-    static int ComputeWidth( ImmutableArray<IRenderable> cells, out int minWidth )
+    static int ComputeWidth( ImmutableArray<IRenderable> cells, out int minWidth, out int nominalWidth )
     {
         minWidth = 0;
+        nominalWidth = 0;
         int w = 0;
         foreach( var cell in cells )
         {
             if( w < cell.Width ) w = cell.Width;
             if( minWidth < cell.MinWidth ) minWidth = cell.MinWidth;
+            if( nominalWidth < cell.NominalWidth ) nominalWidth = cell.NominalWidth;
         }
         return w;
     }
@@ -52,7 +54,49 @@ public sealed class VerticalContent : IRenderable
 
     public int MinWidth => _minWidth;
 
+    public int NominalWidth => _nominalWidth;
+
     public ImmutableArray<IRenderable> Cells => _cells;
+
+    public IRenderable SetWidth( int width )
+    {
+        if( width < _minWidth ) width = _minWidth;
+        if( width == _width ) return this;
+        return ApplyTransform( r => r.SetWidth( width ) );
+    }
+
+    /// <summary>
+    /// Applies a transform function to all <see cref="Cells"/>.
+    /// </summary>
+    /// <param name="f">The transformation to apply.</param>
+    /// <returns>A new vertical content, <see cref="ScreenType.RenderableUnit"/> or this if nothing changed.</returns>
+    public IRenderable ApplyTransform( Func<IRenderable,IRenderable?> f )
+    {
+        ImmutableArray<IRenderable>.Builder? b = null;
+        for( int i = 0; i < _cells.Length; i++ )
+        {
+            var c = _cells[i];
+            var newC = f( c );
+            if( newC != c )
+            {
+                if( b == null )
+                {
+                    b = ImmutableArray.CreateBuilder<IRenderable>( _cells.Length );
+                    b.AddRange( _cells, i );
+                }
+                if( newC != null && newC.Height > 0 ) b.Add( newC );
+            }
+            else
+            {
+                b?.Add( c );
+            }
+        }
+        return b == null
+                ? this
+                : b.Count == 0
+                    ? _screenType.Unit
+                    : new VerticalContent( _screenType, b.DrainToImmutable() );
+    }
 
     public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
 
@@ -148,5 +192,4 @@ public sealed class VerticalContent : IRenderable
         }
         return new VerticalContent( screenType, ImmutableCollectionsMarshal.AsImmutableArray( newContent ) );
     }
-
 }

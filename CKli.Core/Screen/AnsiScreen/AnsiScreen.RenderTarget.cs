@@ -23,6 +23,12 @@ sealed partial class AnsiScreen
             _buffered = text => _buffer.Append( text );
             _unbuffered = writer;
             _screenType = screenType;
+            _current = TextStyle.Default;
+            // Initializes our default colors.
+            Span<char> b = stackalloc char[16];
+            var w = new FixedBufferWriter( b );
+            w.AppendCSIStyle( _current.Color, _current.Effect );
+            writer( w.Text );
         }
 
         public void BeginUpdate() => _updateCount++;
@@ -50,26 +56,28 @@ sealed partial class AnsiScreen
                 var c = _current.OverrideWith( style );
                 if( _current != c )
                 {
-                    WriteDiff( w, _current, c );
-                    _current = c;
+                    _current = WriteDiff( w, _current, c );
                 }
             }
             w( text );
 
-            static void WriteDiff( CoreTextWriter writer, TextStyle current, TextStyle style )
-            {
-                Span<char> styleBuffer = stackalloc char[64];
-                var w = new FixedBufferWriter( styleBuffer );
-                w.AppendCSITextStyleDiff( current, style );
-                writer( w.Text );
-            }
+        }
+
+        static TextStyle WriteDiff( CoreTextWriter writer, TextStyle current, TextStyle style )
+        {
+            Span<char> styleBuffer = stackalloc char[64];
+            var w = new FixedBufferWriter( styleBuffer );
+            w.AppendCSITextStyleDiff( current, style );
+            writer( w.Text );
+            return style;
         }
 
         public void EndOfLine()
         {
-            Span<char> b = stackalloc char[64];
+            _current = TextStyle.Default;
+            Span<char> b = stackalloc char[16];
             var w = new FixedBufferWriter( b );
-            w.AppendCSIStyle( TextStyle.Default.Color, TextEffect.Regular );
+            w.AppendCSIStyle( _current.Color, _current.Effect );
             w.Append( '\n' );
             Write( w.Text );
         }

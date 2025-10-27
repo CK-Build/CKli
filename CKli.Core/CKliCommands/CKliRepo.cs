@@ -10,8 +10,11 @@ sealed class CKliRepo : Command
     public CKliRepo()
         : base( null,
                 "repo",
-                "Lists the World's Repos folder and remote origin.",
-                [], [], [] )
+                "Lists the World's Repos folder, current branch name, remote commit diffs and remote origin url.",
+                [], [],
+                [
+                    (["--by-branch,-b"], "Group by current branch names.")
+                ] )
     {
     }
 
@@ -19,11 +22,12 @@ sealed class CKliRepo : Command
                                                                     CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
+        bool byBranch = cmdLine.EatFlag( "--by-branch", "-b" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && DisplayRepos( monitor, context ) );
+                                     && DisplayRepos( monitor, context, byBranch ) );
     }
 
-    static bool DisplayRepos( IActivityMonitor monitor, CKliEnv context )
+    static bool DisplayRepos( IActivityMonitor monitor, CKliEnv context, bool byBranch )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -37,7 +41,26 @@ sealed class CKliRepo : Command
         {
             var repos = world.GetAllDefinedRepo( monitor );
             if( repos == null ) return false;
-            var display = context.RenderableUnit.AddBelow( repos.Select( r => ToRenderable( context.Screen.ScreenType, r ) ) );
+
+            var screenType = context.Screen.ScreenType;
+            IRenderable display;
+            if( byBranch )
+            {
+                display = screenType.Unit.AddBelow(
+                    repos.GroupBy( r => r.GitStatus.CurrentBranchName )
+                         .OrderBy( g => g.Key )
+                         .Select( g => new Collapsable(
+                             screenType.Text( g.Key )
+                             .AddBelow( screenType.Unit.AddBelow( g.Select( r => r.ToRenderable( screenType, true, true, true ) ) )
+                                        .TableLayout() ) )
+                         ) );
+            }
+            else
+            {
+                display = context.RenderableUnit
+                                 .AddBelow( repos.Select( r => r.ToRenderable( screenType, true, true, true ) ) )
+                                 .TableLayout();
+            }
             context.Screen.Display( display );
             return true;
         }
@@ -45,11 +68,5 @@ sealed class CKliRepo : Command
         {
             stack.Dispose();
         }
-    }
-
-    static IRenderable ToRenderable( ScreenType screenType, Repo repo )
-    {
-        return screenType.Text( repo.DisplayPath ).HyperLink( new System.Uri( $"file:///{repo.WorkingFolder}" ) ).Box( marginRight: 1 )
-                        .AddRight( screenType.Text( repo.OriginUrl.ToString() ) ).HyperLink( repo.OriginUrl );
     }
 }

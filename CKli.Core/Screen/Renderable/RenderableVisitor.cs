@@ -15,58 +15,18 @@ public abstract class RenderableVisitor
 
     public virtual IRenderable Visit( HorizontalContent h )
     {
-        ImmutableArray<IRenderable>.Builder? b = null;
-        for( int i = 0; i < h.Cells.Length; i++ )
-        {
-            IRenderable? c = h.Cells[i];
-            var newC = c.Accept( this );
-            if( newC != c )
-            {
-                if( b == null )
-                {
-                    b = ImmutableArray.CreateBuilder<IRenderable>( h.Cells.Length );
-                    b.AddRange( h.Cells, i );
-                }
-                if( newC.Width > 0 ) b.Add( newC );
-            }
-            else
-            {
-                b?.Add( c );
-            }
-        }
-        return b == null
-                ? h
-                : b.Count == 0
-                    ? h.ScreenType.Unit
-                    : new HorizontalContent( h.ScreenType, b.DrainToImmutable() );
+        return h.ApplyTransform( r => r.Accept( this ) );
     }
 
-    public virtual IRenderable Visit( VerticalContent v )
+    public virtual IRenderable Visit( VerticalContent v ) 
     {
-        ImmutableArray<IRenderable>.Builder? b = null;
-        for( int i = 0; i < v.Cells.Length; i++ )
-        {
-            IRenderable? c = v.Cells[i];
-            var newC = c.Accept( this );
-            if( newC != c )
-            {
-                if( b == null )
-                {
-                    b = ImmutableArray.CreateBuilder<IRenderable>( v.Cells.Length );
-                    b.AddRange( v.Cells, i );
-                }
-                if( newC.Height > 0 ) b.Add( newC );
-            }
-            else
-            {
-                b?.Add( c );
-            }
-        }
-        return b == null
-                ? v
-                : b.Count == 0
-                    ? v.ScreenType.Unit
-                    : new VerticalContent( v.ScreenType, b.DrainToImmutable() );
+        return v.ApplyTransform( r => r.Accept( this ) );
+    }
+
+    public virtual IRenderable Visit( TableLayout t ) 
+    {
+        var rows = t.Rows.Accept( this );
+        return rows != t.Rows ? TableLayout.Create( rows, t.Columns ) : t;
     }
 
     public virtual IRenderable Visit( TextBlock t ) => t;

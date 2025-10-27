@@ -22,7 +22,16 @@ public sealed class HyperLink : IRenderable
 
     public int MinWidth => _content.MinWidth;
 
+    public int NominalWidth => _content.NominalWidth;
+
     public IRenderable Content => _content;
+
+    public IRenderable SetWidth( int width )
+    {
+        var newContent = _content.SetWidth( width );
+        return newContent == _content ? this : new HyperLink( newContent, _target );
+    }
+
 
     public Uri Target => _target;
 

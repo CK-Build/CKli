@@ -22,6 +22,10 @@ sealed class NoColorScreen : IScreen
 
     public void Display( IRenderable renderable )
     {
+        if( renderable.Width > _width )
+        {
+            renderable = renderable.SetWidth( Width );
+        }
         renderable.Render( _target );
     }
 
@@ -39,21 +43,6 @@ sealed class NoColorScreen : IScreen
         {
             return IScreen.MaxScreenWidth;
         }
-    }
-
-    public void DisplayHelp( List<CommandHelp> commands,
-                             CommandLineArguments cmdLine,
-                             ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default,
-                             ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
-    {
-        var help = ScreenHelpers.CreateDisplayHelp( ScreenType, commands, cmdLine, globalOptions, globalFlags, Width );
-        help.Render( _target );
-    }
-
-    public void DisplayPluginInfo( string headerText, List<World.DisplayInfoPlugin>? infos )
-    {
-        var display = ScreenHelpers.CreateDisplayPlugin( ScreenType, headerText, infos, Width );
-        display.Render( _target );
     }
 
     public void OnLogErrorOrWarning( LogLevel level, string message, bool isOpenGroup )

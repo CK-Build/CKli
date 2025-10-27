@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Buffers;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace CKli.Core;
@@ -13,23 +14,26 @@ public sealed class HorizontalContent : IRenderable
     readonly int _width;
     readonly int _height;
     readonly int _minWidth;
+    readonly int _nominalWidth;
 
     public HorizontalContent( ScreenType screenType, params ImmutableArray<IRenderable> cells )
     {
         _screenType = screenType;
         _cells = cells;
-        _width = ComputeWidth( cells, out _minWidth );
+        _width = ComputeWidth( cells, out _minWidth, out _nominalWidth );
         _height = _width > 0 ? ComputeHeight( cells ) : 0;
     }
 
-    static int ComputeWidth( ImmutableArray<IRenderable> cells, out int minWidth )
+    static int ComputeWidth( ImmutableArray<IRenderable> cells, out int minWidth, out int nominalWidth )
     {
+        nominalWidth = 0;
         minWidth = 0;
         int w = 0;
         foreach( var cell in cells )
         {
             w += cell.Width;
             minWidth += cell.MinWidth;
+            nominalWidth += cell.NominalWidth;
         }
         return w;
     }
@@ -52,7 +56,101 @@ public sealed class HorizontalContent : IRenderable
 
     public int MinWidth => _minWidth;
 
+    public int NominalWidth => _nominalWidth;
+
     public ImmutableArray<IRenderable> Cells => _cells;
+
+    public IRenderable SetWidth( int width )
+    {
+        if( width < _minWidth ) width = _minWidth;
+        if( width == _width ) return this;
+
+        int delta = width - _minWidth;
+        if( delta == 0 )
+        {
+            return ApplyTransform( r => r.SetWidth( 0 ) );
+        }
+        delta = width - _nominalWidth;
+        if( delta == 0 )
+        {
+            return ApplyTransform( r => r.SetWidth( r.NominalWidth ) );
+        }
+        double ratio = (double)width / _nominalWidth;
+        var widths = new int[_cells.Length];
+        int sum = 0;
+        for( int i = 0; i < _cells.Length; i++ )
+        {
+            var c = _cells[i];
+            int w = Math.Max( (int)Math.Round( (ratio * c.NominalWidth) + 0.5, MidpointRounding.ToZero ), c.MinWidth );
+            widths[i] = w;
+            sum += w;
+        }
+        delta = width - sum;
+        if( delta > 0 )
+        {
+            do
+            {
+                for( int i = _cells.Length - 1; i >= 0; i-- )
+                {
+                    widths[i]++;
+                    if( --delta == 0 ) break;
+                }
+            }
+            while( delta != 0 );
+        }
+        else if( delta < 0 )
+        {
+            do
+            {
+                for( int i = _cells.Length - 1; i >= 0; i-- )
+                {
+                    var c = _cells[i];
+                    if( widths[i] > c.MinWidth )
+                    {
+                        widths[i]--;
+                        if( ++delta == 0 ) break;
+                    }
+                }
+            }
+            while( delta != 0 );
+        }
+        int iSet = 0;
+        return ApplyTransform( r => r.SetWidth( widths[iSet++] ) );
+    }
+
+    /// <summary>
+    /// Applies a transform function to all <see cref="Cells"/>.
+    /// </summary>
+    /// <param name="f">The transformation to apply.</param>
+    /// <returns>A new horizontal content, <see cref="ScreenType.RenderableUnit"/> or this if nothing changed.</returns>
+    public IRenderable ApplyTransform( Func<IRenderable, IRenderable?> f )
+    {
+        ImmutableArray<IRenderable>.Builder? b = null;
+        for( int i = 0; i < _cells.Length; i++ )
+        {
+            var c = _cells[i];
+            var newC = f( c );
+            if( newC != c )
+            {
+                if( b == null )
+                {
+                    b = ImmutableArray.CreateBuilder<IRenderable>( _cells.Length );
+                    b.AddRange( _cells, i );
+                }
+                if( newC != null && newC.Width > 0 ) b.Add( newC );
+            }
+            else
+            {
+                b?.Add( c );
+            }
+        }
+        return b == null
+                ? this
+                : b.Count == 0
+                    ? _screenType.Unit
+                    : new HorizontalContent( _screenType, b.DrainToImmutable() );
+    }
+
 
     public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
     {

@@ -47,6 +47,10 @@ sealed partial class AnsiScreen : IScreen
     public void Display( IRenderable renderable )
     {
         _animation.Hide();
+        if( renderable.Width > _width )
+        {
+            renderable = renderable.SetWidth( _width );
+        }
         renderable.Render( _target );
     }
 
@@ -64,23 +68,6 @@ sealed partial class AnsiScreen : IScreen
         {
             return IScreen.MaxScreenWidth;
         }
-    }
-
-    public void DisplayHelp( List<CommandHelp> commands,
-                             CommandLineArguments cmdLine,
-                             ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default,
-                             ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
-    {
-        _animation.Hide();
-        var help = ScreenHelpers.CreateDisplayHelp( _screenType, commands, cmdLine, globalOptions, globalFlags, Width );
-        help.Render( _target );
-    }
-
-    public void DisplayPluginInfo( string headerText, List<World.DisplayInfoPlugin>? infos )
-    {
-        _animation.Hide();
-        var display = ScreenHelpers.CreateDisplayPlugin( _screenType, headerText, infos, Width );
-        display.Render( _target );
     }
 
     public void OnLogErrorOrWarning( LogLevel level, string message, bool isOpenGroup )

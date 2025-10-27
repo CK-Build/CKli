@@ -95,4 +95,61 @@ public sealed class Repo
     /// <inheritdoc cref="GitRepository.SetCurrentBranch(IActivityMonitor, string, bool)"/>
     public bool SetCurrentBranch( IActivityMonitor monitor, string branchName, bool skipPullMerge = false )
             => _git.SetCurrentBranch( monitor, branchName, skipPullMerge );
+
+    /// <summary>
+    /// Returns the <see cref="DisplayPath"/> (with its link to <see cref="WorkingFolder"/>) as a <see cref="ContentBox"/>
+    /// or a <see cref="HorizontalContent"/> with it and:
+    /// <list type="number">
+    ///     <item>A box with its current branch name.</item>
+    ///     <item>A Box with the commit remotes ↑0↓0 differences indicator.</item>
+    ///     <item>A Box with the <see cref="Repo.OriginUrl"/>.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="withBranchName">True to add a box with the current branch name.</param>
+    /// <param name="withRemoteDiffCount">True to add a box with the commit remotes ↑0↓0 differences indicator.</param>
+    /// <param name="withOriginUrl">True to add a box with the <see cref="OriginUrl"/>.</param>
+    /// <returns>The renderable.</returns>
+    public IRenderable ToRenderable( ScreenType screenType, bool withBranchName = false, bool withRemoteDiffCount = false, bool withOriginUrl = false )
+    {
+        var status = GitStatus;
+        var folderStyle = new TextStyle( status.IsDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen, ConsoleColor.Black );
+
+        IRenderable folder = screenType.Text( DisplayPath ).HyperLink( new Uri( $"file:///{WorkingFolder}" ) );
+        if( status.IsDirty ) folder = folder.Box( paddingRight: 1 ).AddLeft( screenType.Text( "✱" ).Box( paddingRight: 1 ) );
+        else folder = folder.Box( paddingLeft: 2, paddingRight: 1 );
+        folder = folder.Box( style: folderStyle );
+
+        if( withBranchName )
+        {
+            folder = folder.AddRight( screenType.Text( status.CurrentBranchName ).Box( marginRight: 1 ) );
+        }
+        if( withRemoteDiffCount )
+        {
+            if( status.IsTracked )
+            {
+                var diff = CommitDiff( screenType, '↑', status.CommitAhead.Value )
+                           .AddRight( CommitDiff( screenType, '↓', status.CommitBehind.Value ) );
+                folder = folder.AddRight( diff.Box( marginRight: 1 ) );
+            }
+            else
+            {
+                folder = folder.AddRight( screenType.Text( "<local>" ).Box( marginRight: 1 ) );
+            }
+        }
+        if( withOriginUrl )
+        {
+            folder = folder.AddRight( screenType.Text( OriginUrl.ToString() ).HyperLink( OriginUrl ).Box( marginRight: 1 ) );
+        }
+        return folder;
+
+        static IRenderable CommitDiff( ScreenType screenType, char aheadOrBehind, int count )
+        {
+            return screenType.Text( $"{aheadOrBehind}{count}",
+                                    count != 0
+                                        ? new TextStyle( new Color( System.ConsoleColor.Red, System.ConsoleColor.Black ), TextEffect.Bold )
+                                        : TextStyle.None );
+        }
+    }
+
 }

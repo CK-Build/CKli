@@ -36,18 +36,6 @@ public sealed class StringScreen : IScreen
     {
     }
 
-    public void DisplayHelp( List<CommandHelp> commands, CommandLineArguments cmdLine, ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default, ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
-    {
-        var help = ScreenHelpers.CreateDisplayHelp( ScreenType, commands, cmdLine, globalOptions, globalFlags, IScreen.MaxScreenWidth );
-        help.RenderAsString( _buffer );
-    }
-
-    void IScreen.DisplayPluginInfo( string headerText, List<World.DisplayInfoPlugin>? infos )
-    {
-        var display = ScreenHelpers.CreateDisplayPlugin( ScreenType, headerText, infos, IScreen.MaxScreenWidth );
-        display.RenderAsString( _buffer );
-    }
-
     void IScreen.Close()
     {
     }

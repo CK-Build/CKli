@@ -23,9 +23,17 @@ public sealed class Collapsable : IRenderable
 
     public int MinWidth => 2 + _content.MinWidth;
 
+    public int NominalWidth => 2 + _content.NominalWidth;
+
     public IRenderable Content => _content;
 
     public TextStyle Style => _style;
+
+    public IRenderable SetWidth( int width )
+    {
+        var newContent = _content.SetWidth( width - 2 );
+        return newContent == _content ? this : new Collapsable( newContent, _style );
+    }
 
     public Collapsable WithStyle( TextStyle style ) => new Collapsable( _content, style );
 

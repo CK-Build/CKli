@@ -28,7 +28,6 @@ public interface IScreen
 
     /// <summary>
     /// Displays the renderable.
-    /// When possible, <see cref="Width"/> should be considered.
     /// </summary>
     /// <param name="renderable">The renderable to display.</param>
     void Display( IRenderable renderable );
@@ -57,14 +56,6 @@ public interface IScreen
     string ToString();
 
     internal void OnLogOther( LogLevel level, string? text, bool isOpenGroup );
-
-    internal void DisplayHelp( List<CommandHelp> commands,
-                               CommandLineArguments cmdLine,
-                               ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default,
-                               ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default );
-
-
-    internal void DisplayPluginInfo( string headerText, List<World.DisplayInfoPlugin>? infos );
 
     internal void Close();
 }

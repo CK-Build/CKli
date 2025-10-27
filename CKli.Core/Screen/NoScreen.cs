@@ -28,14 +28,6 @@ public sealed class NoScreen : IScreen
 
     void IScreen.OnLogOther( LogLevel level, string? text, bool isOpenGroup ) { }
 
-    public void DisplayHelp( List<CommandHelp> commands, CommandLineArguments cmdLine, ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default, ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
-    {
-    }
-
-    void IScreen.DisplayPluginInfo( string headerText, List<World.DisplayInfoPlugin>? infos )
-    {
-    }
-
     void IScreen.Close()
     {
     }

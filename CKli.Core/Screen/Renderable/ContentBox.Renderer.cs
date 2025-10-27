@@ -87,7 +87,7 @@ public sealed partial class ContentBox
         protected override void Render()
         {
             if( margin.Left > 0 ) RenderPadding( margin.Left, Target, ParentFinalStyle );
-            int leftPad = padding.Left + Length - ContentLength - margin.Left - margin.Right;
+            int leftPad = Length - ContentLength - padding.Right - margin.Left - margin.Right;
             if( leftPad > 0 ) RenderPadding( leftPad, Target, FinalStyle );
             RenderContent();
             if( padding.Right > 0 ) RenderPadding( padding.Right, Target, FinalStyle );
@@ -101,11 +101,11 @@ public sealed partial class ContentBox
         protected override void Render()
         {
             if( margin.Left > 0 ) RenderPadding( margin.Left, Target, ParentFinalStyle );
-            int pad = Length - ContentLength - margin.Left - margin.Right;
-            int padLeft = padding.Left + (pad >> 1);
+            int linePad = Length - ContentLength - padding.Width - margin.Width;
+            int padLeft = padding.Left + (linePad >> 1);
             if( padLeft > 0 ) RenderPadding( padLeft, Target, FinalStyle );
             RenderContent();
-            int padRight = (pad >> 1) + (pad & 1) + padding.Right;
+            int padRight = (linePad >> 1) + (linePad & 1) + padding.Right;
             if( padRight > 0 ) RenderPadding( padRight, Target, FinalStyle );
             if( margin.Right > 0 ) RenderPadding( margin.Right, Target, ParentFinalStyle );
         }

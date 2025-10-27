@@ -4,9 +4,6 @@ namespace CKli.Core;
 
 /// <summary>
 /// Target to render <see cref="IRenderable"/>.
-/// <para>
-/// This cannot be implemented outside of this library.
-/// </para>
 /// </summary>
 public interface IRenderTarget
 {
@@ -28,9 +25,12 @@ public interface IRenderTarget
     void EndUpdate();
 
     /// <summary>
+    /// Must write the end of the line.
+    /// </summary>
+    void EndOfLine();
+
+    /// <summary>
     /// Gets the screen type.
     /// </summary>
     ScreenType ScreenType { get; }
-
-    internal void EndOfLine();
 }

@@ -4,12 +4,14 @@ using System.Runtime.InteropServices;
 
 namespace CKli.Core;
 
-public class CommandHelp
+/// <summary>
+/// Intermediate projection of a <see cref="Command"/> to ease building the rendered help.
+/// </summary>
+public sealed class CommandHelp
 {
     readonly ScreenType _screenType;
     readonly Command _command;
-    readonly TextBlock _commandPath;
-    readonly IRenderable _commandPathAndArgs;
+    readonly TextBlock _commandPathAndArgs;
     readonly TextBlock _description;
     readonly ImmutableArray<(TextBlock Name, TextBlock Description)> _arguments;
     readonly ImmutableArray<(TextBlock Names, TextBlock Description)> _options;
@@ -19,17 +21,17 @@ public class CommandHelp
     {
         _screenType = screenType;
         _command = c;
-        _commandPath = screenType.Text( c.CommandPath );
         _description = screenType.Text( c.Description );
+        var styleCommand = new TextStyle( System.ConsoleColor.DarkGreen, System.ConsoleColor.Black, TextEffect.Italic );
         // Arguments.
         var args = new (TextBlock, TextBlock)[c.Arguments.Length];
         for( int i = 0; i < args.Length; i++ )
         {
             var a = c.Arguments[i];
-            args[i] = (screenType.Text( $"<{a.Name}>" ), screenType.Text( a.Description ));
+            args[i] = (screenType.Text( $"<{a.Name}>", styleCommand ), screenType.Text( a.Description ));
         }
         _arguments = ImmutableCollectionsMarshal.AsImmutableArray( args );
-        _commandPathAndArgs = _commandPath.AddRight( _arguments.Select( a => a.Name.Box( paddingLeft: 1 ) ) );
+        _commandPathAndArgs = screenType.Text( $"{c.CommandPath} {string.Join( ' ', _arguments.Select( a => a.Name.RawText ) )}", styleCommand );
         // Options.
         _options = ToRenderableOptions( screenType, c.Options );
         // Flags.
@@ -40,9 +42,7 @@ public class CommandHelp
 
     public Command Command => _command;
 
-    public TextBlock CommandPath => _commandPath;
-
-    public IRenderable CommandPathAndArgs => _commandPathAndArgs;
+    public TextBlock CommandPathAndArgs => _commandPathAndArgs;
 
     public TextBlock Description => _description;
 

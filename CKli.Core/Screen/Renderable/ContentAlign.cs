@@ -9,9 +9,14 @@ namespace CKli.Core;
 public enum ContentAlign
 {
     /// <summary>
-    /// No known alignment. 
+    /// Unknown alignment.
     /// </summary>
     Unknwon = 0,
+
+    /// <summary>
+    /// Default is top, Left alignment.
+    /// </summary>
+    Default = VTop | HRight,
 
     /// <summary>
     /// Left alignment (or centered when <see cref="HRight"/> is also set).
@@ -47,11 +52,13 @@ public enum ContentAlign
 public static class ContentAlignmentExtension
 {
     public static bool IsLeft( this ContentAlign c ) => (c & ContentAlign.HCenter) == ContentAlign.HLeft;
+    public static bool IsLeftOrUnknown( this ContentAlign c ) => (c & ContentAlign.HRight) == 0;
     public static bool IsRight( this ContentAlign c ) => (c & ContentAlign.HCenter) == ContentAlign.HRight;
     public static bool IsCenter( this ContentAlign c ) => (c & ContentAlign.HCenter) == ContentAlign.HCenter;
     public static bool IsHorizontalKnown( this ContentAlign c ) => (c & ContentAlign.HCenter) != 0;
 
     public static bool IsTop( this ContentAlign c ) => (c & ContentAlign.VMiddle) == ContentAlign.VTop;
+    public static bool IsTopOrUnknown( this ContentAlign c ) => (c & ContentAlign.VBottom) == 0;
     public static bool IsBottom( this ContentAlign c ) => (c & ContentAlign.VMiddle) == ContentAlign.VBottom;
     public static bool IsMiddle( this ContentAlign c ) => (c & ContentAlign.VMiddle) == ContentAlign.VMiddle;
     public static bool IsVerticalKnown( this ContentAlign c ) => (c & ContentAlign.VMiddle) != 0;

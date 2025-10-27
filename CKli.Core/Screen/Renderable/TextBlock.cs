@@ -15,7 +15,10 @@ public abstract class TextBlock : IRenderable
     readonly internal int _width;
     readonly TextStyle _style;
 
-    private protected TextBlock( ScreenType screenType, string text, int width, TextStyle style )
+    private protected TextBlock( ScreenType screenType,
+                                 string text,
+                                 int width,
+                                 TextStyle style )
     {
         _screenType = screenType;
         _text = text;
@@ -23,8 +26,10 @@ public abstract class TextBlock : IRenderable
         _style = style;
     }
 
+    /// <inheritdoc />
     public ScreenType ScreenType => _screenType;
 
+    /// <inheritdoc />
     public abstract int Height { get; }
 
     /// <summary>
@@ -38,19 +43,31 @@ public abstract class TextBlock : IRenderable
     /// </summary>
     public int MinWidth => Math.Min( _width, MinimalWidth );
 
+    /// <summary>
+    /// Gets the nominal width that is the original text width: the length of the
+    /// longest line. This is definitely the "unconstrained" answer, not the "ideal"
+    /// one.
+    /// </summary>
+    public virtual int NominalWidth => _width;
+
+    /// <summary>
+    /// Gets the original string (not trimmed).
+    /// </summary>
+    public string RawText => _text;
+
     public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
 
     public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
     {
         // Texts have no notion of context. Lines are drawn where they are told to draw,
-        // padding and margins are not their concern (it's the Box responsibility): we
-        // ignore the actualHeight.
+        // padding, margins and alignment are not their concern (it's the Box responsibility):
+        // we ignore the actualHeight.
         BuildSegmentTree( line, parent );
     }
 
     protected abstract void BuildSegmentTree( int line, SegmentRenderer parent );
 
-    public abstract TextBlock SetTextWidth( int width );
+    public abstract IRenderable SetWidth( int width );
 
     /// <summary>
     /// Creates a mono or multi line block of text.
@@ -124,9 +141,10 @@ public abstract class TextBlock : IRenderable
 
         public override int Height => 1;
 
-        public override TextBlock SetTextWidth( int width )
+        public override IRenderable SetWidth( int width )
         {
-            if( width < MinWidth || width >= _width ) return this;
+            if( width < MinWidth ) width = MinWidth;
+            if( width >= _width ) return this;
             var rangeCollector = ImmutableArray.CreateBuilder<(int Start, int Length)>( width / 8 );
             int w = SetWidthLine( width, rangeCollector, _start, _text.AsSpan( _start, _width ) );
             return new LinesAdjustedWidth( this, rangeCollector.DrainToImmutable(), w, _style );
@@ -150,8 +168,8 @@ public abstract class TextBlock : IRenderable
                 }
                 else
                 {
-                    newLen = line.Slice( 0, width ).LastIndexOfAny( _cutChars );
-                    if( newLen == -1 ) newLen = width;
+                    newLen = line.Slice( 1, width ).LastIndexOfAny( _cutChars ) + 1;
+                    if( newLen == 0 ) newLen = width;
                 }
                 rangeCollector.Add( (start, newLen) );
                 if( w < newLen ) w = newLen;
@@ -215,9 +233,10 @@ public abstract class TextBlock : IRenderable
 
         protected override void BuildSegmentTree( int line, SegmentRenderer parent ) => MultiLineRenderer.Create( parent, line, _text, _lines, _style );
 
-        public override TextBlock SetTextWidth( int width )
+        public override IRenderable SetWidth( int width )
         {
-            if( width < MinWidth || width >= _width ) return this;
+            if( width < MinWidth ) width = MinWidth;
+            if( width >= _width ) return this;
             var rangeCollector = ImmutableArray.CreateBuilder<(int Start, int Length)>( _lines.Length * 2 );
             int finalWidth = 0;
             for( int i = 0; i < _lines.Length; i++ )
@@ -230,6 +249,7 @@ public abstract class TextBlock : IRenderable
                 }
                 else
                 {
+                    rangeCollector.Add( (start, len) );
                     if( finalWidth < len ) finalWidth = len;
                 }
             }
@@ -253,9 +273,11 @@ public abstract class TextBlock : IRenderable
 
         public override int Height => _lines.Length;
 
+        public override int NominalWidth => _origin.NominalWidth;
+
         protected override void BuildSegmentTree( int line, SegmentRenderer previous ) => MultiLineRenderer.Create( previous, line, _text, _lines, _style );
 
-        public override TextBlock SetTextWidth( int width ) => _origin.SetTextWidth( width );
+        public override IRenderable SetWidth( int width ) => _origin.SetWidth( width );
     }
 
 }

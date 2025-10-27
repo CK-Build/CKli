@@ -1,9 +1,6 @@
-using CK.Core;
-using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;
 using System;
-using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
@@ -11,7 +8,6 @@ namespace CKli.Core.Tests;
 [TestFixture]
 public class ScreenTextTests
 {
-
     [Test]
     public void TextStyle_override_test()
     {
@@ -20,6 +16,59 @@ public class ScreenTextTests
         var finalStyle = parentStyle.OverrideWith( style );
         finalStyle.Color.ShouldBe( style.Color );
         finalStyle.Effect.ShouldBe( parentStyle.Effect );
+    }
+
+    [Test]
+    public void TextStyle_cascading()
+    {
+        var rF = CreateRepo( false );
+        DebugRenderer.Render( rF ).ShouldBe( """
+            [DARKGREEN] Sample-Repo [GRAY]⮐
+
+            """ );
+
+        var rT = CreateRepo( true );
+        DebugRenderer.Render( rT ).ShouldBe( """
+            [DARKRED]⋆Sample-Repo [GRAY]⮐
+
+            """ );
+
+        static IRenderable CreateRepo( bool isDirty )
+        {
+            var folderStyle = new TextStyle( isDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen, ConsoleColor.Black );
+            IRenderable folder = StringScreenType.Default.Text( "Sample-Repo" ).HyperLink( new System.Uri( $"file:///C:\\Sample-Repo" ) );
+            if( isDirty ) folder = folder.Box( paddingRight: 1 ).AddLeft( StringScreenType.Default.Text( "⋆" ) );
+            else folder = folder.Box( paddingLeft: 1, paddingRight: 1 );
+            return folder.Box( style: folderStyle );
+        }
+
+    }
+
+    [Test]
+    public void Minimal_text_wrap()
+    {
+        var t = StringScreenType.Default.Text( """
+
+
+                        Some text to
+                    test reduces.
+                    (text is trimmed.)   
+
+
+
+
+                    """ );
+        TextBlock.MinimalWidth.ShouldBe( 10 );
+        var tMin = t.SetWidth( 10 );
+        DebugRenderer.Render( tMin ).ShouldBe( """
+            Some text⮐
+            to⮐
+            test⮐
+            reduces.⮐
+            (text is⮐
+            trimmed.)⮐
+
+            """ );
     }
 
     [Test]
@@ -259,7 +308,7 @@ public class ScreenTextTests
     {
         {
             var t = StringScreenType.Default.Text( "            0 1 2 3 4 5 6 7 8 9 A B C D E F G H I J K L M N O P Q R S T U V W X Y Z               " );
-            var tMin = t.SetTextWidth( 15 );
+            var tMin = t.SetWidth( 15 );
             tMin.Width.ShouldBe( 15 );
             tMin.Height.ShouldBe( 5 );
             tMin.RenderAsString().ShouldBe( """
@@ -273,7 +322,7 @@ public class ScreenTextTests
         }
         {
             var t = StringScreenType.Default.Text( "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" );
-            var tMin = t.SetTextWidth( 15 );
+            var tMin = t.SetWidth( 15 );
             tMin.Width.ShouldBe( 15 );
             tMin.Height.ShouldBe( 3 );
             tMin.RenderAsString().ShouldBe( """
@@ -285,7 +334,7 @@ public class ScreenTextTests
         }
         { 
             var t = StringScreenType.Default.Text( "La liberté des uns s'arrête où commence celle des autres." );
-            var tMin = t.SetTextWidth( 15 );
+            var tMin = t.SetWidth( 15 );
             tMin.Width.ShouldBe( 15 );
             tMin.Height.ShouldBe( 4 );
             tMin.RenderAsString().ShouldBe( """
@@ -295,11 +344,11 @@ public class ScreenTextTests
                 des autres.
 
                 """ );
-            var tMin1 = t.SetTextWidth( 15 + 1 );
+            var tMin1 = t.SetWidth( 15 + 1 );
             tMin1.RenderAsString().ShouldBe( tMin.RenderAsString() );
-            var tMin2 = tMin1.SetTextWidth( 15 + 2 );
+            var tMin2 = tMin1.SetWidth( 15 + 2 );
             tMin2.RenderAsString().ShouldBe( tMin.RenderAsString() );
-            var tMin3 = tMin2.SetTextWidth( 15 + 3 );
+            var tMin3 = tMin2.SetWidth( 15 + 3 );
             tMin3.Height.ShouldBe( 4 );
             tMin3.RenderAsString().ShouldBe( """
                 La liberté des uns
@@ -308,7 +357,7 @@ public class ScreenTextTests
                 autres.
 
                 """ );
-            var tMin10 = tMin2.SetTextWidth( 15 + 10 );
+            var tMin10 = tMin2.SetWidth( 15 + 10 );
             tMin10.Height.ShouldBe( 3 );
             tMin10.RenderAsString().ShouldBe( """
                 La liberté des uns
@@ -317,7 +366,7 @@ public class ScreenTextTests
 
                 """ );
 
-            var tMin11 = tMin2.SetTextWidth( 15 + 11 );
+            var tMin11 = tMin2.SetWidth( 15 + 11 );
             tMin11.Height.ShouldBe( 3 );
             tMin11.RenderAsString().ShouldBe( """
                 La liberté des uns
@@ -335,7 +384,7 @@ public class ScreenTextTests
 
 
                 """ );
-            var tMin = t.SetTextWidth( 15 );
+            var tMin = t.SetWidth( 15 );
             tMin.ShouldBeSameAs( t );
             t.RenderAsString().ShouldBe( """
                 A
@@ -348,6 +397,507 @@ public class ScreenTextTests
         }
 
     }
+
+    [Test]
+    public void ContentBox_small_witdh_adjustement()
+    {
+        var b = StringScreenType.Default.Text( """
+            1
+            2
+            """ ).Box();
+        {
+            b = b.SetWidth( 15 );
+            b.Margin.Right.ShouldBe( 14 );
+            b.RenderAsString().ShouldBe( """
+                1··············
+                2··············
+
+                """.Replace( '·', ' ' ) );
+        }
+        {
+            b = b.WithAlign( ContentAlign.HRight ).SetWidth( 15 );
+            b.Margin.Left.ShouldBe( 14 );
+            b.RenderAsString().ShouldBe( """
+                ··············1
+                ··············2
+
+                """.Replace( '·', ' ' ) );
+        }
+        var bRight = b;
+        {
+            b = bRight.WithAlign( ContentAlign.HCenter ).SetWidth( 15 );
+            b.Margin.Left.ShouldBe( 7 );
+            b.Margin.Right.ShouldBe( 7 );
+            b.RenderAsString().ShouldBe( """
+                ·······1·······
+                ·······2·······
+
+                """.Replace( '·', ' ' ) );
+        }
+        {
+            b = b.SetWidth( 16 );
+            b.Margin.Left.ShouldBe( 7 );
+            b.Margin.Right.ShouldBe( 8 );
+            b.RenderAsString().ShouldBe( """
+                ·······1········
+                ·······2········
+
+                """.Replace( '·', ' ' ) );
+        }
+        {
+            b = bRight.SetWidth( 16 ).WithAlign( ContentAlign.HCenter );
+            b.Margin.Left.ShouldBe( 7 );
+            b.Margin.Right.ShouldBe( 8 );
+            b.RenderAsString().ShouldBe( """
+                ·······1········
+                ·······2········
+
+                """.Replace( '·', ' ' ) );
+        }
+    }
+
+    [Test]
+    public void ContentBox_regular_witdh_adjustement()
+    {
+        TextBlock.MinimalWidth.ShouldBeLessThan( 16 );
+        var text = "0123456789ABCDEF";
+        var b = StringScreenType.Default.Text( text ).Box();
+        {
+            b = b.WithAlign( ContentAlign.HCenter ).SetWidth( 21 );
+            b.RenderAsString().ShouldBe( $"""
+                ··{text}···
+
+                """.Replace( '·', ' ' ) );
+        }
+        {
+            b = b.WithAlign( ContentAlign.HRight );
+            b.RenderAsString().ShouldBe( $"""
+                ·····{text}
+
+                """.Replace( '·', ' ' ) );
+        }
+        {
+            b = b.WithAlign( ContentAlign.HLeft );
+            b.RenderAsString().ShouldBe( $"""
+                {text}·····
+
+                """.Replace( '·', ' ' ) );
+        }
+        {
+            b = b.SetWidth( 15 );
+            b.RenderAsString().ShouldBe( $"""
+                0123456789ABCDE
+                F··············
+
+                """.Replace( '·', ' ' ) );
+        }
+        {
+            b = b.WithAlign( ContentAlign.HCenter );
+            b.RenderAsString().ShouldBe( $"""
+                0123456789ABCDE
+                ·······F·······
+
+                """.Replace( '·', ' ' ) );
+        }
+        {
+            b = b.SetWidth( 14 );
+            b.RenderAsString().ShouldBe( $"""
+                0123456789ABCD
+                ······EF······
+
+                """.Replace( '·', ' ' ) );
+        }
+        TextBlock.MinimalWidth.ShouldBe( 10 );
+        {
+            b = b.SetWidth( TextBlock.MinimalWidth );
+            b.RenderAsString().ShouldBe( $"""
+                0123456789
+                ··ABCDEF··
+
+                """.Replace( '·', ' ' ) );
+        }
+        {
+            var same = b.SetWidth( 2 );
+            b.ShouldBeSameAs( same );
+        }
+        {
+            var same = b.SetWidth( 0 );
+            b.ShouldBeSameAs( same );
+        }
+        {
+            var same = b.SetWidth( -1 );
+            b.ShouldBeSameAs( same );
+        }
+    }
+
+    [Test]
+    public void ContentBox_width_Adjustement()
+    {
+        var b = StringScreenType.Default.Text( "X", new TextStyle( ConsoleColor.Red, ConsoleColor.Black ) )
+                                        .Box( marginLeft: 2, paddingLeft: 3, style: new TextStyle( ConsoleColor.Green, ConsoleColor.Black ) );
+        {
+            DebugRenderer.Render( b ).ShouldBe( """
+                  [GREEN]   [RED]X[GRAY]⮐
+
+                """ );
+        }
+        {
+            b = b.SetWidth( 15 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                  [GREEN]   [RED]X[GRAY]         ⮐
+
+                """ );
+        }
+        {
+            b = b.AddPadding( right: 3 );
+            b.Width.ShouldBe( 15 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                  [GREEN]   [RED]X[GREEN]   [GRAY]      ⮐
+                
+                """ );
+        }
+        {
+            b = b.AddPadding( right: 5 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                  [GREEN]   [RED]X[GREEN]        [GRAY] ⮐
+
+                """ );
+        }
+        {
+            b = b.AddPadding( right: -5 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                  [GREEN]   [RED]X[GREEN]   [GRAY]      ⮐
+
+                """ );
+        }
+        {
+            // MinWidth: Only one right and left padding is preserved.
+            b.Margin.Left.ShouldBe( 2 );
+            b.Padding.Left.ShouldBe( 3 );
+            b.Padding.Right.ShouldBe( 3 );
+            b.Margin.Right.ShouldBe( 6, "Width adjustment." );
+            b.MinWidth.ShouldBe( 1 + 1 + 1 );
+            b.NominalWidth.ShouldBe( 2 + 3 + 1 + 3 + 0 );
+            b = b.SetWidth( 0 );
+            b.Width.ShouldBe( 3 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                [GREEN] [RED]X[GREEN] [GRAY]⮐
+
+                """ );
+        }
+        {
+            // MinWidth + 1: Right padding is 2 (because the ContentAlignment is HLeft).
+            b = b.SetWidth( 4 );
+            b.Width.ShouldBe( 4 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                [GREEN] [RED]X[GREEN]  [GRAY]⮐
+
+                """ );
+        }
+        {
+            // MinWidth + 2: Left and Right padding are 2.
+            b = b.SetWidth( 5 );
+            b.Width.ShouldBe( 5 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                [GREEN]  [RED]X[GREEN]  [GRAY]⮐
+
+                """ );
+        }
+        {
+            // MinWidth + 3: Left padding stays to 2 and Right padding is 3.
+            b = b.SetWidth( 6 );
+            b.Width.ShouldBe( 6 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                [GREEN]  [RED]X[GREEN]   [GRAY]⮐
+
+                """ );
+        }
+        {
+            // MinWidth + 4: Left and Right padding are restored to their 3 value.
+            b = b.SetWidth( 7 );
+            b.Width.ShouldBe( 7 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                [GREEN]   [RED]X[GREEN]   [GRAY]⮐
+
+                """ );
+        }
+        {
+            // MinWidth + 5: Entering the margin (Left because there's no right margin here).
+            b = b.SetWidth( 8 );
+            b.Width.ShouldBe( 8 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                 [GREEN]   [RED]X[GREEN]   [GRAY]⮐
+
+                """ );
+        }
+        {
+            // MinWidth + 6: Left margin is 2. Everything is restored.
+            b = b.SetWidth( 9 );
+            b.Width.ShouldBe( 9 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                  [GREEN]   [RED]X[GREEN]   [GRAY]⮐
+
+                """ );
+        }
+        {
+            // MinWidth + 7: Right margin adjustment (because HLeft).
+            b = b.SetWidth( 10 );
+            b.Width.ShouldBe( 10 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                  [GREEN]   [RED]X[GREEN]   [GRAY] ⮐
+
+                """ );
+        }
+        {
+            // MinWidth + 8: Right margin adjustment (because HLeft).
+            b = b.SetWidth( 11 );
+            b.Width.ShouldBe( 11 );
+            DebugRenderer.Render( b ).ShouldBe( """
+                  [GREEN]   [RED]X[GREEN]   [GRAY]  ⮐
+
+                """ );
+        }
+    }
+
+    [TestCase( ContentAlign.HLeft )]
+    [TestCase( ContentAlign.HCenter )]
+    public void ContentBox_SmallerAdjustement_2( ContentAlign a )
+    {
+        var b = StringScreenType.Default.Text( """
+                                               A
+                                               BC
+                                               """, new TextStyle( ConsoleColor.Red, ConsoleColor.Black ) )
+                                .Box( marginLeft: 1, paddingLeft: 2, paddingRight: 3, marginRight: 4,
+                                      style: new TextStyle( ConsoleColor.Green, ConsoleColor.Black ),
+                                      align: a );
+
+        {
+            b.Width.ShouldBe( 1 + 2 + 2 + 3 + 4, "12" );
+            b.NominalWidth.ShouldBe( 12 );
+            b.MinWidth.ShouldBe( 1 + 2 + 1, "Preserves a 1 padding on both sides. Cancelling the margins." );
+            DebugRenderer.Render( b ).ShouldBe( """
+                 [GREEN]  [RED]A[GREEN]    [GRAY]    ⮐
+                 [GREEN]  [RED]BC[GREEN]   [GRAY]    ⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 1: Right is chosen because ContentAligmnent is HLeft.
+            var s = b.SetWidth( 11 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                 [GREEN]  [RED]A[GREEN]    [GRAY]   ⮐
+                 [GREEN]  [RED]BC[GREEN]   [GRAY]   ⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 2: Because we have a left padding, we can sacrifice the Left margin.
+            var s = b.SetWidth( 10 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]  [RED]A[GREEN]    [GRAY]   ⮐
+                [GREEN]  [RED]BC[GREEN]   [GRAY]   ⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 3: Right margin decreases.
+            var s = b.SetWidth( 9 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]  [RED]A[GREEN]    [GRAY]  ⮐
+                [GREEN]  [RED]BC[GREEN]   [GRAY]  ⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 4: Right margin decreases.
+            var s = b.SetWidth( 8 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]  [RED]A[GREEN]    [GRAY] ⮐
+                [GREEN]  [RED]BC[GREEN]   [GRAY] ⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 5: Right margin decreases. No more margin.
+            var s = b.SetWidth( 7 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]  [RED]A[GREEN]    [GRAY]⮐
+                [GREEN]  [RED]BC[GREEN]   [GRAY]⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 6: Starting padding (Right because HLeft).
+            var s = b.SetWidth( 6 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]  [RED]A[GREEN]   [GRAY]⮐
+                [GREEN]  [RED]BC[GREEN]  [GRAY]⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 7: Left padding is touched.
+            var s = b.SetWidth( 5 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN] [RED]A[GREEN]   [GRAY]⮐
+                [GREEN] [RED]BC[GREEN]  [GRAY]⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 8: Left and Right padding are 1: we reached the MinWidth.
+            var s = b.SetWidth( 4 );
+            s.Width.ShouldBe( b.MinWidth );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN] [RED]A[GREEN]  [GRAY]⮐
+                [GREEN] [RED]BC[GREEN] [GRAY]⮐
+                
+                """ );
+            var below = b.SetWidth( 0 );
+            below.Width.ShouldBe( b.MinWidth );
+            DebugRenderer.Render( below ).ShouldBe( """
+                [GREEN] [RED]A[GREEN]  [GRAY]⮐
+                [GREEN] [RED]BC[GREEN] [GRAY]⮐
+                
+                """ );
+        }
+    }
+
+    [Test]
+    public void ContentBox_SmallerAdjustement_3()
+    {
+        var b = StringScreenType.Default.Text( """
+                                               A
+                                               BC
+                                               """, new TextStyle( ConsoleColor.Red, ConsoleColor.Black ) )
+                                .Box( marginLeft: 1, marginRight: 1,
+                                      style: new TextStyle( ConsoleColor.Green, ConsoleColor.Black ) );
+
+        {
+            b.Width.ShouldBe( 1 + 0 + 2 + 0 + 1, "4" );
+            b.NominalWidth.ShouldBe( 4 );
+            b.MinWidth.ShouldBe( 1 + 2 + 1, "Smaller lines are padded. The one margin is preserved." );
+            DebugRenderer.Render( b ).ShouldBe( """
+                 [RED]A[GREEN] [GRAY] ⮐
+                 [RED]BC[GRAY] ⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 1: no way. MiniWidth.
+            var s = b.SetWidth( 3 );
+            s.Width.ShouldBe( 4 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                 [RED]A[GREEN] [GRAY] ⮐
+                 [RED]BC[GRAY] ⮐
+                
+                """ );
+        }
+    }
+
+    [Test]
+    public void ContentBox_SmallerAdjustement_2_HRight()
+    {
+        var b = StringScreenType.Default.Text( """
+                                               A
+                                               BC
+                                               """, new TextStyle( ConsoleColor.Red, ConsoleColor.Black ) )
+                                .Box( marginLeft: 1, paddingLeft: 2, paddingRight: 3, marginRight: 4,
+                                      align: ContentAlign.HRight,
+                                      style: new TextStyle( ConsoleColor.Green, ConsoleColor.Black ) );
+
+        {
+            b.Width.ShouldBe( 1 + 2 + 2 + 3 + 4, "12" );
+            b.NominalWidth.ShouldBe( 12 );
+            b.MinWidth.ShouldBe( 1 + 2 + 1, "Preserves a 1 padding on both sides. Cancelling the margins." );
+            DebugRenderer.Render( b ).ShouldBe( """
+                 [GREEN]   [RED]A[GREEN]   [GRAY]    ⮐
+                 [GREEN]  [RED]BC[GREEN]   [GRAY]    ⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 1: Right margin decreases.
+            var s = b.SetWidth( 11 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                 [GREEN]   [RED]A[GREEN]   [GRAY]   ⮐
+                 [GREEN]  [RED]BC[GREEN]   [GRAY]   ⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 2: No more Left margin.
+            var s = b.SetWidth( 10 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]   [RED]A[GREEN]   [GRAY]   ⮐
+                [GREEN]  [RED]BC[GREEN]   [GRAY]   ⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 3: Right margin again.
+            var s = b.SetWidth( 9 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]   [RED]A[GREEN]   [GRAY]  ⮐
+                [GREEN]  [RED]BC[GREEN]   [GRAY]  ⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 4: Right margin.
+            var s = b.SetWidth( 8 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]   [RED]A[GREEN]   [GRAY] ⮐
+                [GREEN]  [RED]BC[GREEN]   [GRAY] ⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 5: No more margin.
+            var s = b.SetWidth( 7 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]   [RED]A[GREEN]   [GRAY]⮐
+                [GREEN]  [RED]BC[GREEN]   [GRAY]⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 6: Starting padding.
+            var s = b.SetWidth( 6 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]   [RED]A[GREEN]  [GRAY]⮐
+                [GREEN]  [RED]BC[GREEN]  [GRAY]⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 7: Left padding is touched.
+            var s = b.SetWidth( 5 );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]  [RED]A[GREEN]  [GRAY]⮐
+                [GREEN] [RED]BC[GREEN]  [GRAY]⮐
+                
+                """ );
+        }
+        {
+            // Shrinked 8: Left and Right padding are 1: we reached the MinWidth.
+            var s = b.SetWidth( 4 );
+            s.Width.ShouldBe( b.MinWidth );
+            DebugRenderer.Render( s ).ShouldBe( """
+                [GREEN]  [RED]A[GREEN] [GRAY]⮐
+                [GREEN] [RED]BC[GREEN] [GRAY]⮐
+                
+                """ );
+            var below = b.SetWidth( 0 );
+            below.Width.ShouldBe( b.MinWidth );
+            DebugRenderer.Render( below ).ShouldBe( """
+                [GREEN]  [RED]A[GREEN] [GRAY]⮐
+                [GREEN] [RED]BC[GREEN] [GRAY]⮐
+                
+                """ );
+        }
+    }
+
 
     [Test]
     public void CommandLineArguments_remaining_args()
@@ -372,7 +922,7 @@ public class ScreenTextTests
         cmdLine.EatFlag( "-f1" ).ShouldBeTrue();
 
         cmdLine.Close( TestHelper.Monitor ).ShouldBe( false );
-        var header = ScreenHelpers.CreateDisplayHelpHeader( StringScreenType.Default, cmdLine );
+        var header = ScreenExtensions.CreateDisplayHelpHeader( StringScreenType.Default, cmdLine );
         string result = header.RenderAsString();
 
         Console.Write( result );
@@ -383,81 +933,6 @@ public class ScreenTextTests
                     
                     """ );
 
-    }
-
-    sealed class ZCommand : Command
-    {
-        public ZCommand()
-            : base( null,
-                    "ze command",
-                    """
-
-                       Only here to
-                    test display.
-                    (text is trimmed.)   
-
-
-
-
-                    """,
-                    arguments: [("a1", """
-                        Argument n°1 is
-                        required like
-                        all arguments. 
-                        """)],
-                    options: [
-                        (["--options", "-o"], "This description should be prefixed with [Multiple].", Multiple: true),
-                        (["--single", "-s"], "This description one is not multiple.", Multiple: false),
-                        (["--others", "-o2"], """
-                        Also multiple and
-                        on multiple
-                        lines.
-                        """, Multiple: true),
-                        ],
-                    flags: [
-                        (["--flag1", "-f1"], "Flag n°1."),
-                        (["--flag2", "-f2"], "Flag n°2.")
-                        ] )
-        {
-        }
-
-        protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
-        {
-            return ValueTask.FromResult( true );
-        }
-    }
-
-    [Test]
-    public void basic_Console_help_display_for_plugin_section()
-    {
-        var commands = CKliCommands.Commands.GetForHelp( StringScreenType.Default, "plugin", null );
-        commands.Add( new CommandHelp( StringScreenType.Default, new ZCommand() ) );
-
-        var help = ScreenHelpers.CreateDisplayHelp( StringScreenType.Default,
-                                                    commands,
-                                                    new CommandLineArguments( [] ), default, default, IScreen.MaxScreenWidth );
-
-        string result = help.RenderAsString();
-
-        Console.Write( result );
-        result.ShouldContain( """
-            > ze command <a1>              Only here to
-            │                              test display.
-            │                              (text is trimmed.)
-            │    <a1>                      Argument n°1 is
-            │                              required like
-            │                              all arguments.
-            │    Options:
-            │      --options, -o           [Multiple] This description should be prefixed with [Multiple].
-            │      --single, -s            This description one is not multiple.
-            │      --others, -o2           [Multiple] Also multiple and
-            │                              on multiple
-            │                              lines.
-            │    Flags:
-            │      --flag1, -f1            Flag n°1.
-            │      --flag2, -f2            Flag n°2.
-
-            """ );
     }
 
 }
