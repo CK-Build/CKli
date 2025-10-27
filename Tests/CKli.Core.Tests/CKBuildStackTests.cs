@@ -25,14 +25,14 @@ public class CKBuildStackTests
         // cd CK-Build
         context = context.ChangeDirectory( "CK-Build" );
 
-        // ckli branch
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "branch" )).ShouldBeTrue();
+        // ckli repo
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo" )).ShouldBeTrue();
         ((StringScreen)context.Screen).ToString().ShouldBe( """
-             CSemVer-Net master ↑0↓0
-             SGV-Net master ↑0↓0
-             Cake/CodeCake master ↑0↓0
+            ··CSemVer-Net···master·↑0↓0·https://github.com/CK-Build/CSemVer-Net·
+            ··SGV-Net·······master·↑0↓0·https://github.com/CK-Build/SGV-Net·····
+            ··Cake/CodeCake·master·↑0↓0·https://github.com/CK-Build/CodeCake····
 
-            """ );
+            """.Replace( '·', ' ' ) );
 
         // ckli dotnet build /p:Version=1.1.1
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "exec", "dotnet", "build", "/p:Version=1.1.1" )).ShouldBeTrue();

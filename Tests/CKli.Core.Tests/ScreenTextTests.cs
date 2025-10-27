@@ -145,23 +145,23 @@ public class ScreenTextTests
                 |10
                 """ );
         {
-            //var lineUnk = text.Box().AddRight( bigCell );
-            //var lineTop = text.Box( ContentAlign.VTop ).AddRight( bigCell );
-            //string result = """
-            //    Hello world,··············|1
-            //    ··························|2
-            //    I'm glad to be there...···|3
-            //    But...····················|4
-            //    I'm sad that Trump's here.|5
-            //    ··························|6
-            //    ··························|7
-            //    ··························|8
-            //    ··························|9
-            //    ··························|10
+            var lineUnk = text.Box().AddRight( bigCell );
+            var lineTop = text.Box( ContentAlign.VTop ).AddRight( bigCell );
+            string result = """
+                Hello world,··············|1
+                ··························|2
+                I'm glad to be there...···|3
+                But...····················|4
+                I'm sad that Trump's here.|5
+                ··························|6
+                ··························|7
+                ··························|8
+                ··························|9
+                ··························|10
 
-            //    """.Replace( '·', ' ' );
-            //lineUnk.RenderAsString().ShouldBe( result );
-            //lineTop.RenderAsString().ShouldBe( result );
+                """.Replace( '·', ' ' );
+            lineUnk.RenderAsString().ShouldBe( result );
+            lineTop.RenderAsString().ShouldBe( result );
         }
         // VBottom: bigCell (no box) - text
         {
