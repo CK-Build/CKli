@@ -173,7 +173,7 @@ static partial class TestEnv
     }
 
     /// <summary>
-    /// Gets the the version "CKli.Core" and "CKi.Plugins.Core" that have been compiled and ar available
+    /// Gets the the version "CKli.Core" and "CKi.Plugins.Core" that have been compiled and are available
     /// in the "NuGetSource/" folder.
     /// </summary>
     public static SVersion CKliPluginsCoreVersion => _cKliPluginsCoreVersion!;
