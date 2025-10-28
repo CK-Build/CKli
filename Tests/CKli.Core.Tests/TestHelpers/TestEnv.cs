@@ -93,7 +93,8 @@ static partial class TestEnv
     {
         var zipPath = _remotesPath.AppendPart( "Remotes.zip" );
         var zipTime = File.GetLastWriteTimeUtc( zipPath );
-        if( LastWriteTimeChanged( zipTime ) )
+        if( !Directory.EnumerateDirectories( _remotesPath ).Any()
+            || LastWriteTimeChanged( zipTime ) )
         {
             using( TestHelper.Monitor.OpenInfo( $"Last write time of 'Remotes/' differ from 'Remotes/Remotes.zip'. Restoring remotes from zip." ) )
             {
