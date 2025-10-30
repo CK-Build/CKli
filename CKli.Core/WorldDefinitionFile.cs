@@ -556,7 +556,7 @@ public sealed class WorldDefinitionFile
                         monitor.Error( $"""
                                         Invalid element:
                                         {c}
-                                        Attribute Url=\"...\" is missing.
+                                        Attribute Url="..." is missing.
                                         """ );
                         hasError = true;
                     }
@@ -566,21 +566,35 @@ public sealed class WorldDefinitionFile
                         {
                             // The Url is not an url.
                             // Enter "Repositories Proxy" mode.
-                            if( IsValidFolderName( aUrl.Value ) && !world.Stack.LocalProxyRepositoriesPath.IsEmptyPath )
+                            if( !world.Stack.LocalProxyRepositoriesPath.IsEmptyPath )
                             {
-                                var candidate = world.Stack.LocalProxyRepositoriesPath.AppendPart( aUrl.Value );
-                                if( Directory.Exists( candidate ) )
+                                if( IsValidFolderName( aUrl.Value ) )
                                 {
-                                    url = new Uri( "file:///" + candidate, UriKind.Absolute );
-                                    monitor.Trace( $"Automatic Repository Proxy mapping of Url=\"{aUrl.Value}\" to '{url}'." );
+                                    var candidate = world.Stack.LocalProxyRepositoriesPath.AppendPart( aUrl.Value );
+                                    if( Directory.Exists( candidate ) )
+                                    {
+                                        url = new Uri( "file:///" + candidate, UriKind.Absolute );
+                                        monitor.Trace( $"Automatic Repository Proxy mapping of Url=\"{aUrl.Value}\" to '{url}'." );
+                                    }
+                                }
+                                else
+                                {
+                                    monitor.Error( $"""
+                                                Invalid element:
+                                                {c}
+                                                The Url="{url}" cannot be mapped to any folder in the local proxy repository.
+                                                {world.Stack.LocalProxyRepositoriesPath} contains the directories:
+                                                {Directory.EnumerateDirectories( world.Stack.LocalProxyRepositoriesPath ).Concatenate()}
+                                                """ );
+                                    hasError = true;
                                 }
                             }
-                            if( url == null )
+                            else
                             {
                                 monitor.Error( $"""
                                                 Invalid element:
                                                 {c}
-                                                Attribute Url=\"{url}\" is invalid.
+                                                The Url="{url}" is not a valid url.
                                                 """ );
                                 hasError = true;
                             }
