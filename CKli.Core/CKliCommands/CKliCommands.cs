@@ -99,6 +99,10 @@ public static class CKliCommands
         // No current World (not in a Stack directory): we can only display help on the CKli commands.
         if( world == null )
         {
+            if( cmdLine.FoundCommand == null )
+            {
+                monitor.Error( $"Unknown command '{cmdLine.InitialAsStringArguments}'." );
+            }
             context.Screen.DisplayHelp( _commands.GetForHelp( context.Screen.ScreenType, helpPath, null ),
                                         cmdLine,
                                         CKliRootEnv.GlobalOptions?.Invoke() ?? default,
@@ -112,6 +116,10 @@ public static class CKliCommands
                 || cmdLine.FoundCommand == null
                 || cmdLine.HasHelp )
             {
+                if( cmdLine.FoundCommand == null )
+                {
+                    monitor.Error( $"Unknown command '{cmdLine.InitialAsStringArguments}'." );
+                }
                 // No luck or the --help is requested.
                 // Displays the help in the context of the World. The World's commands
                 // contain the CKli command: the help mixes the 2 kind of commands if
