@@ -15,7 +15,7 @@ public class StackRepositoryTests
     [Test]
     public void simple_Clone()
     {
-        var context = ClonedPaths.EnsureCleanFolder();
+        var context = TestEnv.EnsureCleanFolder();
         File.Exists( context.CurrentDirectory.Combine( "CKt/CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeFalse();
 
         var remotes = TestEnv.UseReadOnly( "CKt" );
@@ -40,7 +40,7 @@ public class StackRepositoryTests
     [Test]
     public void Clone_and_OpenFrom()
     {
-        var context = ClonedPaths.EnsureCleanFolder();
+        var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "CKt" );
         using( var stack = StackRepository.Clone( TestHelper.Monitor,
                                                   context.SecretsStore,
@@ -86,7 +86,7 @@ public class StackRepositoryTests
     [Test]
     public void Clone_and_TryOpenWorldFrom()
     {
-        var context = ClonedPaths.EnsureCleanFolder();
+        var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "CKt" );
 
         using( var clone = StackRepository.Clone( TestHelper.Monitor,
@@ -137,7 +137,7 @@ public class StackRepositoryTests
     [Test]
     public void Clone_and_OpenWorldFrom()
     {
-        var context = ClonedPaths.EnsureCleanFolder();
+        var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "CKt" );
 
         using( var clone = StackRepository.Clone( TestHelper.Monitor,
@@ -190,7 +190,7 @@ public class StackRepositoryTests
     [Test]
     public async Task Add_new_repository_to_Default_World_Async()
     {
-        var context = ClonedPaths.EnsureCleanFolder();
+        var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "CKt" );
 
         // ckli clone file:///.../CKt-Stack
@@ -230,7 +230,7 @@ public class StackRepositoryTests
         }
         using( TestHelper.Monitor.OpenInfo( "Delete the CKt-ActivityMonitor repository working folder and pull the default world's repositories." ) )
         {
-            ClonedPaths.DeleteClonedFolderOnly( context.CurrentDirectory.Combine( "CKt-ActivityMonitor" ) ).ShouldBeTrue( "This is a git working folder." );
+            TestEnv.DeleteFolder( context.CurrentDirectory.Combine( "CKt-ActivityMonitor" ) );
 
             File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No more." );
 
@@ -251,7 +251,7 @@ public class StackRepositoryTests
     [Test]
     public async Task DuplicateOf_detection_Async()
     {
-        var root = ClonedPaths.EnsureCleanFolder();
+        var root = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "CKt" );
 
         var initialPath = root.ChangeDirectory( "Initial" );

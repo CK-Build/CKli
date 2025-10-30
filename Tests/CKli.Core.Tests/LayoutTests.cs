@@ -15,7 +15,7 @@ public class LayoutTests
     [Test]
     public async Task layout_fix_Async()
     {
-        var context = ClonedPaths.EnsureCleanFolder();
+        var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "CKt" );
 
         // ckli clone file:///.../CKt-Stack
@@ -37,8 +37,8 @@ public class LayoutTests
 
         // Moves CKt-Core at the root and renamed to BadFolderRepository.
         // Deletes CKt-ActivityMonitor.
-        ClonedPaths.MoveFolder( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core" ), context.CurrentDirectory.Combine( "BadFolderRepository" ) );
-        ClonedPaths.DeleteClonedFolderOnly( context.CurrentDirectory.Combine( "CKt-ActivityMonitor" ) ).ShouldBeTrue();
+        TestEnv.MoveFolder( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core" ), context.CurrentDirectory.Combine( "BadFolderRepository" ) );
+        TestEnv.DeleteFolder( context.CurrentDirectory.Combine( "CKt-ActivityMonitor" ) );
         File.Exists( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeFalse( "Moved." );
         File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "Deleted." );
 
@@ -52,7 +52,7 @@ public class LayoutTests
     [Test]
     public async Task layout_xif_Async()
     {
-        var context = ClonedPaths.EnsureCleanFolder();
+        var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "CKt" );
 
         // ckli clone file:///.../CKt-Stack
@@ -69,8 +69,8 @@ public class LayoutTests
 
         // Moves CKt-Core and CKt-ActivityMonitor to NewCore.
         Directory.CreateDirectory( context.CurrentDirectory.AppendPart( "NewCore" ) );
-        ClonedPaths.MoveFolder( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core" ), context.CurrentDirectory.Combine( "NewCore/CKt-Core" ) );
-        ClonedPaths.MoveFolder( context.CurrentDirectory.Combine( "CKt-ActivityMonitor" ), context.CurrentDirectory.Combine( "NewCore/CKt-ActivityMonitor" ) );
+        TestEnv.MoveFolder( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core" ), context.CurrentDirectory.Combine( "NewCore/CKt-Core" ) );
+        TestEnv.MoveFolder( context.CurrentDirectory.Combine( "CKt-ActivityMonitor" ), context.CurrentDirectory.Combine( "NewCore/CKt-ActivityMonitor" ) );
 
         // ckli layout xif
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "layout", "xif" )).ShouldBeTrue();

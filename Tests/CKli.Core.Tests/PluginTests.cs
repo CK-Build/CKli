@@ -13,7 +13,7 @@ public class PluginTests
     [Test]
     public async Task create_plugin_request_Info_and_remove_it_Async()
     {
-        var context = ClonedPaths.EnsureCleanFolder();
+        var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "One" );
 
         // ckli clone file:///.../One-Stack
@@ -57,7 +57,7 @@ public class PluginTests
     [Test]
     public async Task add_CommandSample_package_Async()
     {
-        var context = ClonedPaths.EnsureCleanFolder();
+        var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "One" );
 
         TestEnv.EnsurePluginPackage( "CKli.CommandSample.Plugin" );

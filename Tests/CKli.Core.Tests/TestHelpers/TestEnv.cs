@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 
@@ -18,6 +19,8 @@ static partial class TestEnv
     readonly static NormalizedPath _remotesPath = TestHelper.TestProjectFolder.AppendPart( "Remotes" );
     readonly static NormalizedPath _nugetSourcePath = TestHelper.TestProjectFolder.AppendPart( "NuGetSource" );
     readonly static NormalizedPath _packagedPluginsPath = TestHelper.TestProjectFolder.AppendPart( "PackagedPlugins" );
+    static NormalizedPath _clonedPath = TestHelper.TestProjectFolder.AppendPart( "Cloned" );
+
     static SVersion? _cKliPluginsCoreVersion;
     static XDocument? _packagedDirectoryPackagesProps;
     static Dictionary<string, RemotesCollection>? _readOnlyRemotes;
@@ -102,7 +105,7 @@ static partial class TestEnv
                 {
                     foreach( var repository in Directory.EnumerateDirectories( stack ) )
                     {
-                        if( !ClonedPaths.DeleteClonedFolderOnly( repository ) )
+                        if( !FileHelper.DeleteClonedFolderOnly( TestHelper.Monitor, repository, out var _ ) )
                         {
                             TestHelper.Monitor.Warn( $"Folder '{repository}' didn't contain a .git folder. All folders in Remotes/<stack> should be git working folders." );
                         }
@@ -179,6 +182,52 @@ static partial class TestEnv
     public static SVersion CKliPluginsCoreVersion => _cKliPluginsCoreVersion!;
 
     /// <summary>
+    /// Gets the path to the "Cloned" folder where stacks are cloned from the "Remotes" for each
+    /// test that calls <see cref="EnsureCleanFolder(string?, bool)"/>.
+    /// </summary>
+    public static NormalizedPath ClonedPath => _clonedPath;
+
+    /// <summary>
+    /// Called by tests to cleanup their respective "Cloned/&lt;test-name&gt;" where they can clone
+    /// the stack they want from the "Remotes".
+    /// </summary>
+    /// <param name="name">The test name.</param>
+    /// <param name="clearStackRegistryFile">True to clear the stack registry (<see cref="StackRepository.ClearRegistry"/>).</param>
+    /// <returns>A <see cref="CKliEnv"/> where <see cref="CKliEnv.CurrentDirectory"/> is the dedicated test repository.</returns>
+    public static CKliEnv EnsureCleanFolder( [CallerMemberName] string? name = null, bool clearStackRegistryFile = true )
+    {
+        var path = _clonedPath.AppendPart( name );
+        if( Directory.Exists( path ) )
+        {
+            RemoveAllReadOnlyAttribute( path );
+            TestHelper.CleanupFolder( path, ensureFolderAvailable: true );
+        }
+        else
+        {
+            Directory.CreateDirectory( path );
+        }
+        if( clearStackRegistryFile )
+        {
+            Throw.CheckState( StackRepository.ClearRegistry( TestHelper.Monitor ) );
+        }
+        return new CKliEnv( path );
+
+        static void RemoveAllReadOnlyAttribute( string folder )
+        {
+            var options = new EnumerationOptions
+            {
+                IgnoreInaccessible = false,
+                RecurseSubdirectories = true,
+                AttributesToSkip = FileAttributes.System
+            };
+            foreach( var f in Directory.EnumerateFiles( folder, "*", options ) )
+            {
+                File.SetAttributes( f, FileAttributes.Normal );
+            }
+        }
+    }
+
+    /// <summary>
     /// Compiles and packs the specified "PcackgedPlugins/<paramref name="projectName"/>" and
     /// make it available in the "NuGetSource" folder.
     /// </summary>
@@ -216,6 +265,26 @@ static partial class TestEnv
             """ );
         ProcessRunner.RunProcess( TestHelper.Monitor.ParallelLogger, "dotnet", args, path, null )
             .ShouldBe( 0 );
+    }
+
+    /// <summary>
+    /// Ensures that <see cref="FileHelper.TryMoveFolder(IActivityMonitor, NormalizedPath, NormalizedPath, HashSet{NormalizedPath}?)"/>
+    /// succeeds.
+    /// </summary>
+    /// <param name="from">The folder path to move.</param>
+    /// <param name="to">The renamed or moved destination folder path.</param>
+    public static void MoveFolder( NormalizedPath from, NormalizedPath to )
+    {
+        FileHelper.TryMoveFolder( TestHelper.Monitor, from, to ).ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// Ensures that <see cref="FileHelper.DeleteFolder(IActivityMonitor, string)"/> succeeds.
+    /// </summary>
+    /// <param name="path">The folder path to delete.</param>
+    public static void DeleteFolder( NormalizedPath path )
+    {
+        FileHelper.DeleteFolder( TestHelper.Monitor, path ).ShouldBeTrue();
     }
 
 }

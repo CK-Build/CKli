@@ -31,7 +31,7 @@ public abstract class RepoInfo
     /// <param name="errorState">Must not be <see cref="RepoInfoErrorState.None"/>.</param>
     /// <param name="reason">
     /// The reason.
-    /// Must be a string, an exception, a <see cref="CKExceptionData"/> or another RepoMetaInfo
+    /// Must be a string, an exception, a <see cref="CKExceptionData"/> or another RepInfo
     /// that must be invalid or on error.
     /// </param>
     protected RepoInfo( Repo repo, RepoInfoErrorState errorState, object reason )
@@ -58,7 +58,7 @@ public abstract class RepoInfo
     public RepoInfoErrorState ErrorState => _errorState;
 
     /// <summary>
-    /// Gets the error reason. It is a non empty string, a <see cref="CKExceptionData"/> or another RepoMetaInfo
+    /// Gets the error reason. It is a non empty string, a <see cref="CKExceptionData"/> or another RepoInfo
     /// that is invalid or on error.
     /// </summary>
     public object? ErrorReason => _errorReason;

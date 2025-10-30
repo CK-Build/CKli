@@ -95,6 +95,10 @@ public sealed class FileHelper
     /// before attempting to delete the folder. Only ".git/objects/" files are handled: if the folder contains other read-only files,
     /// this fails.
     /// <para>
+    /// This doesn't recurse blindly on folders: only the top folder ".git" is handled if it exists. If it contains subordinated
+    /// git folders, this fails.
+    /// </para>
+    /// <para>
     /// Retries up to 5 times and ultimately gives up with a logged error and returns false.
     /// </para>
     /// </summary>
@@ -118,7 +122,14 @@ public sealed class FileHelper
         return true;
     }
 
-    static bool DeleteClonedFolderOnly( IActivityMonitor monitor, string path, out bool isClonedFolder )
+    /// <summary>
+    /// Attempts to delete a folder that must have a ".git/objects/" sub directory.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The folder path to remove.</param>
+    /// <param name="isClonedFolder">Outputs whether <paramref name="path"/> is a cloned folder, regardless of the returned result.</param>
+    /// <returns>True on success, false othewise.</returns>
+    public static bool DeleteClonedFolderOnly( IActivityMonitor monitor, string path, out bool isClonedFolder )
     {
         isClonedFolder = false;
         var gitObjectsPath = Path.Combine( path, ".git", "objects" );

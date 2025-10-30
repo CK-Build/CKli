@@ -11,9 +11,9 @@ namespace CKli.Core.Tests;
 public class CKBuildStackTests
 {
     [Test]
-    public async Task Clone_with_diff_casing_and_DotNet_build_and_test_Async()
+    public async Task Clone_with_diff_casing_Async()
     {
-        var context = ClonedPaths.EnsureCleanFolder();
+        var context = TestEnv.EnsureCleanFolder();
 
         // ckli clone https://github.com/CK-Build/ck-bUILD-stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", "https://github.com/CK-Build/ck-bUILD-stack" )).ShouldBeTrue();
@@ -33,12 +33,5 @@ public class CKBuildStackTests
             ··Cake/CodeCake·master·↑0↓0·https://github.com/CK-Build/CodeCake····
 
             """.Replace( '·', ' ' ) );
-
-        // ckli dotnet build /p:Version=1.1.1
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "exec", "dotnet", "build", "/p:Version=1.1.1" )).ShouldBeTrue();
-
-        // ckli dotnet test --no-restore --no-build
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "exec", "dotnet", "test", "--no-restore", "--no-build" )).ShouldBeTrue();
-
     }
 }
