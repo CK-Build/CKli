@@ -5,4 +5,5 @@
     <File Path="nuget.config" />
   </Folder>
   <Project Path="CKli.CommandSample.Plugin/CKli.CommandSample.Plugin.csproj" />
+  <Project Path="CKli.VSSolutionSample.Plugin/CKli.VSSolutionSample.Plugin.csproj" Id="be71b5d6-1991-4209-a341-1e14214c4a8c" />
 </Solution>

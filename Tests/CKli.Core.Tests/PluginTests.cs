@@ -91,4 +91,28 @@ public class PluginTests
 
     }
 
+    [Test]
+    public async Task VSSolutionSample_issues_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var remotes = TestEnv.UseReadOnly( "WithIssues" );
+
+        // ckli clone file:///.../WithIssues-Stack
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
+
+        // cd WithIssues
+        context = context.ChangeDirectory( "WithIssues" );
+
+        TestEnv.EnsurePluginPackage( "CKli.VSSolutionSample.Plugin" );
+
+        // ckli plugin add VSSolutionSample@version
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "add", $"VSSolutionSample@{TestEnv.CKliPluginsCoreVersion}" )).ShouldBeTrue();
+
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            // ckli issue
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue" )).ShouldBeTrue();
+        }
+    }
+
 }
