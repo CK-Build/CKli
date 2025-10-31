@@ -20,6 +20,14 @@ public sealed class ScreenType
     public static readonly ScreenType Default = new ScreenType( false, false );
 
     /// <summary>
+    /// ActivityMonitor tag that can be used to display a persistent info, trace or debug on the <see cref="IScreen"/>.
+    /// <para>
+    /// Fatal, Errors and Warnings are always persistent.
+    /// </para>
+    /// </summary>
+    public static readonly CKTrait CKliScreenTag = ActivityMonitor.Tags.Register( "Screen" );
+
+    /// <summary>
     /// Initializes a new screen type.
     /// </summary>
     /// <param name="canBeInteractive">True if the screen can be in interactive mode.</param>

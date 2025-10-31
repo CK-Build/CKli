@@ -83,12 +83,12 @@ public static class CKliCommands
                                         cmdLine,
                                         CKliRootEnv.GlobalOptions?.Invoke() ?? default,
                                         CKliRootEnv.GlobalFlags?.Invoke() ?? default );
-            return ValueTask.FromResult( true );
+            return HandleInteractiveAsync( monitor, context, cmdLine, null, true );
         }
         // If it's a CKli command, we can now execute it.
         if( cmdLine.FoundCommand != null )
         {
-            return ExecuteAsync( monitor, context, cmdLine );
+            return ExecuteAsync( monitor, context, cmdLine, null );
         }
         // Not a CKli command. Opens the current World and tries to find a plugin command.
         var (stack, world) = StackRepository.TryOpenWorldFromPath( monitor, context, out bool error, skipPullStack: true );
@@ -108,7 +108,7 @@ public static class CKliCommands
                                         cmdLine,
                                         CKliRootEnv.GlobalOptions?.Invoke() ?? default,
                                         CKliRootEnv.GlobalFlags?.Invoke() ?? default );
-            return ValueTask.FromResult( false );
+            return HandleInteractiveAsync( monitor, context, cmdLine, null, false );
         }
         try
         {
@@ -131,16 +131,16 @@ public static class CKliCommands
                                             cmdLine,
                                             CKliRootEnv.GlobalOptions?.Invoke() ?? default,
                                             CKliRootEnv.GlobalFlags?.Invoke() ?? default );
-                return ValueTask.FromResult( cmdLine.HasHelp );
+                return HandleInteractiveAsync( monitor, context, cmdLine, stack, cmdLine.HasHelp );
             }
             // We have a plugin command (and no --help).
             Throw.DebugAssert( "This cannot be a CKli command: we'd have located it initially.", cmdLine.FoundCommand.PluginTypeInfo != null );
             if( cmdLine.FoundCommand.IsDisabled )
             {
                 monitor.Error( $"Command '{cmdLine.FoundCommand.CommandPath}' exists but its type '{cmdLine.FoundCommand.PluginTypeInfo.TypeName}' is disabled in plugin '{cmdLine.FoundCommand.PluginTypeInfo.Plugin.FullPluginName}'." );
-                return ValueTask.FromResult( false );
+                return HandleInteractiveAsync( monitor, context, cmdLine, stack, false );
             }
-            return ExecuteAsync( monitor, context, cmdLine );
+            return ExecuteAsync( monitor, context, cmdLine, stack );
         }
         finally
         {
@@ -148,10 +148,11 @@ public static class CKliCommands
         }
     }
 
-    static async ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
+    static async ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine, StackRepository? initialStack )
     {
+        Throw.DebugAssert( cmdLine.FoundCommand != null );
         var result = await DoExecuteAsync( monitor, context, cmdLine );
-        return result;
+        return await HandleInteractiveAsync( monitor, context, cmdLine, initialStack, result );
 
         static async Task<bool> DoExecuteAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
         {
@@ -213,6 +214,42 @@ public static class CKliCommands
                 CKliRootEnv.OnAnyOtherCommandAndSuccess();
             }
             return success;
+        }
+    }
+
+    static ValueTask<bool> HandleInteractiveAsync( IActivityMonitor monitor,
+                                                   CKliEnv context,
+                                                   CommandLineArguments cmdLine,
+                                                   StackRepository? initialStack,
+                                                   bool initialResult )
+    {
+        if( cmdLine.HasInteractiveArgument && context.Screen is not IInteractiveScreen )
+        {
+            var iScreen = context.Screen.TryCreateInteractive( monitor );
+            if( iScreen != null )
+            {
+                if( !context.Screen.ScreenType.CanBeInteractive )
+                {
+                    monitor.Warn( $"Screen type '{context.Screen.GetType().Name}' doesn't support interactive mode." );
+                }
+                else
+                {
+                    initialStack?.Dispose();
+                    return new ValueTask<bool>( RunInteractiveAsync( monitor, context, iScreen ) );
+                }
+            }
+        }
+        return ValueTask.FromResult( initialResult );
+    }
+
+    static async Task<bool> RunInteractiveAsync( IActivityMonitor monitor, CKliEnv context, IInteractiveScreen iScreen )
+    {
+        var iContext = new CKliEnv( iScreen, context.SecretsStore, context.CurrentDirectory, context.CurrentStackPath );
+        for(; ; )
+        {
+            CommandLineArguments? cmd = await iScreen.PromptAsync( monitor, iContext );
+            if( cmd == null ) return true;
+            await HandleCommandAsync( monitor, iContext, cmd );
         }
     }
 }

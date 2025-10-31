@@ -1,8 +1,6 @@
 using CK.Core;
 using System;
-using System.Buffers;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace CKli.Core;

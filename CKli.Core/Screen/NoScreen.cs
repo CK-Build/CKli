@@ -1,6 +1,4 @@
 using CK.Core;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 
 namespace CKli.Core;
 
@@ -25,6 +23,12 @@ public sealed class NoScreen : IScreen
 
     void IScreen.Close()
     {
+    }
+
+    IInteractiveScreen? IScreen.TryCreateInteractive( IActivityMonitor monitor )
+    {
+        monitor.Warn( $"Screen type '{nameof( NoScreen )}' doesn't support interactive mode." );
+        return null;
     }
 
     public override string ToString() => string.Empty;

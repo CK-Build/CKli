@@ -3,7 +3,6 @@ using NUnit.Framework;
 using Shouldly;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace CKli.Core.Tests;
 

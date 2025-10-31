@@ -1,7 +1,5 @@
 using CK.Core;
 using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Text;
 
 namespace CKli.Core;
@@ -44,6 +42,13 @@ public sealed class StringScreen : IScreen
     void IScreen.Close()
     {
     }
+
+    IInteractiveScreen? IScreen.TryCreateInteractive( IActivityMonitor monitor )
+    {
+        monitor.Warn( $"Screen type '{nameof( StringScreen )}' doesn't support interactive mode." );
+        return null;
+    }
+
 
     /// <summary>
     /// Gets the screen content.

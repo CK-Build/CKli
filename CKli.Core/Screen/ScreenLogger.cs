@@ -1,9 +1,5 @@
 using CK.Core;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CKli.Core;
 
@@ -43,7 +39,7 @@ public sealed class ScreenLogger : IActivityMonitorClient
     void OnLog( ref ActivityMonitorLogData data, bool isOpenGroup )
     {
         var l = data.MaskedLevel;
-        if( l >= LogLevel.Warn )
+        if( l >= LogLevel.Warn || data.Tags.Overlaps( ScreenType.CKliScreenTag ) )
         {
             _screen.OnLogErrorOrWarning( l, data.Text, isOpenGroup );
         }

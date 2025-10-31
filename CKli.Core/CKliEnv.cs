@@ -14,7 +14,7 @@ public sealed class CKliEnv
     readonly NormalizedPath _currentDirectory;
     readonly NormalizedPath _currentStackPath;
 
-    // CKliRootEnv.DefaultCommandContext
+    // CKliRootEnv.DefaultCommandContext & CKliCommands.ExecuteAsync that sets an interactive screen.
     internal CKliEnv( IScreen screen, ISecretsStore secretsStore, NormalizedPath currentDirectory, NormalizedPath currentStackPath )
     {
         _screen = screen;
@@ -73,4 +73,5 @@ public sealed class CKliEnv
     public CKliEnv ChangeDirectory( NormalizedPath path ) => path.IsEmptyPath
                                                                 ? this
                                                                 : new CKliEnv( _currentDirectory.Combine( path ).ResolveDots(), _secretsStore, _screen );
+
 }

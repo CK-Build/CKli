@@ -88,5 +88,7 @@ sealed partial class AnsiScreen : IScreen
         AnsiDetector.RestoreConsoleMode( _originalConsoleMode );
     }
 
+    IInteractiveScreen? IScreen.TryCreateInteractive( IActivityMonitor monitor ) => new Interactive( this );
+
     public override string ToString() => string.Empty;
 }

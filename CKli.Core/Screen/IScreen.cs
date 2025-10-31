@@ -1,12 +1,9 @@
 using CK.Core;
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 
 namespace CKli.Core;
 
 /// <summary>
-/// A screen handles the console output. This interface cannot be implemented outside CKLi.Core:
+/// A screen handles the console output. This interface cannot be implemented outside CKli.Core:
 /// the only concrete screens that exist are internal except <see cref="StringScreen"/> and <see cref="NoScreen"/>.
 /// </summary>
 public interface IScreen
@@ -53,4 +50,6 @@ public interface IScreen
     internal void OnLogOther( LogLevel level, string? text, bool isOpenGroup );
 
     internal void Close();
+
+    internal IInteractiveScreen? TryCreateInteractive( IActivityMonitor monitor );
 }

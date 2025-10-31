@@ -1,4 +1,3 @@
-using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;
 using System.IO;

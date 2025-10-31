@@ -1,5 +1,3 @@
-using CK.Core;
-using CK.Monitoring;
 using System;
 using System.Diagnostics;
 

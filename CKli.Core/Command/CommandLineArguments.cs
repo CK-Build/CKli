@@ -1,5 +1,4 @@
 using CK.Core;
-using CommunityToolkit.HighPerformance;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -26,6 +25,16 @@ public sealed class CommandLineArguments
     Command? _foundCommand;
     HashSet<string>? _optionOrFlagNames;
     ImmutableArray<(string Argument, bool Remaining)> _remainingArguments;
+
+    /// <summary>
+    /// Initializes a new <see cref="CommandLineArguments"/> from an argument string.
+    /// This uses <see cref="ArgumentHelper.SplitCommandLine(string)"/>.
+    /// </summary>
+    /// <param name="arguments">The arguments.</param>
+    public CommandLineArguments( string arguments )
+        : this( ArgumentHelper.SplitCommandLine( arguments ).ToArray() )
+    {
+    }
 
     /// <summary>
     /// Initializes a new <see cref="CommandLineArguments"/> from the initial process arguments.
@@ -117,7 +126,7 @@ public sealed class CommandLineArguments
     /// <summary>
     /// Gets the <see cref="InitialArguments"/> as a string with escaped arguments.
     /// </summary>
-    public string InitialAsStringArguments => _initialAsStringArguments ??= ArgumentEscaper.EscapeAndConcatenateArgArrayForProcessStart( _initial );
+    public string InitialAsStringArguments => _initialAsStringArguments ??= ArgumentHelper.EscapeAndConcatenateArgArrayForProcessStart( _initial );
 
     /// <summary>
     /// Extracts the next required argument. <see cref="RemainingCount"/> must be positive otherwise
@@ -277,7 +286,7 @@ public sealed class CommandLineArguments
     /// <param name="arguments">The arguments to use to start an external process.</param>
     public void CloseWithRemainingAsProcessStartArgs( out string arguments )
     {
-        arguments = ArgumentEscaper.EscapeAndConcatenateArgArrayForProcessStart( _args );
+        arguments = ArgumentHelper.EscapeAndConcatenateArgArrayForProcessStart( _args );
         CloseAndForgetRemaingArguments();
     }
 
