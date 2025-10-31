@@ -8,6 +8,8 @@ namespace CKli.Core;
 
 sealed class NoColorScreen : IScreen
 {
+    static ScreenType _screenType = new ScreenType( true, false );
+
     readonly RenderTarget _target;
     int? _width;
 
@@ -16,9 +18,7 @@ sealed class NoColorScreen : IScreen
         _target = new RenderTarget();
     }
 
-    public ScreenType ScreenType => StringScreenType.Default;
-
-    public void Clear() => Console.Clear();
+    public ScreenType ScreenType => _screenType;
 
     public void Display( IRenderable renderable )
     {
@@ -98,7 +98,7 @@ sealed class NoColorScreen : IScreen
             }
         }
 
-        public ScreenType ScreenType => StringScreenType.Default;
+        public ScreenType ScreenType => _screenType;
 
         public void EndOfLine() => Write( Environment.NewLine, TextStyle.None );
     }

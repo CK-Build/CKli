@@ -22,11 +22,6 @@ public interface IScreen
     ScreenType ScreenType { get; }
 
     /// <summary>
-    /// Clears the screen.
-    /// </summary>
-    void Clear();
-
-    /// <summary>
     /// Displays the renderable.
     /// </summary>
     /// <param name="renderable">The renderable to display.</param>

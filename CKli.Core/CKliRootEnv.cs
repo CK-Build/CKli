@@ -139,7 +139,7 @@ public static class CKliRootEnv
         static IScreen CreateScreen( CommandLineArguments? arguments )
         {
             bool forceAnsi = false;
-            var optScreen = arguments?.EatSingleOption( "--screen" );
+            var optScreen = arguments?.ScreenOption;
             if( optScreen != null )
             {
                 if( optScreen.Equals( "no-color", StringComparison.OrdinalIgnoreCase )
@@ -160,7 +160,7 @@ public static class CKliRootEnv
             {
                 (ansiConsole, originalConsoleMode) = AnsiDetector.TryEnableAnsiColorCodes();
             }
-            IScreen s = forceAnsi || ansiConsole ? new AnsiScreen( originalConsoleMode, false ) : new NoColorScreen();
+            IScreen s = forceAnsi || ansiConsole ? new AnsiScreen( originalConsoleMode ) : new NoColorScreen();
             return s;
         }
     }

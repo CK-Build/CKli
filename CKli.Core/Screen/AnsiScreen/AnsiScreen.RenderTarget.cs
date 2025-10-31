@@ -13,16 +13,14 @@ sealed partial class AnsiScreen
         readonly StringBuilder _buffer;
         readonly CoreTextWriter _buffered;
         readonly CoreTextWriter _unbuffered;
-        readonly ScreenType _screenType;
         int _updateCount;
         TextStyle _current;
 
-        public RenderTarget( CoreTextWriter writer, ScreenType screenType )
+        public RenderTarget( CoreTextWriter writer )
         {
             _buffer = new StringBuilder();
             _buffered = text => _buffer.Append( text );
             _unbuffered = writer;
-            _screenType = screenType;
             _current = TextStyle.Default;
             // Initializes our default colors.
             Span<char> b = stackalloc char[16];

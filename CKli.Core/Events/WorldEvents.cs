@@ -12,6 +12,7 @@ public sealed class WorldEvents
     {
         PluginInfo = null;
         FixedLayout = null;
+        Issue = null;
     }
 
     static bool Raise<T>( IActivityMonitor monitor, Action<T>? handler, T e ) where T : WorldEvent
@@ -45,5 +46,12 @@ public sealed class WorldEvents
     public event Action<PluginInfoEvent>? PluginInfo;
 
     internal bool SafeRaiseEvent( IActivityMonitor monitor, PluginInfoEvent e ) => Raise( monitor, PluginInfo, e );
+
+    /// <summary>
+    /// Raised by "ckli issue".
+    /// </summary>
+    public event Action<IssueEvent>? Issue;
+
+    internal bool SafeRaiseEvent( IActivityMonitor monitor, IssueEvent e ) => Raise( monitor, Issue, e );
 
 }

@@ -22,6 +22,8 @@ sealed class CKliClone : Command
     {
     }
 
+    public override InteractiveMode InteractiveMode => InteractiveMode.Rejects;
+
     internal protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
                                                                     CommandLineArguments cmdLine )

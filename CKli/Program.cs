@@ -9,13 +9,13 @@ using System.Linq;
 
 var arguments = new CommandLineArguments( args );
 
-if( arguments.EatFlag( "--debug-launch" ) )
+if( arguments.HasDebugLaunchFlag )
 {
     if( !Debugger.IsAttached ) Debugger.Launch();
 }
 
 // Sets the Environment.CurrentDirectory before CKliRootEnv.Initialize().
-var explicitPath = arguments.EatSingleOption( "--path", "-p" );
+var explicitPath = arguments.ExplicitPathOption;
 if( explicitPath != null )
 {
     if( Directory.Exists( explicitPath ) )
@@ -30,7 +30,7 @@ if( explicitPath != null )
     }
 }
 // Since we Console.WriteLine we dont' need the environment to be setup.
-if( arguments.EatFlag( "--version" ) )
+if( arguments.HasVersionFlag )
 {
     var info = CSemVer.InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() );
     Console.WriteLine( $"CKli - {info.Version} - {info.OriginalInformationalVersion}." );

@@ -16,6 +16,12 @@ public sealed class CommandLineArguments
     readonly ImmutableArray<string> _initial;
     readonly List<string> _args;
     readonly bool _hasHelp;
+    readonly bool _hasDebugLaunch;
+    readonly bool _hasVersion;
+    readonly string? _explicitPath;
+    readonly string? _screen;
+    readonly bool _hasInteractive;
+    readonly bool _expectCommand;
     string? _initialAsStringArguments;
     Command? _foundCommand;
     HashSet<string>? _optionOrFlagNames;
@@ -28,14 +34,60 @@ public sealed class CommandLineArguments
     public CommandLineArguments( string[] arguments )
     {
         _initial = [..arguments];
-        _args = arguments.ToList();
+        if( arguments.Length > 0
+            && (arguments[0] == "i" || arguments[0] == "interactive") )
+        {
+            _hasInteractive = true;
+            _args = [.. arguments.Skip( 1 )];
+        }
+        else
+        {
+            _args = [.. arguments];
+        }
         _hasHelp = EatFlag( "--help", "-h", "-?" );
+        _hasDebugLaunch = EatFlag( "--debug-launch" );
+        _hasVersion = EatFlag( "--version" );
+        _explicitPath = EatSingleOption( "--path", "-p" );
+        _screen = EatSingleOption( "--screen" );
+
+        _expectCommand = _args.Count > 0;
     }
 
     /// <summary>
     /// Gets whether "--help", "-h" or "-?" was in the command line.
     /// </summary>
     public bool HasHelp => _hasHelp;
+
+    /// <summary>
+    /// Gets whether debugger must be launched.
+    /// </summary>
+    public bool HasDebugLaunchFlag => _hasDebugLaunch;
+
+    /// <summary>
+    /// Gets whether the "--version" flag was specified.
+    /// </summary>
+    public bool HasVersionFlag => _hasVersion;
+
+    /// <summary>
+    /// Gets whether the command line started with "i ..." or "interactive ..." .
+    /// </summary>
+    public bool HasInteractiveArgument => _hasInteractive;
+
+    /// <summary>
+    /// Gets the "--path" or "-p" option.
+    /// </summary>
+    public string? ExplicitPathOption => _explicitPath;
+
+    /// <summary>
+    /// Gets whether the command line is initially empty after having handled <see cref="HasHelp"/>
+    /// and <see cref="HasInteractiveArgument"/>.
+    /// </summary>
+    public bool ExpectCommand => _expectCommand;
+
+    /// <summary>
+    /// Gets the "--screen" option if any.
+    /// </summary>
+    public string? ScreenOption => _screen;
 
     /// <summary>
     /// Gets whether all arguments have been eaten.

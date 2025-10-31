@@ -24,7 +24,7 @@ sealed class DebugRenderer : IRenderTarget
         return b.ToString();
     }
 
-    ScreenType IRenderTarget.ScreenType => StringScreenType.Default;
+    ScreenType IRenderTarget.ScreenType => ScreenType.Default;
 
     void IRenderTarget.BeginUpdate() {}
 

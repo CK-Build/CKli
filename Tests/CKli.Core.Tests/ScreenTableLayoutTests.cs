@@ -12,9 +12,9 @@ public class ScreenTableLayoutTests
     [Test]
     public void HorizontalContent_SetWidth_1()
     {
-        var h = StringScreenType.Default.Text( "1" ).Box()
-                .AddRight( StringScreenType.Default.Text( "2" ).Box( marginLeft: 1 ) )
-                .AddRight( StringScreenType.Default.Text( "3" ).Box( marginLeft: 1 ) );
+        var h = ScreenType.Default.Text( "1" ).Box()
+                .AddRight( ScreenType.Default.Text( "2" ).Box( marginLeft: 1 ) )
+                .AddRight( ScreenType.Default.Text( "3" ).Box( marginLeft: 1 ) );
         h.Width.ShouldBe( h.NominalWidth ).ShouldBe( h.MinWidth ).ShouldBe( 5 );
         {
             DebugRenderer.Render( h ).ShouldBe( """
@@ -76,9 +76,9 @@ public class ScreenTableLayoutTests
     [Test]
     public void HorizontalContent_SetWidth_2()
     {
-        var h = StringScreenType.Default.Text( "0123456789" ).Box( paddingLeft: 2, paddingRight: 2, marginRight: 1 )
-                .AddRight( StringScreenType.Default.Text( "0123456789" ).Box( paddingLeft: 2, paddingRight: 2, marginRight: 1 ) )
-                .AddRight( StringScreenType.Default.Text( "0123456789" ).Box( paddingLeft: 2, paddingRight: 2 ) );
+        var h = ScreenType.Default.Text( "0123456789" ).Box( paddingLeft: 2, paddingRight: 2, marginRight: 1 )
+                .AddRight( ScreenType.Default.Text( "0123456789" ).Box( paddingLeft: 2, paddingRight: 2, marginRight: 1 ) )
+                .AddRight( ScreenType.Default.Text( "0123456789" ).Box( paddingLeft: 2, paddingRight: 2 ) );
         h.Width.ShouldBe( h.NominalWidth ).ShouldBe( 30 + 10 + 4 );
         TextBlock.MinimalWidth.ShouldBe( 10 );
         h.MinWidth.ShouldBe( 30 + 2 * 3 );
@@ -151,7 +151,7 @@ public class ScreenTableLayoutTests
     [Test]
     public void TableLayout_1_2()
     {
-        var r = TableLayout.Create( StringScreenType.Default.Text( "0" ).AddRight( StringScreenType.Default.Text( "1" ) ) );
+        var r = TableLayout.Create( ScreenType.Default.Text( "0" ).AddRight( ScreenType.Default.Text( "1" ) ) );
         var t = r.ShouldBeAssignableTo<TableLayout>();
         t.Width.ShouldBe( 2 );
         t.NominalWidth.ShouldBe( 2 );
@@ -169,7 +169,7 @@ public class ScreenTableLayoutTests
     [Test]
     public void TableLayout_Collapsable_1_2()
     {
-        var r = TableLayout.Create( new Collapsable( StringScreenType.Default.Text( "0" ).AddRight( StringScreenType.Default.Text( "1" ) ) ),
+        var r = TableLayout.Create( new Collapsable( ScreenType.Default.Text( "0" ).AddRight( ScreenType.Default.Text( "1" ) ) ),
                                     new ColumnDefinition( minWidth: 5 ) );
         DebugRenderer.Render( r ).ShouldBe( """
                     > 0  1⮐
@@ -180,7 +180,7 @@ public class ScreenTableLayoutTests
     [Test]
     public void TableLayout_Collapsable_12_2()
     {
-        static TextBlock T( string t ) => StringScreenType.Default.Text( t );
+        static TextBlock T( string t ) => ScreenType.Default.Text( t );
 
         var r = TableLayout.Create( new Collapsable( T( "0" ).AddRight( T( "D" ) ) )
                                     .AddBelow( new Collapsable( T( "01" ).AddRight( T( "D" ) ) ) )
@@ -259,10 +259,10 @@ public class ScreenTableLayoutTests
     [Test]
     public void basic_Console_help_display_for_plugin_section()
     {
-        var commands = CKliCommands.Commands.GetForHelp( StringScreenType.Default, "plugin", null );
-        commands.Insert( 0, new CommandHelp( StringScreenType.Default, new ZCommand() ) );
+        var commands = CKliCommands.Commands.GetForHelp( ScreenType.Default, "plugin", null );
+        commands.Insert( 0, new CommandHelp( ScreenType.Default, new ZCommand() ) );
 
-        var help = ScreenExtensions.CreateDisplayHelp( StringScreenType.Default,
+        var help = ScreenExtensions.CreateDisplayHelp( ScreenType.Default,
                                                     commands,
                                                     new CommandLineArguments( [] ), default, default );
         help.MinWidth.ShouldBe( 39 );

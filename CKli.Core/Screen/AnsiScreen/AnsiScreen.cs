@@ -1,14 +1,13 @@
 using CK.Core;
 using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Text;
 
 namespace CKli.Core;
 
 sealed partial class AnsiScreen : IScreen
 {
-    readonly AnsiScreenType _screenType;
+    static readonly ScreenType _screenType = new ScreenType( true, true );
+
     readonly RenderTarget _target;
     readonly uint? _originalConsoleMode;
     readonly Encoding _originalOutputEncoding;
@@ -19,30 +18,26 @@ sealed partial class AnsiScreen : IScreen
 
     IRenderable ErrorHead => _errorHead ??= _screenType.Text( "Error:" )
                                             .Box( paddingLeft: 1,
-                                                    paddingRight: 1,
-                                                    style: new TextStyle( new Color( ConsoleColor.Black, ConsoleColor.DarkRed ), TextEffect.Bold ) );
+                                                  paddingRight: 1,
+                                                  style: new TextStyle( new Color( ConsoleColor.Black, ConsoleColor.DarkRed ), TextEffect.Bold ) );
 
     IRenderable WarningHead => _warningHead ??= _screenType.Text( "Warning:" )
                                                 .Box( paddingLeft: 1,
-                                                        paddingRight: 1,
-                                                        style: new TextStyle( new Color( ConsoleColor.Yellow, ConsoleColor.Black ), TextEffect.Bold ) );
+                                                      paddingRight: 1,
+                                                      style: new TextStyle( new Color( ConsoleColor.Yellow, ConsoleColor.Black ), TextEffect.Bold ) );
 
 
-    public AnsiScreen( uint? originalConsoleMode, bool isInteractive )
+    public AnsiScreen( uint? originalConsoleMode )
     {
         _originalConsoleMode = originalConsoleMode;
         _originalOutputEncoding = Console.OutputEncoding;
         Console.OutputEncoding = Encoding.UTF8;
-
-        _screenType = new AnsiScreenType( isInteractive );
-        _target = new RenderTarget( Console.Out.Write, _screenType );
+        _target = new RenderTarget( Console.Out.Write );
         _width = GetWindowWidth();
         _animation = new Animation( _target, _width );
     }
 
     public ScreenType ScreenType => _screenType;
-
-    public void Clear() => Console.Clear();
 
     public void Display( IRenderable renderable )
     {
@@ -94,13 +89,4 @@ sealed partial class AnsiScreen : IScreen
     }
 
     public override string ToString() => string.Empty;
-
-
-    sealed class AnsiScreenType : ScreenType
-    {
-        public AnsiScreenType( bool isInteractive )
-            : base( isInteractive, true )
-        {
-        }
-    }
 }

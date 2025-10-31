@@ -118,6 +118,11 @@ public abstract partial class Command
     public ImmutableArray<(ImmutableArray<string> Names, string Description)> Flags => _flags;
 
     /// <summary>
+    /// Gets the interactive mode.
+    /// </summary>
+    public virtual InteractiveMode InteractiveMode => InteractiveMode.Both;
+
+    /// <summary>
     /// Returns "[CKli] commad path".
     /// This applies to intrinsic CKli commands and is overridden by command implemented by plugin.
     /// </summary>

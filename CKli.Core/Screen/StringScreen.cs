@@ -14,19 +14,24 @@ public sealed class StringScreen : IScreen
 {
     readonly StringBuilder _buffer;
 
+    /// <summary>
+    /// Initializes a new string screen.
+    /// </summary>
     public StringScreen()
     {
         _buffer = new StringBuilder();
     }
 
-    public ScreenType ScreenType => StringScreenType.Default;
+    /// <inheritdoc />
+    public ScreenType ScreenType => ScreenType.Default;
 
-    public void Clear() => _buffer.Clear();
-
+    /// <inheritdoc />
     public void Display( IRenderable renderable ) => _buffer.Append( renderable.RenderAsString() );
 
+    /// <inheritdoc />
     public int Width => IScreen.MaxScreenWidth;
 
+    /// <inheritdoc />
     public void OnLogErrorOrWarning( LogLevel level, string message, bool isOpenGroup )
     {
         _buffer.Append( level == LogLevel.Warn ? "Warning: " : "Error: " ).Append( message ).AppendLine();
@@ -60,7 +65,7 @@ public sealed class StringScreen : IScreen
 
         public void EndUpdate() { }
 
-        public ScreenType ScreenType => StringScreenType.Default;
+        public ScreenType ScreenType => ScreenType.Default;
 
         public override string ToString() => _b.ToString();
     }

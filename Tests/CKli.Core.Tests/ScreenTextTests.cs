@@ -36,8 +36,8 @@ public class ScreenTextTests
         static IRenderable CreateRepo( bool isDirty )
         {
             var folderStyle = new TextStyle( isDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen, ConsoleColor.Black );
-            IRenderable folder = StringScreenType.Default.Text( "Sample-Repo" ).HyperLink( new System.Uri( $"file:///C:\\Sample-Repo" ) );
-            if( isDirty ) folder = folder.Box( paddingRight: 1 ).AddLeft( StringScreenType.Default.Text( "⋆" ) );
+            IRenderable folder = ScreenType.Default.Text( "Sample-Repo" ).HyperLink( new System.Uri( $"file:///C:\\Sample-Repo" ) );
+            if( isDirty ) folder = folder.Box( paddingRight: 1 ).AddLeft( ScreenType.Default.Text( "⋆" ) );
             else folder = folder.Box( paddingLeft: 1, paddingRight: 1 );
             return folder.Box( style: folderStyle );
         }
@@ -47,7 +47,7 @@ public class ScreenTextTests
     [Test]
     public void Minimal_text_wrap()
     {
-        var t = StringScreenType.Default.Text( """
+        var t = ScreenType.Default.Text( """
 
 
                         Some text to
@@ -74,7 +74,7 @@ public class ScreenTextTests
     [Test]
     public void ContentAlign_Horizontal_test()
     {
-        var text = StringScreenType.Default.Text( """
+        var text = ScreenType.Default.Text( """
                 Hello world,
 
                 I'm glad to be there...
@@ -125,14 +125,14 @@ public class ScreenTextTests
     [Test]
     public void ContentAlign_Vertical_test()
     {
-        var text = StringScreenType.Default.Text( """
+        var text = ScreenType.Default.Text( """
                 Hello world,
 
                 I'm glad to be there...
                 But...
                 I'm sad that Trump's here.
                 """ );
-        var bigCell = StringScreenType.Default.Text( """
+        var bigCell = ScreenType.Default.Text( """
                 |1
                 |2
                 |3
@@ -241,23 +241,23 @@ public class ScreenTextTests
     public void simple_line_test()
     {
         {
-            var line = StringScreenType.Default.Text( "Hello" ).AddRight( StringScreenType.Default.Text( "world" ) );
+            var line = ScreenType.Default.Text( "Hello" ).AddRight( ScreenType.Default.Text( "world" ) );
             line.RenderAsString().ShouldBe( """
                 Helloworld
 
                 """ );
         }
         {
-            var line = StringScreenType.Default.Text( "Hello" ).Box( paddingLeft: 1, paddingRight: 1 ).AddRight( StringScreenType.Default.Text( "world" ) );
+            var line = ScreenType.Default.Text( "Hello" ).Box( paddingLeft: 1, paddingRight: 1 ).AddRight( ScreenType.Default.Text( "world" ) );
             line.RenderAsString().ShouldBe( """
                  Hello world
 
                 """ );
         }
         {
-            var line = StringScreenType.Default.Text( "Hello" ).Box( paddingLeft: 1, paddingRight: 1 )
-                            .AddRight( StringScreenType.Default.Text( "world" ).Box( paddingLeft: 2, paddingRight: 2 ) )
-                            .AddRight( StringScreenType.Default.Text( "!" ) );
+            var line = ScreenType.Default.Text( "Hello" ).Box( paddingLeft: 1, paddingRight: 1 )
+                            .AddRight( ScreenType.Default.Text( "world" ).Box( paddingLeft: 2, paddingRight: 2 ) )
+                            .AddRight( ScreenType.Default.Text( "!" ) );
             line.RenderAsString().ShouldBe( """
                  Hello   world  !
 
@@ -269,8 +269,8 @@ public class ScreenTextTests
     public void simple_2_lines_test()
     {
         {
-            var line = StringScreenType.Default.Text( "Message:" )
-                        .AddBelow( StringScreenType.Default.Text( "Hello world!" ).Box( marginLeft: 3 ) );
+            var line = ScreenType.Default.Text( "Message:" )
+                        .AddBelow( ScreenType.Default.Text( "Hello world!" ).Box( marginLeft: 3 ) );
             line.RenderAsString().ShouldBe( """
                 Message:
                    Hello world!
@@ -278,8 +278,8 @@ public class ScreenTextTests
                 """ );
         }
         {
-            var line = StringScreenType.Default.Text( "Message:" )
-                        .AddBelow( StringScreenType.Default.Text( "Hello world!" ).Box( paddingLeft: 3 ) );
+            var line = ScreenType.Default.Text( "Message:" )
+                        .AddBelow( ScreenType.Default.Text( "Hello world!" ).Box( paddingLeft: 3 ) );
             line.RenderAsString().ShouldBe( """
                 Message:
                    Hello world!
@@ -287,7 +287,7 @@ public class ScreenTextTests
                 """ );
         }
         {
-            var line = StringScreenType.Default.Text( """
+            var line = ScreenType.Default.Text( """
 
 
                   text
@@ -307,7 +307,7 @@ public class ScreenTextTests
     public void TextBlock_witdh_adjustement()
     {
         {
-            var t = StringScreenType.Default.Text( "            0 1 2 3 4 5 6 7 8 9 A B C D E F G H I J K L M N O P Q R S T U V W X Y Z               " );
+            var t = ScreenType.Default.Text( "            0 1 2 3 4 5 6 7 8 9 A B C D E F G H I J K L M N O P Q R S T U V W X Y Z               " );
             var tMin = t.SetWidth( 15 );
             tMin.Width.ShouldBe( 15 );
             tMin.Height.ShouldBe( 5 );
@@ -321,7 +321,7 @@ public class ScreenTextTests
                 """ );
         }
         {
-            var t = StringScreenType.Default.Text( "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" );
+            var t = ScreenType.Default.Text( "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" );
             var tMin = t.SetWidth( 15 );
             tMin.Width.ShouldBe( 15 );
             tMin.Height.ShouldBe( 3 );
@@ -333,7 +333,7 @@ public class ScreenTextTests
                 """ );
         }
         { 
-            var t = StringScreenType.Default.Text( "La liberté des uns s'arrête où commence celle des autres." );
+            var t = ScreenType.Default.Text( "La liberté des uns s'arrête où commence celle des autres." );
             var tMin = t.SetWidth( 15 );
             tMin.Width.ShouldBe( 15 );
             tMin.Height.ShouldBe( 4 );
@@ -376,7 +376,7 @@ public class ScreenTextTests
                 """ );
         }
         {
-            var t = StringScreenType.Default.Text( """
+            var t = ScreenType.Default.Text( """
                                 A
                                 B            
 
@@ -401,7 +401,7 @@ public class ScreenTextTests
     [Test]
     public void ContentBox_small_witdh_adjustement()
     {
-        var b = StringScreenType.Default.Text( """
+        var b = ScreenType.Default.Text( """
             1
             2
             """ ).Box();
@@ -461,7 +461,7 @@ public class ScreenTextTests
     {
         TextBlock.MinimalWidth.ShouldBeLessThan( 16 );
         var text = "0123456789ABCDEF";
-        var b = StringScreenType.Default.Text( text ).Box();
+        var b = ScreenType.Default.Text( text ).Box();
         {
             b = b.WithAlign( ContentAlign.HCenter ).SetWidth( 21 );
             b.RenderAsString().ShouldBe( $"""
@@ -533,7 +533,7 @@ public class ScreenTextTests
     [Test]
     public void ContentBox_width_Adjustement()
     {
-        var b = StringScreenType.Default.Text( "X", new TextStyle( ConsoleColor.Red, ConsoleColor.Black ) )
+        var b = ScreenType.Default.Text( "X", new TextStyle( ConsoleColor.Red, ConsoleColor.Black ) )
                                         .Box( marginLeft: 2, paddingLeft: 3, style: new TextStyle( ConsoleColor.Green, ConsoleColor.Black ) );
         {
             DebugRenderer.Render( b ).ShouldBe( """
@@ -663,7 +663,7 @@ public class ScreenTextTests
     [TestCase( ContentAlign.HCenter )]
     public void ContentBox_SmallerAdjustement_2( ContentAlign a )
     {
-        var b = StringScreenType.Default.Text( """
+        var b = ScreenType.Default.Text( """
                                                A
                                                BC
                                                """, new TextStyle( ConsoleColor.Red, ConsoleColor.Black ) )
@@ -766,7 +766,7 @@ public class ScreenTextTests
     [Test]
     public void ContentBox_SmallerAdjustement_3()
     {
-        var b = StringScreenType.Default.Text( """
+        var b = ScreenType.Default.Text( """
                                                A
                                                BC
                                                """, new TextStyle( ConsoleColor.Red, ConsoleColor.Black ) )
@@ -798,7 +798,7 @@ public class ScreenTextTests
     [Test]
     public void ContentBox_SmallerAdjustement_2_HRight()
     {
-        var b = StringScreenType.Default.Text( """
+        var b = ScreenType.Default.Text( """
                                                A
                                                BC
                                                """, new TextStyle( ConsoleColor.Red, ConsoleColor.Black ) )
@@ -922,7 +922,7 @@ public class ScreenTextTests
         cmdLine.EatFlag( "-f1" ).ShouldBeTrue();
 
         cmdLine.Close( TestHelper.Monitor ).ShouldBe( false );
-        var header = ScreenExtensions.CreateDisplayHelpHeader( StringScreenType.Default, cmdLine );
+        var header = ScreenExtensions.CreateDisplayHelpHeader( ScreenType.Default, cmdLine );
         string result = header.RenderAsString();
 
         Console.Write( result );

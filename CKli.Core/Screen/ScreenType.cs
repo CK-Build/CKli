@@ -3,36 +3,38 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.Core;
 
-public enum HyperLinkStyle
-{
-    Default = 0,
-
-    UnderlinedText,
-
-    UnderlinedLink,
-
-
-
-}
-
-public abstract class ScreenType
+/// <summary>
+/// Models screen capabilities. This is also a generator for <see cref="IRenderable"/> objects
+/// thanks to <see cref="Unit"/> and <see cref="EmptyString"/>.
+/// </summary>
+public sealed class ScreenType
 {
     readonly IRenderable _unit;
     TextBlock? _emptyString;
-    readonly bool _isInteractive;
+    readonly bool _canBeInteractive;
     readonly bool _hasAnsiLink;
 
-    protected ScreenType( bool isInteractive, bool hasAnsiLink )
+    /// <summary>
+    /// Gets a passive, basic screen type. Applies to <see cref="StringScreen"/> and <see cref="NoScreen"/>.
+    /// </summary>
+    public static readonly ScreenType Default = new ScreenType( false, false );
+
+    /// <summary>
+    /// Initializes a new screen type.
+    /// </summary>
+    /// <param name="canBeInteractive">True if the screen can be in interactive mode.</param>
+    /// <param name="hasAnsiLink">True if screen supports Ansi links.</param>
+    public ScreenType( bool canBeInteractive, bool hasAnsiLink )
     {
-        _isInteractive = isInteractive;
+        _canBeInteractive = canBeInteractive;
         _hasAnsiLink = hasAnsiLink;
         _unit = new RenderableUnit( this );
     }
 
     /// <summary>
-    /// Gets whether the screen is in interactive mode.
+    /// Gets whether the screen can be in interactive mode.
     /// </summary>
-    public bool IsInteractive => _isInteractive;
+    public bool CanBeInteractive => _canBeInteractive;
 
     /// <summary>
     /// Gets whether the screen supports Ansi link display.

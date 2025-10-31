@@ -35,24 +35,16 @@ public sealed partial class World
     /// <returns>True on success, false on error.</returns>
     internal bool RaisePluginInfo( IActivityMonitor monitor, out string headerText, out List<DisplayInfoPlugin>? infos )
     {
-        var definitionFile = DefinitionFile;
-        if( definitionFile.IsPluginsDisabled )
+        var disabledPlugin = GetDisabledPluginsHeader();
+        if( disabledPlugin != null )
         {
+            headerText = disabledPlugin;
             infos = null;
-            headerText = $"""
-                    Plugins are disabled by configuration.
-                    Configurations:
-                    {definitionFile.Plugins}
-                    """;
             return true;
         }
-        if( _plugins == null )
-        {
-            infos = null;
-            headerText = "No configured PluginLoader. Plugins are disabled.";
-            return true;
-        }
-        var config = definitionFile.ReadPluginsConfiguration( monitor );
+
+        Throw.DebugAssert( _plugins != null );
+        var config = _definitionFile.ReadPluginsConfiguration( monitor );
         var loaded = _plugins.Plugins;
 
         Throw.DebugAssert( "Or we'll not be here.", config != null );
@@ -70,4 +62,20 @@ public sealed partial class World
         return loaded.Count == 0 || _events.SafeRaiseEvent( monitor, new PluginInfoEvent( monitor, this, infos ) );
     }
 
+    internal string? GetDisabledPluginsHeader()
+    {
+        if( _definitionFile.IsPluginsDisabled )
+        {
+            return $"""
+                    Plugins are disabled by configuration.
+                    Configurations:
+                    {_definitionFile.Plugins}
+                    """;
+        }
+        if( _plugins == null )
+        {
+            return "No configured PluginLoader. Plugins are disabled.";
+        }
+        return null;
+    }
 }
