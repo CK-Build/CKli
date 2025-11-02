@@ -39,14 +39,16 @@ sealed partial class AnsiScreen : IScreen
 
     public ScreenType ScreenType => _screenType;
 
-    public void Display( IRenderable renderable )
+    public void Display( IRenderable renderable ) => Display( renderable, false );
+
+    public void Display( IRenderable renderable, bool newLine )
     {
         _animation.Hide();
         if( renderable.Width > _width )
         {
             renderable = renderable.SetWidth( _width );
         }
-        renderable.Render( _target );
+        renderable.Render( _target, newLine );
     }
 
     public int Width => _width;
@@ -65,13 +67,22 @@ sealed partial class AnsiScreen : IScreen
         }
     }
 
-    public void OnLogErrorOrWarning( LogLevel level, string message, bool isOpenGroup )
+    public void OnLog( LogLevel level, string message, bool isOpenGroup )
     {
         _animation.Hide();
-        var h = level == LogLevel.Warn ? WarningHead : ErrorHead;
-        h.AddRight( _screenType.Text( message, TextStyle.Default ) ).Render( _target );
+        CreateLog( level, message ).Render( _target );
         if( isOpenGroup ) _animation.OpenGroup( level, message );
         else _animation.Line( level, message );
+    }
+
+    IRenderable CreateLog( LogLevel level, string message )
+    {
+        if( level >= LogLevel.Warn )
+        {
+            var h = level == LogLevel.Warn ? WarningHead : ErrorHead;
+            return h.AddRight( _screenType.Text( message, TextStyle.Default ) );
+        }
+        return _screenType.Text( message, TextStyle.Default );
     }
 
     public void OnLogOther( LogLevel level, string? text, bool isOpenGroup )

@@ -21,7 +21,7 @@ sealed partial class AnsiScreen
 
         public void Display( IRenderable renderable ) => _screen.Display( renderable );
 
-        public void OnLogErrorOrWarning( LogLevel level, string text, bool isOpenGroup = false ) => _screen.OnLogErrorOrWarning( level, text, isOpenGroup );
+        public void OnLog( LogLevel level, string text, bool isOpenGroup = false ) => _screen.OnLog( level, text, isOpenGroup );
 
         void IScreen.Close() => ((IScreen)_screen).Close();
 
@@ -35,13 +35,43 @@ sealed partial class AnsiScreen
         {
             _screen._width = GetWindowWidth();
             _screen._animation.Hide();
-            Console.Write( $"[CKli] {context.CurrentDirectory}> " );
+            DisplayPrompt( context );
             var line = Console.ReadLine();
+            return Task.FromResult( CreateLine( line ) );
+        }
 
-            var cmdLine = line == null || line.Equals( "exit", StringComparison.OrdinalIgnoreCase )
-                            ? null
-                            : new CommandLineArguments( line );
-            return Task.FromResult( cmdLine );
+        void DisplayPrompt( CKliEnv context )
+        {
+            string ctx = "CKli";
+            string path = context.CurrentDirectory;
+            if( !context.CurrentStackPath.IsEmptyPath )
+            {
+                Throw.DebugAssert( context.CurrentStackPath.LastPart == StackRepository.PublicStackName
+                                    || context.CurrentStackPath.LastPart == StackRepository.PrivateStackName );
+                var stackRoot = context.CurrentStackPath.RemoveLastPart();
+                ctx = stackRoot.LastPart;
+                int rootLen = stackRoot.Path.Length;
+                path = path.Length > rootLen
+                        ? context.CurrentDirectory.Path.Substring( rootLen + 1 )
+                        : "";
+            }
+            var prompt = _screenType.Text( $"[{ctx}]", new TextStyle( ConsoleColor.Yellow ) ).Box( marginRight: 1 )
+                                    .AddRight( _screenType.Text( path + '>' ) );
+            _screen.Display( prompt, false );
+        }
+
+        static CommandLineArguments? CreateLine( string? line )
+        {
+            if( line == null ) return null;
+            if( line.StartsWith( "ckli", StringComparison.OrdinalIgnoreCase ) )
+            {
+                line = line.Substring( 4 );
+            }
+            if( line.Equals( "exit", StringComparison.OrdinalIgnoreCase ) )
+            {
+                return null;
+            }
+            return new CommandLineArguments( line );
         }
     }
 }

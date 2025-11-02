@@ -41,7 +41,7 @@ public sealed class ScreenLogger : IActivityMonitorClient
         var l = data.MaskedLevel;
         if( l >= LogLevel.Warn || data.Tags.Overlaps( ScreenType.CKliScreenTag ) )
         {
-            _screen.OnLogErrorOrWarning( l, data.Text, isOpenGroup );
+            _screen.OnLog( l, data.Text, isOpenGroup );
         }
         else
         {

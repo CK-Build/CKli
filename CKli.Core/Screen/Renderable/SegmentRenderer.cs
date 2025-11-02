@@ -119,13 +119,13 @@ public class SegmentRenderer
     /// <param name="target">The rendering target.</param>
     protected virtual void Render() => RenderContent();
 
-    internal static void Render( IRenderable r, IRenderTarget target )
+    internal static void Render( IRenderable r, IRenderTarget target, bool newLine )
     {
         target.BeginUpdate();
         for( int line = 0; line < r.Height; line++ )
         {
             RenderLine( r, target, line, r.Height );
-            target.EndOfLine();
+            target.EndOfLine( newLine || line < r.Height - 1 );
         }
         target.EndUpdate();
     }

@@ -263,8 +263,9 @@ public class ScreenTableLayoutTests
         commands.Insert( 0, new CommandHelp( ScreenType.Default, new ZCommand() ) );
 
         var help = ScreenExtensions.CreateDisplayHelp( ScreenType.Default,
-                                                    commands,
-                                                    new CommandLineArguments( [] ), default, default );
+                                                       isInteractiveScreen: false,
+                                                       commands,
+                                                       new CommandLineArguments( [] ), default, default );
         help.MinWidth.ShouldBe( 39 );
         help = help.SetWidth( 40 );
 

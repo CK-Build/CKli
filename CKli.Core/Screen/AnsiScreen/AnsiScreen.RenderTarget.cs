@@ -69,13 +69,13 @@ sealed partial class AnsiScreen
             return style;
         }
 
-        public void EndOfLine()
+        public void EndOfLine( bool newLine )
         {
             _current = TextStyle.Default;
             Span<char> b = stackalloc char[16];
             var w = new FixedBufferWriter( b );
             w.AppendCSIStyle( _current.Color, _current.Effect );
-            w.Append( '\n' );
+            if( newLine ) w.Append( '\n' );
             Write( w.Text );
         }
     }

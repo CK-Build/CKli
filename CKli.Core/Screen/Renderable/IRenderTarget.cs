@@ -27,7 +27,8 @@ public interface IRenderTarget
     /// <summary>
     /// Must write the end of the line.
     /// </summary>
-    void EndOfLine();
+    /// <param name="newLine">False to not start a new line.</param>
+    void EndOfLine( bool newLine = true );
 
     /// <summary>
     /// Gets the screen type.

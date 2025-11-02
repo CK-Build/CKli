@@ -31,14 +31,15 @@ public interface IScreen
     int Width { get; }
 
     /// <summary>
-    /// Called whenever a error (can be <see cref="LogLevel.Fatal"/>) or a warning is logged.
+    /// Called whenever a error (can be <see cref="LogLevel.Fatal"/>) or a warning or
+    /// <see cref="ScreenType.CKliScreenTag"/> log is emitted.
     /// <para>
     /// Can be used directly to emit non logged errors or warnings.
     /// </para>
     /// </summary>
     /// <param name="level">The level.</param>
     /// <param name="text">The message.</param>
-    void OnLogErrorOrWarning( LogLevel level, string text, bool isOpenGroup = false );
+    void OnLog( LogLevel level, string text, bool isOpenGroup = false );
 
     /// <summary>
     /// All screens returns an empty string except <see cref="StringScreen"/> that returns

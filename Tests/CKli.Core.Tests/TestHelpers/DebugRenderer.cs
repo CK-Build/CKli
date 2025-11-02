@@ -30,10 +30,10 @@ sealed class DebugRenderer : IRenderTarget
 
     void IRenderTarget.EndUpdate() { }
 
-    void IRenderTarget.EndOfLine()
+    void IRenderTarget.EndOfLine( bool newLine )
     {
         _current = WriteDiffStyle( _b, _current, TextStyle.Default );
-        _b.Append( '⮐' ).AppendLine();
+        if( newLine ) _b.Append( '⮐' ).AppendLine();
     }
 
     void IRenderTarget.Write( ReadOnlySpan<char> text, TextStyle style )

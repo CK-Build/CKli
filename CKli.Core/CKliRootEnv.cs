@@ -72,7 +72,7 @@ public static class CKliRootEnv
                 }
                 else
                 {
-                    _screen.OnLogErrorOrWarning( LogLevel.Warn, $"""
+                    _screen.OnLog( LogLevel.Warn, $"""
                     Invalid '{configFilePath}':
                     {lines.Concatenate( Environment.NewLine )}
                     Resetting it to default values.
@@ -88,7 +88,7 @@ public static class CKliRootEnv
         }
         catch( Exception ex )
         {
-            _screen.OnLogErrorOrWarning( LogLevel.Warn, $"""
+            _screen.OnLog( LogLevel.Warn, $"""
                 Error while initializing CKliRootEnv:
                 {CKExceptionData.CreateFrom( ex )}
                 Resetting the '{configFilePath}' to default values.

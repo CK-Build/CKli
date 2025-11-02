@@ -43,7 +43,7 @@ sealed class NoColorScreen : IScreen
         }
     }
 
-    public void OnLogErrorOrWarning( LogLevel level, string message, bool isOpenGroup )
+    public void OnLog( LogLevel level, string message, bool isOpenGroup )
     {
         if( level == LogLevel.Warn )
         {
@@ -104,7 +104,13 @@ sealed class NoColorScreen : IScreen
 
         public ScreenType ScreenType => _screenType;
 
-        public void EndOfLine() => Write( Environment.NewLine, TextStyle.None );
+        public void EndOfLine( bool newLine )
+        {
+            if( newLine )
+            {
+                Write( Environment.NewLine, TextStyle.None );
+            }
+        }
     }
 
 }

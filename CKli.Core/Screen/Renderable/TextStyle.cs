@@ -31,6 +31,11 @@ public readonly struct TextStyle : IEquatable<TextStyle>
     {
     }
 
+    public TextStyle( ConsoleColor foreColor, TextEffect effect = TextEffect.Ignore )
+        : this( new Color( foreColor, ConsoleColor.Black ), effect )
+    {
+    }
+
     public TextStyle( TextEffect effect )
     {
         _effect = (byte)effect;

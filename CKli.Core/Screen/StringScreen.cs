@@ -30,7 +30,7 @@ public sealed class StringScreen : IScreen
     public int Width => IScreen.MaxScreenWidth;
 
     /// <inheritdoc />
-    public void OnLogErrorOrWarning( LogLevel level, string message, bool isOpenGroup )
+    public void OnLog( LogLevel level, string message, bool isOpenGroup )
     {
         _buffer.Append( level == LogLevel.Warn ? "Warning: " : "Error: " ).Append( message ).AppendLine();
     }
@@ -64,7 +64,13 @@ public sealed class StringScreen : IScreen
 
         public void Write( ReadOnlySpan<char> s, TextStyle style ) => _b.Append( s );
 
-        public void EndOfLine() => _b.AppendLine();
+        public void EndOfLine( bool newLine )
+        {
+            if( newLine )
+            {
+                _b.AppendLine();
+            }
+        }
 
         public void BeginUpdate() { }
 

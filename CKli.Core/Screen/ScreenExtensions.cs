@@ -24,7 +24,12 @@ public static class ScreenExtensions
                                     ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default,
                                     ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
     {
-        var h = CreateDisplayHelp( screen.ScreenType, commands, cmdLine, globalOptions, globalFlags );
+        var h = CreateDisplayHelp( screen.ScreenType,
+                                   screen is IInteractiveScreen,
+                                   commands,
+                                   cmdLine,
+                                   globalOptions,
+                                   globalFlags );
         screen.Display( h );
     }
 
@@ -65,11 +70,16 @@ public static class ScreenExtensions
     /// Public for tests.
     /// </remarks>
     /// <param name="screenType">The screen type.</param>
+    /// <param name="isInteractiveScreen">
+    /// True if the screen is in interactive mode.
+    /// In interactive mode, help is displayed only if explicitly required (the header is always displayed).
+    /// </param>
     /// <param name="commands">The command helps to display.</param>
     /// <param name="cmdLine">The current command line.</param>
     /// <param name="globalOptions">The global options.</param>
     /// <param name="globalFlags">The global flags.</param>
     public static IRenderable CreateDisplayHelp( ScreenType screenType,
+                                                 bool isInteractiveScreen,
                                                  List<CommandHelp> commands,
                                                  CommandLineArguments cmdLine,
                                                  ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions,
@@ -78,6 +88,13 @@ public static class ScreenExtensions
         IRenderable head = commands.Count == 1
                                 ? CreateDisplayHelpHeader( screenType, cmdLine )
                                 : screenType.Unit;
+        // In interactive mode, help is displayed only if explicitly required.
+        isInteractiveScreen |= cmdLine.HasInteractiveArgument;
+        if( isInteractiveScreen && !cmdLine.HasHelp )
+        {
+            return head;
+        }
+
         // Layout:
         // > command path <name1> <name2>   Description
         // |      <name1>                   Description

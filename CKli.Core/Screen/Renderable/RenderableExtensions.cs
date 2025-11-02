@@ -16,17 +16,19 @@ public static class RenderableExtensions
     /// </summary>
     /// <param name="r">This renderable.</param>
     /// <param name="target">The target renderer.</param>
-    public static void Render( this IRenderable r, IRenderTarget target ) => SegmentRenderer.Render( r, target );
+    /// <param name="newLine">False to not append a new line after the renderable.</param>
+    public static void Render( this IRenderable r, IRenderTarget target, bool newLine = true ) => SegmentRenderer.Render( r, target, newLine );
 
     /// <summary>
     /// Renders this into the provided string builder.
     /// </summary>
     /// <param name="r">This renderable.</param>
     /// <param name="b">The target builder.</param>
+    /// <param name="newLine">False to not append a new line after the renderable.</param>
     /// <returns>The builder.</returns>
-    public static StringBuilder RenderAsString( this IRenderable r, StringBuilder b )
+    public static StringBuilder RenderAsString( this IRenderable r, StringBuilder b, bool newLine = true )
     {
-        SegmentRenderer.Render( r, new StringScreen.Renderer( b ) );
+        SegmentRenderer.Render( r, new StringScreen.Renderer( b ), newLine );
         return b;
     }
 
