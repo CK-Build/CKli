@@ -123,7 +123,7 @@ sealed class CKliLog : Command
 
     static bool OpenLogFolder( IActivityMonitor monitor, string folder )
     {
-        Process.Start( new ProcessStartInfo()
+        using var p = Process.Start( new ProcessStartInfo()
         {
             FileName = folder,
             UseShellExecute = true,
@@ -134,11 +134,12 @@ sealed class CKliLog : Command
 
     static bool OpenLogFile( IActivityMonitor monitor, string path )
     {
-        if( Process.Start( new ProcessStartInfo()
+        using var p = Process.Start( new ProcessStartInfo()
         {
             FileName = path,
             UseShellExecute = true,
-        } ) == null )
+        } );
+        if( p == null )
         {
             monitor.Error( $"Unable to open log file '{path}'." );
             return false;
