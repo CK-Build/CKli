@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace CKli.Core;
 
@@ -366,19 +367,19 @@ sealed partial class World
     }
     sealed record Suppress( NormalizedPath Path, Uri Uri ) : LayoutAction( Path, Uri )
     {
-        public override string ToString( int skipedPathParts ) => $"Suppress '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' ({Uri})";
+        public override string ToString( int skipedPathParts ) => $"Suppressing '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' ({Uri})";
     }
     sealed record Move( NormalizedPath Path, Uri Uri, NormalizedPath NewPath, bool FixedCase ) : LayoutAction( Path, Uri )
     {
-        public override string ToString( int skipedPathParts ) => $"{(FixedCase ? "Fixed case in" : "Moved")} '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' to '{NewPath.Parts.Skip( skipedPathParts ).Concatenate( '/' )}'.";
+        public override string ToString( int skipedPathParts ) => $"{(FixedCase ? "Fixing case in" : "Moving")} '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' to '{NewPath.Parts.Skip( skipedPathParts ).Concatenate( '/' )}'.";
     }
 
-    List<LayoutAction>? CreateFixOrXifLayoutRoadMap( IActivityMonitor monitor, bool fix )
+    List<LayoutAction>? CreateFixOrXifLayoutRoadMap( IActivityMonitor monitor, bool fix, bool emitNoActionMessage = true )
     {
         var physicalLayout = ReadPhysicalLayout( monitor, !fix );
         if( physicalLayout == null ) return null;
         var actions = CreateFixOrXifLayoutRoadMap( physicalLayout, _layout, fix );
-        if( actions.Count == 0 )
+        if( emitNoActionMessage && actions.Count == 0 )
         {
             monitor.Info( ScreenType.CKliScreenTag, $"Layout '{_stackRepository.GitDisplayPath}/{_name.XmlDescriptionFilePath.LastPart}' is up-to-date with folders and repositories in '{_name.WorldRoot}'." );
         }
@@ -568,6 +569,28 @@ sealed partial class World
             return uri;
         }
 
+    }
+
+
+    internal World.Issue? CreateLayoutIssue( IActivityMonitor monitor, IScreen screen )
+    {
+        var actions = CreateFixOrXifLayoutRoadMap( monitor, fix: true, emitNoActionMessage: false );
+        if( actions == null || actions.Count == 0 ) return null;
+        var body = screen.ScreenType.Text( string.Join( Environment.NewLine, actions.Select( a => a.ToString( _name.WorldRoot.Parts.Count ) ) ) );
+        return new LayoutIssue( $"Repo layout requires {actions.Count} actions.", body );
+    }
+
+    sealed class LayoutIssue : World.Issue
+    {
+        public LayoutIssue( string title, IRenderable body )
+            : base( title, body, null )
+        {
+        }
+
+        protected internal override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world )
+        {
+            return ValueTask.FromResult( world.FixLayout( monitor, true, out _ ) );
+        }
     }
 
 }
