@@ -1,6 +1,7 @@
 using CK.Core;
 using NUnit.Framework;
 using Shouldly;
+using System.IO;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 
@@ -107,11 +108,28 @@ public class PluginTests
         // ckli plugin add VSSolutionSample@version
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "add", $"VSSolutionSample@{TestEnv.CKliPluginsCoreVersion}" )).ShouldBeTrue();
 
-        using( TestHelper.Monitor.CollectTexts( out var logs ) )
-        {
-            // ckli issue
-            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue" )).ShouldBeTrue();
-        }
+        // ckli issue
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue" )).ShouldBeTrue();
+        var display = ((StringScreen)context.Screen).ToString();
+        display.ShouldBe( """
+            > EmptySolution (1)
+            │ > Empty solution file.
+            │ │ Ignoring 2 projects:
+            │ │ CodeCakeBuilder\CodeCakeBuilder.csproj, SomeJsApp\SomeJsApp.esproj
+            > MissingSolution (1)
+            │ > No solution found. Expecting 'MissingSolution.sln' (or '.slnx').
+            > MultipleSolutions (1)
+            │ > Multiple solution files found. One of them must be 'MultipleSolutions.sln' (or '.slnx').
+            │ │ Found: 'Candidate1.slnx', 'Candidate2.sln', 'SomeOther.slnx'.
+            
+            """ );
+
+        // cd WithIssues
+        context = context.ChangeDirectory( "MultipleSolutions" );
+        // Rename "MultipleSolutions/Candidate2.sln" to "MultipleSolutions/MultipleSolutions.sln".
+        File.Move( context.CurrentDirectory.AppendPart( "Candidate2.sln" ),
+                   context.CurrentDirectory.AppendPart( "MultipleSolutions.sln" ) );
+
     }
 
 }

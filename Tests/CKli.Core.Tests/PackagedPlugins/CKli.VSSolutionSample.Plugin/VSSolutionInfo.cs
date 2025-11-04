@@ -4,6 +4,9 @@ using Microsoft.VisualStudio.SolutionPersistence.Model;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
+using System.Linq;
+using static CKli.Core.World;
 
 namespace CKli.VSSolutionSample.Plugin;
 
@@ -17,9 +20,10 @@ namespace CKli.VSSolutionSample.Plugin;
 public sealed class VSSolutionInfo : RepoInfo
 {
     readonly VSSolutionIssue _issue;
+    internal readonly List<string>? _candidatePaths;
     readonly IReadOnlyDictionary<string, SolutionProjectModel> _projects;
     readonly IReadOnlyList<SolutionProjectModel> _ignoreProjects;
-    readonly IReadOnlyList<NormalizedPath> _missingProjectFiles;
+    readonly IReadOnlyList<SolutionProjectModel> _missingProjectFiles;
     readonly string _name;
     readonly NormalizedPath _slnPath;
     readonly SolutionModel? _solution;
@@ -40,12 +44,29 @@ public sealed class VSSolutionInfo : RepoInfo
         _missingProjectFiles = [];
     }
 
+    // Failed ctor (candidates .sln only).
+    internal VSSolutionInfo( Repo repo, List<string> candidates )
+        : base( repo )
+    {
+        _issue = candidates.Count switch
+        {
+            0 => VSSolutionIssue.MissingSolution,
+            1 => VSSolutionIssue.BadNameSolution,
+            _ => VSSolutionIssue.MultipleSolutions
+        };
+        _candidatePaths = candidates;
+        _ignoreProjects = [];
+        _missingProjectFiles = [];
+        _projects = ImmutableDictionary<string, SolutionProjectModel>.Empty;
+        _name = string.Empty;
+    }
+
     // Failed ctor.
     internal VSSolutionInfo( Repo repo,
-                          VSSolutionIssue issue,
-                          SolutionModel? solution,
-                          IReadOnlyList<SolutionProjectModel>? ignoreProjects,
-                          IReadOnlyList<NormalizedPath>? missingProjectFiles )
+                             VSSolutionIssue issue,
+                             SolutionModel solution,
+                             IReadOnlyList<SolutionProjectModel>? ignoreProjects,
+                             IReadOnlyList<SolutionProjectModel>? missingProjectFiles )
         : base( repo )
     {
         _issue = issue;
@@ -83,6 +104,59 @@ public sealed class VSSolutionInfo : RepoInfo
     /// or <see cref="VSSolutionIssue.BadNameSolution"/>.
     /// </summary>
     public SolutionModel? Solution => _solution;
+
+
+    internal World.Issue CreateIssue( ScreenType screenType )
+    {
+        Throw.DebugAssert( _issue is not VSSolutionIssue.None );
+        IRenderable body = screenType.Unit;
+        if( _issue is VSSolutionIssue.MissingSolution )
+        {
+            return World.Issue.CreateManual( $"No solution found. Expecting '{Repo.DisplayPath.LastPart}.sln' (or '.slnx').",
+                                             body,
+                                             Repo );
+        }
+        if( _issue is VSSolutionIssue.BadNameSolution )
+        {
+            Throw.DebugAssert( _candidatePaths != null && _candidatePaths.Count == 1 );
+            var exist = Path.GetFileName( _candidatePaths![0].AsSpan() );
+            var title = $"Single solution file '{exist}' should be '{Repo.DisplayPath.LastPart}{Path.GetExtension( exist )}' (case matters).";
+            return World.Issue.CreateManual( title, body, Repo );
+        }
+        if( _issue is VSSolutionIssue.MultipleSolutions )
+        {
+            Throw.DebugAssert( _candidatePaths != null && _candidatePaths.Count > 1 );
+            var title = $"Multiple solution files found. One of them must be '{Repo.DisplayPath.LastPart}.sln' (or '.slnx').";
+            body = screenType.Text( $"""
+                    Found: '{_candidatePaths.Select( p => Path.GetFileName( p ) ).Concatenate( "', '" )}'.
+                    """ );
+            return World.Issue.CreateManual( title, body, Repo );
+        }
+        if( _ignoreProjects.Count > 0 )
+        {
+            body = screenType.Text( $"""
+                    Ignoring {_ignoreProjects.Count} projects:
+                    {_ignoreProjects.Select( p => p.FilePath ).Concatenate()}
+                    """ );
+        }
+        if( _issue is VSSolutionIssue.EmptySolution )
+        {
+            var title = $"Empty solution file.";
+            return World.Issue.CreateManual( title, body, Repo );
+        }
+        if( (_issue & VSSolutionIssue.DuplicateProjects) != 0 )
+        {
+            body = body.AddBelow( screenType.Text( $"Duplicate projects found (see Warnings)" ).Box() );
+        }
+        if( _missingProjectFiles.Count > 0 )
+        {
+            body = body.AddBelow( screenType.Text( $"""
+                                Missing {_missingProjectFiles.Count} declared project files:
+                                {_missingProjectFiles.Select( p => p.FilePath ).Concatenate()}
+                                """ ).Box() );
+        }
+        return World.Issue.CreateManual( "Invalid solution.", body, Repo );
+    }
 
     /// <summary>
     /// Overridden to return this <see cref="Name"/>.

@@ -5,6 +5,7 @@
     <!-- This project is compiled and packaged by the tests. -->
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
+    <LangVersion>13</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,5 +1,7 @@
 using CKli.Core;
 using System;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace CKli.VSSolutionSample.Plugin;
 

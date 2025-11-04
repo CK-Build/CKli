@@ -4,39 +4,51 @@ using Microsoft.VisualStudio.SolutionPersistence.Model;
 using Microsoft.VisualStudio.SolutionPersistence.Serializer;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace CKli.VSSolutionSample.Plugin;
 
 public sealed partial class VSSolutionSamplePlugin : RepoPlugin<VSSolutionInfo>
 {
-    public VSSolutionSamplePlugin( World world )
-        : base( world )
+    public VSSolutionSamplePlugin( PrimaryPluginContext context )
+        : base( context.World )
     {
+        World.Events.Issue += OnIssue;
+    }
 
+    void OnIssue( IssueEvent e )
+    {
+        if( !TryGetAll( e.Monitor, out var all ) ) return;
+        foreach( var s in all )
+        {
+            if( s.Issue != VSSolutionIssue.None )
+            {
+                // A BadNameSolution is the only one we COULD fix automatically but
+                // this would require an intermediate commit in the repository (on Windows)...
+                // This can be done but it's rather useless: let it be a manual action.
+                e.Add( s.CreateIssue( e.ScreenType ) );
+            }
+        }
     }
 
     protected override VSSolutionInfo Create( IActivityMonitor monitor, Repo repo )
     {
-        // Fast path: the .sln exists.
-        var content = ReadSlnOrSlnxFile( repo.DisplayPath.LastPart, out var slnPath );
+        // Fast path: the .sln or .slnx exists.
+        var content = ReadSlnOrSlnxFile( repo.WorkingFolder, out var slnPath );
         if( content != null )
         {
             return LoadProjects( monitor, repo, slnPath, content );
         }
         // No luck.
-        int candidateCount = Directory.EnumerateFiles( repo.WorkingFolder, "*.sln*" )
-                                      .Count( sln => sln.EndsWith( ".sln", StringComparison.OrdinalIgnoreCase )
-                                                     || sln.EndsWith( ".slnx", StringComparison.OrdinalIgnoreCase ) );
-        VSSolutionIssue issue = candidateCount switch
-        {
-            0 => VSSolutionIssue.MissingSolution,
-            1 => VSSolutionIssue.BadNameSolution,
-            _ => VSSolutionIssue.MultipleSolutions
-        };
+        var candidates = Directory.EnumerateFiles( repo.WorkingFolder, "*.sln*" )
+                                  .Where( sln => sln.EndsWith( ".sln", StringComparison.OrdinalIgnoreCase )
+                                                 || sln.EndsWith( ".slnx", StringComparison.OrdinalIgnoreCase ) )
+                                  .ToList();
         monitor.Warn( $"Unable to read solution from '{repo.DisplayPath}'." );
-        return new VSSolutionInfo( repo, issue, null, null, null );
+        return new VSSolutionInfo( repo, candidates );
     }
 
     static string? GetValidProjectName( NormalizedPath filePath, SolutionProjectModel p, ref List<SolutionProjectModel>? ignoredProjects )
@@ -58,18 +70,18 @@ public sealed partial class VSSolutionSamplePlugin : RepoPlugin<VSSolutionInfo>
                                         SolutionModel solution )
     {
         Dictionary<string, SolutionProjectModel>? projects = null;
-        List<NormalizedPath>? missingProjectFiles = null;
+        List<SolutionProjectModel>? missingProjectFiles = null;
         List<SolutionProjectModel>? ignoredProjects = null;
 
         VSSolutionIssue issue = VSSolutionIssue.None;
         foreach( var p in solution.SolutionProjects )
         {
-            var path = repo.WorkingFolder.Combine( p.FilePath );
+            var path = repo.WorkingFolder.Combine( p.FilePath ).ResolveDots();
             if( !File.Exists( path ) )
             {
                 monitor.Warn( $"Project file '{path}' declared in solution file '{slnPath.LastPart}' not found." );
-                missingProjectFiles ??= new List<NormalizedPath>();
-                missingProjectFiles.Add( path );
+                missingProjectFiles ??= new List<SolutionProjectModel>();
+                missingProjectFiles.Add( p );
                 issue |= VSSolutionIssue.MissingProjects;
             }
             else
@@ -81,8 +93,6 @@ public sealed partial class VSSolutionSamplePlugin : RepoPlugin<VSSolutionInfo>
                     if( !projects.TryAdd( name, p ) )
                     {
                         monitor.Warn( $"Found duplicate project '{name}' in solution file '{slnPath.LastPart}'." );
-                        ignoredProjects ??= new List<SolutionProjectModel>();
-                        ignoredProjects.Add( p );
                         issue |= VSSolutionIssue.DuplicateProjects;
                     }
                 }
@@ -96,6 +106,7 @@ public sealed partial class VSSolutionSamplePlugin : RepoPlugin<VSSolutionInfo>
         {
             return new VSSolutionInfo( repo, issue, solution, ignoredProjects, missingProjectFiles );
         }
+        // Success.
         return new VSSolutionInfo( repo, slnPath, solution, projects, ignoredProjects );
     }
 
