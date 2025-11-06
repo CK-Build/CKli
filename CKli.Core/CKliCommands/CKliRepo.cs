@@ -52,7 +52,7 @@ sealed class CKliRepo : Command
                          .Select( g => new Collapsable(
                              screenType.Text( g.Key )
                              .AddBelow( screenType.Unit.AddBelow( g.Select( r => r.ToRenderable( screenType, true, true, true ) ) )
-                                        .TableLayout() ) )
+                                                       .TableLayout() ) )
                          ) );
             }
             else

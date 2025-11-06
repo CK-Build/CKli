@@ -128,12 +128,15 @@ public sealed partial class InteractiveScreen : IScreen
         for(; ; )
         {
             var newScreen = _nextScreenBuilder( _screen.ScreenType, _header, _body, _footer )
-                                .SetWidth( _driver.UpdateScreenWidth() );
+                                .SetWidth( _driver.UpdateScreenWidth(), allowWider: false );
             if( newScreen != _previousScreen )
             {
                 newScreen.Render( _target, newLine: false );
                 _previousScreen = newScreen;
             }
+            _header.Clear();
+            _body.Clear();
+            _footer.Clear();
             CommandLineArguments? cmd = await _driver.PromptAsync( monitor );
             if( cmd == null ) break;
             _history.Add( cmd );

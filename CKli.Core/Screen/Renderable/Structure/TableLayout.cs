@@ -198,7 +198,7 @@ public partial class TableLayout : IRenderable
 
     public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight ) => _rows.BuildSegmentTree( line, parent, actualHeight );
 
-    public IRenderable SetWidth( int width )
+    public IRenderable SetWidth( int width, bool allowWider )
     {
         if( width < _minWidth ) width = _minWidth;
         if( width == _width ) return this;
@@ -210,7 +210,7 @@ public partial class TableLayout : IRenderable
             cols = ColDef.ToMinWidth( _cols );
         }
         delta = width - _nominalWidth;
-        if( delta == 0 )
+        if( delta == 0 || (delta > 0 && !allowWider ) )
         {
             cols = ColDef.ToNominalWidth( _cols );
         }

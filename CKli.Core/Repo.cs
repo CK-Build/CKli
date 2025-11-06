@@ -115,9 +115,11 @@ public sealed class Repo
         var status = GitStatus;
         var folderStyle = new TextStyle( status.IsDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen, ConsoleColor.Black );
 
+        // First Box.
         IRenderable folder = screenType.Text( DisplayPath ).HyperLink( new Uri( $"file:///{WorkingFolder}" ) );
-        if( status.IsDirty ) folder = folder.Box( paddingRight: 1 ).AddLeft( screenType.Text( "✱" ).Box( paddingRight: 1 ) );
-        else folder = folder.Box( paddingLeft: 2, paddingRight: 1 );
+        folder = status.IsDirty
+                    ? folder.Box( paddingRight: 1 ).AddLeft( screenType.Text( "✱" ).Box( paddingRight: 1 ) )
+                    : folder.Box( paddingLeft: 2, paddingRight: 1 );
         folder = folder.Box( style: folderStyle );
 
         if( withBranchName )

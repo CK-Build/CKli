@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using static System.Reflection.Metadata.BlobBuilder;
 
 namespace CKli.Core;
 
@@ -25,6 +26,11 @@ public sealed class InteractiveFooter
     /// Gets the prompt to render (without a new line after it). 
     /// </summary>
     public IRenderable Prompt => _prompt;
+
+    internal void Clear()
+    {
+        _header = null;
+    }
 
     internal void UpdatePrompt( CKliEnv context ) => _prompt = ComputePrompt( context );
 

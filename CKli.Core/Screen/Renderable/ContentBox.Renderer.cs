@@ -13,8 +13,8 @@ public sealed partial class ContentBox
         int deltaH = actualHeight - Height;
         if( deltaH != 0 )
         {
-            if( _align.IsBottom() ) topMargin += actualHeight - Height;
-            else if( _align.IsMiddle() ) topMargin += (actualHeight - Height) >> 1;
+            if( _align.IsBottom() ) topMargin += deltaH;
+            else if( _align.IsMiddle() ) topMargin += deltaH >> 1;
         }
         line -= topMargin;
         if( line < 0 )

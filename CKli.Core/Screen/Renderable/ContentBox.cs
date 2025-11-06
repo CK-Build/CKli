@@ -69,20 +69,24 @@ public sealed partial class ContentBox : IRenderable
 
     public ContentAlign Align => _align;
 
-    IRenderable IRenderable.SetWidth( int width ) => SetWidth( width );
+    IRenderable IRenderable.SetWidth( int width, bool allowWider ) => SetWidth( width, allowWider );
 
-    public ContentBox SetWidth( int width )
+    public ContentBox SetWidth( int width, bool allowWider = true )
     {
         int minWidth = MinWidth;
         if( width < minWidth ) width = minWidth;
         if( width == _width ) return this;
-        if( _origin != null ) return _origin.SetWidth( width );
+        if( _origin != null ) return _origin.SetWidth( width, allowWider );
         int delta = width - NominalWidth;
         if( delta > 0 )
         {
             // The requested width is larger than the NominalWitdh: we use our margin
             // to satisfy the request (accounting the alignment).
-            return BiggerAdjust( delta, _content.SetWidth( _content.NominalWidth ) );
+            // Note that it is this enclosing Box that adjusts its width: the content is
+            // set to its NominalWidth.
+            return allowWider
+                    ? BiggerAdjust( delta, _content.SetWidth( _content.NominalWidth, false ) )
+                    : this;
         }
         if( width == minWidth )
         {
@@ -99,11 +103,11 @@ public sealed partial class ContentBox : IRenderable
             var padding = new Filler( _padding.Top, pLeft, _padding.Bottom, pRight );
             var margin = new Filler( _margin.Top, mLeft, _margin.Bottom, mRight );
 
-            return new ContentBox( this, _content.SetWidth( 0 ), padding, margin, _align, _style );
+            return new ContentBox( this, _content.SetWidth( 0, false ), padding, margin, _align, _style );
         }
         var ourSpace = _margin.Width + _padding.Width;
         var contentWidth = width - ourSpace;
-        var newContent = _content.SetWidth( contentWidth );
+        var newContent = _content.SetWidth( contentWidth, false );
         delta = width - (ourSpace + newContent.Width);
         if( delta == 0 )
         {
@@ -188,7 +192,7 @@ public sealed partial class ContentBox : IRenderable
     {
         if( top == 0 && left == 0 && bottom == 0 && right == 0 ) return this;
         if( _origin != null ) return _origin.AddPadding( top, left, bottom, right )
-                                            .SetWidth( Width );
+                                            .SetWidth( Width, true );
 
         int vLeft = int.Clamp( left + _padding.Left, 0, short.MaxValue );
         int vRight = int.Clamp( right + _padding.Right, 0, short.MaxValue );
@@ -203,7 +207,7 @@ public sealed partial class ContentBox : IRenderable
     {
         if( top == 0 && left == 0 && bottom == 0 && right == 0 ) return this;
         if( _origin != null ) return _origin.AddMargin( top, left, bottom, right )
-                                       .SetWidth( Width );
+                                       .SetWidth( Width, true );
         int vLeft = int.Clamp( left + _margin.Left, 0, short.MaxValue );
         int vRight = int.Clamp( right + _margin.Right, 0, short.MaxValue );
         var m = new Filler( (short)int.Clamp( top + _margin.Top, 0, short.MaxValue ),
@@ -236,7 +240,7 @@ public sealed partial class ContentBox : IRenderable
             ? this
             : _origin == null
                 ? new ContentBox( null, _content, _padding, _margin, align, _style )
-                : _origin.WithAlign( align ).SetWidth( Width );
+                : _origin.WithAlign( align ).SetWidth( Width, true );
     }
 
     public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );

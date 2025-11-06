@@ -210,7 +210,7 @@ static partial class TestEnv
         {
             Throw.CheckState( StackRepository.ClearRegistry( TestHelper.Monitor ) );
         }
-        return new CKliEnv( path );
+        return new CKliEnv( path, screen: new StringScreen() );
 
         static void RemoveAllReadOnlyAttribute( string folder )
         {

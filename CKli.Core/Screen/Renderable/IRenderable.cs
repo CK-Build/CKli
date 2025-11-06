@@ -27,9 +27,13 @@ public interface IRenderable
     /// Sets this renderable width.
     /// </summary>
     /// <param name="width">The width to set.</param>
-    /// <param name="force">True to expand width greater than th <see cref="NominalWidth"/>.</param>
+    /// <param name="allowWider">
+    /// True to allow the width to be greater than the <see cref="NominalWidth"/>.
+    /// When false, the width is at most the NominalWidth (for <see cref="TextBlock"/>, this
+    /// is always the case).
+    /// </param>
     /// <returns>The renderable (may be this one).</returns>
-    IRenderable SetWidth( int width );
+    IRenderable SetWidth( int width, bool allowWider = true );
 
     /// <summary>
     /// Gets the height in characters of this renderable.

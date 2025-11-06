@@ -115,7 +115,7 @@ public sealed class ScreenType
 
         public ScreenType ScreenType { get; }
 
-        public IRenderable SetWidth( int width ) => this;
+        public IRenderable SetWidth( int width, bool allowWider ) => this;
 
         public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight ) { }
 
@@ -133,7 +133,7 @@ public sealed class ScreenType
 
         protected override void BuildSegmentTree( int line, SegmentRenderer parent ) { }
 
-        public override IRenderable SetWidth( int width ) => this;
+        public override IRenderable SetWidth( int width, bool allowWider ) => this;
     }
 
 }

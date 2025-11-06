@@ -58,11 +58,11 @@ public sealed class VerticalContent : IRenderable
 
     public ImmutableArray<IRenderable> Cells => _cells;
 
-    public IRenderable SetWidth( int width )
+    public IRenderable SetWidth( int width, bool allowWider )
     {
         if( width < _minWidth ) width = _minWidth;
         if( width == _width ) return this;
-        return ApplyTransform( r => r.SetWidth( width ) );
+        return ApplyTransform( r => r.SetWidth( width, allowWider ) );
     }
 
     /// <summary>

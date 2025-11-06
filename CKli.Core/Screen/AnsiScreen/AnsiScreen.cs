@@ -33,7 +33,7 @@ sealed partial class AnsiScreen : IScreen
         _animation.Hide();
         if( renderable.Width > _width )
         {
-            renderable = renderable.SetWidth( _width );
+            renderable = renderable.SetWidth( _width, false );
         }
         renderable.Render( _target, newLine );
     }

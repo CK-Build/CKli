@@ -67,7 +67,7 @@ public abstract class TextBlock : IRenderable
 
     protected abstract void BuildSegmentTree( int line, SegmentRenderer parent );
 
-    public abstract IRenderable SetWidth( int width );
+    public abstract IRenderable SetWidth( int width, bool allowWider = true );
 
     /// <summary>
     /// Creates a mono or multi line block of text.
@@ -141,7 +141,7 @@ public abstract class TextBlock : IRenderable
 
         public override int Height => 1;
 
-        public override IRenderable SetWidth( int width )
+        public override IRenderable SetWidth( int width, bool _ )
         {
             if( width < MinWidth ) width = MinWidth;
             if( width >= _width ) return this;
@@ -233,7 +233,7 @@ public abstract class TextBlock : IRenderable
 
         protected override void BuildSegmentTree( int line, SegmentRenderer parent ) => MultiLineRenderer.Create( parent, line, _text, _lines, _style );
 
-        public override IRenderable SetWidth( int width )
+        public override IRenderable SetWidth( int width, bool _ )
         {
             if( width < MinWidth ) width = MinWidth;
             if( width >= _width ) return this;
@@ -277,7 +277,7 @@ public abstract class TextBlock : IRenderable
 
         protected override void BuildSegmentTree( int line, SegmentRenderer previous ) => MultiLineRenderer.Create( previous, line, _text, _lines, _style );
 
-        public override IRenderable SetWidth( int width ) => _origin.SetWidth( width );
+        public override IRenderable SetWidth( int width, bool allowWider ) => _origin.SetWidth( width, allowWider );
     }
 
 }

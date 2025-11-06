@@ -26,9 +26,9 @@ public sealed class HyperLink : IRenderable
 
     public IRenderable Content => _content;
 
-    public IRenderable SetWidth( int width )
+    public IRenderable SetWidth( int width, bool allowWider )
     {
-        var newContent = _content.SetWidth( width );
+        var newContent = _content.SetWidth( width, allowWider );
         return newContent == _content ? this : new HyperLink( newContent, _target );
     }
 

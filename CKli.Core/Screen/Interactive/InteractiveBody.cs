@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using static System.Reflection.Metadata.BlobBuilder;
 
 namespace CKli.Core;
 
@@ -25,5 +26,12 @@ public sealed class InteractiveBody
     {
         get => _footer;
         set => _footer = value;
+    }
+
+    internal void Clear()
+    {
+        _header = null;
+        _content.Clear();
+        _footer = null;
     }
 }

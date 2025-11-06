@@ -22,7 +22,7 @@ sealed class ConsoleScreen : IScreen
     {
         if( renderable.Width > _width )
         {
-            renderable = renderable.SetWidth( Width );
+            renderable = renderable.SetWidth( Width, false );
         }
         renderable.Render( _target );
     }

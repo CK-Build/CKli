@@ -58,7 +58,7 @@ public sealed class HorizontalContent : IRenderable
 
     public ImmutableArray<IRenderable> Cells => _cells;
 
-    public IRenderable SetWidth( int width )
+    public IRenderable SetWidth( int width, bool allowWider )
     {
         if( width < _minWidth ) width = _minWidth;
         if( width == _width ) return this;
@@ -66,12 +66,12 @@ public sealed class HorizontalContent : IRenderable
         int delta = width - _minWidth;
         if( delta == 0 )
         {
-            return ApplyTransform( r => r.SetWidth( 0 ) );
+            return ApplyTransform( r => r.SetWidth( 0, false ) );
         }
         delta = width - _nominalWidth;
-        if( delta == 0 )
+        if( delta == 0 || (delta > 0 && !allowWider ) )
         {
-            return ApplyTransform( r => r.SetWidth( r.NominalWidth ) );
+            return ApplyTransform( r => r.SetWidth( r.NominalWidth, false ) );
         }
         double ratio = (double)width / _nominalWidth;
         var widths = new int[_cells.Length];
@@ -113,7 +113,7 @@ public sealed class HorizontalContent : IRenderable
             while( delta != 0 );
         }
         int iSet = 0;
-        return ApplyTransform( r => r.SetWidth( widths[iSet++] ) );
+        return ApplyTransform( r => r.SetWidth( widths[iSet++], allowWider ) );
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using CK.Core;
+using System;
 using System.Collections.Generic;
 
 namespace CKli.Core;
@@ -26,5 +27,12 @@ public sealed class InteractiveHeader
     {
         get => _footer;
         set => _footer = value;
+    }
+
+    internal void Clear()
+    {
+        _header = null;
+        _logs.Clear();
+        _footer = null;
     }
 }
