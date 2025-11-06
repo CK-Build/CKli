@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace CKli.Core;
 
 /// <summary>
@@ -118,6 +120,28 @@ public class SegmentRenderer
     /// </summary>
     /// <param name="target">The rendering target.</param>
     protected virtual void Render() => RenderContent();
+
+    internal static void Render( IEnumerable<IRenderable> renderables, IRenderTarget target, bool newLine )
+    {
+        target.BeginUpdate();
+        var e = renderables.GetEnumerator();
+        if( e.MoveNext() )
+        {
+            bool hasMore;
+            do
+            {
+                var r = e.Current;
+                hasMore = e.MoveNext();
+                for( int line = 0; line < r.Height; line++ )
+                {
+                    RenderLine( r, target, line, r.Height );
+                    target.EndOfLine( hasMore || newLine || line < r.Height - 1 );
+                }
+            }
+            while( !hasMore );
+        }
+        target.EndUpdate();
+    }
 
     internal static void Render( IRenderable r, IRenderTarget target, bool newLine )
     {

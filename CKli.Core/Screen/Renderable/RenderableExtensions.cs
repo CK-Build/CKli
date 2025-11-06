@@ -20,6 +20,14 @@ public static class RenderableExtensions
     public static void Render( this IRenderable r, IRenderTarget target, bool newLine = true ) => SegmentRenderer.Render( r, target, newLine );
 
     /// <summary>
+    /// Renders these renderables into the provided <see cref="IRenderTarget"/>.
+    /// </summary>
+    /// <param name="renderables">This renderables.</param>
+    /// <param name="target">The target renderer.</param>
+    /// <param name="newLine">False to not append a new line after the last renderable.</param>
+    public static void Render( this IEnumerable<IRenderable> renderables, IRenderTarget target, bool newLine = true ) => SegmentRenderer.Render( renderables, target, newLine );
+
+    /// <summary>
     /// Renders this into the provided string builder.
     /// </summary>
     /// <param name="r">This renderable.</param>
@@ -28,7 +36,7 @@ public static class RenderableExtensions
     /// <returns>The builder.</returns>
     public static StringBuilder RenderAsString( this IRenderable r, StringBuilder b, bool newLine = true )
     {
-        SegmentRenderer.Render( r, new StringScreen.Renderer( b ), newLine );
+        SegmentRenderer.Render( r, new StringScreen.RenderTarget( b ), newLine );
         return b;
     }
 

@@ -17,15 +17,13 @@ public sealed class NoScreen : IScreen
 
     public int Width => IScreen.MaxScreenWidth;
 
-    public void OnLog( LogLevel level, string message, bool isOpenGroup ) { }
+    public void ScreenLog( LogLevel level, string message ) { }
 
-    void IScreen.OnLogOther( LogLevel level, string? text, bool isOpenGroup ) { }
+    void IScreen.OnLog( LogLevel level, string? text, bool isOpenGroup ) { }
 
-    void IScreen.Close()
-    {
-    }
+    void IScreen.Close() { }
 
-    IInteractiveScreen? IScreen.TryCreateInteractive( IActivityMonitor monitor )
+    InteractiveScreen? IScreen.TryCreateInteractive( IActivityMonitor monitor, CKliEnv context )
     {
         monitor.Warn( $"Screen type '{nameof( NoScreen )}' doesn't support interactive mode." );
         return null;

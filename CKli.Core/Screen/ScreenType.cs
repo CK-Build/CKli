@@ -1,4 +1,5 @@
 using CK.Core;
+using System;
 using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.Core;
@@ -11,8 +12,20 @@ public sealed class ScreenType
 {
     readonly IRenderable _unit;
     TextBlock? _emptyString;
+    IRenderable? _errorHead;
+    IRenderable? _warningHead;
     readonly bool _canBeInteractive;
     readonly bool _hasAnsiLink;
+
+    IRenderable ErrorHead => _errorHead ??= Text( "Error:" )
+                                            .Box( paddingLeft: 1,
+                                                  paddingRight: 1,
+                                                  style: new TextStyle( new Color( ConsoleColor.Black, ConsoleColor.DarkRed ), TextEffect.Bold ) );
+
+    IRenderable WarningHead => _warningHead ??= Text( "Warning:" )
+                                                .Box( paddingLeft: 1,
+                                                      paddingRight: 1,
+                                                      style: new TextStyle( new Color( ConsoleColor.Yellow, ConsoleColor.Black ), TextEffect.Bold ) );
 
     /// <summary>
     /// Gets a passive, basic screen type. Applies to <see cref="StringScreen"/> and <see cref="NoScreen"/>.
@@ -67,6 +80,23 @@ public sealed class ScreenType
     /// <returns>The renderable.</returns>
     [return: NotNullIfNotNull( nameof( text ) )]
     public TextBlock? Text( string? text, TextStyle style = default ) => TextBlock.FromText( this, text, style );
+
+    /// <summary>
+    /// Creates a renderable log.
+    /// </summary>
+    /// <param name="level">The log level.</param>
+    /// <param name="message">The log message.</param>
+    /// <returns>The renderable.</returns>
+    public IRenderable CreateLog( LogLevel level, string message )
+    {
+        if( level >= LogLevel.Warn )
+        {
+            var h = level == LogLevel.Warn ? WarningHead : ErrorHead;
+            return h.AddRight( Text( message, TextStyle.Default ) );
+        }
+        return Text( message, TextStyle.Default );
+    }
+
 
     sealed class RenderableUnit : IRenderable
     {

@@ -4,14 +4,14 @@ using System.Text;
 
 namespace CKli.Core;
 
-sealed class NoColorScreen : IScreen
+sealed class ConsoleScreen : IScreen
 {
     static ScreenType _screenType = new ScreenType( true, false );
 
     readonly RenderTarget _target;
     int? _width;
 
-    public NoColorScreen()
+    public ConsoleScreen()
     {
         _target = new RenderTarget();
     }
@@ -29,7 +29,7 @@ sealed class NoColorScreen : IScreen
 
     public int Width => _width ??= GetWindowWidth();
 
-    static int GetWindowWidth()
+    internal static int GetWindowWidth()
     {
         try
         {
@@ -43,7 +43,7 @@ sealed class NoColorScreen : IScreen
         }
     }
 
-    public void OnLog( LogLevel level, string message, bool isOpenGroup )
+    public void ScreenLog( LogLevel level, string message )
     {
         if( level == LogLevel.Warn )
         {
@@ -58,17 +58,15 @@ sealed class NoColorScreen : IScreen
         Console.Out.WriteLine( b.ToString() );
     }
 
-    public void OnLogOther( LogLevel level, string? text, bool isOpenGroup )
+    public void OnLog( LogLevel level, string? text, bool isOpenGroup )
     {
     }
 
-    void IScreen.Close()
-    {
-    }
+    void IScreen.Close() { }
 
-    public IInteractiveScreen? TryCreateInteractive( IActivityMonitor monitor )
+    public InteractiveScreen? TryCreateInteractive( IActivityMonitor monitor, CKliEnv context )
     {
-        monitor.Warn( $"Screen type '{nameof(NoColorScreen)}' doesn't support interactive mode yet." );
+        monitor.Warn( $"Screen type '{nameof(ConsoleScreen)}' doesn't support interactive mode yet." );
         return null;
     }
 

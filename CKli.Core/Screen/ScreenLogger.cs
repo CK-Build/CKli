@@ -21,7 +21,7 @@ public sealed class ScreenLogger : IActivityMonitorClient
 
     public void OnGroupClosed( IActivityLogGroup group, IReadOnlyList<ActivityLogGroupConclusion> conclusions )
     {
-        _screen.OnLogOther( LogLevel.None, null, false );
+        _screen.OnLog( LogLevel.None, null, false );
     }
 
     public void OnGroupClosing( IActivityLogGroup group, ref List<ActivityLogGroupConclusion>? conclusions )
@@ -41,11 +41,8 @@ public sealed class ScreenLogger : IActivityMonitorClient
         var l = data.MaskedLevel;
         if( l >= LogLevel.Warn || data.Tags.Overlaps( ScreenType.CKliScreenTag ) )
         {
-            _screen.OnLog( l, data.Text, isOpenGroup );
+            _screen.ScreenLog( l, data.Text );
         }
-        else
-        {
-            _screen.OnLogOther( l, data.Text, isOpenGroup );
-        }
+        _screen.OnLog( l, data.Text, isOpenGroup );
     }
 }

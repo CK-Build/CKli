@@ -34,12 +34,12 @@ public interface IScreen
     /// Called whenever a error (can be <see cref="LogLevel.Fatal"/>) or a warning or
     /// <see cref="ScreenType.CKliScreenTag"/> log is emitted.
     /// <para>
-    /// Can be used directly to emit non logged errors or warnings.
+    /// Can be used directly to display non logged errors or warnings.
     /// </para>
     /// </summary>
     /// <param name="level">The level.</param>
     /// <param name="text">The message.</param>
-    void OnLog( LogLevel level, string text, bool isOpenGroup = false );
+    void ScreenLog( LogLevel level, string text );
 
     /// <summary>
     /// All screens returns an empty string except <see cref="StringScreen"/> that returns
@@ -48,9 +48,9 @@ public interface IScreen
     /// <returns>A non null string.</returns>
     string ToString();
 
-    internal void OnLogOther( LogLevel level, string? text, bool isOpenGroup );
+    internal void OnLog( LogLevel level, string? text, bool isOpenGroup );
 
     internal void Close();
 
-    internal IInteractiveScreen? TryCreateInteractive( IActivityMonitor monitor );
+    internal InteractiveScreen? TryCreateInteractive( IActivityMonitor monitor, CKliEnv context );
 }

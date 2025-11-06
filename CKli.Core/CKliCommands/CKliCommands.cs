@@ -68,6 +68,20 @@ public static class CKliCommands
                                                       CKliEnv context,
                                                       CommandLineArguments cmdLine )
     {
+        // Honor the "ckli i" if specified.
+        // The command will be handled below but with the InteractiveSreen (the command may use it)
+        // and we will enter the interactive loop if this is the first command (History is empty and no
+        // PreviousScreen exist) rather than returning from this method.
+        var interactiveScreen = context.Screen as InteractiveScreen;
+        if( interactiveScreen == null && cmdLine.HasInteractiveArgument )
+        {
+            interactiveScreen = context.Screen.TryCreateInteractive( monitor, context );
+            if( interactiveScreen != null )
+            {
+                context = interactiveScreen.Context;
+            }
+        }
+
         // First, tries to locate a CKli intrinsic command and handles it independently when found:
         // one cannot mix the 2 kind of commands: some CKli commands loads the current Stack and World if
         // needed, we cannot pre-load the current World here.
@@ -94,6 +108,7 @@ public static class CKliCommands
         var (stack, world) = StackRepository.TryOpenWorldFromPath( monitor, context, out bool error, skipPullStack: true );
         if( error )
         {
+            // Don't enter interactive mode on error here.
             Throw.DebugAssert( stack == null && world == null );
             return ValueTask.FromResult( false );
         }
@@ -223,33 +238,11 @@ public static class CKliCommands
                                                    StackRepository? initialStack,
                                                    bool initialResult )
     {
-        if( cmdLine.HasInteractiveArgument && context.Screen is not IInteractiveScreen )
+        if( context.Screen is InteractiveScreen interactive && interactive.PreviousScreen == null )
         {
-            var iScreen = context.Screen.TryCreateInteractive( monitor );
-            if( iScreen != null )
-            {
-                if( !context.Screen.ScreenType.CanBeInteractive )
-                {
-                    monitor.Warn( $"Screen type '{context.Screen.GetType().Name}' doesn't support interactive mode." );
-                }
-                else
-                {
-                    initialStack?.Dispose();
-                    return new ValueTask<bool>( RunInteractiveAsync( monitor, context, iScreen ) );
-                }
-            }
+            initialStack?.Dispose();
+            return new ValueTask<bool>( interactive.RunInteractiveAsync( monitor, cmdLine ) );
         }
         return ValueTask.FromResult( initialResult );
-    }
-
-    static async Task<bool> RunInteractiveAsync( IActivityMonitor monitor, CKliEnv context, IInteractiveScreen iScreen )
-    {
-        var iContext = new CKliEnv( iScreen, context.SecretsStore, context.CurrentDirectory, context.CurrentStackPath );
-        for(; ; )
-        {
-            CommandLineArguments? cmd = await iScreen.PromptAsync( monitor, iContext );
-            if( cmd == null ) return true;
-            await HandleCommandAsync( monitor, iContext, cmd );
-        }
     }
 }

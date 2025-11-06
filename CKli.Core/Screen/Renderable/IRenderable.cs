@@ -27,6 +27,7 @@ public interface IRenderable
     /// Sets this renderable width.
     /// </summary>
     /// <param name="width">The width to set.</param>
+    /// <param name="force">True to expand width greater than th <see cref="NominalWidth"/>.</param>
     /// <returns>The renderable (may be this one).</returns>
     IRenderable SetWidth( int width );
 

@@ -25,7 +25,7 @@ public static class ScreenExtensions
                                     ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
     {
         var h = CreateDisplayHelp( screen.ScreenType,
-                                   screen is IInteractiveScreen,
+                                   screen is InteractiveScreen,
                                    commands,
                                    cmdLine,
                                    globalOptions,

@@ -72,7 +72,7 @@ public static class CKliRootEnv
                 }
                 else
                 {
-                    _screen.OnLog( LogLevel.Warn, $"""
+                    _screen.ScreenLog( LogLevel.Warn, $"""
                     Invalid '{configFilePath}':
                     {lines.Concatenate( Environment.NewLine )}
                     Resetting it to default values.
@@ -88,7 +88,7 @@ public static class CKliRootEnv
         }
         catch( Exception ex )
         {
-            _screen.OnLog( LogLevel.Warn, $"""
+            _screen.ScreenLog( LogLevel.Warn, $"""
                 Error while initializing CKliRootEnv:
                 {CKExceptionData.CreateFrom( ex )}
                 Resetting the '{configFilePath}' to default values.
@@ -141,7 +141,7 @@ public static class CKliRootEnv
                 if( optScreen.Equals( "no-color", StringComparison.OrdinalIgnoreCase )
                     || optScreen.Equals( "no_color", StringComparison.OrdinalIgnoreCase ) )
                 {
-                    return new NoColorScreen();
+                    return new ConsoleScreen();
                 }
                 if( optScreen.Equals( "none", StringComparison.OrdinalIgnoreCase ) )
                 {
@@ -156,7 +156,7 @@ public static class CKliRootEnv
             {
                 (ansiConsole, originalConsoleMode) = AnsiDetector.TryEnableAnsiColorCodes();
             }
-            IScreen s = forceAnsi || ansiConsole ? new AnsiScreen( originalConsoleMode ) : new NoColorScreen();
+            IScreen s = forceAnsi || ansiConsole ? new AnsiScreen( originalConsoleMode ) : new ConsoleScreen();
             return s;
         }
     }

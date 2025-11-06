@@ -41,15 +41,16 @@ sealed class CKliFetch : Command
         }
         try
         {
-            if( !all )
+            var repos = all
+                        ? world.GetAllDefinedRepo( monitor )
+                        : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
+            if( repos == null ) return false;
+            bool success = true;
+            foreach( var r in repos )
             {
-                var repo = world.TryGetRepo( monitor, context.CurrentDirectory );
-                if( repo != null )
-                {
-                    return repo.Fetch( monitor, originOnly: !fromAllRemotes );
-                }
+                success &= r.Fetch( monitor, originOnly: !fromAllRemotes );
             }
-            return world.Fetch( monitor, originOnly: !fromAllRemotes );
+            return success;
         }
         finally
         {

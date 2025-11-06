@@ -211,11 +211,11 @@ public sealed partial class World
         var all = GetAllDefinedRepo( monitor );
         if( all == null ) return false;
         bool success = true;
-        foreach( var g in all )
+        foreach( var r in all )
         {
-            if( skipPull == null || skipPull( g ) )
+            if( skipPull == null || skipPull( r ) )
             {
-                success &= g.Pull( monitor ).IsSuccess();
+                success &= r.Pull( monitor ).IsSuccess();
             }
         }
         return success;
@@ -318,6 +318,46 @@ public sealed partial class World
     public Repo? TryGetRepo( IActivityMonitor monitor, string uriOrPath ) => TryLoadDefinedGitRepository( monitor, uriOrPath, false );
 
     /// <summary>
+    /// Gets all <see cref="Repo"/> from the provided path (case insensitive) that must be below or equal
+    /// to this <see cref="LocalWorldName.WorldRoot"/> (otherwise an <see cref="ArgumentException"/> is thrown).
+    /// <para>
+    /// The returned list may be empty if this world is empty.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The path that must be below the world root.</param>
+    /// <returns>The repositories or null on error.</returns>
+    public IReadOnlyList<Repo>? GetAllDefinedRepo( IActivityMonitor monitor, NormalizedPath path )
+    {
+        Throw.CheckArgument( IsBelowPathOrEqual( _name.WorldRoot, path ) );
+        var worldPath = _name.WorldRoot.Path;
+        if( _name.WorldRoot.Path.Length == path.Path.Length )
+        {
+            return GetAllDefinedRepo( monitor );
+        }
+
+        // Load only one Repo if possible.
+        var belowOne = TryLoadDefinedGitRepository( monitor, path, false );
+        if( belowOne != null ) return [belowOne];
+
+        var all = GetAllDefinedRepo( monitor );
+        if( all == null ) return null;
+        var result = new List<Repo>();
+        foreach( var repo in all )
+        {
+            var p = repo.WorkingFolder.Path;
+            Throw.DebugAssert( "We must have resolved it above (belowOne).",
+                               !p.StartsWith( path, StringComparison.OrdinalIgnoreCase ) || p.Length > path.Path.Length );
+            if( p.StartsWith( path, StringComparison.OrdinalIgnoreCase )
+                && p[path.Path.Length] == '/' )
+            {
+                result.Add( repo );
+            } 
+        }
+        return result;
+    }
+
+    /// <summary>
     /// Tries to load all the <see cref="Repo"/> in the <see cref="Layout"/>.
     /// The repositories are cached: this must be called to work with all repositories.
     /// </summary>
@@ -347,20 +387,20 @@ public sealed partial class World
         for( index = 0; index < _layout.Count; ++index )
         {
             var (path, uri) = _layout[index];
-            if( MatchPath( key, path )
+            if( IsBelowPathOrEqual( path, key )
                 || uri.ToString().Equals( key, StringComparison.OrdinalIgnoreCase ) )
             {
                 return path;
             }
         }
         return default;
+    }
 
-        static bool MatchPath( string key, NormalizedPath path )
-        {
-            var p = path.Path;
-            return p.StartsWith( key, StringComparison.OrdinalIgnoreCase )
-                   && (p.Length == key.Length || key[p.Length] is '/' or '\\');
-        }
+    static bool IsBelowPathOrEqual( NormalizedPath path, string candidate )
+    {
+        var p = path.Path;
+        return p.StartsWith( candidate, StringComparison.OrdinalIgnoreCase )
+                && (p.Length == candidate.Length || p[candidate.Length] is '/' or '\\');
     }
 
     Repo? TryLoadDefinedGitRepository( IActivityMonitor monitor, string key, bool mustExist )

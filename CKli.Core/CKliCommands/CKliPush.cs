@@ -47,19 +47,33 @@ sealed class CKliPush : Command
         }
         try
         {
-            if( !all )
+            bool success = true;
+            if( !stackOnly )
             {
-                var repo = world.TryGetRepo( monitor, context.CurrentDirectory );
-                if( repo != null )
+                var repos = all
+                     ? world.GetAllDefinedRepo( monitor )
+                     : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
+                if( repos == null )
                 {
-                    return repo.Push( monitor );
+                    success = false;
+                }
+                else
+                {
+                    foreach( var r in repos )
+                    {
+                        success &= r.Push( monitor );
+                        if( !success && !continueOnError )
+                        {
+                            break;
+                        }
+                    }
                 }
             }
-            if( !stack.PushChanges( monitor ) )
+            if( success || continueOnError )
             {
-                return false;
+                success &= stack.PushChanges( monitor );
             }
-            return stackOnly || world.Push( monitor, !continueOnError );
+            return success;
         }
         finally
         {

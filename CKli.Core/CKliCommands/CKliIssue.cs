@@ -55,24 +55,12 @@ sealed class CKliIssue : Command
                 monitor.Warn( disabledPlugin );
                 return ValueTask.FromResult( true );
             }
-            // Scope: All or Single repo?
-            // => Not good!!!! Should use the Folders to work on a a sub set of Repo.
-            // => Need a world.TryGetRepositories( context.CurrentDirectory ) => IReadOnlyList<Repo>
-            //
-            Repo? singleRepo = null;
-            IReadOnlyList<Repo>? allRepo = null;
-            if( all )
-            {
-                allRepo = world.GetAllDefinedRepo( monitor );
-                if( allRepo == null ) return ValueTask.FromResult( false );
-            }
-            else
-            {
-                singleRepo = world.TryGetRepo( monitor, context.CurrentDirectory );
-                if( singleRepo == null ) return ValueTask.FromResult( false );
-            }
+            IReadOnlyList<Repo>? repos = all
+                                          ? world.GetAllDefinedRepo( monitor )
+                                          : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
+            if( repos == null ) return ValueTask.FromResult( false );
 
-            if( !world.Events.SafeRaiseEvent( monitor, new IssueEvent( monitor, world, issues ) ) )
+            if( repos.Count > 0 && !world.Events.SafeRaiseEvent( monitor, new IssueEvent( monitor, world, repos, issues ) ) )
             {
                 return ValueTask.FromResult( false );
             }
@@ -109,7 +97,7 @@ sealed class CKliIssue : Command
                                         .HyperLink( new Uri( $"file://{world.Name.WorldRoot}" ) )
                                     : context.Screen.ScreenType.Text( g.Key.DisplayPath )
                                         .HyperLink( new Uri( $"file://{g.Key.WorkingFolder}" ) );
-                        var header = link.Box( marginRight: 1 ).AddRight( context.Screen.ScreenType.Text( $"({g.Count()})" ) );
+                        var header = link.Box( marginRight: 1 ).AddRight( context.Screen.ScreenType.Text( $"({g.Count()})", new TextStyle( TextEffect.Italic ) ) );
                         var repo = header.AddBelow( g.Select( i => i.ToRenderable( context.Screen.ScreenType ) ) );
                         context.Screen.Display( new Collapsable( repo ) );
                     }

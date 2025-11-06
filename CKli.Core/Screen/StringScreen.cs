@@ -1,6 +1,7 @@
 using CK.Core;
 using System;
 using System.Text;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace CKli.Core;
 
@@ -10,57 +11,49 @@ namespace CKli.Core;
 /// </summary>
 public sealed class StringScreen : IScreen
 {
-    readonly StringBuilder _buffer;
+    readonly RenderTarget _renderer;
 
     /// <summary>
     /// Initializes a new string screen.
     /// </summary>
     public StringScreen()
     {
-        _buffer = new StringBuilder();
+        _renderer = new RenderTarget( new StringBuilder() );
     }
 
     /// <inheritdoc />
     public ScreenType ScreenType => ScreenType.Default;
 
     /// <inheritdoc />
-    public void Display( IRenderable renderable ) => _buffer.Append( renderable.RenderAsString() );
+    public void Display( IRenderable renderable ) => renderable.Render( _renderer );
 
     /// <inheritdoc />
     public int Width => IScreen.MaxScreenWidth;
 
     /// <inheritdoc />
-    public void OnLog( LogLevel level, string message, bool isOpenGroup )
-    {
-        _buffer.Append( level == LogLevel.Warn ? "Warning: " : "Error: " ).Append( message ).AppendLine();
-    }
+    public void ScreenLog( LogLevel level, string message ) => ScreenType.Default.CreateLog( level, message ).Render( _renderer );
 
-    void IScreen.OnLogOther( LogLevel level, string? text, bool isOpenGroup )
-    {
-    }
+    void IScreen.OnLog( LogLevel level, string? text, bool isOpenGroup ) { }
 
-    void IScreen.Close()
-    {
-    }
+    void IScreen.Close() { }
 
-    IInteractiveScreen? IScreen.TryCreateInteractive( IActivityMonitor monitor )
+    InteractiveScreen? IScreen.TryCreateInteractive( IActivityMonitor monitor, CKliEnv context )
     {
         monitor.Warn( $"Screen type '{nameof( StringScreen )}' doesn't support interactive mode." );
         return null;
     }
 
-
     /// <summary>
     /// Gets the screen content.
     /// </summary>
     /// <returns>The screen content.</returns>
-    public override string ToString() => _buffer.ToString();
+    public override string ToString() => _renderer.ToString();
 
-    internal sealed class Renderer : IRenderTarget
+    internal sealed class RenderTarget : IRenderTarget
     {
         readonly StringBuilder _b;
 
-        public Renderer( StringBuilder b ) => _b = b;
+        public RenderTarget( StringBuilder b ) => _b = b;
 
         public void Write( ReadOnlySpan<char> s, TextStyle style ) => _b.Append( s );
 

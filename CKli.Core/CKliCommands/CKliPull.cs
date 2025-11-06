@@ -41,15 +41,16 @@ sealed class CKliPull : Command
             }
             try
             {
-                if( !all )
+                var repos = all
+                            ? world.GetAllDefinedRepo( monitor )
+                            : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
+                if( repos == null ) return false;
+                bool success = true;
+                foreach( var r in repos )
                 {
-                    var repo = world.TryGetRepo( monitor, context.CurrentDirectory );
-                    if( repo != null )
-                    {
-                        return repo.Pull( monitor ).IsSuccess();
-                    }
+                    success &= r.Pull( monitor ).IsSuccess();
                 }
-                return world.Pull( monitor );
+                return success;
             }
             finally
             {
