@@ -213,6 +213,66 @@ public class ScreenTableLayoutTests
                     """ );
     }
 
+
+    [Test]
+    public void Repo_like()
+    {
+        var all = ScreenType.Default.Unit.AddBelow( CreateRepo( "Some-Repo", "master", true ),
+                                                    CreateRepo( "Some-other-Repo", "develop", false ) )
+                                         .TableLayout();
+        all.Width.ShouldBe( 18 + 8 + 39 );
+        DebugRenderer.Render( all ).ShouldBe( """
+                    * Some-Repo       master  https://github.com/org/Some-Repo       ⮐
+                      Some-other-Repo develop https://github.com/org/Some-other-Repo ⮐
+
+                    """ );
+        all = all.SetWidth( all.Width - 1 );
+        DebugRenderer.Render( all ).ShouldBe( """
+                    * Some-Repo       master  https://github.com/org/Some-Repo      ⮐
+                      Some-other-Repo develop https://github.com/org/Some-other     ⮐
+                                              -Repo                                 ⮐
+
+                    """ );
+        all = all.SetWidth( all.Width - 2 );
+        DebugRenderer.Render( all ).ShouldBe( """
+                    * Some-Repo      master  https://github.com/org/Some-Repo     ⮐
+                      Some-other     develop https://github.com/org/Some-other    ⮐
+                      -Repo                  -Repo                                ⮐
+
+                    """ );
+
+        all = all.SetWidth( all.Width - 3 );
+        DebugRenderer.Render( all ).ShouldBe( """
+                    * Some-Repo     master  https://github.com/org/Some-Repo   ⮐
+                      Some-other    develop https://github.com/org/Some-other  ⮐
+                      -Repo                 -Repo                              ⮐
+
+                    """ );
+
+        all = all.SetWidth( all.Width - 2 );
+        DebugRenderer.Render( all ).ShouldBe( """
+                    * Some-Repo     master  https://github.com/org/Some-Repo ⮐
+                      Some-other    develop https://github.com/org/Some      ⮐
+                      -Repo                 -other-Repo                      ⮐
+
+                    """ );
+
+        static IRenderable CreateRepo( string name, string branchName, bool isDirty )
+        {
+            IRenderable folder = ScreenType.Default.Text( name ).HyperLink( new Uri( $"file:///{name}" ) );
+            folder = isDirty
+                        ? folder.Box( paddingRight: 1 ).AddLeft( ScreenType.Default.Text( "*" ).Box( paddingRight: 1 ) )
+                        : folder.Box( paddingLeft: 2, paddingRight: 1 );
+            folder = folder.Box();
+
+            folder = folder.AddRight( ScreenType.Default.Text( branchName ).Box( marginRight: 1 ) );
+            var url = $"https://github.com/org/{name}";
+            folder = folder.AddRight( ScreenType.Default.Text( url ).HyperLink( new Uri( url ) ).Box( marginRight: 1 ) );
+            return folder;
+        }
+
+    }
+
     sealed class ZCommand : Command
     {
         public ZCommand()

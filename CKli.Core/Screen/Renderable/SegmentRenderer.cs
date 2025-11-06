@@ -25,16 +25,8 @@ public class SegmentRenderer
         _parentStyle = TextStyle.Default;
     }
 
-    /// <summary>
-    /// Initializes a new segment renderer without content.
-    /// </summary>
-    /// <param name="parent">The parent renderer.</param>
-    /// <param name="length">
-    /// The number of characters that must be rendered. This is most often the <see cref="IRenderable.Width"/>
-    /// but can be the length of a smaller line in a multi line content.
-    /// </param>
-    /// <param name="style">Optional text style to apply.</param>
-    protected SegmentRenderer( SegmentRenderer parent, int length, TextStyle style = default )
+    // Child renderer. The Length must be specified.
+    SegmentRenderer( SegmentRenderer parent, TextStyle style )
     {
         _parent = parent;
         _target = parent._target;
@@ -48,20 +40,32 @@ public class SegmentRenderer
             _parent._lastChild._next = this;
             _parent._lastChild = this;
         }
-        _length = length;
-        parent._contentLength += length;
         _parentStyle = parent._style;
         _style = _parentStyle.OverrideWith( style );
     }
 
     /// <summary>
-    /// Initializes a new segment renderer that has a content.
+    /// Initializes a new segment renderer without content.
     /// </summary>
     /// <param name="parent">The parent renderer.</param>
     /// <param name="length">
     /// The number of characters that must be rendered. This is most often the <see cref="IRenderable.Width"/>
     /// but can be the length of a smaller line in a multi line content.
     /// </param>
+    /// <param name="style">Optional text style to apply.</param>
+    protected SegmentRenderer( SegmentRenderer parent, int length, TextStyle style = default )
+        : this( parent, style )
+    {
+        _length = length;
+        parent._contentLength += length;
+    }
+
+    /// <summary>
+    /// Initializes a new segment renderer that has a content and a length that is bigger than than
+    /// the content's length: the renderer must fill the difference.
+    /// </summary>
+    /// <param name="parent">The parent renderer.</param>
+    /// <param name="length">The number of characters that must be rendered.</param>
     /// <param name="content">The content.</param>
     /// <param name="line">The rendered line number.</param>
     /// <param name="actualHeight">The actual height.</param>
@@ -70,6 +74,25 @@ public class SegmentRenderer
         : this( parent, length, style )
     {
         content.BuildSegmentTree( line, this, actualHeight );
+    }
+
+    /// <summary>
+    /// Initializes a new segment renderer that wraps a content. Its length is the content length.
+    /// </summary>
+    /// <param name="parent">The parent renderer.</param>
+    /// <param name="content">The content.</param>
+    /// <param name="line">The rendered line number.</param>
+    /// <param name="actualHeight">The actual height.</param>
+    /// <param name="style">Optional text style to apply.</param>
+    public SegmentRenderer( SegmentRenderer parent, IRenderable content, int line, int actualHeight, TextStyle style = default )
+        : this( parent, style )
+    {
+        content.BuildSegmentTree( line, this, actualHeight );
+        if( _firstChild != null )
+        {
+            _length = _firstChild._length;
+            parent._contentLength += _length;
+        }
     }
 
     /// <summary>

@@ -48,17 +48,17 @@ public sealed class HyperLink : IRenderable
         {
             if( ScreenType.HasAnsiLink )
             {
-                _ = new HyperLinkRenderer( parent, Width, _content, line, actualHeight, _target );
+                _ = new HyperLinkRenderer( parent, _content, line, actualHeight, _target );
             }
             else
             {
-                _ = new SegmentRenderer( parent, Width, _content, line, actualHeight );
+                _ = new SegmentRenderer( parent, _content, line, actualHeight );
             }
         }
     }
 
-    sealed class HyperLinkRenderer( SegmentRenderer parent, int length, IRenderable content, int line, int actualHeight, Uri target )
-        : SegmentRenderer( parent, length, content, line, actualHeight )
+    sealed class HyperLinkRenderer( SegmentRenderer parent, IRenderable content, int line, int actualHeight, Uri target )
+        : SegmentRenderer( parent, content, line, actualHeight )
     {
         protected override void Render()
         {
