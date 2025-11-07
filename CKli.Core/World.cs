@@ -399,8 +399,8 @@ public sealed partial class World
     static bool IsBelowPathOrEqual( NormalizedPath path, string candidate )
     {
         var p = path.Path;
-        return p.StartsWith( candidate, StringComparison.OrdinalIgnoreCase )
-                && (p.Length == candidate.Length || p[candidate.Length] is '/' or '\\');
+        return candidate.StartsWith( p, StringComparison.OrdinalIgnoreCase )
+                && (p.Length == candidate.Length || candidate[p.Length] is '/' or '\\');
     }
 
     Repo? TryLoadDefinedGitRepository( IActivityMonitor monitor, string key, bool mustExist )

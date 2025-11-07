@@ -21,14 +21,11 @@ public sealed partial class VSSolutionSamplePlugin : RepoPlugin<VSSolutionInfo>
 
     void OnIssue( IssueEvent e )
     {
-        if( !TryGetAll( e.Monitor, out var all ) ) return;
-        foreach( var s in all )
+        foreach( var r in e.Repos )
         {
-            if( s.Issue != VSSolutionIssue.None )
+            var s = TryGet( r );
+            if( s != null && s.Issue != VSSolutionIssue.None )
             {
-                // A BadNameSolution is the only one we COULD fix automatically but
-                // this would require an intermediate commit in the repository (on Windows)...
-                // This can be done but it's rather useless: let it be a manual action.
                 e.Add( s.CreateIssue( e.ScreenType ) );
             }
         }

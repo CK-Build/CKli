@@ -42,7 +42,6 @@ CKliRootEnv.GlobalFlags = GetGlobalFlags;
 
 var monitor = new ActivityMonitor();
 monitor.Output.RegisterClient( new ScreenLogger( CKliRootEnv.Screen ) );
-monitor.Info( $"Executing '{arguments.InitialAsStringArguments}'." );
 
 CoreApplicationIdentity.Initialize();
 

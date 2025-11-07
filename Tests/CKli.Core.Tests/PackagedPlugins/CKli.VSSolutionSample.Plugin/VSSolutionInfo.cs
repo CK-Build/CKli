@@ -118,6 +118,10 @@ public sealed class VSSolutionInfo : RepoInfo
         }
         if( _issue is VSSolutionIssue.BadNameSolution )
         {
+            // A BadNameSolution is the only one we COULD fix automatically but
+            // this would require an intermediate commit in the repository (on
+            // Windows to fix the case)...
+            // This can be done but it's rather useless: let it be a manual action.
             Throw.DebugAssert( _candidatePaths != null && _candidatePaths.Count == 1 );
             var exist = Path.GetFileName( _candidatePaths![0].AsSpan() );
             var title = $"Single solution file '{exist}' should be '{Repo.DisplayPath.LastPart}{Path.GetExtension( exist )}' (case matters).";

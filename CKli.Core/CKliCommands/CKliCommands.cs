@@ -68,6 +68,8 @@ public static class CKliCommands
                                                       CKliEnv context,
                                                       CommandLineArguments cmdLine )
     {
+        monitor.Info( $"Executing '{cmdLine.InitialAsStringArguments}'." );
+
         // Honor the "ckli i" if specified.
         // The command will be handled below but with the InteractiveSreen (the command may use it)
         // and we will enter the interactive loop if this is the first command (History is empty and no
@@ -238,10 +240,18 @@ public static class CKliCommands
                                                    StackRepository? initialStack,
                                                    bool initialResult )
     {
-        if( context.Screen is InteractiveScreen interactive && interactive.PreviousScreen == null )
+        if( context.Screen is InteractiveScreen interactive )
         {
-            initialStack?.Dispose();
-            return new ValueTask<bool>( interactive.RunInteractiveAsync( monitor, cmdLine ) );
+            // Always handle the current log file: this avoids saving the
+            // log file for "ckli log" or help display.
+            CKliRootEnv.OnInteractiveCommandExecuted( monitor, cmdLine );
+            // If we are initiating the interactive mode, enter its loop:
+            // this will return with the "exit" command.
+            if( interactive.PreviousScreen == null )
+            {
+                initialStack?.Dispose();
+                return new ValueTask<bool>( interactive.RunInteractiveAsync( monitor, cmdLine ) );
+            }
         }
         return ValueTask.FromResult( initialResult );
     }

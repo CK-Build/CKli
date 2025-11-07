@@ -110,8 +110,8 @@ public class PluginTests
 
         // ckli issue
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue" )).ShouldBeTrue();
-        var display = ((StringScreen)context.Screen).ToString();
-        display.ShouldBe( """
+        var display = (StringScreen)context.Screen;
+        display.ToString().ShouldBe( """
             > EmptySolution (1)
             │ > Empty solution file.
             │ │ Ignoring 2 projects:
@@ -130,6 +130,17 @@ public class PluginTests
         File.Move( context.CurrentDirectory.AppendPart( "Candidate2.sln" ),
                    context.CurrentDirectory.AppendPart( "MultipleSolutions.sln" ) );
 
-    }
+        display.Clear();
+        // ckli issue
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue" )).ShouldBeTrue();
+        display.ToString().ShouldBe( """
+            > EmptySolution (1)
+            │ > Empty solution file.
+            │ │ Ignoring 2 projects:
+            │ │ CodeCakeBuilder\CodeCakeBuilder.csproj, SomeJsApp\SomeJsApp.esproj
+            > MissingSolution (1)
+            │ > No solution found. Expecting 'MissingSolution.sln' (or '.slnx').
+            
+            """ );    }
 
 }

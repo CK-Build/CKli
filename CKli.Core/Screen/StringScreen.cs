@@ -11,6 +11,7 @@ namespace CKli.Core;
 /// </summary>
 public sealed class StringScreen : IScreen
 {
+    readonly StringBuilder _b;
     readonly RenderTarget _renderer;
 
     /// <summary>
@@ -18,7 +19,8 @@ public sealed class StringScreen : IScreen
     /// </summary>
     public StringScreen()
     {
-        _renderer = new RenderTarget( new StringBuilder() );
+        _b = new StringBuilder();
+        _renderer = new RenderTarget( _b );
     }
 
     /// <inheritdoc />
@@ -29,6 +31,8 @@ public sealed class StringScreen : IScreen
 
     /// <inheritdoc />
     public int Width => IScreen.MaxScreenWidth;
+
+
 
     /// <inheritdoc />
     public void ScreenLog( LogLevel level, string message ) => ScreenType.Default.CreateLog( level, message ).Render( _renderer );
@@ -44,10 +48,15 @@ public sealed class StringScreen : IScreen
     }
 
     /// <summary>
+    /// Clears the screen content.
+    /// </summary>
+    public void Clear() => _b.Clear();
+
+    /// <summary>
     /// Gets the screen content.
     /// </summary>
     /// <returns>The screen content.</returns>
-    public override string ToString() => _renderer.ToString();
+    public override string ToString() => _b.ToString();
 
     internal sealed class RenderTarget : IRenderTarget
     {

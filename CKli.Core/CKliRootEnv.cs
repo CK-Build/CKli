@@ -174,23 +174,62 @@ public static class CKliRootEnv
         var defaultOutput = GrandOutput.Default;
         if( defaultOutput != null )
         {
-            await defaultOutput.DisposeAsync();
-            // We have a choice here:
-            // By checking is true, we remove the log file if ONLY 'ckli log' has been called.
-            // By checking is not false (ie. true or null), we remove a log file when no command
-            // has been executed: calls to help or to command with argument errors are not logged.
-            // Currently we chose to forget help only, keeping command argument errors.
-            if( _shouldDeletePureCKliLogFile is true
-                || (_shouldDeletePureCKliLogFile is not false && arguments.HasHelp) )
+            // Before disposing, posts the supression of the current log file if it
+            // must be suppressed: this avoids useless file manipulations.
+            if( ShouldDeleteCurrentLogFile( arguments ) )
             {
-                CKliLog.RemoveStupidLogFile( monitor );
+                defaultOutput.Sink.Submit( new TextLogFileCloser( true ) );
             }
+            await defaultOutput.DisposeAsync();
         }
+    }
+
+    static bool ShouldDeleteCurrentLogFile( CommandLineArguments arguments )
+    {
+        // We have a choice here:
+        // - By checking is true, we remove the log file if ONLY 'ckli log' has been called.
+        // - By checking is not false (ie. true or null), we remove a log file when no command
+        //   has been executed: calls to help or to command with argument errors are not logged.
+        //
+        // Currently we chose to forget help only, keeping a log with command argument errors.
+        //
+        return _shouldDeletePureCKliLogFile is true
+                    || (_shouldDeletePureCKliLogFile is not false && arguments.HasHelp);
     }
 
     internal static void OnSuccessfulCKliLogCommand() => _shouldDeletePureCKliLogFile ??= true;
 
     internal static void OnAnyOtherCommandAndSuccess() => _shouldDeletePureCKliLogFile = false;
+
+    sealed class TextLogFileCloser( bool forgetCurrentFile ) : GrandOutputHandlersAction
+    {
+        protected override ValueTask RunAsync( IActivityMonitor monitor, DispatcherSink.HandlerList handlers )
+        {
+            foreach( var h in handlers.Handlers )
+            {
+                if( h is CK.Monitoring.Handlers.TextFile t && t.KeyPath == "Text" )
+                {
+                    t.CloseCurrentFile( forgetCurrentFile );
+                }
+            }
+            return default;
+        }
+    }
+
+    internal static void OnInteractiveCommandExecuted( IActivityMonitor monitor, CommandLineArguments arguments )
+    {
+        var defaultOutput = GrandOutput.Default;
+        if( defaultOutput != null )
+        {
+            // We fire & forget here because we can (and avoid an async context): this uses the capability
+            // of the Text sink handler to forget the current file: the file won't appear at all on the
+            // file system. If a "ckli log" is emitted, the previous one will be found. (Moreover CKliLog
+            // command cleanup any successful "ckli log" file result.)
+            bool suppressFile = ShouldDeleteCurrentLogFile( arguments );
+            _shouldDeletePureCKliLogFile = null;
+            defaultOutput.Sink.Submit( new TextLogFileCloser( suppressFile ) );
+        }
+    }
 
     /// <summary>
     /// Throws an <see cref="InvalidOperationException"/> if <see cref="Initialize(string?)"/> has not been called.
