@@ -20,7 +20,7 @@ namespace CKli.Core;
 /// not already initialized.
 /// </para>
 /// </summary>
-public static class CKliRootEnv
+public static partial class CKliRootEnv
 {
     static NormalizedPath _appLocalDataPath;
     static ISecretsStore? _secretsStore;
@@ -175,12 +175,11 @@ public static class CKliRootEnv
         if( defaultOutput != null )
         {
             // Before disposing, posts the supression of the current log file if it
-            // must be suppressed: this avoids useless file manipulations.
-            if( ShouldDeleteCurrentLogFile( arguments ) )
-            {
-                defaultOutput.Sink.Submit( new TextLogFileCloser( true ) );
-            }
-            await defaultOutput.DisposeAsync();
+            // must be suppressed and prevently removes the handler.
+            var logCloser = new TextLogFileCloser( ShouldDeleteCurrentLogFile( arguments ), deactivateHandler: true );
+            defaultOutput.Sink.Submit( logCloser );
+            await logCloser.Completion.ConfigureAwait( false );
+            await defaultOutput.DisposeAsync().ConfigureAwait( false );
         }
     }
 
@@ -201,21 +200,6 @@ public static class CKliRootEnv
 
     internal static void OnAnyOtherCommandAndSuccess() => _shouldDeletePureCKliLogFile = false;
 
-    sealed class TextLogFileCloser( bool forgetCurrentFile ) : GrandOutputHandlersAction
-    {
-        protected override ValueTask RunAsync( IActivityMonitor monitor, DispatcherSink.HandlerList handlers )
-        {
-            foreach( var h in handlers.Handlers )
-            {
-                if( h is CK.Monitoring.Handlers.TextFile t && t.KeyPath == "Text" )
-                {
-                    t.CloseCurrentFile( forgetCurrentFile );
-                }
-            }
-            return default;
-        }
-    }
-
     internal static void OnInteractiveCommandExecuted( IActivityMonitor monitor, CommandLineArguments arguments )
     {
         var defaultOutput = GrandOutput.Default;
@@ -227,7 +211,7 @@ public static class CKliRootEnv
             // command cleanup any successful "ckli log" file result.)
             bool suppressFile = ShouldDeleteCurrentLogFile( arguments );
             _shouldDeletePureCKliLogFile = null;
-            defaultOutput.Sink.Submit( new TextLogFileCloser( suppressFile ) );
+            defaultOutput.Sink.Submit( new TextLogFileCloser( suppressFile, deactivateHandler: false ) );
         }
     }
 
