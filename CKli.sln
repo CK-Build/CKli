@@ -23,8 +23,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{02EA681E
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CKli.Core.Tests", "Tests\CKli.Core.Tests\CKli.Core.Tests.csproj", "{78ADE056-4EAB-449F-81AF-C440A43AC66B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CKli.BasicDotNetSolution.Plugin", "Plugins\CKli.BasicDotNetSolution.Plugin\CKli.BasicDotNetSolution.Plugin.csproj", "{1C321668-A517-461F-AC90-AF51889A2E55}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CKli.DotNetSolution.Plugin", "Plugins\CKli.DotNetSolution.Plugin\CKli.DotNetSolution.Plugin.csproj", "{5B9B787D-FD93-40D7-BC74-719C56F8BDF8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CKli.Plugins.Core", "CKli.Plugins.Core\CKli.Plugins.Core.csproj", "{7F9588C2-2F9A-44D0-83B7-653BED2AA8AC}"
@@ -34,6 +32,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CodeCakeBuilder", "CodeCakeBuilder\CodeCakeBuilder.csproj", "{484E57FF-04CA-282B-DF8A-95F0C8587F63}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CKli.Loader", "CKli.Loader\CKli.Loader.csproj", "{7AEAE993-E1C3-48F1-B0D9-8C9637B276FB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CKli.VSSolution.Plugin", "Plugins\CKli.VSSolution.Plugin\CKli.VSSolution.Plugin.csproj", "{0CF90E1F-FB0F-42E6-9865-8F2CA969D49D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -53,10 +53,6 @@ Global
 		{78ADE056-4EAB-449F-81AF-C440A43AC66B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{78ADE056-4EAB-449F-81AF-C440A43AC66B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{78ADE056-4EAB-449F-81AF-C440A43AC66B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1C321668-A517-461F-AC90-AF51889A2E55}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1C321668-A517-461F-AC90-AF51889A2E55}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1C321668-A517-461F-AC90-AF51889A2E55}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1C321668-A517-461F-AC90-AF51889A2E55}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5B9B787D-FD93-40D7-BC74-719C56F8BDF8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5B9B787D-FD93-40D7-BC74-719C56F8BDF8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5B9B787D-FD93-40D7-BC74-719C56F8BDF8}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -73,14 +69,18 @@ Global
 		{7AEAE993-E1C3-48F1-B0D9-8C9637B276FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7AEAE993-E1C3-48F1-B0D9-8C9637B276FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7AEAE993-E1C3-48F1-B0D9-8C9637B276FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0CF90E1F-FB0F-42E6-9865-8F2CA969D49D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0CF90E1F-FB0F-42E6-9865-8F2CA969D49D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0CF90E1F-FB0F-42E6-9865-8F2CA969D49D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0CF90E1F-FB0F-42E6-9865-8F2CA969D49D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{78ADE056-4EAB-449F-81AF-C440A43AC66B} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
-		{1C321668-A517-461F-AC90-AF51889A2E55} = {FBCA7161-1322-45F6-AD7D-74474C217CE1}
 		{5B9B787D-FD93-40D7-BC74-719C56F8BDF8} = {FBCA7161-1322-45F6-AD7D-74474C217CE1}
+		{0CF90E1F-FB0F-42E6-9865-8F2CA969D49D} = {FBCA7161-1322-45F6-AD7D-74474C217CE1}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {44AF4FE0-7386-4FB4-B966-0107DAE25DC4}
