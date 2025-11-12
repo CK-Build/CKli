@@ -23,8 +23,8 @@ public sealed partial class VSSolutionSamplePlugin : RepoPlugin<VSSolutionInfo>
     {
         foreach( var r in e.Repos )
         {
-            var s = TryGet( r );
-            if( s != null && s.Issue != VSSolutionIssue.None )
+            var s = Get( e.Monitor, r );
+            if( s.Issue != VSSolutionIssue.None )
             {
                 e.Add( s.CreateIssue( e.ScreenType ) );
             }
