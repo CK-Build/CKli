@@ -1,5 +1,4 @@
 using CK.Core;
-using CliWrap;
 using System;
 using System.Buffers;
 using System.Diagnostics;
