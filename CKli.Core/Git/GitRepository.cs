@@ -182,6 +182,26 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
         return b?.Tip.Sha;
     }
 
+    /// <summary>
+    /// Gets the LibGitRepository's <see cref="Branch"/> of the given branch or null if the branch
+    /// doesn't exist locally and in the "origin" remote.
+    /// <para>
+    /// If the remote "origin" exists, it is created locally.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="branchName">The branch name. Must not be null or white space.</param>
+    /// <param name="missingLocalAndRemote">
+    /// By default a warning is emitted if the branch doesn't exist locally nor on the origin.
+    /// Use <see cref="LogLevel.None"/> to not warn.
+    /// </param>
+    /// <returns>The branch or null.</returns>
+    public Branch? GetBranch( IActivityMonitor monitor, string branchName, LogLevel missingLocalAndRemote = LogLevel.Warn )
+    {
+        Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
+        return DoGetBranch( monitor, _git, branchName, missingLocalAndRemote, _displayPath );
+    }
+
     static Branch? DoGetBranch( IActivityMonitor monitor,
                                 Repository r,
                                 string branchName,
