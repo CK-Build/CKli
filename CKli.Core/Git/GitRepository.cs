@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Runtime.Intrinsics.X86;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core;
@@ -90,6 +91,8 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
 
     int? IGitHeadInfo.AheadOriginCommitCount => _git.Head.TrackingDetails.AheadBy;
 
+    int? IGitHeadInfo.BehindOriginCommitCount => _git.Head.TrackingDetails.BehindBy;
+
     string? IGitHeadInfo.GetSha( string? path )
     {
         if( string.IsNullOrEmpty( path ) ) return _git.Head.Tip.Sha;
@@ -98,13 +101,22 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
+    /// Gets the LibGit2Sharp <see cref="Repository"/>.
+    /// This should be used when the simplified API that this wrapper offers is not enough.
+    /// <para>
+    /// This object MUST NOT be disposed.
+    /// </para>
+    /// </summary>
+    public Repository Repository => _git;
+
+    /// <summary>
     /// Captures minimal status information.
     /// </summary>
     /// <param name="CurrentBranchName">The currently checked out branch.</param>
     /// <param name="IsDirty">Whether the working folder is dirty.</param>
     /// <param name="CommitAhead">
     /// The number of commit that are ahead of the origin.
-    /// 0 mean that there a no commit ahead of origin (there's notthing to push).
+    /// 0 mean that there a no commit ahead of origin (there's nothing to push).
     /// Null if there is no origin (the branch is not tracked).
     /// </param>
     /// <param name="CommitBehind">

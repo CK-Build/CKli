@@ -32,9 +32,16 @@ public interface IGitHeadInfo
 
     /// <summary>
     /// Gets the number of commit that are ahead of the origin.
-    /// 0 mean that there a no commit ahead of origin.
-    /// null if there is no origin.
+    /// 0 mean that there a no commit ahead of origin (there's nothing to push).
+    /// Null if there is no origin (the branch is not tracked).
     /// </summary>
     int? AheadOriginCommitCount { get; }
+
+    /// <summary>
+    /// Gets the number of commit that are behind of the origin.
+    /// 0 mean that there a no commit behind of origin (there's nothing to pull).
+    /// Null if there is no origin (the branch is not tracked).
+    /// </summary>
+    int? BehindOriginCommitCount { get; }
 
 }

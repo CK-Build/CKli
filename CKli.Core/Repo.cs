@@ -1,4 +1,5 @@
 using CK.Core;
+using LibGit2Sharp;
 using System;
 
 namespace CKli.Core;
@@ -57,6 +58,15 @@ public sealed class Repo
             return _status;
         }
     }
+
+    /// <summary>
+    /// Gets the wrapped <see cref="GitRepository"/>. This should be used when the simplified API that
+    /// this wrapper offers is not enough.
+    /// <para>
+    /// This object MUST NOT be disposed.
+    /// </para>
+    /// </summary>
+    public GitRepository GitRepository => _git;
 
     /// <summary>
     /// Gets the index of this Repo in the World according to <see cref="WorldDefinitionFile.RepoOrder"/>.
