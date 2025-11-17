@@ -1,6 +1,8 @@
 
 version: build{build}
 image: Visual Studio 2022
+init:
+- git config --global core.autocrlf true
 clone_folder: C:\CKli-World\CK-Core-Projects\CK-Core
 branches:
   only:
@@ -8,12 +10,21 @@ branches:
 environment:
   CODECAKEBUILDER_SECRET_KEY:
     secure: 8VAzdXgUQaJyFoU3WLf2iPFV/8zPDm9qV4TfOpx8/rg=
-build_script:
-  - dotnet run --project CodeCakeBuilder -nointeraction
 test: false
 install: []
-
+build_script:
+  - dotnet run --project CodeCakeBuilder -nointeraction
 on_finish:
-  - ps: Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'Log files' }
-  - ps: Get-ChildItem -Recurse **\Tests\**\TestResult*.xml | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'NUnit tests result files' }
-  - ps: Get-ChildItem -Recurse **Tests\**\Logs\**\* | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'Log files' }
+- ps: >-
+    Write-Host "Collecting logs..."
+
+    Get-ChildItem -Recurse *.log -Exclude LastRun.log -ErrorAction SilentlyContinue |
+
+    ForEach-Object {
+        $filePath = $_.FullName;
+        $fileName = $_.FullName.Replace('/', '_').Replace('\', '_').Replace(':', '');
+        $fileName = $fileName.Substring($fileName.IndexOf("_Tests_") + 7).Replace("_Logs_Text_", "-");
+        Push-AppveyorArtifact $_.FullName -FileName $fileName
+    }
+
+    Write-Host "Logs uploaded."
