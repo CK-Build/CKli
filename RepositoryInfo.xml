@@ -2,7 +2,7 @@
 
   <SimpleGitVersion>
     <Branches>
-      <Branch Name="develop" CIVersionMode="LastReleaseBased" VersionName="develop" />
+      <Branch Name="main" CIVersionMode="LastReleaseBased" VersionName="dev" />
     </Branches>
   </SimpleGitVersion>
   
