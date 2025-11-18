@@ -129,13 +129,13 @@ public sealed partial class World
         return w;
     }
 
-    bool AcquirePlugins( IActivityMonitor monitor )
+    internal bool AcquirePlugins( IActivityMonitor monitor )
     {
         Throw.DebugAssert( _pluginMachinery != null );
         try
         {
             _plugins = _pluginMachinery.PluginFactory.Create( monitor, this );
-            return true;
+            return _plugins.CallPluginsInitialization( monitor );
         }
         catch( Exception ex )
         {

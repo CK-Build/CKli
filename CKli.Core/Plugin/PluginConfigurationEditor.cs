@@ -6,7 +6,7 @@ namespace CKli.Core;
 
 /// <summary>
 /// Allows primary Plugins to edit their configuration.
-/// This can be obtained from the <see cref="PrimaryPluginContext.XmlConfigurationEditor"/>.
+/// This can be obtained from the <see cref="PrimaryPluginContext.ConfigurationEditor"/>.
 /// </summary>
 public sealed class PluginConfigurationEditor
 {

@@ -110,7 +110,7 @@ public class PluginTests
 
         var definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
         var config = definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
-        config.ShouldNotBeNull().Value.ShouldBe( "" );
+        config.ShouldNotBeNull().Value.ShouldBe( "Initial Description..." );
 
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )

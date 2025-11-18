@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 
 namespace CKli.Core;
@@ -33,4 +34,19 @@ public abstract class PluginBase
     /// Gets the world.
     /// </summary>
     protected World World => _world;
+
+    /// <summary>
+    /// Optional extension point called once all plugins have been instantiated in the
+    /// order of the dependencies. Does nothing by default and returns true. 
+    /// <para>
+    /// Returning false here is a strong error that prevents the load of the plugins.
+    /// </para>
+    /// <para>
+    /// For <see cref="PrimaryPluginBase"/> (or <see cref="PrimaryRepoPlugin{T}"/>) This can typically be used to
+    /// initialize an empty configuration or migrate it.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>True on success, false on error.</returns>
+    internal protected virtual bool Initialize( IActivityMonitor monitor ) => true;
 }

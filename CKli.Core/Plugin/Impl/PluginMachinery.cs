@@ -49,6 +49,8 @@ public sealed partial class PluginMachinery
     static Action<IActivityMonitor, XDocument>? _nuGetConfigFileHook;
 
     // Result, on success, is set by Create (on error, the failing Machinery is not exposed).
+    // In OnPluginChanged, we first release the existing world plugins and call World.AcquirePlugin
+    // only if we were able to reload the plugin factory.
     [AllowNull] IPluginFactory _pluginFactory;
 
     /// <summary>
@@ -509,7 +511,11 @@ public sealed partial class PluginMachinery
         {
             return false;
         }
-        return true;
+        // When plugins change (the 4 reasons are: SetPluginCompilationMode, CreatePlugin, AddOrSetPluginPackage, RemovePlugin)
+        // we instantiate and initialize the plugins even if we won't use them: this is to ensure that everything works fine
+        // and to sollicitate Initialize() method that may update the Plugin configuration in the definition file.
+        // This is a "useless" operation that costs but it's not every day that a plugin is added, removed or updated.
+        return world.AcquirePlugins( monitor );
     }
 
     /// <summary>

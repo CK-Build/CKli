@@ -36,6 +36,24 @@ public abstract class PluginCollection
     /// </summary>
     public CommandNamespace Commands => _commands;
 
+    internal bool CallPluginsInitialization( IActivityMonitor monitor )
+    {
+        Throw.DebugAssert( "DisposeDisposablePlugins has not been called.", _instantiated != null );
+        bool success = true;
+        foreach( var o in _instantiated )
+        {
+            if( o is PluginBase p )
+            {
+                if( !p.Initialize( monitor ) )
+                {
+                    monitor.Error( $"Plugin '{p.GetType().FullName}' initialization failed." );
+                    success = false;
+                }
+            }
+        }
+        return success;
+    }
+
     internal void DisposeDisposablePlugins()
     {
         if( _instantiated != null )

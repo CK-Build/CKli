@@ -40,6 +40,15 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
         return true;
     }
 
+    protected override bool Initialize( IActivityMonitor monitor )
+    {
+        return !PrimaryPluginContext.Configuration.IsEmpty
+               || PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
+                    {
+                        e.SetValue( "Initial Description..." );
+                    } );
+    }
+
     [CommandPath( "test config edit" )]
     [Description( "Change this Plugin configuration." )]
     public bool TestConfigEdit( IActivityMonitor monitor,
@@ -50,20 +59,20 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
                                 [Description("Try to rename the Plugin configuration element.")]
                                 bool renamePluginConfiguration )
     {
-        PrimaryPluginContext.XmlConfigurationEditor.Edit( monitor, ( monitor, e ) =>
+        PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
         {
             e.SetValue( description );
         } );
         if( removePluginConfiguration )
         {
-            PrimaryPluginContext.XmlConfigurationEditor.Edit( monitor, ( monitor, e ) =>
+            PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
             {
                 e.Remove();
             } );
         }
         if( renamePluginConfiguration )
         {
-            PrimaryPluginContext.XmlConfigurationEditor.Edit( monitor, ( monitor, e ) =>
+            PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
             {
                 e.Name = "SomeOtherName";
             } );
