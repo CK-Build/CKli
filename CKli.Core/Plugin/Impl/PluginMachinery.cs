@@ -402,19 +402,21 @@ public sealed partial class PluginMachinery
 
             namespace CKli.{{shortPluginName}}.Plugin;
 
-            public sealed class {{shortPluginName}}Plugin : PluginBase
+            public sealed class {{shortPluginName}}Plugin : PrimaryPluginBase
             {
                 /// <summary>
-                /// This is a primary plugin.
+                /// This is a primary plugin. <see cref="PrimaryPluginBase.PrimaryPluginContext"/>
+                /// is always available (as well as the <see cref="PluginBase.World"/>).
                 /// </summary>
                 public {{shortPluginName}}Plugin( PrimaryPluginContext primaryContext )
                     : base( primaryContext )
                 {
                     primaryContext.World.Events.PluginInfo += e =>
                     {
-                        Throw.CheckState( PrimaryContext.PluginInfo.FullPluginName == "{{fullPluginName}}" );
-                        Throw.CheckState( PrimaryContext.World == e.World );
-                        e.AddMessage( PrimaryContext, e.ScreenType.Text( "Message from '{{shortPluginName}}' plugin." ) );
+                        Throw.CheckState( PrimaryPluginContext.PluginInfo.FullPluginName == "{{fullPluginName}}" );
+                        Throw.CheckState( World == e.World );
+                        Throw.CheckState( PrimaryPluginContext.World == e.World );
+                        e.AddMessage( PrimaryPluginContext, e.ScreenType.Text( "Message from '{{shortPluginName}}' plugin." ) );
                         e.Monitor.Info( $"New '{{shortPluginName}}' in world '{e.World.Name}' plugin certainly requires some development." );
                         Console.WriteLine( $"Hello from '{{shortPluginName}}' plugin." );
                     };

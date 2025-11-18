@@ -9,6 +9,8 @@ namespace CKli.Core;
 /// </summary>
 public sealed class PrimaryPluginContext
 {
+    PluginConfigurationEditor? _configurationEditor;
+
     /// <summary>
     /// Constructor used by reflection based plugins.
     /// </summary>
@@ -36,6 +38,11 @@ public sealed class PrimaryPluginContext
     }
 
     /// <summary>
+    /// Gets the world.
+    /// </summary>
+    public World World { get; }
+
+    /// <summary>
     /// Gets the plugin info.
     /// </summary>
     public PluginInfo PluginInfo { get; }
@@ -43,11 +50,20 @@ public sealed class PrimaryPluginContext
     /// <summary>
     /// Gets the xml configuration element.
     /// This must not be altered otherwise an <see cref="InvalidOperationException"/> is thrown.
+    /// <para>
+    /// Use the <see cref="XmlConfigurationEditor"/> to edit the configuration.
+    /// </para>
     /// </summary>
     public XElement XmlConfiguration { get; }
 
     /// <summary>
-    /// Gets the world.
+    /// Gets the editor that can be used to edit the plugin configuration.
     /// </summary>
-    public World World { get; }
+    public PluginConfigurationEditor XmlConfigurationEditor
+    {
+        get
+        {
+            return _configurationEditor ??= new PluginConfigurationEditor( PluginInfo, World.DefinitionFile, XmlConfiguration );
+        }
+    }
 }

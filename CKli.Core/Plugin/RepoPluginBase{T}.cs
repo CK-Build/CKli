@@ -5,11 +5,16 @@ using System.Runtime.InteropServices;
 namespace CKli.Core;
 
 /// <summary>
-/// <see cref="PluginBase"/> simple Template Method Pattern that caches information
-/// associated to a <see cref="Repo"/>.
+/// <see cref="PluginBase"/> simple Template Method Pattern that can compute and cache
+/// any information associated to each <see cref="Repo"/> of a Stack.
+/// <para>
+/// A plugin that specializes this class is "optional": it will be instantiated only if required by
+/// another plugin constructor. Use the <see cref="PrimaryRepoPlugin{T}"/> as the base class for a
+/// primary plugin that will be instantiated by default.
+/// </para>
 /// </summary>
 /// <typeparam name="T">The information type.</typeparam>
-public abstract class RepoPlugin<T> : PluginBase
+public abstract class RepoPluginBase<T> : PluginBase
     where T : RepoInfo
 {
     readonly T?[] _infos;
@@ -19,7 +24,7 @@ public abstract class RepoPlugin<T> : PluginBase
     /// Initializes a new information cache.
     /// </summary>
     /// <param name="world">The world.</param>
-    protected RepoPlugin( World world )
+    protected RepoPluginBase( World world )
         : base( world )
     {
         _infos = new T[world.Layout.Count];

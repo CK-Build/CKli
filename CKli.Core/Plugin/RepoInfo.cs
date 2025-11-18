@@ -7,7 +7,7 @@ namespace CKli.Core;
 /// Required base class of information associated to a <see cref="Repo"/>.
 /// <para>
 /// This is used to signal and propagate any error or incapacity to produce an
-/// information accross dependent <see cref="RepoPlugin{T}"/>.
+/// information accross dependent <see cref="RepoPluginBase{T}"/>.
 /// </para>
 /// </summary>
 public abstract class RepoInfo

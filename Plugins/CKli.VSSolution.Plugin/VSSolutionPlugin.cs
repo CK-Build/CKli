@@ -16,10 +16,10 @@ using System.Linq;
 
 namespace CKli.VSSolution.Plugin;
 
-public sealed partial class VSSolutionPlugin : RepoPlugin<VSSolutionInfo>
+public sealed partial class VSSolutionPlugin : PrimaryRepoPlugin<VSSolutionInfo>
 {
     public VSSolutionPlugin( PrimaryPluginContext context )
-        : base( context.World )
+        : base( context )
     {
         World.Events.Issue += OnIssue;
     }

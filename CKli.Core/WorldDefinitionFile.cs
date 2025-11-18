@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -19,6 +20,7 @@ public sealed class WorldDefinitionFile
     List<(NormalizedPath, Uri)>? _layout;
     Dictionary<string, (XElement Config, bool IsDisabled)>? _pluginsConfiguration;
     PluginCompilationMode? _compilationMode;
+    XElement? _allowedChangingElement;
     bool _allowEdit;
     bool _isDirty;
 
@@ -54,19 +56,34 @@ public sealed class WorldDefinitionFile
         Throw.DebugAssert( root.Document != null );
         _root = root;
         _plugins = plugins;
-        _root.Document.Changing += OnDocumentChanging;
+        _root.Document.Changed += OnDocumentChanged;
         _world = world;
     }
 
-    void OnDocumentChanging( object? sender, XObjectChangeEventArgs e )
+    void OnDocumentChanged( object? sender, XObjectChangeEventArgs e )
     {
         if( _allowEdit )
         {
             _isDirty = true;
         }
+        else if( _allowedChangingElement != null && sender != null )
+        {
+            var c = (XObject)sender;
+            var p = c;
+            while( p != null )
+            {
+                if( p == _allowedChangingElement ) break;
+                p = p.Parent;
+            }
+            if( p == null )
+            {
+                Throw.InvalidOperationException( "Plugin cannot change Xml outside its own configuration element." );
+            }
+            _isDirty = true;
+        }
         else
         {
-            Throw.InvalidOperationException( "Xml document must not be changed." );
+            Throw.InvalidOperationException( "Xml Definition file must not be changed." );
         }
     }
 
@@ -234,9 +251,17 @@ public sealed class WorldDefinitionFile
     // World.XifLayout uses this before multiple calls to Remove/AddRepostiory.
     internal IDisposable StartEdit()
     {
-        Throw.DebugAssert( !_allowEdit );
+        Throw.DebugAssert( !_allowEdit && _allowedChangingElement == null );
         _allowEdit = true;
         return Util.CreateDisposableAction( () => _allowEdit = false );
+    }
+
+    internal IDisposable StartEdit( XElement element )
+    {
+        Throw.DebugAssert( !_allowEdit );
+        Throw.CheckState( "Only one Plugin at a time can edit its configuration.", _allowedChangingElement == null );
+        _allowedChangingElement = element;
+        return Util.CreateDisposableAction( () => _allowedChangingElement = null );
     }
 
     internal bool SetPluginCompilationMode( IActivityMonitor monitor, PluginCompilationMode mode )

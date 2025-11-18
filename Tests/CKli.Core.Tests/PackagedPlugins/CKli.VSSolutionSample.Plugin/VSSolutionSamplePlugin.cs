@@ -11,10 +11,10 @@ using System.Threading.Tasks;
 
 namespace CKli.VSSolutionSample.Plugin;
 
-public sealed partial class VSSolutionSamplePlugin : RepoPlugin<VSSolutionInfo>
+public sealed partial class VSSolutionSamplePlugin : PrimaryRepoPlugin<VSSolutionInfo>
 {
     public VSSolutionSamplePlugin( PrimaryPluginContext context )
-        : base( context.World )
+        : base( context )
     {
         World.Events.Issue += OnIssue;
     }

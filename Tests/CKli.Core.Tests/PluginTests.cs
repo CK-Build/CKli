@@ -3,6 +3,7 @@ using NUnit.Framework;
 using Shouldly;
 using System.IO;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
@@ -55,7 +56,7 @@ public class PluginTests
     }
 
     [Test]
-    public async Task add_CommandSample_package_Async()
+    public async Task CommandSample_package_echo_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "One" );
@@ -89,6 +90,44 @@ public class PluginTests
         // ckli plugin remove CommandSample
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "remove", "CommandSample" )).ShouldBeTrue();
 
+    }
+
+    [Test]
+    public async Task CommandSample_package_config_edit_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var remotes = TestEnv.UseReadOnly( "One" );
+
+        TestEnv.EnsurePluginPackage( "CKli.CommandSample.Plugin" );
+
+        // ckli clone file:///.../One-Stack
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
+        // cd One
+        context = context.ChangeDirectory( "One" );
+
+        // ckli plugin add CommandSample@version
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "add", $"CommandSample@{TestEnv.CKliPluginsCoreVersion}" )).ShouldBeTrue();
+
+        var definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
+        var config = definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
+        config.ShouldNotBeNull().Value.ShouldBe( "" );
+
+
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "New Description!" )).ShouldBeTrue();
+
+            definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
+            config = definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
+            config.ShouldNotBeNull().Value.ShouldBe( "New Description!" );
+        }
+
+        // ckli plugin remove CommandSample
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "remove", "CommandSample" )).ShouldBeTrue();
+
+        definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
+        config = definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
+        config.ShouldBeNull();
     }
 
     [Test]
