@@ -21,5 +21,5 @@ public abstract class PrimaryPluginBase : PluginBase
     /// <summary>
     /// Gets the context of this primary plugin.
     /// </summary>
-    public PrimaryPluginContext PrimaryPluginContext => _primaryContext;
+    protected PrimaryPluginContext PrimaryPluginContext => _primaryContext;
 }

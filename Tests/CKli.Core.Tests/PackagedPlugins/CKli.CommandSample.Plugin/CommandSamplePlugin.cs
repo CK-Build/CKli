@@ -22,7 +22,7 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
     public CommandSamplePlugin( PrimaryPluginContext context, SupportWithCommand tool )
         : base( context )
     {
-        Throw.CheckArgument( tool != null && tool.World == World );
+        Throw.CheckArgument( tool != null );
         _tool = tool;
     }
 

@@ -31,7 +31,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
         _runFolder = runFolder;
     }
 
-    IPluginCollection IPluginFactory.Create( IActivityMonitor monitor, World world ) => _pluginFactory!.Create( monitor, world );
+    PluginCollection IPluginFactory.Create( IActivityMonitor monitor, World world ) => _pluginFactory!.Create( monitor, world );
 
     PluginCompilationMode IPluginFactory.CompilationMode => _pluginFactory!.CompilationMode;
 

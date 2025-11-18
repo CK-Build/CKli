@@ -5,7 +5,7 @@ using System.Runtime.Loader;
 namespace CKli.Core;
 
 /// <summary>
-/// Factory for <see cref="IPluginCollection"/>.
+/// Factory for <see cref="PluginCollection"/>.
 /// </summary>
 public interface IPluginFactory : IDisposable
 {
@@ -18,7 +18,7 @@ public interface IPluginFactory : IDisposable
     /// A disposable that must be called to release the <see cref="AssemblyLoadContext"/> and dispose
     /// plugins that are IDisposable.
     /// </returns>
-    IPluginCollection Create( IActivityMonitor monitor, World world );
+    PluginCollection Create( IActivityMonitor monitor, World world );
 
     /// <summary>
     /// Gets this factory compilation mode.

@@ -43,7 +43,7 @@ public sealed partial class World
     readonly WorldDefinitionFile _definitionFile;
     readonly WorldEvents _events;
     readonly PluginMachinery? _pluginMachinery;
-    IPluginCollection? _plugins;
+    PluginCollection? _plugins;
 
     // The WorldDefinitionFile maintains its layout list.
     // AddRepository, RemoveRepository and XifLayout are the only ones that can
@@ -152,7 +152,7 @@ public sealed partial class World
             if( _plugins != null )
             {
                 _plugins.Commands.Clear();
-                _plugins.Dispose();
+                _plugins.DisposeDisposablePlugins();
                 _plugins = null;
             }
             _pluginMachinery.ReleasePluginFactory();

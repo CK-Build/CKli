@@ -29,14 +29,14 @@ sealed partial class ReflectionPluginCollector
             _pluginCommands = pluginCommands;
         }
 
-        public IPluginCollection Create( IActivityMonitor monitor, World world )
+        public PluginCollection Create( IActivityMonitor monitor, World world )
         {
             var instantiated = new object[_activationList.Count];
             for( int i = 0; i < _activationList.Count; ++i )
             {
                 instantiated[i] = _activationList[i].Instantiate( world, instantiated );
             }
-            return PluginCollection.CreateAndBindCommands( instantiated, _pluginInfos, _commands, _pluginCommands );
+            return PluginCollectionImpl.CreateAndBindCommands( instantiated, _pluginInfos, _commands, _pluginCommands );
         }
 
         public PluginCompilationMode CompilationMode => PluginCompilationMode.None;
@@ -110,7 +110,7 @@ sealed partial class ReflectionPluginCollector
 
                 public string GenerateCode() => throw new InvalidOperationException( "CompilationMode is not PluginCompilationMode.None" );
 
-                public IPluginCollection Create( IActivityMonitor monitor, World world )
+                public PluginCollection Create( IActivityMonitor monitor, World world )
                 {
                     var configs = world.DefinitionFile.ReadPluginsConfiguration( monitor );
                     Throw.CheckState( "Plugins configurations have already been loaded.", configs != null );
@@ -150,7 +150,7 @@ sealed partial class ReflectionPluginCollector
                 b.Append( " );" ).AppendLine();
             }
             b.Append( """
-                    return PluginCollection.CreateAndBindCommands( objects, _plugins, _commands, _pluginCommands );
+                    return PluginCollectionImpl.CreateAndBindCommands( objects, _plugins, _commands, _pluginCommands );
                 }
 
                 public void Dispose() { }

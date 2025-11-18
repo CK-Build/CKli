@@ -23,6 +23,6 @@ public abstract class PrimaryRepoPlugin<T> : RepoPluginBase<T>
     /// <summary>
     /// Gets the context of this primary plugin.
     /// </summary>
-    public PrimaryPluginContext PrimaryPluginContext => _primaryContext;
+    protected PrimaryPluginContext PrimaryPluginContext => _primaryContext;
 
 }

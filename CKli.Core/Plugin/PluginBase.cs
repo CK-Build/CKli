@@ -32,5 +32,5 @@ public abstract class PluginBase
     /// <summary>
     /// Gets the world.
     /// </summary>
-    public World World => _world;
+    protected World World => _world;
 }
