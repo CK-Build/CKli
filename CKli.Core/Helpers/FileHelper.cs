@@ -13,6 +13,7 @@ public sealed class FileHelper
 {
     /// <summary>
     /// Standard helper with 5 retries. Ultimately gives up with a logged error and returns false.
+    /// If the file doesn't exist, this is successful.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="path">The file path to delete.</param>

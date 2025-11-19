@@ -37,25 +37,28 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
 
     string IPluginFactory.GenerateCode() => _pluginFactory!.GenerateCode();
 
-    /// <summary>
-    /// Loads the core "CKli.Plugins.dll" and all its plugins.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="dllPath">The core "CKli.Plugins.dll" path.</param>
-    /// <param name="context">The context (provides plugin configurations.)</param>
-    /// <returns>The plugin collection on success, null on error.</returns>
-    static public IPluginFactory? Load( IActivityMonitor monitor, NormalizedPath dllPath, PluginCollectorContext context )
+    static public IPluginFactory? Load( IActivityMonitor monitor,
+                                        NormalizedPath dllPath,
+                                        PluginCollectorContext context,
+                                        out bool recoverableError,
+                                        out WeakReference? loader )
     {
+        recoverableError = false;
         if( !File.Exists( dllPath ) )
         {
-            monitor.Error( $"Expected compiled plugin not found: {dllPath}" );
+            recoverableError = true;
+            loader = null;
+            monitor.Warn( $"Expected compiled plugin not found: {dllPath}" );
             return null;
         }
         var runFolder = Path.GetDirectoryName( dllPath.Path );
         Throw.CheckArgument( "DllPath cannot be at the root of the file system.", runFolder != null );
         var result = new PluginLoadContext( context.WorldName, runFolder );
+        loader = new WeakReference( result, trackResurrection: true );
         try
         {
+            // If this fails without throwing exceptions, this is not a recoverable error: the "regular" error cases
+            // are handled and ultimately, reflection is used.
             if( result.DoLoad( monitor, dllPath, context ) )
             {
                 return result;
@@ -63,8 +66,14 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
         }
         catch( Exception ex )
         {
-            monitor.Error( $"Error while collecting plugins.", ex );
+            // An exception here indicates that a call to the plugins fails, typically
+            // with a missing methond exception. By deleting the CKli.CompiledPlugins.cs generated file,
+            // reflection may do the job.
+            recoverableError = true;
+            monitor.Warn( $"Error while collecting plugins.", ex );
         }
+        // Dispose the AssemblyLoadContext but the loader weak reference must not be alive anymore before
+        // retrying to compile or obtain the plugins.
         ((IDisposable)result).Dispose();
         return null;
     }

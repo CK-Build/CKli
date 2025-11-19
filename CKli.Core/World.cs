@@ -19,7 +19,29 @@ public sealed partial class World
     /// </summary>
     public static readonly InformationalVersion CKliVersion = InformationalVersion.ReadFromAssembly( typeof( PluginMachinery ).Assembly );
 
-    static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IPluginFactory?>? _pluginLoader;
+    /// <summary>
+    /// Loads the core "CKli.Plugins.dll" and all its plugins.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="dllPath">The core "CKli.Plugins.dll" path.</param>
+    /// <param name="context">The context (provides plugin configurations.)</param>
+    /// <param name="recoverableError">
+    /// Outputs whether the error may be fixed by deleting the CKli.CompiledPlugins.cs generated file if it exists
+    /// and recompiling the CKli.Plugins project.
+    /// </param>
+    /// <param name="loader">
+    /// Outputs a weak reference on the PluginLoadContext that may have been instantiated (and disposed) even if
+    /// this fails and returns null: <see cref="WeakReference.IsAlive"/> must be false before trying to reoad or
+    /// recompile plugins.
+    /// </param>
+    /// <returns>The plugin factory on success, null on error.</returns>
+    public delegate IPluginFactory? PluginLoaderFunction( IActivityMonitor monitor,
+                                                          NormalizedPath dllPath,
+                                                          PluginCollectorContext context,
+                                                          out bool recoverableError,
+                                                          out WeakReference? loader );
+
+    static PluginLoaderFunction? _pluginLoader;
 
     /// <summary>
     /// Gets or sets once the loader for plugins.
@@ -27,7 +49,7 @@ public sealed partial class World
     /// When not set, plugins are disabled. Once set, it cannot be changed.
     /// </para>
     /// </summary>
-    public static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IPluginFactory?>? PluginLoader
+    public static PluginLoaderFunction? PluginLoader
     {
         get => _pluginLoader;
         set
@@ -102,7 +124,7 @@ public sealed partial class World
         }
         Throw.DebugAssert( worldName != null && definitionFile != null );
         PluginMachinery? machinery = null;
-        if( !definitionFile.IsPluginsDisabled && World.PluginLoader != null )
+        if( !definitionFile.IsPluginsDisabled && PluginLoader != null )
         {
             machinery = new PluginMachinery( worldName, definitionFile );
             if( !machinery.FirstLoad( monitor, out PluginCollectorContext? toRecompile ) )

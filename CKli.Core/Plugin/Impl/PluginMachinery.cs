@@ -149,27 +149,21 @@ public sealed partial class PluginMachinery
         }
         // Loads the plugins.
         var pluginContext = new PluginCollectorContext( _definitionFile.World, pluginsConfiguration );
-        var pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext );
+        var pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext, out bool recoverableError, out _singleFactory );
         if( pluginFactory == null )
         {
-            using( monitor.OpenInfo( "Initial plugin discovery failed. Trying to recompile the CKli.Plugins project." ) )
+            if( !recoverableError )
             {
-                // There should raise a compile error that will spot the issue.
-                if( !DoCompilePlugins( monitor ) )
-                {
-                    return false;
-                }
-                pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext );
-                if( pluginFactory == null )
-                {
-                    monitor.Error( ActivityMonitor.Tags.ToBeInvestigated,
-                                   "This should not happen (compilation succeeds but load fails). CKli.Plugins must be manually fixed." );
-                    return false;
-                }
+                return false;
             }
+            if( File.Exists( CKliCompiledPluginsFile ) )
+            {
+                monitor.Trace( $"Deleting '{CKliCompiledPluginsFile}'." );
+                FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile );
+            }
+            toRecompile = pluginContext;
+            return true;
         }
-        // Memorizes the AssemblyLoadContext to be able to wait for its actual unload.
-        _singleFactory = new WeakReference( pluginFactory, trackResurrection: true );
         // Decide whether a recompilation is required. 
         if( pluginFactory.CompilationMode != _definitionFile.CompilationMode )
         {
@@ -215,20 +209,21 @@ public sealed partial class PluginMachinery
     internal bool Recompile( IActivityMonitor monitor, PluginCollectorContext pluginContext )
     {
         Throw.DebugAssert( World.PluginLoader != null );
-        using var _ = monitor.OpenTrace( $"Recompiling CKli.Plugins and loading Plugin factory." );
-        if( !RelaseCurrentSingleRunning( monitor )
-            || !DoCompilePlugins( monitor ) )
+        using( monitor.OpenTrace( $"Recompiling CKli.Plugins and loading Plugin factory." ) )
         {
-            return false;
+            if( !RelaseCurrentSingleRunning( monitor )
+                || !DoCompilePlugins( monitor ) )
+            {
+                return false;
+            }
+            var pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext, out _, out _singleFactory );
+            if( pluginFactory == null )
+            {
+                return false;
+            }
+            _pluginFactory = pluginFactory;
+            return true;
         }
-        var pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext );
-        if( pluginFactory == null )
-        {
-            return false;
-        }
-        _singleFactory = new WeakReference( pluginFactory, trackResurrection: true );
-        _pluginFactory = pluginFactory;
-        return true;
     }
 
     static bool RelaseCurrentSingleRunning( IActivityMonitor monitor )
