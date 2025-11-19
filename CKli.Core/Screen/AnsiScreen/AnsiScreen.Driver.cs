@@ -1,8 +1,3 @@
-using CK.Core;
-using System;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
-
 namespace CKli.Core;
 
 sealed partial class AnsiScreen

@@ -54,9 +54,9 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
     public bool TestConfigEdit( IActivityMonitor monitor,
                                 [Description("The Description to update in the Xml element.")]
                                 string description,
-                                [Description("Try to remove the Plugin configuration element.")]
+                                [Description("Try to remove the Plugin configuration element: Exception because we work on a detached clone.")]
                                 bool removePluginConfiguration,
-                                [Description("Try to rename the Plugin configuration element.")]
+                                [Description("Rename the Plugin configuration element: ignored as we work on a clone and Nodes and Attributes are copied back.")]
                                 bool renamePluginConfiguration )
     {
         PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
@@ -65,14 +65,14 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
         } );
         if( removePluginConfiguration )
         {
-            PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
+            return PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
             {
                 e.Remove();
             } );
         }
         if( renamePluginConfiguration )
         {
-            PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
+            return PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
             {
                 e.Name = "SomeOtherName";
             } );

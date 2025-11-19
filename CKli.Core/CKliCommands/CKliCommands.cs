@@ -73,7 +73,7 @@ public static class CKliCommands
         // Honor the "ckli i" if specified.
         // The command will be handled below but with the InteractiveSreen (the command may use it)
         // and we will enter the interactive loop if this is the first command (History is empty and no
-        // PreviousScreen exist) rather than returning from this method.
+        // PreviousScreen exist) rather than returning from this method (FinalHandleInteractiveAsync does this).
         var interactiveScreen = context.Screen as InteractiveScreen;
         if( interactiveScreen == null && cmdLine.HasInteractiveArgument )
         {
@@ -99,7 +99,7 @@ public static class CKliCommands
                                         cmdLine,
                                         CKliRootEnv.GlobalOptions?.Invoke() ?? default,
                                         CKliRootEnv.GlobalFlags?.Invoke() ?? default );
-            return HandleInteractiveAsync( monitor, context, cmdLine, null, true );
+            return FinalHandleInteractiveAsync( monitor, context, cmdLine, null, true );
         }
         // If it's a CKli command, we can now execute it.
         if( cmdLine.FoundCommand != null )
@@ -125,51 +125,62 @@ public static class CKliCommands
                                         cmdLine,
                                         CKliRootEnv.GlobalOptions?.Invoke() ?? default,
                                         CKliRootEnv.GlobalFlags?.Invoke() ?? default );
-            return HandleInteractiveAsync( monitor, context, cmdLine, null, false );
+            return FinalHandleInteractiveAsync( monitor, context, cmdLine, null, false );
         }
-        try
+
+        // We are in a World, we have an opened Stack: handles World.Commands.
+        return ExecuteWorldCommandAsync( monitor, context, cmdLine, helpPath, stack!, world );
+
+        static async ValueTask<bool> ExecuteWorldCommandAsync( IActivityMonitor monitor,
+                                                               CKliEnv context,
+                                                               CommandLineArguments cmdLine,
+                                                               string? helpPath,
+                                                               StackRepository stack,
+                                                               World world )
         {
-            // We are in a World.
-            if( !world.Commands.TryFindForExecution( monitor, cmdLine, out var worldHelpPath )
-                || cmdLine.FoundCommand == null
-                || cmdLine.HasHelp )
+            try
             {
-                if( cmdLine.FoundCommand == null && cmdLine.ExpectCommand )
+                if( !world.Commands.TryFindForExecution( monitor, cmdLine, out var worldHelpPath )
+                    || cmdLine.FoundCommand == null
+                    || cmdLine.HasHelp )
                 {
-                    monitor.Error( $"Unknown command '{cmdLine.InitialAsStringArguments}'." );
+                    if( cmdLine.FoundCommand == null && cmdLine.ExpectCommand )
+                    {
+                        monitor.Error( $"Unknown command '{cmdLine.InitialAsStringArguments}'." );
+                    }
+                    // No luck or the --help is requested.
+                    // Displays the help in the context of the World. The World's commands
+                    // is extended with the CKli command: the help mixes the 2 kind of commands if
+                    // needed (based on the helpPath). If this second TryFindForExecution call
+                    // returned an help path, it should be the same or a better help path than
+                    // the one from only the CKli commands: use it.
+                    context.Screen.DisplayHelp( world.Commands.GetForHelp( context.Screen.ScreenType, worldHelpPath ?? helpPath, _commands ),
+                                                cmdLine,
+                                                CKliRootEnv.GlobalOptions?.Invoke() ?? default,
+                                                CKliRootEnv.GlobalFlags?.Invoke() ?? default );
+                    return await FinalHandleInteractiveAsync( monitor, context, cmdLine, stack, cmdLine.HasHelp ).ConfigureAwait( false );
                 }
-                // No luck or the --help is requested.
-                // Displays the help in the context of the World. The World's commands
-                // is extended with the CKli command: the help mixes the 2 kind of commands if
-                // needed (based on the helpPath). If this second TryFindForExecution call
-                // returned an help path, it should be the same or a better help path than
-                // the one from only the CKli commands: use it.
-                context.Screen.DisplayHelp( world.Commands.GetForHelp( context.Screen.ScreenType, worldHelpPath ?? helpPath, _commands ),
-                                            cmdLine,
-                                            CKliRootEnv.GlobalOptions?.Invoke() ?? default,
-                                            CKliRootEnv.GlobalFlags?.Invoke() ?? default );
-                return HandleInteractiveAsync( monitor, context, cmdLine, stack, cmdLine.HasHelp );
+                // We have a plugin command (and no --help).
+                Throw.DebugAssert( "This cannot be a CKli command: we'd have located it initially.", cmdLine.FoundCommand.PluginTypeInfo != null );
+                if( cmdLine.FoundCommand.IsDisabled )
+                {
+                    monitor.Error( $"Command '{cmdLine.FoundCommand.CommandPath}' exists but its type '{cmdLine.FoundCommand.PluginTypeInfo.TypeName}' is disabled in plugin '{cmdLine.FoundCommand.PluginTypeInfo.Plugin.FullPluginName}'." );
+                    return await FinalHandleInteractiveAsync( monitor, context, cmdLine, stack, false ).ConfigureAwait( false );
+                }
+                return await ExecuteAsync( monitor, context, cmdLine, stack ).ConfigureAwait( false );
             }
-            // We have a plugin command (and no --help).
-            Throw.DebugAssert( "This cannot be a CKli command: we'd have located it initially.", cmdLine.FoundCommand.PluginTypeInfo != null );
-            if( cmdLine.FoundCommand.IsDisabled )
+            finally
             {
-                monitor.Error( $"Command '{cmdLine.FoundCommand.CommandPath}' exists but its type '{cmdLine.FoundCommand.PluginTypeInfo.TypeName}' is disabled in plugin '{cmdLine.FoundCommand.PluginTypeInfo.Plugin.FullPluginName}'." );
-                return HandleInteractiveAsync( monitor, context, cmdLine, stack, false );
+                stack?.Dispose();
             }
-            return ExecuteAsync( monitor, context, cmdLine, stack );
-        }
-        finally
-        {
-            stack?.Dispose();
         }
     }
 
     static async ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine, StackRepository? initialStack )
     {
         Throw.DebugAssert( cmdLine.FoundCommand != null );
-        var result = await DoExecuteAsync( monitor, context, cmdLine );
-        return await HandleInteractiveAsync( monitor, context, cmdLine, initialStack, result );
+        var result = await DoExecuteAsync( monitor, context, cmdLine ).ConfigureAwait( false );
+        return await FinalHandleInteractiveAsync( monitor, context, cmdLine, initialStack, result ).ConfigureAwait( false );
 
         static async Task<bool> DoExecuteAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
         {
@@ -177,7 +188,7 @@ public static class CKliCommands
             bool success;
             try
             {
-                success = await cmdLine.FoundCommand.HandleCommandAsync( monitor, context, cmdLine );
+                success = await cmdLine.FoundCommand.HandleCommandAsync( monitor, context, cmdLine ).ConfigureAwait( false );
             }
             catch( Exception ex )
             {
@@ -190,7 +201,7 @@ public static class CKliCommands
 
             if( success && !cmdLine.IsClosed )
             {
-                // The command line has not been but the command handler returned true, it is buggy.
+                // The command line has not been closed but the command handler returned true, it is buggy.
                 // We return false (even if the handler claimed to be successful).
                 monitor.Error( $"""
                 The command '{cmdLine.FoundCommand.CommandPath}' implementation in '{cmdLine.FoundCommand.PluginTypeInfo?.TypeName ?? "CKli"}' is buggy.
@@ -234,12 +245,23 @@ public static class CKliCommands
         }
     }
 
-    static ValueTask<bool> HandleInteractiveAsync( IActivityMonitor monitor,
-                                                   CKliEnv context,
-                                                   CommandLineArguments cmdLine,
-                                                   StackRepository? initialStack,
-                                                   bool initialResult )
+    static ValueTask<bool> FinalHandleInteractiveAsync( IActivityMonitor monitor,
+                                                        CKliEnv context,
+                                                        CommandLineArguments cmdLine,
+                                                        StackRepository? initialStack,
+                                                        bool initialResult )
     {
+        if( initialStack != null )
+        {
+            if( initialResult )
+            {
+                initialStack.Close( monitor );
+            }
+            else
+            {
+                initialStack.Dispose();
+            }
+        }
         if( context.Screen is InteractiveScreen interactive )
         {
             // Always handle the current log file: this avoids saving the
@@ -249,7 +271,6 @@ public static class CKliCommands
             // this will return with the "exit" command.
             if( interactive.PreviousScreen == null )
             {
-                initialStack?.Dispose();
                 return new ValueTask<bool>( interactive.RunInteractiveAsync( monitor, cmdLine ) );
             }
         }

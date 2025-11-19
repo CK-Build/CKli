@@ -44,6 +44,7 @@ sealed class CKliPluginCreate : Command
             {
                 return CKliRepoAdd.RequiresAllowLTS( monitor, world.Name );
             }
+            // Both CreatePlugin and RemovePlugin handle the WorldDefinition file save and commit.
             return create
                     ? world.CreatePlugin( monitor, pluginName )
                     : world.RemovePlugin( monitor, pluginName );

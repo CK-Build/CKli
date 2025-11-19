@@ -49,10 +49,12 @@ sealed class CKliRepoAdd : Command
             {
                 return RequiresAllowLTS( monitor, world.Name );
             }
+            // AddRepository handles the WorldDefinition file save and commit.
             return world.AddRepository( monitor, repositoryUrl, context.CurrentDirectory );
         }
         finally
         {
+            // On error, don't save a dirty World's DefinitionFile.
             stack.Dispose();
         }
     }

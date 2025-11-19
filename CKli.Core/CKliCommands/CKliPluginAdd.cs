@@ -52,6 +52,7 @@ sealed class CKliPluginAdd : Command
             {
                 return CKliRepoAdd.RequiresAllowLTS( monitor, world.Name );
             }
+            // AddOrSetPluginPackage handles the WorldDefinition file save and commit.
             return world.AddOrSetPluginPackage( monitor, package.PackageId, package.Version );
         }
         finally

@@ -35,11 +35,11 @@ sealed class CKliIssue : Command
         return IssueAsync( monitor, context, all, fix );
     }
 
-    static ValueTask<bool> IssueAsync( IActivityMonitor monitor, CKliEnv context, bool all, bool fix )
+    static async ValueTask<bool> IssueAsync( IActivityMonitor monitor, CKliEnv context, bool all, bool fix )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
-            return ValueTask.FromResult( false );
+            return false;
         }
         try
         {
@@ -53,16 +53,16 @@ sealed class CKliIssue : Command
             if( disabledPlugin != null )
             {
                 monitor.Warn( disabledPlugin );
-                return ValueTask.FromResult( true );
+                return true;
             }
             IReadOnlyList<Repo>? repos = all
                                           ? world.GetAllDefinedRepo( monitor )
                                           : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
-            if( repos == null ) return ValueTask.FromResult( false );
+            if( repos == null ) return false;
 
             if( repos.Count > 0 && !world.Events.SafeRaiseEvent( monitor, new IssueEvent( monitor, world, repos, issues ) ) )
             {
-                return ValueTask.FromResult( false );
+                return false;
             }
             if( issues.Count == 0 )
             {
@@ -84,8 +84,24 @@ sealed class CKliIssue : Command
                                                     ? $"Trying to fix {autoFixCount} issues ({manualFixCount} issues must be fixed manually)."
                                                     : $"Trying to fix {autoFixCount} issues." ) )
                         {
-                            return new ValueTask<bool>( DoFixAsync( monitor, context, world, issues ) );
+                            foreach( var i in issues )
+                            {
+                                try
+                                {
+                                    if( !i.ManualFix && !await i.ExecuteAsync( monitor, context, world ).ConfigureAwait( false ) )
+                                    {
+                                        return false;
+                                    }
+                                }
+                                catch( Exception ex )
+                                {
+                                    monitor.Error( ex );
+                                    return false;
+                                }
+                            }
                         }
+                        // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
+                        return stack.Close( monitor );
                     }
                 }
                 else
@@ -103,31 +119,14 @@ sealed class CKliIssue : Command
                     }
                 }
             }
-            return ValueTask.FromResult( true );
+            // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
+            return stack.Close( monitor );
         }
         finally
         {
+            // On error, don't save a dirty World's DefinitionFile.
             stack.Dispose();
         }
     }
 
-    static async Task<bool> DoFixAsync( IActivityMonitor monitor, CKliEnv context, World world, List<World.Issue> issues )
-    {
-        foreach( var i in issues )
-        {
-            try
-            {
-                if( !i.ManualFix && !await i.ExecuteAsync( monitor, context, world ) )
-                {
-                    return false;
-                }
-            }
-            catch( Exception ex )
-            {
-                monitor.Error( ex );
-                return false;
-            }
-        }
-        return true;
-    }
 }

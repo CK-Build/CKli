@@ -20,7 +20,7 @@ public static partial class CKliRootEnv
                 if( h is CK.Monitoring.Handlers.TextFile t && t.KeyPath == "Text" )
                 {
                     t.CloseCurrentFile( forgetCurrentFile );
-                    if( deactivateHandler ) await handlers.RemoveAsync( monitor, h );
+                    if( deactivateHandler ) await handlers.RemoveAsync( monitor, h ).ConfigureAwait( false );
                     break;
                 }
             }

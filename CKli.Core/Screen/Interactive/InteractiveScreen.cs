@@ -1,7 +1,6 @@
 using CK.Core;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -137,10 +136,10 @@ public sealed partial class InteractiveScreen : IScreen
             _header.Clear();
             _body.Clear();
             _footer.Clear();
-            CommandLineArguments? cmd = await _driver.PromptAsync( monitor );
+            CommandLineArguments? cmd = await _driver.PromptAsync( monitor ).ConfigureAwait( false );
             if( cmd == null ) break;
             _history.Add( cmd );
-            await CKliCommands.HandleCommandAsync( monitor, _context, cmd );
+            await CKliCommands.HandleCommandAsync( monitor, _context, cmd ).ConfigureAwait( false );
         }
         return true;
     }

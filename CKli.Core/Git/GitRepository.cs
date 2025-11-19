@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
-using System.Runtime.Intrinsics.X86;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core;

@@ -73,10 +73,12 @@ sealed class CKliPush : Command
             {
                 success &= stack.PushChanges( monitor );
             }
-            return success;
+            // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
+            return stack.Close( monitor );
         }
         finally
         {
+            // On error, don't save a dirty World's DefinitionFile.
             stack.Dispose();
         }
     }

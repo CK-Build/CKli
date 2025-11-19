@@ -229,11 +229,6 @@ public sealed partial class StackRepository : IDisposable
     public bool PushChanges( IActivityMonitor monitor )
     {
         CommitResult result = _git.Commit( monitor, "Automatic pre-push commit." );
-        if( result == CommitResult.NoChanges )
-        {
-            monitor.Trace( "Nothing committed. Skipping push." );
-            return true;
-        }
         return result != CommitResult.Error && _git.Push( monitor );
     }
 
@@ -671,10 +666,47 @@ public sealed partial class StackRepository : IDisposable
         return newOne;
     }
 
+    /// <summary>
+    /// Closes this stack. This releases the world (if a world has been opened) and if the <see cref="WorldDefinitionFile"/>
+    /// has been modified but not yet saved, it is saved and a commit is created.
+    /// <para>
+    /// Once called, it is useless to call <see cref="Dispose()"/> (but it doesn't harm).
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The required monitor.</param>
+    /// <returns>True on success, false if an error occured when saving the definition file.</returns>
+    public bool Close( IActivityMonitor monitor )
+    {
+        bool success = true;
+        if( _world != null )
+        {
+            if( _world.DefinitionFile.IsDirty )
+            {
+                success = _world.DefinitionFile.SaveFile( monitor ) && Commit( monitor, "Updated Definition file." );
+            }
+            _world.DisposeRepositoriesAndReleasePlugins();
+            _world = null;
+        }
+        _git.Dispose();
+        return success;
+    }
+
+    /// <summary>
+    /// Close this world. This doesn't handle the save of the <see cref="WorldDefinitionFile"/>: use <see cref="Close(IActivityMonitor)"/>
+    /// if the definition file must be saved and comitted.
+    /// </summary>
     public void Dispose()
     {
+        if( _world != null )
+        {
+            if( _world.DefinitionFile.IsDirty )
+            {
+                ActivityMonitor.StaticLogger.Warn( "World's DefinitionFile has been modified but not saved." );
+            }
+            _world.DisposeRepositoriesAndReleasePlugins();
+            _world = null;
+        }
         _git.Dispose();
-        _world?.DisposeRepositoriesAndReleasePlugins();
     }
 
     static bool CheckOriginUrlStackSuffix( IActivityMonitor monitor,

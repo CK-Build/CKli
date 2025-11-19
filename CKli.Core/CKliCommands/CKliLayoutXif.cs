@@ -33,6 +33,7 @@ sealed class CKliLayoutXif : Command
         }
         try
         {
+            // XifLayout handles the WorldDefinition file save and commit.
             return world.XifLayout( monitor );
         }
         finally

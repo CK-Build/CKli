@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Xml;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -20,7 +19,6 @@ public sealed class WorldDefinitionFile
     List<(NormalizedPath, Uri)>? _layout;
     Dictionary<string, (XElement Config, bool IsDisabled)>? _pluginsConfiguration;
     PluginCompilationMode? _compilationMode;
-    XElement? _allowedChangingElement;
     bool _allowEdit;
     bool _isDirty;
 
@@ -64,21 +62,6 @@ public sealed class WorldDefinitionFile
     {
         if( _allowEdit )
         {
-            _isDirty = true;
-        }
-        else if( _allowedChangingElement != null && sender != null )
-        {
-            var c = (XObject)sender;
-            var p = c;
-            while( p != null )
-            {
-                if( p == _allowedChangingElement ) break;
-                p = p.Parent;
-            }
-            if( p == null )
-            {
-                Throw.InvalidOperationException( "Plugin cannot change Xml outside its own configuration element." );
-            }
             _isDirty = true;
         }
         else
@@ -177,11 +160,11 @@ public sealed class WorldDefinitionFile
     {
         var config = ReadPluginsConfiguration( monitor );
         if( config == null ) return false;
-        bool isGlobal = name == "global";
         XElement? e = null;
-        if( !isGlobal )
+        string? shortPluginName = null;
+        if( name != "global" )
         {
-            if( !PluginMachinery.EnsureFullPluginName( monitor, name, out var shortPluginName, out var longPluginName ) )
+            if( !PluginMachinery.EnsureFullPluginName( monitor, name, out shortPluginName, out var longPluginName ) )
             {
                 return false;
             }
@@ -208,7 +191,10 @@ public sealed class WorldDefinitionFile
         {
             e.SetAttributeValue( _xDisabled, enable ? null : "true" );
         }
-        return SaveFile( monitor );
+        return SaveFile( monitor )
+               && _world.Stack.Commit( monitor, shortPluginName == null
+                                                    ? "Disabling all plugins."
+                                                    : $"Disabling '{shortPluginName}' plugin." );
     }
 
     /// <summary>
@@ -251,57 +237,44 @@ public sealed class WorldDefinitionFile
     // World.XifLayout uses this before multiple calls to Remove/AddRepostiory.
     internal IDisposable StartEdit()
     {
-        Throw.DebugAssert( !_allowEdit && _allowedChangingElement == null );
+        Throw.DebugAssert( !_allowEdit );
         _allowEdit = true;
         return Util.CreateDisposableAction( () => _allowEdit = false );
     }
 
-    internal IDisposable StartEdit( XElement element )
-    {
-        Throw.DebugAssert( !_allowEdit );
-        Throw.CheckState( "Only one Plugin at a time can edit its configuration.", _allowedChangingElement == null );
-        _allowedChangingElement = element;
-        return Util.CreateDisposableAction( () => _allowedChangingElement = null );
-    }
-
-    internal bool SetPluginCompilationMode( IActivityMonitor monitor, PluginCompilationMode mode )
+    internal void SetPluginCompilationMode( IActivityMonitor monitor, PluginCompilationMode mode )
     {
         using( StartEdit() )
         {
             _plugins.SetAttributeValue( _xCompilationMode, mode != PluginCompilationMode.Release ? mode.ToString() : null );
             _compilationMode = mode;
         }
-        return SaveFile( monitor );
     }
 
-    internal bool EnsurePluginConfiguration( IActivityMonitor monitor, string shortPluginName )
-    {
-        var config = Plugins.Elements().FirstOrDefault( e => e.Name.LocalName.Equals( shortPluginName, StringComparison.OrdinalIgnoreCase ) );
-        if( config != null )
-        {
-            return true;
-        }
-        using( StartEdit() )
-        {
-            Plugins.Add( new XElement( shortPluginName ) );
-            _pluginsConfiguration = null;
-        }
-        return SaveFile( monitor );
-    }
-
-    internal bool RemovePluginConfiguration( IActivityMonitor monitor, string shortPluginName )
+    internal void EnsurePluginConfiguration( IActivityMonitor monitor, string shortPluginName )
     {
         var config = Plugins.Elements().FirstOrDefault( e => e.Name.LocalName.Equals( shortPluginName, StringComparison.OrdinalIgnoreCase ) );
         if( config == null )
         {
-            return true;
+            using( StartEdit() )
+            {
+                Plugins.Add( new XElement( shortPluginName ) );
+                _pluginsConfiguration = null;
+            }
         }
-        using( StartEdit() )
+    }
+
+    internal void RemovePluginConfiguration( IActivityMonitor monitor, string shortPluginName )
+    {
+        var config = Plugins.Elements().FirstOrDefault( e => e.Name.LocalName.Equals( shortPluginName, StringComparison.OrdinalIgnoreCase ) );
+        if( config != null )
         {
-            config.Remove();
-            _pluginsConfiguration = null;
+            using( StartEdit() )
+            {
+                config.Remove();
+                _pluginsConfiguration = null;
+            }
         }
-        return SaveFile( monitor );
     }
 
     /// <summary>
@@ -422,6 +395,8 @@ public sealed class WorldDefinitionFile
         Throw.DebugAssert( _allowEdit );
         _root.Descendants( _xFolder ).Where( e => !e.HasElements ).Remove();
     }
+
+    internal bool IsDirty => _isDirty;
 
     internal bool SaveFile( IActivityMonitor monitor )
     {

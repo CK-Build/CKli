@@ -1,7 +1,6 @@
 using CK.Core;
 using System;
 using System.Text;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace CKli.Core;
 

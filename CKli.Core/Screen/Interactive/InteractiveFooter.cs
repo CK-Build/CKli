@@ -1,6 +1,5 @@
 using CK.Core;
 using System;
-using static System.Reflection.Metadata.BlobBuilder;
 
 namespace CKli.Core;
 

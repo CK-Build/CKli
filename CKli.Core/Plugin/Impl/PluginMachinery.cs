@@ -357,11 +357,8 @@ public sealed partial class PluginMachinery
     internal bool SetPluginCompilationMode( IActivityMonitor monitor, World world, PluginCompilationMode mode )
     {
         Throw.DebugAssert( mode != _definitionFile.CompilationMode );
-        if( !_definitionFile.SetPluginCompilationMode( monitor, mode ) )
-        {
-            return false;
-        }
-        return OnPluginChanged( monitor, world ); 
+        _definitionFile.SetPluginCompilationMode( monitor, mode );
+        return OnPluginChanged( monitor, world, false ); 
     }
 
     internal bool CreatePlugin( IActivityMonitor monitor, World world, string shortPluginName, string fullPluginName )
@@ -382,10 +379,7 @@ public sealed partial class PluginMachinery
         {
             return false;
         }
-        if( !_definitionFile.EnsurePluginConfiguration( monitor, shortPluginName ) )
-        {
-            return false;
-        }
+        _definitionFile.EnsurePluginConfiguration( monitor, shortPluginName );
         Directory.CreateDirectory( projectPath );
         File.WriteAllText( projectPath.AppendPart( $"{fullPluginName}.csproj" ), $$"""
             <Project Sdk="Microsoft.NET.Sdk">
@@ -433,7 +427,7 @@ public sealed partial class PluginMachinery
             monitor.Error( $"Command 'dotnet sln add {fullPluginName}' failed." );
             return false;
         }
-        return OnPluginChanged( monitor, world );
+        return OnPluginChanged( monitor, world, false );
     }
 
     internal bool AddOrSetPluginPackage( IActivityMonitor monitor,
@@ -459,11 +453,8 @@ public sealed partial class PluginMachinery
             monitor.CloseGroup( "No change, skipping plugins recompilation." );
             return true;
         }
-        if( !_definitionFile.EnsurePluginConfiguration( monitor, shortPluginName ) )
-        {
-            return false;
-        }
-        return OnPluginChanged( monitor, world );
+        _definitionFile.EnsurePluginConfiguration( monitor, shortPluginName );
+        return OnPluginChanged( monitor, world, true );
     }
 
     internal bool RemovePlugin( IActivityMonitor monitor, World world, string shortPluginName, string fullPluginName )
@@ -476,10 +467,7 @@ public sealed partial class PluginMachinery
         {
             return false;
         }
-        if( !_definitionFile.RemovePluginConfiguration( monitor, shortPluginName ) )
-        {
-            return false;
-        }
+        _definitionFile.RemovePluginConfiguration( monitor, shortPluginName );
         if( wasProjectReference )
         {
             var projectPath = Root.AppendPart( fullPluginName );
@@ -496,10 +484,10 @@ public sealed partial class PluginMachinery
                 return false;
             }
         }
-        return OnPluginChanged( monitor, world );
+        return OnPluginChanged( monitor, world, true );
     }
 
-    bool OnPluginChanged( IActivityMonitor monitor, World world )
+    bool OnPluginChanged( IActivityMonitor monitor, World world, bool reloadPlugins )
     {
         world.ReleasePlugins();
         if( !LoadPluginFactory( monitor, true, out var toRecompile ) )
@@ -511,11 +499,29 @@ public sealed partial class PluginMachinery
         {
             return false;
         }
-        // When plugins change (the 4 reasons are: SetPluginCompilationMode, CreatePlugin, AddOrSetPluginPackage, RemovePlugin)
-        // we instantiate and initialize the plugins even if we won't use them: this is to ensure that everything works fine
-        // and to sollicitate Initialize() method that may update the Plugin configuration in the definition file.
-        // This is a "useless" operation that costs but it's not every day that a plugin is added, removed or updated.
-        return world.AcquirePlugins( monitor );
+        // When plugins change, the 4 possible reasons are:
+        // - SetPluginCompilationMode: This doesn't change anything (at least should not).
+        //                             There's no reason to reload the plugin instances.
+        // - CreatePlugin: The new plugin does nothing (it doesn't touch its empty configuration element)
+        //                 and necessarily works. There's no reason to reload the plugin instances.
+        // - RemovePlugin: The plugin and its configuration is removed. There is no "OnRemove" on a plugin.
+        //                 If the removed plugin was referenced by another one, the LoadPluginFactory above
+        //                 fails to load or recompile the plugins.
+        //                 A plugin that loses an optional dependency MAY change something in its Xml configuration:
+        //                 ==> reloadPlugins is true.
+        // - AddOrSetPluginPackage: Obvisously, a Plugin may initialize its configuration.
+        //                          ==> reloadPlugins is true.
+        // 
+        // Note that both CreatePlugin, RemovePlugin and AddOrSetPluginPackage are "transacted" (by a pre commit and
+        // a reset hard on failure).
+        //
+        // When reloadPlugins is true, we instantiate and initialize the plugins even if we won't use them: this is to ensure
+        // that everything works fine and to sollicitate Initialize() method that may update the Plugin configuration in
+        // the definition file.
+        // This is a "useless" operation (because the plugins won't be used in this run) that costs but it's not every day that
+        // a plugin is added, removed or updated.
+        //
+        return !reloadPlugins || world.AcquirePlugins( monitor );
     }
 
     /// <summary>

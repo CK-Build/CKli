@@ -24,8 +24,7 @@ public sealed class PluginConfigurationEditor
     /// <summary>
     /// Allows the Xml configuration to be changed.
     /// <para>
-    /// This can fail and return false if an exception is thrown by <paramref name="editor"/>
-    /// or if the <see cref="WorldDefinitionFile"/> cannot be saved or commit in the <see cref="StackRepository"/> fails.
+    /// This can fail and return false if an exception is thrown by <paramref name="editor"/>.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -33,23 +32,26 @@ public sealed class PluginConfigurationEditor
     /// <returns>True on success, false otherwise.</returns>
     public bool Edit( IActivityMonitor monitor, Action<IActivityMonitor,XElement> editor )
     {
-        using( _definitionFile.StartEdit( _xmlConfiguration ) )
+        try
         {
-            try
+            var clone = new XElement( _xmlConfiguration );
+            editor( monitor, clone );
+            using( _definitionFile.StartEdit() )
             {
-                editor( monitor, _xmlConfiguration );
-            }
-            catch( Exception ex )
-            {
-                monitor.Error( $"""
-                    Plugin '{_pluginInfo.PluginName}' error while editing configuration:
-                    {_xmlConfiguration}
-                    """, ex );
-                return false;
+                _xmlConfiguration.RemoveAll();
+                _xmlConfiguration.Add( clone.Attributes() );
+                _xmlConfiguration.Add( clone.Nodes() );
             }
         }
-        return _definitionFile.SaveFile( monitor )
-               && _definitionFile.World.Stack.Commit( monitor, $"Plugin '{_pluginInfo.PluginName}' changed its configuration." );
+        catch( Exception ex )
+        {
+            monitor.Error( $"""
+                Plugin '{_pluginInfo.PluginName}' error while editing configuration:
+                {_xmlConfiguration}
+                """, ex );
+            return false;
+        }
+        return true;
     }
 
 }

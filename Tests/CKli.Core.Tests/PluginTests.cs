@@ -122,6 +122,31 @@ public class PluginTests
             config.ShouldNotBeNull().Value.ShouldBe( "New Description!" );
         }
 
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "Will fail!", "--remove-plugin-configuration" ))
+                .ShouldBeFalse();
+
+            logs.ShouldContain( """
+                Plugin 'CommandSample' error while editing configuration:
+                <CommandSample>Will fail!</CommandSample>
+                """ );
+
+            definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
+            config = definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
+            config.ShouldNotBeNull().Value.ShouldBe( "New Description!", "Definition file is not saved on error." );
+        }
+
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "This will work but does nothing.", "--rename-plugin-configuration" ))
+                .ShouldBeTrue();
+
+            definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
+            config = definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
+            config.ShouldNotBeNull().Value.ShouldBe( "This will work but does nothing." );
+        }
+
         // ckli plugin remove CommandSample
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "remove", "CommandSample" )).ShouldBeTrue();
 

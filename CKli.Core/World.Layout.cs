@@ -350,11 +350,8 @@ sealed partial class World
             }
             _definitionFile.RemoveEmptyFolders();
         }
-        if( !_definitionFile.SaveFile( monitor ) )
-        {
-            return false;
-        }
-        return _stackRepository.Commit( monitor, "After XifLayout." );
+        return !_definitionFile.IsDirty
+               || (_definitionFile.SaveFile( monitor ) && _stackRepository.Commit( monitor, "After XifLayout." ));
     }
 
     abstract record LayoutAction( NormalizedPath Path, Uri Uri )

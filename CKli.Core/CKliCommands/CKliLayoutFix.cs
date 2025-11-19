@@ -37,10 +37,12 @@ sealed class CKliLayoutFix : Command
         }
         try
         {
-            return world.FixLayout( monitor, deleteAliens, out _ );
+            // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
+            return world.FixLayout( monitor, deleteAliens, out _ ) && stack.Close( monitor );
         }
         finally
         {
+            // On error, don't save a dirty World's DefinitionFile.
             stack.Dispose();
         }
     }

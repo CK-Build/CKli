@@ -33,6 +33,7 @@ sealed class CKliPluginEnable : Command
                 var definitionFile = stack.GetWorldNameFromPath( monitor, context.CurrentDirectory )?.LoadDefinitionFile( monitor );
                 if( definitionFile != null )
                 {
+                    // EnablePlugin handles the WorldDefinition file save and commit.
                     return definitionFile.EnablePlugin( monitor, name, enable );
                 }
             }

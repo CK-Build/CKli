@@ -45,11 +45,11 @@ monitor.Output.RegisterClient( new ScreenLogger( CKliRootEnv.Screen ) );
 
 CoreApplicationIdentity.Initialize();
 
-Environment.ExitCode = (await CKliCommands.HandleCommandAsync( monitor, CKliRootEnv.DefaultCKliEnv, arguments ))
+Environment.ExitCode = (await CKliCommands.HandleCommandAsync( monitor, CKliRootEnv.DefaultCKliEnv, arguments ).ConfigureAwait( false ))
                         ? 0
                         : -1;
 
-await CKliRootEnv.CloseAsync( monitor, arguments );
+await CKliRootEnv.CloseAsync( monitor, arguments ).ConfigureAwait( false );
 
 static ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> GetGlobalOptions()
 {

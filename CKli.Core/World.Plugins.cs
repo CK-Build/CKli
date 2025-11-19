@@ -21,29 +21,31 @@ public sealed partial class World
     internal bool SetPluginCompilationMode( IActivityMonitor monitor, PluginCompilationMode mode )
     {
         Throw.DebugAssert( mode != DefinitionFile.CompilationMode );
-        return _pluginMachinery != null
-            ? _pluginMachinery.SetPluginCompilationMode( monitor, this, mode )
-            : _definitionFile.SetPluginCompilationMode( monitor, mode );
+        if( _pluginMachinery != null )
+        {
+            return _pluginMachinery.SetPluginCompilationMode( monitor, this, mode );
+        }
+        _definitionFile.SetPluginCompilationMode( monitor, mode );
+        return true;
     }
 
     internal bool AddOrSetPluginPackage( IActivityMonitor monitor, string packageId, SVersion version )
     {
+        // This creates a Stack Commit if the Stack's working folder is dirty.
         if( !CheckAndPrepareForNewPlugin( monitor, packageId, out var shortName, out var fullName ) )
         {
             return false;
         }
-        if( !_pluginMachinery.AddOrSetPluginPackage( monitor, this, shortName, fullName, version, out bool added, out bool versionChanged ) )
+        if( !_pluginMachinery.AddOrSetPluginPackage( monitor, this, shortName, fullName, version, out bool added, out bool versionChanged )
+            || !_definitionFile.SaveFile( monitor ) )
         {
             _stackRepository.ResetHard( monitor );
             return false;
         }
-        if( !added && !versionChanged )
-        {
-            return true;
-        }
-        return _stackRepository.Commit( monitor, added
-                                                    ? $"Added plugin '{fullName}' in version '{version}'."
-                                                    : $"Updated plugin '{fullName}' to version '{version}'." );
+        return !added && !versionChanged
+                || _stackRepository.Commit( monitor, added
+                                                      ? $"Added plugin '{fullName}' in version '{version}'."
+                                                      : $"Updated plugin '{fullName}' to version '{version}'." );
     }
 
     internal bool CreatePlugin( IActivityMonitor monitor, string pluginName )
@@ -52,7 +54,8 @@ public sealed partial class World
         {
             return false;
         }
-        if( !_pluginMachinery.CreatePlugin( monitor, this, shortName, fullName ) )
+        if( !_pluginMachinery.CreatePlugin( monitor, this, shortName, fullName )
+            || !_definitionFile.SaveFile( monitor ) )
         {
             _stackRepository.ResetHard( monitor );
             return false;
@@ -100,7 +103,8 @@ public sealed partial class World
         {
             return false;
         }
-        if( !_pluginMachinery.RemovePlugin( monitor, this, shortName, fullName ) )
+        if( !_pluginMachinery.RemovePlugin( monitor, this, shortName, fullName )
+            || !_definitionFile.SaveFile( monitor ) )
         {
             _stackRepository.ResetHard( monitor );
             return false;

@@ -43,6 +43,7 @@ sealed class CKliRepoRemove : Command
             {
                 return CKliRepoAdd.RequiresAllowLTS( monitor, world.Name );
             }
+            // RemoveRepository handles the WorldDefinition file save and commit.
             return world.RemoveRepository( monitor, nameOrUrl );
         }
         finally
