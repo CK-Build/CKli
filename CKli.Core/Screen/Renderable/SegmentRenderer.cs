@@ -141,7 +141,6 @@ public class SegmentRenderer
     /// <see cref="RenderContent"/> to render in <see cref="Target"/>.
     /// </para>
     /// </summary>
-    /// <param name="target">The rendering target.</param>
     protected virtual void Render() => RenderContent();
 
     internal static void Render( IEnumerable<IRenderable> renderables, IRenderTarget target, bool newLine )

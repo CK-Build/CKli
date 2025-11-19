@@ -12,6 +12,17 @@ public abstract class PluginCommand : Command
     readonly MethodAsyncReturn _returnType;
     internal object? _instance;
 
+    /// <summary>
+    /// Initializes a new <see cref="PluginCommand"/>.
+    /// </summary>
+    /// <param name="typeInfo">The type info.</param>
+    /// <param name="commandPath">The command path.</param>
+    /// <param name="description">The command description.</param>
+    /// <param name="arguments">The command arguments.</param>
+    /// <param name="options">The command options.</param>
+    /// <param name="flags">The command flags.</param>
+    /// <param name="methodName">The method name that implements the command.</param>
+    /// <param name="returnType">The command return type.</param>
     protected PluginCommand( IPluginTypeInfo typeInfo,
                              string commandPath,
                              string description,
@@ -41,6 +52,9 @@ public abstract class PluginCommand : Command
     /// </summary>
     public MethodAsyncReturn ReturnType => _returnType;
 
+    /// <summary>
+    /// Gets the instance that implements the command.
+    /// </summary>
     protected object Instance
     {
         get

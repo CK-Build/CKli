@@ -5,6 +5,9 @@ using System.Runtime.InteropServices;
 
 namespace CKli.Core;
 
+/// <summary>
+/// An horizontal set of renderables.
+/// </summary>
 public sealed class HorizontalContent : IRenderable
 {
     readonly ImmutableArray<IRenderable> _cells;
@@ -14,6 +17,11 @@ public sealed class HorizontalContent : IRenderable
     readonly int _minWidth;
     readonly int _nominalWidth;
 
+    /// <summary>
+    /// Initializes a new horizontal content.
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="cells">The content.</param>
     public HorizontalContent( ScreenType screenType, params ImmutableArray<IRenderable> cells )
     {
         _screenType = screenType;
@@ -46,18 +54,27 @@ public sealed class HorizontalContent : IRenderable
         return h;
     }
 
+    /// <inheritdoc />
     public ScreenType ScreenType => _screenType;
 
+    /// <inheritdoc />
     public int Height => _height;
 
+    /// <inheritdoc />
     public int Width => _width;
 
+    /// <inheritdoc />
     public int MinWidth => _minWidth;
 
+    /// <inheritdoc />
     public int NominalWidth => _nominalWidth;
 
+    /// <summary>
+    /// Gets the content.
+    /// </summary>
     public ImmutableArray<IRenderable> Cells => _cells;
 
+    /// <inheritdoc />
     public IRenderable SetWidth( int width, bool allowWider )
     {
         if( width < _minWidth ) width = _minWidth;
@@ -150,6 +167,7 @@ public sealed class HorizontalContent : IRenderable
     }
 
 
+    /// <inheritdoc />
     public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
     {
         Throw.CheckArgument( line >= 0 && line < actualHeight );
@@ -165,6 +183,11 @@ public sealed class HorizontalContent : IRenderable
         }
     }
 
+    /// <summary>
+    /// Returns a new horizontal content with the appended content.
+    /// </summary>
+    /// <param name="horizontalContent">Content to append.</param>
+    /// <returns>This or a new horizontal content.</returns>
     public HorizontalContent Append( ReadOnlySpan<IRenderable?> horizontalContent )
     {
         if( horizontalContent.Length == 0 ) return this;
@@ -176,6 +199,11 @@ public sealed class HorizontalContent : IRenderable
         return FillNewContent( _screenType, horizontalContent, hasSpecial, a, _cells.Length );
     }
 
+    /// <summary>
+    /// Returns a new horizontal content with some content before this one.
+    /// </summary>
+    /// <param name="horizontalContent">Content to insert before this one.</param>
+    /// <returns>This or a new horizontal content.</returns>
     public HorizontalContent Prepend( ReadOnlySpan<IRenderable?> horizontalContent )
     {
         if( horizontalContent.Length == 0 ) return this;
@@ -186,6 +214,7 @@ public sealed class HorizontalContent : IRenderable
         return FillNewContent( _screenType, horizontalContent, hasSpecial, a, 0 );
     }
 
+    /// <inheritdoc />
     public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
 
     internal static int ComputeActualContentLength( ReadOnlySpan<IRenderable?> horizontalContent, out bool hasSpecial )

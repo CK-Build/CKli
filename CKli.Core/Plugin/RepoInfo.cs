@@ -28,6 +28,7 @@ public abstract class RepoInfo
     /// <summary>
     /// Error constructor.
     /// </summary>
+    /// <param name="repo">The repository.</param>
     /// <param name="errorState">Must not be <see cref="RepoInfoErrorState.None"/>.</param>
     /// <param name="reason">
     /// The reason.

@@ -180,5 +180,4 @@ public partial class TableLayout
             return cols;
         }
     }
-
 }

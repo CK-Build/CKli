@@ -14,6 +14,7 @@ public sealed class PluginTypeInfo : IPluginTypeInfo
     /// <param name="typeName">The type name.</param>
     /// <param name="isPrimary">Whether this is a primary or a support plugin.</param>
     /// <param name="status">The plugin status.</param>
+    /// <param name="activationIndex">The activation index.</param>
     public PluginTypeInfo( PluginInfo plugin, string typeName, bool isPrimary, int status, int activationIndex )
     {
         Plugin = plugin;
@@ -38,5 +39,9 @@ public sealed class PluginTypeInfo : IPluginTypeInfo
     /// <inheritdoc />
     public int ActivationIndex { get; }
 
+    /// <summary>
+    /// Overridden to return the <see cref="TypeName"/>.
+    /// </summary>
+    /// <returns>The TypeName.</returns>
     public override string ToString() => TypeName;
 }

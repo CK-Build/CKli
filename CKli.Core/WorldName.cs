@@ -129,7 +129,7 @@ public partial class WorldName : IEquatable<WorldName>
     }
 
     /// <summary>
-    /// Overridden to handle equality against any other <see cref="IWorldName"/>.
+    /// Overridden to handle equality against any other <see cref="WorldName"/>.
     /// </summary>
     /// <param name="obj">The other object.</param>
     /// <returns>Whether other is the same name or not.</returns>

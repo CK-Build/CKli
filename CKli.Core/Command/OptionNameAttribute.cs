@@ -13,7 +13,7 @@ public sealed class OptionNameAttribute : Attribute
     /// <summary>
     /// Initializes a new <see cref="OptionNameAttribute"/>.
     /// </summary>
-    /// <param name="description">The comma separated names.</param>
+    /// <param name="names">The comma separated names.</param>
     public OptionNameAttribute( string names )
     {
     }

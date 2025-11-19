@@ -10,14 +10,17 @@ namespace CKli.Core;
 /// <summary>
 /// Encapsulates the arguments for CKli.Plugins helper.
 /// </summary>
-/// <param name="WorldName">The world name.</param>
-/// <param name="PluginsConfiguration">The plugins configuration.</param>
 public sealed class PluginCollectorContext
 {
     readonly WorldName _worldName;
     readonly IReadOnlyDictionary<string, (XElement Config, bool IsDisabled)> _pluginsConfiguration;
     byte[]? _signature;
 
+    /// <summary>
+    /// Initializes a new <see cref="PluginCollectorContext"/>.
+    /// </summary>
+    /// <param name="worldName">The world name.</param>
+    /// <param name="pluginsConfiguration">The plugins configuration.</param>
     public PluginCollectorContext( WorldName worldName,
                                    IReadOnlyDictionary<string, (XElement Config, bool IsDisabled)> pluginsConfiguration )
     {

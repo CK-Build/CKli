@@ -259,6 +259,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="branchName">The branch name.</param>
+    /// <param name="createLocalLogLevel">Log level to log branch creation.</param>
     public void EnsureBranch( IActivityMonitor monitor, string branchName, LogLevel createLocalLogLevel = LogLevel.Info )
     {
         DoEnsureBranch( monitor, _git, branchName, createLocalLogLevel, DisplayPath, out var _ );
@@ -586,7 +587,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// match the content of the index and by default tries to removes untracked files.
     /// <para>
     /// When removing of an untracked file fails, this returns true, warnings are emitted and
-    /// <see cref="remainingUntrackedFiles"/> is not null and contains the paths relative to
+    /// <paramref name="remainingUntrackedFiles"/> is not null and contains the paths relative to
     /// the <see cref="WorkingFolder"/> that failed to be deleted.
     /// </para>
     /// </summary>

@@ -99,7 +99,7 @@ public sealed class VSSolutionInfo : RepoInfo
     public IReadOnlyDictionary<string, SolutionProjectModel> Projects => _projects;
 
     /// <summary>
-    /// Gets the solution if not <see cref="VSSolutionIssue.MissingSolution"/>, <see cref="VSSolutionIssue.MultipleSolution"/>
+    /// Gets the solution if not <see cref="VSSolutionIssue.MissingSolution"/>, <see cref="VSSolutionIssue.MultipleSolutions"/>
     /// or <see cref="VSSolutionIssue.BadNameSolution"/>.
     /// </summary>
     public SolutionModel? Solution => _solution;

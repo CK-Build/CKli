@@ -1,5 +1,8 @@
 namespace CKli.Core;
 
+/// <summary>
+/// Fundamental renderable abstraction.
+/// </summary>
 public interface IRenderable
 {
     /// <summary>

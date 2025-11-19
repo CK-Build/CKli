@@ -5,6 +5,7 @@ namespace CKli.Core;
 
 public sealed partial class ContentBox
 {
+    /// <inheritdoc />
     public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
     {
         Throw.CheckArgument( line >= 0 && line < actualHeight && actualHeight >= Height );

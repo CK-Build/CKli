@@ -1,5 +1,8 @@
 namespace CKli.Core;
 
+/// <summary>
+/// Defines how plugins are handled.
+/// </summary>
 public enum PluginCompilationMode
 {
     /// <summary>

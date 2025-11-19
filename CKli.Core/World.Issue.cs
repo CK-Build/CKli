@@ -5,6 +5,9 @@ namespace CKli.Core;
 
 public sealed partial class World
 {
+    /// <summary>
+    /// Models a World issue.
+    /// </summary>
     public abstract class Issue
     {
         readonly string _title;
@@ -22,6 +25,12 @@ public sealed partial class World
             _manualFix = manualFix;
         }
 
+        /// <summary>
+        /// Initializes a new Issue.
+        /// </summary>
+        /// <param name="title">The title.</param>
+        /// <param name="body">The body. Can be <see cref="ScreenType.Unit"/>.</param>
+        /// <param name="repo">The repository if this issue is related to a specific repository.</param>
         protected Issue( string title, IRenderable body, Repo? repo )
             : this( title, body, repo, false )
         {

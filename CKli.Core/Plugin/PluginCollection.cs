@@ -19,6 +19,12 @@ public abstract class PluginCollection
     IReadOnlyCollection<PluginInfo> _plugins;
     CommandNamespace _commands;
 
+    /// <summary>
+    /// Initializes a new <see cref="PluginCollection"/>.
+    /// </summary>
+    /// <param name="instantiated">The instantiated plugins.</param>
+    /// <param name="plugins">The plugin infos.</param>
+    /// <param name="commands">The plugin commands.</param>
     protected PluginCollection( object[] instantiated, IReadOnlyCollection<PluginInfo> plugins, CommandNamespace commands )
     {
         _instantiated = instantiated;

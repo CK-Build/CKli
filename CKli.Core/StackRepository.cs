@@ -28,8 +28,19 @@ namespace CKli.Core;
 /// </summary>
 public sealed partial class StackRepository : IDisposable
 {
+    /// <summary>
+    /// Public stack folder name.
+    /// </summary>
     public const string PublicStackName = ".PublicStack";
+
+    /// <summary>
+    /// Private stack folder name.
+    /// </summary>
     public const string PrivateStackName = ".PrivateStack";
+
+    /// <summary>
+    /// Prefix for duplicated stack.
+    /// </summary>
     public const string DuplicatePrefix = "DuplicateOf-";
 
     readonly GitRepository _git;
@@ -115,9 +126,6 @@ public sealed partial class StackRepository : IDisposable
     /// and lexigraphically sorted.
     /// <para>
     /// Worlds are defined by the xml World definition files "StackName[@LTSName].xml" in this stack reposiory <see cref="StackWorkingFolder"/>.
-    /// </summary>
-    /// <param name="path">The file path.</param>
-    /// <returns>The name or null on error.</returns>
     /// </para>
     /// </summary>
     public ImmutableArray<LocalWorldName> WorldNames
@@ -251,7 +259,7 @@ public sealed partial class StackRepository : IDisposable
 
     /// <summary>
     /// Tries to open a stack directory from a path.
-    /// This lookups the ".PrivateStack" or ".PublicStack" in and above <paramref name="path"/>: if none
+    /// This lookups the ".PrivateStack" or ".PublicStack" in and above <see cref="CKliEnv.CurrentDirectory"/>: if none
     /// are found, there is no <paramref name="error"/> and null is returned.
     /// <para>
     /// On success, the stack repository is on the <paramref name="stackBranchName"/> and, by default,
@@ -316,7 +324,7 @@ public sealed partial class StackRepository : IDisposable
 
     /// <summary>
     /// Open a stack from a path.
-    /// This lookups the ".PrivateStack" or ".PublicStack" in and above <paramref name="path"/>: a stack
+    /// This lookups the ".PrivateStack" or ".PublicStack" in and above <see cref="CKliEnv.CurrentDirectory"/>: a stack
     /// must be found otherwise it is an error.
     /// <para>
     /// On success, the stack repository is on the <paramref name="stackBranchName"/> and, by default,
@@ -351,7 +359,7 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
-    /// Tries to open a stack and a world from a <paramref name="path"/>. If no stack is found on or above the path,
+    /// Tries to open a stack and a world from a <see cref="CKliEnv.CurrentDirectory"/>. If no stack is found on or above the path,
     /// this is not an error but <c>(null,null)</c> is returned.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -383,7 +391,7 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
-    /// Opens a stack and a world from a <paramref name="path"/>.
+    /// Opens a stack and a world from a <see cref="CKliEnv.CurrentDirectory"/>.
     /// A stack must be found on or above the path otherwise it is an error.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>

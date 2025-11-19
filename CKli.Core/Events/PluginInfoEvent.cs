@@ -4,6 +4,9 @@ using System.Linq;
 
 namespace CKli.Core;
 
+/// <summary>
+/// Event raised by "ckli plugin" command to collect plugin information.
+/// </summary>
 public sealed class PluginInfoEvent : WorldEvent
 {
     readonly List<World.DisplayInfoPlugin> _display;

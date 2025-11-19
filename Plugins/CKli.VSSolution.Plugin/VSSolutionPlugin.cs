@@ -16,8 +16,15 @@ using System.Linq;
 
 namespace CKli.VSSolution.Plugin;
 
+/// <summary>
+/// Primary plugin that provides a <see cref="VSSolutionInfo"/> for repository.
+/// </summary>
 public sealed partial class VSSolutionPlugin : PrimaryRepoPlugin<VSSolutionInfo>
 {
+    /// <summary>
+    /// Initializes a new <see cref="VSSolutionPlugin"/>.
+    /// </summary>
+    /// <param name="context">The plugin context.</param>
     public VSSolutionPlugin( PrimaryPluginContext context )
         : base( context )
     {
@@ -36,6 +43,7 @@ public sealed partial class VSSolutionPlugin : PrimaryRepoPlugin<VSSolutionInfo>
         }
     }
 
+    /// <inheritdoc />
     protected override VSSolutionInfo Create( IActivityMonitor monitor, Repo repo )
     {
         // Fast path: the .sln or .slnx exists.

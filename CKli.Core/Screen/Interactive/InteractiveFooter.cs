@@ -3,18 +3,24 @@ using System;
 
 namespace CKli.Core;
 
+/// <summary>
+/// An interactive footer is a <see cref="Prompt"/> with an optional <see cref="Header"/>.
+/// </summary>
 public sealed class InteractiveFooter
 {
     readonly InteractiveScreen _screen;
     IRenderable? _header;
     IRenderable _prompt;
 
-    public InteractiveFooter( InteractiveScreen screen )
+    internal InteractiveFooter( InteractiveScreen screen )
     {
         _screen = screen;
         _prompt = ComputePrompt( _screen.Context );
     }
 
+    /// <summary>
+    /// Gets or sets the optional header.
+    /// </summary>
     public IRenderable? Header
     {
         get => _header;

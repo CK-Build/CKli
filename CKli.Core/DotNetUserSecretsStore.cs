@@ -21,7 +21,8 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
     // No Empty pattern. https://github.com/dotnet/runtime/issues/59303
     JsonDocument? _document;
     bool _documentLoaded;
-    
+
+    /// <inheritdoc />
     public string? TryGetRequiredSecret( IActivityMonitor monitor, IEnumerable<string> keys )
     {
         Throw.CheckNotNullArgument( keys );
@@ -87,5 +88,6 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
         return _document;
     }
 
+    /// <inheritdoc />
     public void Dispose() => _document?.Dispose();
 }

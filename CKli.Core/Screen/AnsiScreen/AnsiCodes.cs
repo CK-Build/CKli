@@ -102,13 +102,13 @@ internal static class AnsiCodes
     public static string ShowCursor( bool show = true ) => show ? "\u001b[?25h" : "\u001b[?25l";
 
     /// <summary>
-    /// Saves the cursor position. Can be restored by <see cref=""/>
+    /// Saves the cursor position. Can be restored by <see cref="RestoreCursorPosition"/>.
     /// </summary>
     /// <returns>The Ansi string.</returns>
     public static string SaveCursorPosition() => "\x1b[s";
 
     /// <summary>
-    /// Saves the cursor position. Can be restored by <see cref=""/>
+    /// Restores the cursor positionsaved by <see cref="SaveCursorPosition"/>.
     /// </summary>
     /// <returns>The Ansi string.</returns>
     public static string RestoreCursorPosition() => "\x1b[u";
@@ -192,6 +192,7 @@ internal static class AnsiCodes
     /// <summary>
     /// Writes an hyperlink.
     /// </summary>
+    /// <param name="w">This buffer writer.</param>
     /// <param name="text">The link text.</param>
     /// <param name="url">The target url.</param>
     /// <returns>True on success, false otherwise.</returns>

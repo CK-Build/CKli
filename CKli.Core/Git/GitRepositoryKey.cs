@@ -39,6 +39,7 @@ public partial class GitRepositoryKey
     /// <summary>
     /// Initializes a new <see cref="GitRepositoryKey"/>.
     /// </summary>
+    /// <param name="secretsStore">The secrets store to use.</param>
     /// <param name="url">The url of the remote.</param>
     /// <param name="isPublic">Whether this repository is public.</param>
     public GitRepositoryKey( ISecretsStore secretsStore, Uri url, bool isPublic )

@@ -23,7 +23,7 @@ sealed partial class World
     /// <list type="number">
     ///     <item>The uri must be a valid absolute url.</item>
     ///     <item>No existing repository must exist with the same repository name.</item>
-    ///     <item>The path must be <see cref="WorldRoot"/> or starts with it (it should not end with the repository name).</item>
+    ///     <item>The path must be <see cref="LocalWorldName.WorldRoot"/> or starts with it (it should not end with the repository name).</item>
     ///     <item>The path must not be below any exisiting repository.</item>
     ///     <item>The repository is cloned.</item>
     ///     <item>The world definition file is updated, saved and comitted in the Stack repository.</item>
@@ -31,7 +31,7 @@ sealed partial class World
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="repositoryUri">The repository url.</param>
-    /// <param name="folderPath">The absolute folder path inside <see cref="WorldRoot"/>.</param>
+    /// <param name="folderPath">The absolute folder path inside <see cref="LocalWorldName.WorldRoot"/>.</param>
     /// <returns>True on success, false on error.</returns>
     public bool AddRepository( IActivityMonitor monitor, Uri repositoryUri, NormalizedPath folderPath )
     {

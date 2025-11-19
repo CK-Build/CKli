@@ -14,8 +14,10 @@ namespace CKli.Core;
 /// It may be extended in the future to handle other basic locally configurable aspect but currently it has all what we need.
 /// This must be initialized before anything can be done with the <see cref="StackRepository"/>.
 /// <para>
-/// This is a static class. Tests use the <see cref="Initialize(string?)"/> instance name to isolate the test environment ("CKli-Test")
-/// from the regular run environment ("CKli").
+/// This is a static class. Tests use the <see cref="Initialize(string?, CommandLineArguments?, IScreen?)"/> instance name to isolate the
+/// test environment ("CKli-Test") from the regular run environment ("CKli").
+/// </para>
+/// <para>
 /// This captures the initial <see cref="Environment.CurrentDirectory"/> and initializes the <see cref="GrandOutput.Default"/> if it is
 /// not already initialized.
 /// </para>
@@ -216,7 +218,7 @@ public static partial class CKliRootEnv
     }
 
     /// <summary>
-    /// Throws an <see cref="InvalidOperationException"/> if <see cref="Initialize(string?)"/> has not been called.
+    /// Throws an <see cref="InvalidOperationException"/> if <see cref="Initialize"/> has not been called.
     /// </summary>
     [MemberNotNull( nameof( _screen ) )]
     public static void CheckInitialized() => Throw.CheckState( "CKliRootEnv.Initialize() must have been called before.", _screen != null );

@@ -5,6 +5,10 @@ using System.Threading.Tasks;
 
 namespace CKli.Core;
 
+/// <summary>
+/// The interactive screen is a <see cref="IScreen"/> that wraps another <see cref="IScreen"/>
+/// and handles interaction.
+/// </summary>
 public sealed partial class InteractiveScreen : IScreen
 {
     readonly IScreen _screen;
@@ -43,16 +47,30 @@ public sealed partial class InteractiveScreen : IScreen
     /// </summary>
     public CKliEnv Context => _context;
 
+    /// <summary>
+    /// Gets the interactive header.
+    /// </summary>
     public InteractiveHeader Header => _header;
 
+    /// <summary>
+    /// Gets the interactive body.
+    /// </summary>
     public InteractiveBody Body => _body;
 
+    /// <summary>
+    /// Gets the interactive footer.
+    /// </summary>
     public InteractiveFooter Footer => _footer;
 
+    /// <summary>
+    /// Gets the history of commands that have been handled.
+    /// </summary>
     public IReadOnlyList<CommandLineArguments> History => _history;
 
+    /// <inheritdoc />
     public ScreenType ScreenType => _screen.ScreenType;
 
+    /// <inheritdoc />
     public int Width => _screen.Width;
 
     /// <summary>
@@ -110,8 +128,10 @@ public sealed partial class InteractiveScreen : IScreen
                                          footer.Prompt );
     }
 
+    /// <inheritdoc />
     public void Display( IRenderable renderable ) => _body.Content.Add( renderable );
 
+    /// <inheritdoc />
     public void ScreenLog( LogLevel level, string text ) => _header.Logs.Add( _screen.ScreenType.CreateLog( level, text ) );
 
     void IScreen.Close() => ((IScreen)_screen).Close();
@@ -144,6 +164,10 @@ public sealed partial class InteractiveScreen : IScreen
         return true;
     }
 
+    /// <summary>
+    /// Returns an empty string.
+    /// </summary>
+    /// <returns>An empty string.</returns>
     public override string ToString() => string.Empty;
 
 }

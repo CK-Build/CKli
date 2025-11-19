@@ -12,7 +12,7 @@ and concentrates informations in a single place.
 
 - [.NET SDK 8.0](https://dotnet.microsoft.com/download)
 
-### Installation (not supported yet)
+### Installation
 
 CKli is a [dotnet tool](https://docs.microsoft.com/en-us/dotnet/core/tools/global-tools).
 You should install it globally by running:
@@ -24,6 +24,12 @@ And update it with:
 
 ```powershell
 dotnet tool update <PACKAGE_ID> -g
+```
+
+To use a CI build instead of the last stable release, specify the version and the Azure source feed:
+
+```powershell
+dotnet tool update CKli -g --version 0.0.8--0007-dev --source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json
 ```
 
 ### Run CKli
@@ -122,7 +128,7 @@ If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified b
 it is weird to remove a Repo from a Long Term Support World.
 
 This deletes the local repository, updates the World's definition file in
-the Stack repsoitory and creates a commit. To publish this removal, a `push` (typically
+the Stack repository and creates a commit. To publish this removal, a `push` (typically
 with `--stack-only`) must be executed.
 
 ### `layout fix --delete-aliens`
@@ -138,6 +144,11 @@ The World's definition file is updated and a commit is done in the Stack reposit
 
 To publish this update, a `push` (typically with `--stack-only`) must be executed.
 
+### `issue --all --fix`
+
+Detects issues and display them or fix the issues that can be automatically fixed when `--fix` is specified.
+When `--all` is specified, this applies to all the Repos of the current World (even if current path is in a Repo).
+
 ## Plugin commands
 
 The core commands of CKli handles Stack, World and Repo (Git repositories).
@@ -149,7 +160,8 @@ in the Stack repository.
 
 ### `plugin --compile-mode`
 
-Provides informations on installed plugins and their state.
+Provides informations on installed plugins, their state, Xml configuration element and an optional message
+that can be produced by the plugin itself.
 
 `--compile-mode` is an advanced option to be used when developping plugins. Plugins are discovered
 once (after a creation, an install or a removal) via reflection and then compiled in `Release`
@@ -158,7 +170,8 @@ with generated code that replaces all the reflection.
 A regular load is just an `Assembly.Load` (in a collectible `AssemblyLoadContext`) and a call to an
 initialization function that initializes the graph of objetc (command handlers, Plugin description, etc.).
 
-In very specific scenario (developping, debugging), it is possible to set the compile 
+In very specific scenario (developping, debugging), it is possible to set the compile mode to `None` (plugins
+are not compiled, reflection is always used) or `Debug` to compile the plugins in debug configuration.
 
 ### `plugin create <name> --allow-lts`
 Creates a new source based plugin project in the current World.
@@ -180,7 +193,7 @@ The new plugin is added to the `<Plugins />` element of the world definition fil
 </MyWorld>
 ```
 The `<MyFirstOne />` element is the plugin configuration: the plugin code can read it to configure
-its behavior.
+its behavior and update it.
 
 :warning: Warnings:
 - The plugins must not be globally disabled (see below).
@@ -203,7 +216,7 @@ If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified b
 it is weird to remove a plugin from a Long Term Support World.
 
 ### `plugin add <packageId@version> --allow-lts`
-Adds a new packaged plugin in the current World or sets its version.
+Adds a new packaged plugin in the current World or updates its version.
 
 When added, the plugin is added to the `<Plugins />` element of the world definition file,
 just like in the source based scenario.
@@ -226,10 +239,9 @@ When a name is specified, the attribute is set on the corresponding plugin confi
 <MyWorld>
 
   <Plugins IsDisabled="true">
-    <EnsureBranch IsDisabled="true">
-      <Branch Name="main" />
-      <Branch Name="develop" />
-    </EnsureBranch>
+    <MyPlugin IsDisabled="true">
+      <SomeOption>None</SomeOption>
+    </MyPlugin>
     <MyPlugin />
   </Plugins>
 
@@ -242,8 +254,4 @@ As usual, this modification will be "published" when `push` (typically with `--s
 Reverts the `plugin disable` command by removing the `IsDisabled="true"` attribute.
 
 As usual, this modification will be "published" when `push` (typically with `--stack-only`) is executed.
-
-### `plugin info`
-Displays plugin related information (configured, disabled) and an optional message that can be
-produced by the plugin itself.
 

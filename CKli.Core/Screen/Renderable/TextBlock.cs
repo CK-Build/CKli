@@ -6,8 +6,14 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.Core;
 
+/// <summary>
+/// A text block.
+/// </summary>
 public abstract class TextBlock : IRenderable
 {
+    /// <summary>
+    /// Minimal width of text.
+    /// </summary>
     public const int MinimalWidth = 10;
 
     readonly internal string _text;
@@ -55,8 +61,10 @@ public abstract class TextBlock : IRenderable
     /// </summary>
     public string RawText => _text;
 
+    /// <inheritdoc />
     public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
 
+    /// <inheritdoc />
     public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
     {
         // Texts have no notion of context. Lines are drawn where they are told to draw,
@@ -65,8 +73,9 @@ public abstract class TextBlock : IRenderable
         BuildSegmentTree( line, parent );
     }
 
-    protected abstract void BuildSegmentTree( int line, SegmentRenderer parent );
+    private protected abstract void BuildSegmentTree( int line, SegmentRenderer parent );
 
+    /// <inheritdoc />
     public abstract IRenderable SetWidth( int width, bool allowWider = true );
 
     /// <summary>
@@ -188,7 +197,7 @@ public abstract class TextBlock : IRenderable
             return w;
         }
 
-        protected override void BuildSegmentTree( int line, SegmentRenderer parent )
+        private protected override void BuildSegmentTree( int line, SegmentRenderer parent )
         {
             Throw.DebugAssert( line >= 0 );
             if( line == 0 )
@@ -231,7 +240,7 @@ public abstract class TextBlock : IRenderable
 
         public override int Height => _lines.Length;
 
-        protected override void BuildSegmentTree( int line, SegmentRenderer parent ) => MultiLineRenderer.Create( parent, line, _text, _lines, _style );
+        private protected override void BuildSegmentTree( int line, SegmentRenderer parent ) => MultiLineRenderer.Create( parent, line, _text, _lines, _style );
 
         public override IRenderable SetWidth( int width, bool _ )
         {
@@ -275,7 +284,7 @@ public abstract class TextBlock : IRenderable
 
         public override int NominalWidth => _origin.NominalWidth;
 
-        protected override void BuildSegmentTree( int line, SegmentRenderer previous ) => MultiLineRenderer.Create( previous, line, _text, _lines, _style );
+        private protected override void BuildSegmentTree( int line, SegmentRenderer previous ) => MultiLineRenderer.Create( previous, line, _text, _lines, _style );
 
         public override IRenderable SetWidth( int width, bool allowWider ) => _origin.SetWidth( width, allowWider );
     }

@@ -109,7 +109,7 @@ public sealed class CommandLineArguments
     public int RemainingCount => _args.Count;
 
     /// <summary>
-    /// Gets the found command set once by <see cref="SetFoundCommand(Command)"/>.
+    /// Gets the found command.
     /// </summary>
     public Command? FoundCommand => _foundCommand;
 
@@ -119,7 +119,7 @@ public sealed class CommandLineArguments
     public ImmutableArray<string> InitialArguments => _initial;
 
     /// <summary>
-    /// Gets whether <see cref="Close(IActivityMonitor, out ImmutableArray{ValueTuple{string, bool}})"/> has been called.
+    /// Gets whether <see cref="Close"/> has been called.
     /// </summary>
     public bool IsClosed => !_remainingArguments.IsDefault;
 
@@ -173,7 +173,6 @@ public sealed class CommandLineArguments
     /// <summary>
     /// Extracts a multiple optional values.
     /// </summary>
-    /// <param name="names"></param>
     /// <param name="names">The option names.</param>
     /// <returns>The option values or null if not found.</returns>
     public string[]? EatMultipleOption( params IEnumerable<string> names )
@@ -305,6 +304,7 @@ public sealed class CommandLineArguments
     /// Sets the found command and eats the first <paramref name="pathCount"/> arguments.
     /// </summary>
     /// <param name="found">The found command.</param>
+    /// <param name="pathCount">Number or arguments to consume.</param>
     internal void SetFoundCommand( Command found, int pathCount )
     {
         Throw.DebugAssert( FoundCommand == null );
@@ -329,4 +329,9 @@ public sealed class CommandLineArguments
         return ImmutableCollectionsMarshal.AsImmutableArray( all );
     }
 
+    /// <summary>
+    /// Overridden to return the <see cref="InitialAsStringArguments"/>.
+    /// </summary>
+    /// <returns>The InitialAsStringArguments.</returns>
+    public override string ToString() => InitialAsStringArguments;
 }

@@ -25,12 +25,16 @@ public interface ISecretsStore
     string? TryGetRequiredSecret( IActivityMonitor monitor, IEnumerable<string> keys );
 }
 
+/// <summary>
+/// Extends <see cref="ISecretsStore"/>.
+/// </summary>
 public static class SecretsStoreExtensions
 {
     /// <summary>
     /// Provides the secret if it exists or returns null and emits an error that explains
     /// how to register the secret on the system.
     /// </summary>
+    /// <param name="store">This store.</param>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="strongestKey">The strongest key that would allow the operation and more.</param>
     /// <param name="regularKey">The regular key that would allow the operation.</param>
@@ -42,6 +46,7 @@ public static class SecretsStoreExtensions
     /// Provides the secret if it exists or returns null and emits an error that explains
     /// how to register the secret on the system.
     /// </summary>
+    /// <param name="store">This store.</param>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="key">The key of the secret to locate.</param>
     /// <returns>The secret or null if the secret is not available.</returns>
@@ -52,6 +57,7 @@ public static class SecretsStoreExtensions
     /// Provides a secret if it exists or returns null and emits an error that explains
     /// how to register the secret on the system.
     /// </summary>
+    /// <param name="store">This store.</param>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="strongestKey">The strongest key of the secret to locate.</param>
     /// <param name="otherKeys">Other keys.</param>

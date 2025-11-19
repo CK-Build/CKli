@@ -49,6 +49,7 @@ public enum ContentAlign
     VMiddle = VTop | VBottom
 }
 
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 public static class ContentAlignmentExtension
 {
     public static bool IsLeft( this ContentAlign c ) => (c & ContentAlign.HCenter) == ContentAlign.HLeft;
@@ -63,3 +64,4 @@ public static class ContentAlignmentExtension
     public static bool IsMiddle( this ContentAlign c ) => (c & ContentAlign.VMiddle) == ContentAlign.VMiddle;
     public static bool IsVerticalKnown( this ContentAlign c ) => (c & ContentAlign.VMiddle) != 0;
 }
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member

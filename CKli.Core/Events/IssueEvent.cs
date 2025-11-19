@@ -3,12 +3,15 @@ using System.Collections.Generic;
 
 namespace CKli.Core;
 
+/// <summary>
+/// Raised by the "ckli issue" command.
+/// </summary>
 public sealed class IssueEvent : WorldEvent
 {
     readonly IReadOnlyList<Repo> _repos;
     readonly List<World.Issue> _issues;
 
-    public IssueEvent( IActivityMonitor monitor,
+    internal IssueEvent( IActivityMonitor monitor,
                        World world,
                        IReadOnlyList<Repo> repos,
                        List<World.Issue> issues )

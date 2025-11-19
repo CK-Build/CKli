@@ -20,9 +20,7 @@ public abstract class PluginBase
     readonly World _world;
 
     /// <summary>
-    /// Initializes a support plugin.
-    /// Primary plugins must accept a <see cref="PrimaryPluginContext"/> parameter
-    /// and call <see cref="PluginBase(PrimaryPluginContext)"/>.
+    /// Initializes a plugin.
     /// </summary>
     /// <param name="world">The world.</param>
     protected PluginBase( World world )

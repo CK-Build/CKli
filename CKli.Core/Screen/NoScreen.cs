@@ -7,16 +7,16 @@ namespace CKli.Core;
 /// </summary>
 public sealed class NoScreen : IScreen
 {
-    public NoScreen()
-    {
-    }
-
+    /// <inheritdoc />
     public ScreenType ScreenType => ScreenType.Default;
 
+    /// <inheritdoc />
     public void Display( IRenderable renderable ) { }
 
+    /// <inheritdoc />
     public int Width => IScreen.MaxScreenWidth;
 
+    /// <inheritdoc />
     public void ScreenLog( LogLevel level, string message ) { }
 
     void IScreen.OnLog( LogLevel level, string? text, bool isOpenGroup ) { }
@@ -29,6 +29,10 @@ public sealed class NoScreen : IScreen
         return null;
     }
 
+    /// <summary>
+    /// Returns an empty string.
+    /// </summary>
+    /// <returns>An empty string.</returns>
     public override string ToString() => string.Empty;
 
 

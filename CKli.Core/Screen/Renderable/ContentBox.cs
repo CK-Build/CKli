@@ -3,6 +3,9 @@ using System;
 
 namespace CKli.Core;
 
+/// <summary>
+/// A Box wraps a content and can have margins, paddings and handles content alignment.
+/// </summary>
 public sealed partial class ContentBox : IRenderable
 {
     readonly IRenderable _content;
@@ -14,11 +17,33 @@ public sealed partial class ContentBox : IRenderable
     readonly int _height;
     readonly ContentAlign _align;
 
+    /// <summary>
+    /// Initializes a new <see cref="ContentBox"/>.
+    /// </summary>
+    /// <param name="content">The content.</param>
+    /// <param name="padding">The padding.</param>
+    /// <param name="margin">The margin.</param>
+    /// <param name="align">The content alignment.</param>
+    /// <param name="style">The content style.</param>
     public ContentBox( IRenderable content, Filler padding, Filler margin, ContentAlign align = default, TextStyle style = default )
         : this( null, content, padding, margin, align, style )
     {
     }
 
+    /// <summary>
+    /// Initializes a new <see cref="ContentBox"/>.
+    /// </summary>
+    /// <param name="content">The content.</param>
+    /// <param name="paddingTop">The top padding.</param>
+    /// <param name="paddingLeft">The left padding.</param>
+    /// <param name="paddingBottom">The bottom padding.</param>
+    /// <param name="paddingRight">The right padding.</param>
+    /// <param name="marginTop">The top margin.</param>
+    /// <param name="marginLeft">The left margin.</param>
+    /// <param name="marginBottom">The bottom margin.</param>
+    /// <param name="marginRight">The right margin.</param>
+    /// <param name="align">The content alignment.</param>
+    /// <param name="style">The content style.</param>
     public ContentBox( IRenderable content,
                        int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
                        int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0,
@@ -44,33 +69,53 @@ public sealed partial class ContentBox : IRenderable
         _width = margin.Left + padding.Left + content.Width + padding.Right + margin.Right;
     }
 
+    /// <inheritdoc />
     public ScreenType ScreenType => _content.ScreenType;
 
+    /// <inheritdoc />
     public int Height => _height;
 
+    /// <inheritdoc />
     public int Width => _width;
 
+    /// <inheritdoc />
     public int MinWidth => _origin == null
                             ? (_margin.Left + _padding.Left > 0 ? 1 : 0) + _content.MinWidth + (_padding.Right + _margin.Right > 0 ? 1 : 0)
                             : _origin.MinWidth;
 
+    /// <inheritdoc />
     public int NominalWidth => _origin == null
                                 ? (_margin.Left + _padding.Left + _content.NominalWidth + _padding.Right + _margin.Right)
                                 : _origin.NominalWidth;
 
-
+    /// <summary>
+    /// Gets the padding.
+    /// </summary>
     public Filler Padding => _padding;
 
+    /// <summary>
+    /// Gets the margin.
+    /// </summary>
     public Filler Margin => _margin;
 
+    /// <summary>
+    /// Gets this Box's content.
+    /// </summary>
     public IRenderable Content => _content;
 
+    /// <summary>
+    /// Gets the text style to apply to the content (including paddings but not margins).
+    /// </summary>
     public TextStyle Style => _style;
 
+    /// <summary>
+    /// Gets how the content must be aligned in this Box.
+    /// </summary>
     public ContentAlign Align => _align;
 
     IRenderable IRenderable.SetWidth( int width, bool allowWider ) => SetWidth( width, allowWider );
 
+    /// <inheritdoc />
     public ContentBox SetWidth( int width, bool allowWider = true )
     {
         int minWidth = MinWidth;
@@ -182,12 +227,25 @@ public sealed partial class ContentBox : IRenderable
         return new ContentBox( this, nc, padding, margin, _align, _style );
     }
 
+    /// <summary>
+    /// Returns a ContentBox with an updated content.
+    /// </summary>
+    /// <param name="content">The new content.</param>
+    /// <returns>The updated ContentBox.</returns>
     public ContentBox WithContent( IRenderable content ) => content == _content
                                                                 ? this
                                                                 : _origin == null
                                                                     ? new ContentBox( null, content, _padding, _margin, _align, _style )
                                                                     : new ContentBox( _origin.WithContent( content ), content, _padding, _margin, _align, _style );
 
+    /// <summary>
+    /// Adds the provided padding values to the <see cref="Padding"/> and returns a new Box.
+    /// </summary>
+    /// <param name="top">The top value to add (can be negative).</param>
+    /// <param name="left">The left value to add (can be negative).</param>
+    /// <param name="bottom">The bottom value to add (can be negative).</param>
+    /// <param name="right">The right value to add (can be negative).</param>
+    /// <returns>A new ContentBox with the updated padding.</returns>
     public ContentBox AddPadding( int top = 0, int left = 0, int bottom = 0, int right = 0 )
     {
         if( top == 0 && left == 0 && bottom == 0 && right == 0 ) return this;
@@ -203,6 +261,14 @@ public sealed partial class ContentBox : IRenderable
         return new ContentBox( null, _content, p, _margin, _align, _style );
     }
 
+    /// <summary>
+    /// Adds the provided margin values to the <see cref="Margin"/> and returns a new Box.
+    /// </summary>
+    /// <param name="top">The top value to add (can be negative).</param>
+    /// <param name="left">The left value to add (can be negative).</param>
+    /// <param name="bottom">The bottom value to add (can be negative).</param>
+    /// <param name="right">The right value to add (can be negative).</param>
+    /// <returns>A new ContentBox with the updated margin.</returns>
     public ContentBox AddMargin( int top = 0, int left = 0, int bottom = 0, int right = 0 )
     {
         if( top == 0 && left == 0 && bottom == 0 && right == 0 ) return this;
@@ -243,6 +309,7 @@ public sealed partial class ContentBox : IRenderable
                 : _origin.WithAlign( align ).SetWidth( Width, true );
     }
 
+    /// <inheritdoc />
     public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
 
 }

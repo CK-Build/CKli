@@ -33,8 +33,10 @@ public enum MergeResult
     NonFastForward,
 }
 
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 public static class MergeResultExtensions
 {
     public static bool IsError( this MergeResult result ) => result is MergeResult.Error or MergeResult.ErrorConflicts;
     public static bool IsSuccess( this MergeResult result ) => result is not MergeResult.Error and not MergeResult.ErrorConflicts;
 }
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member

@@ -218,7 +218,7 @@ public static class ArgumentHelper
     /// https://docs.microsoft.com/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
     /// </para>
     /// </summary>
-    /// <param name="args">The arguments.</param>
+    /// <param name="arguments">The arguments.</param>
     /// <returns>The escaped arguments.</returns>
     static IEnumerable<string> CmdEscapeArgArray( IEnumerable<string> arguments )
     {
@@ -301,8 +301,8 @@ public static class ArgumentHelper
     /// https://docs.microsoft.com/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
     /// </para>
     /// </summary>
-    /// <param name="args"></param>
-    /// <returns></returns>
+    /// <param name="argument">The argument to escape.</param>
+    /// <returns>The escaped argument.</returns>
     static string CmdEscapeArg( string argument )
     {
         var sb = new StringBuilder();

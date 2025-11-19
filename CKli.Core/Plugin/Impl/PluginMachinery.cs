@@ -562,6 +562,14 @@ public sealed partial class PluginMachinery
         }
     }
 
+    /// <summary>
+    /// Helper that checks and normalizes a plugin name.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="pluginName">The candidate name.</param>
+    /// <param name="shortPluginName">The short plugin name on success.</param>
+    /// <param name="fullPluginName">The full plugin name on success.</param>
+    /// <returns>True on success, false if the plugin name is invalid.</returns>
     public static bool EnsureFullPluginName( IActivityMonitor monitor,
                                              string? pluginName,
                                              [NotNullWhen( true )] out string? shortPluginName,
@@ -575,6 +583,13 @@ public sealed partial class PluginMachinery
         return true;
     }
 
+    /// <summary>
+    /// Helper that checks and normalizes a plugin name.
+    /// </summary>
+    /// <param name="pluginName">The candidate name.</param>
+    /// <param name="shortPluginName">The short plugin name on success.</param>
+    /// <param name="fullPluginName">The full plugin name on success.</param>
+    /// <returns>True on success, false if the plugin name is invalid.</returns>
     public static bool EnsureFullPluginName( string? pluginName,
                                              [NotNullWhen( true )] out string? shortPluginName,
                                              [NotNullWhen( true )] out string? fullPluginName )

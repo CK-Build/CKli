@@ -5,6 +5,9 @@ using System.Runtime.InteropServices;
 
 namespace CKli.Core;
 
+/// <summary>
+/// A vertical set of renderables.
+/// </summary>
 public sealed class VerticalContent : IRenderable
 {
     readonly ImmutableArray<IRenderable> _cells;
@@ -14,6 +17,11 @@ public sealed class VerticalContent : IRenderable
     readonly int _minWidth;
     readonly int _nominalWidth;
 
+    /// <summary>
+    /// Initializes a new <see cref="VerticalContent"/>.
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="cells">The content.</param>
     public VerticalContent( ScreenType screenType, params ImmutableArray<IRenderable> cells )
     {
         _screenType = screenType;
@@ -46,18 +54,27 @@ public sealed class VerticalContent : IRenderable
         return h;
     }
 
+    /// <inheritdoc />
     public ScreenType ScreenType => _screenType;
 
+    /// <inheritdoc />
     public int Height => _height;
 
+    /// <inheritdoc />
     public int Width => _width;
 
+    /// <inheritdoc />
     public int MinWidth => _minWidth;
 
+    /// <inheritdoc />
     public int NominalWidth => _nominalWidth;
 
+    /// <summary>
+    /// Gets the content.
+    /// </summary>
     public ImmutableArray<IRenderable> Cells => _cells;
 
+    /// <inheritdoc />
     public IRenderable SetWidth( int width, bool allowWider )
     {
         if( width < _minWidth ) width = _minWidth;
@@ -98,8 +115,10 @@ public sealed class VerticalContent : IRenderable
                     : new VerticalContent( _screenType, b.DrainToImmutable() );
     }
 
+    /// <inheritdoc />
     public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
 
+    /// <inheritdoc />
     public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight )
     {
         Throw.CheckArgument( line >= 0 && line < actualHeight && actualHeight >= Height );
@@ -121,6 +140,11 @@ public sealed class VerticalContent : IRenderable
         }
     }
 
+    /// <summary>
+    /// Returns a new vertical content with the appended content.
+    /// </summary>
+    /// <param name="verticalContent">Content to append.</param>
+    /// <returns>This or a new vertical content.</returns>
     public VerticalContent Append( ReadOnlySpan<IRenderable?> verticalContent )
     {
         if( verticalContent.Length == 0 ) return this;
@@ -131,6 +155,11 @@ public sealed class VerticalContent : IRenderable
         return FillNewContent( _screenType, verticalContent, hasSpecial, newContent, _cells.Length );
     }
 
+    /// <summary>
+    /// Returns a new vertical content with some content before this one.
+    /// </summary>
+    /// <param name="verticalContent">Content to insert before this one.</param>
+    /// <returns>This or a new vertical content.</returns>
     public VerticalContent Prepend( ReadOnlySpan<IRenderable?> verticalContent )
     {
         if( verticalContent.Length == 0 ) return this;

@@ -16,6 +16,10 @@ public ref struct FixedBufferWriter
     Span<char> _head;
     readonly Span<char> _buffer;
 
+    /// <summary>
+    /// Initializes a new buffer writer.
+    /// </summary>
+    /// <param name="buffer">The target byte buffer.</param>
     public FixedBufferWriter( Span<char> buffer )
     {
         _buffer = buffer;
@@ -63,6 +67,11 @@ public ref struct FixedBufferWriter
         return false;
     }
 
+    /// <summary>
+    /// Appends a <see cref="ISpanFormattable"/>.
+    /// </summary>
+    /// <param name="formattable">The formattable.</param>
+    /// <returns>True on success, false if the formattable requires more than <see cref="RemainingLength"/>.</returns>
     public bool Append( ISpanFormattable formattable )
     {
         if( formattable.TryFormat( _head, out int written, default, System.Globalization.CultureInfo.InvariantCulture ) )

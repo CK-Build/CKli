@@ -27,6 +27,12 @@ public partial class TableLayout : IRenderable
         _width = width;
     }
 
+    /// <summary>
+    /// Factory method for a <see cref="TableLayout"/>.
+    /// </summary>
+    /// <param name="rows">The content rows.</param>
+    /// <param name="columns">Optional columns definition.</param>
+    /// <returns>A TableLyout or the <paramref name="rows"/> if no columns can be inferred.</returns>
     public static IRenderable Create( IRenderable rows, params ImmutableArray<ColumnDefinition> columns )
     {
         var cols = new List<ColDef>();
@@ -180,24 +186,38 @@ public partial class TableLayout : IRenderable
         }
     }
 
+    /// <inheritdoc />
     public int Width => _width;
 
+    /// <inheritdoc />
     public int MinWidth => _minWidth;
 
+    /// <inheritdoc />
     public int NominalWidth => _nominalWidth;
 
+    /// <inheritdoc />
     public int Height => _rows.Height;
 
+    /// <inheritdoc />
     public ScreenType ScreenType => _rows.ScreenType;
 
+    /// <summary>
+    /// The content rows.
+    /// </summary>
     public IRenderable Rows => _rows;
 
+    /// <summary>
+    /// The column definition. May be empty.
+    /// </summary>
     public ImmutableArray<ColumnDefinition> Columns => _columns;
 
+    /// <inheritdoc />
     public IRenderable Accept( RenderableVisitor visitor ) => visitor.Visit( this );
 
+    /// <inheritdoc />
     public void BuildSegmentTree( int line, SegmentRenderer parent, int actualHeight ) => _rows.BuildSegmentTree( line, parent, actualHeight );
 
+    /// <inheritdoc />
     public IRenderable SetWidth( int width, bool allowWider )
     {
         if( width < _minWidth ) width = _minWidth;
