@@ -1,4 +1,6 @@
+using CSemVer;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.Core;
 
@@ -9,8 +11,10 @@ public sealed class PluginInfo
 {
     readonly string _fullPluginName;
     readonly string _pluginName;
-    readonly PluginStatus _status;
     readonly IReadOnlyList<IPluginTypeInfo> _pluginTypes;
+    readonly string? _originalVersion;
+    readonly PluginStatus _status;
+    InformationalVersion? _informationalVersion;
 
     /// <summary>
     /// Initializes a new PluginInfo.
@@ -18,12 +22,18 @@ public sealed class PluginInfo
     /// <param name="fullPluginName">The full "CKli.XXX.Plugin" name.</param>
     /// <param name="pluginName">The plugin name.</param>
     /// <param name="status">The status.</param>
+    /// <param name="informationalVersion">The informational version (for a packaged plugin), null for a source plugin.</param>
     /// <param name="pluginTypes">The types defined by this plugin.</param>
-    public PluginInfo( string fullPluginName, string pluginName, PluginStatus status, IReadOnlyList<IPluginTypeInfo> pluginTypes )
+    public PluginInfo( string fullPluginName,
+                       string pluginName,
+                       PluginStatus status,
+                       string? informationalVersion,
+                       IReadOnlyList<IPluginTypeInfo> pluginTypes )
     {
         _fullPluginName = fullPluginName;
         _pluginName = pluginName;
         _status = status;
+        _originalVersion = informationalVersion;
         _pluginTypes = pluginTypes;
     }
 
@@ -38,7 +48,7 @@ public sealed class PluginInfo
     public string PluginName => _pluginName;
 
     /// <summary>
-    /// Gets the status flags. <see cref="PluginStatus.DisabledByDependency"/> doesn't apply here.
+    /// Gets the status flags.
     /// </summary>
     public PluginStatus Status => _status;
 
@@ -46,6 +56,19 @@ public sealed class PluginInfo
     /// Gets the types defined by this plugin.
     /// </summary>
     public IReadOnlyList<IPluginTypeInfo> PluginTypes => _pluginTypes;
+
+    /// <summary>
+    /// Gets whether this plugin is implemented locally in the <see cref="StackRepository"/> (not a packaged one).
+    /// </summary>
+    [MemberNotNullWhen( false, nameof( InformationalVersion ) )]
+    public bool IsSourcePlugin => _originalVersion == null;
+
+    /// <summary>
+    /// Gets the <see cref="InformationalVersion"/>. Null for a source plugin.
+    /// </summary>
+    public InformationalVersion? InformationalVersion => _informationalVersion ??= _originalVersion != null
+                                                                                    ? new InformationalVersion( _originalVersion )
+                                                                                    : null;
 
     /// <summary>
     /// Returns the <see cref="FullPluginName"/>.

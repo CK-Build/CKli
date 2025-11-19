@@ -36,11 +36,12 @@ public class PluginTests
             screen.ShouldContain( """
                 1 loaded plugins, 1 configured plugins.
 
-                > MyFirstOne     <MyFirstOne />
-                │    Available   
+                > MyFirstOne          > <MyFirstOne />
+                │    Available        │ 
+                │    <source based>   │ 
                 │ Message:
                 │    Message from 'MyFirstOne' plugin.
-
+                
                 """ );
         }
 

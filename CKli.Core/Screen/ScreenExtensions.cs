@@ -158,7 +158,7 @@ public static class ScreenExtensions
             // Layout:
             // > ShortName       | <Xml>                
             // |   TextStatus    |                      
-            // |                 |                      
+            // |   Version       |                      
             // | Message:
             // |    <Message>
 
@@ -167,8 +167,12 @@ public static class ScreenExtensions
                 infos.Select(
                     i => new Collapsable(
                             new ContentBox( screen.ScreenType.Text( i.ShortName )
-                                            .AddBelow( screen.ScreenType.Text( i.Status.GetTextStatus() ).Box( paddingLeft: 3 ) ), paddingRight: 3 )
-                            .AddRight( screen.ScreenType.Text( i.Configuration?.ToString() ) )
+                                            .AddBelow(
+                                                screen.ScreenType.Text( i.Status.GetTextStatus() )
+                                                .AddBelow( screen.ScreenType.Text( i.Version?.Version?.ToString() ?? "<source based>",
+                                                                                   new TextStyle( TextEffect.Italic ) )
+                                                ).Box( paddingLeft: 3 ) ), paddingRight: 3 )
+                            .AddRight( screen.ScreenType.Text( i.Configuration?.ToString() ).Collapsable() )
                             .AddBelow( i.Message != null
                                         ? screen.ScreenType.Text( "Message:" ).AddBelow( i.Message.Box( paddingLeft: 3 ) )
                                         : null ) ) )

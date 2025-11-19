@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -49,6 +50,14 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
             {
                 Throw.CKException( $"Invalid primary Plugin namespace '{primaryPlugin.Name}': it must be the same as the assembly name '{aName}'." );
             }
+
+            // Consider that packaged plugins have a valid CSemVer InformationalVersion.
+            // (source packages use the default .Net 1.0.0+<commit-sha>).
+            // This is not ideal but this is simple and efficient and avoid tracking assembly
+            // origin to detect source packages vs. packaged ones.
+            var informationalVersion = InformationalVersion.ReadFromAssembly( a );
+            string? version = informationalVersion.IsValidSyntax ? informationalVersion.OriginalInformationalVersion : null;
+
             var status = PluginStatus.Available;
             XElement? configuration = null;
             if( _context.PluginsConfiguration.TryGetValue( shortPluginName, out var config ) )
@@ -64,7 +73,11 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                 status |= PluginStatus.DisabledByMissingConfiguration;
             }
             // The PluginType ctor (in Build) downcasts the pluginTypes list to add itself to its pluginInfo.PluginTypes.
-            var pluginInfo = new PluginInfo( fullPluginName, shortPluginName, status, new List<IPluginTypeInfo>() );
+            var pluginInfo = new PluginInfo( fullPluginName,
+                                             shortPluginName,
+                                             status,
+                                             version,
+                                             new List<IPluginTypeInfo>() );
             _pluginInfos.Add( pluginInfo );
             foreach( var t in a.GetExportedTypes().Where( t => !t.IsAbstract
                                                                && !t.IsGenericTypeDefinition

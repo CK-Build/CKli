@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
@@ -9,16 +10,22 @@ public sealed partial class World
 {
     internal sealed class DisplayInfoPlugin
     {
-        public DisplayInfoPlugin( string shortPluginName, string fullName, PluginStatus status, XElement? configuration )
+        public DisplayInfoPlugin( string shortPluginName,
+                                  string fullName,
+                                  PluginStatus status,
+                                  InformationalVersion? version,
+                                  XElement? configuration )
         {
             ShortName = shortPluginName;
             FullName = fullName;
             Status = status;
+            Version = version;
             Configuration = configuration;
         }
         public string ShortName { get; }
         public string FullName { get; }
         public PluginStatus Status { get; }
+        public InformationalVersion? Version { get; }
         public XElement? Configuration { get; }
         public IRenderable? Message { get; set; }
     }
@@ -40,7 +47,7 @@ public sealed partial class World
             return true;
         }
 
-        Throw.DebugAssert( _plugins != null );
+        Throw.DebugAssert( "Plugins are not disabled.", _plugins != null );
         var config = _definitionFile.ReadPluginsConfiguration( monitor );
         var loaded = _plugins.Plugins;
 
@@ -49,8 +56,8 @@ public sealed partial class World
         // No need to optimize this.
         var missings = config.Select( kv => (ShortName: kv.Key, FullName: $"CKli.{kv.Key}.Plugin", Configuration: kv.Value.Config) )
                               .Where( e => !loaded.Any( p => p.FullPluginName == e.FullName ) )
-                              .Select( e => new DisplayInfoPlugin( e.ShortName, e.FullName, PluginStatus.MissingImplementation, e.Configuration ) );
-        infos = loaded.Select( p => new DisplayInfoPlugin( p.PluginName, p.FullPluginName, p.Status, config.GetValueOrDefault( p.PluginName ).Config ) )
+                              .Select( e => new DisplayInfoPlugin( e.ShortName, e.FullName, PluginStatus.MissingImplementation, null, e.Configuration ) );
+        infos = loaded.Select( p => new DisplayInfoPlugin( p.PluginName, p.FullPluginName, p.Status, p.InformationalVersion, config.GetValueOrDefault( p.PluginName ).Config ) )
                          .Concat( missings )
                          .ToList();
 

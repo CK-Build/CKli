@@ -173,8 +173,9 @@ sealed partial class ReflectionPluginCollector
             offset += 4;
             foreach( var p in _pluginInfos )
             {
+                var version = p.InformationalVersion == null ? "null" : '"' + p.InformationalVersion.OriginalInformationalVersion + '"';
                 b.Append( ' ', offset )
-                 .Append( $$"""new PluginInfo( "{{p.FullPluginName}}", "{{p.PluginName}}", (PluginStatus){{(int)p.Status}}, new IPluginTypeInfo[{{p.PluginTypes.Count}}] ),""" )
+                 .Append( $$"""new PluginInfo( "{{p.FullPluginName}}", "{{p.PluginName}}", (PluginStatus){{(int)p.Status}}, {{version}}, new IPluginTypeInfo[{{p.PluginTypes.Count}}] ),""" )
                  .AppendLine();
             }
             offset -= 4;
