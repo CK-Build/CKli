@@ -152,7 +152,21 @@ public sealed partial class PluginMachinery
         var pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext );
         if( pluginFactory == null )
         {
-            return false;
+            using( monitor.OpenInfo( "Initial plugin discovery failed. Trying to recompile the CKli.Plugins project." ) )
+            {
+                // There should raise a compile error that will spot the issue.
+                if( !DoCompilePlugins( monitor ) )
+                {
+                    return false;
+                }
+                pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext );
+                if( pluginFactory == null )
+                {
+                    monitor.Error( ActivityMonitor.Tags.ToBeInvestigated,
+                                   "This should not happen (compilation succeeds but load fails). CKli.Plugins must be manually fixed." );
+                    return false;
+                }
+            }
         }
         // Memorizes the AssemblyLoadContext to be able to wait for its actual unload.
         _singleFactory = new WeakReference( pluginFactory, trackResurrection: true );
