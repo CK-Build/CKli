@@ -11,6 +11,11 @@ namespace CKli;
 /// </summary>
 public sealed class CommandNamespace
 {
+    /// <summary>
+    /// An empty command namespace.
+    /// </summary>
+    public static readonly CommandNamespace Empty = new CommandNamespace( new Dictionary<string, Command?>() );
+
     readonly Dictionary<string, Command?> _commands;
 
     internal CommandNamespace( Dictionary<string, Command?> commands )

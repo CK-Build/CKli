@@ -32,7 +32,7 @@ public sealed partial class World
     internal bool AddOrSetPluginPackage( IActivityMonitor monitor, string packageId, SVersion version )
     {
         // This creates a Stack Commit if the Stack's working folder is dirty.
-        if( !CheckAndPrepareForNewPlugin( monitor, packageId, out var shortName, out var fullName ) )
+        if( !CheckAndPrepareForNewPlugin( monitor, packageId, createMode: false, out var shortName, out var fullName ) )
         {
             return false;
         }
@@ -50,7 +50,7 @@ public sealed partial class World
 
     internal bool CreatePlugin( IActivityMonitor monitor, string pluginName )
     {
-        if( !CheckAndPrepareForNewPlugin( monitor, pluginName, out var shortName, out var fullName ) )
+        if( !CheckAndPrepareForNewPlugin( monitor, pluginName, createMode: true, out var shortName, out var fullName ) )
         {
             return false;
         }
@@ -66,6 +66,7 @@ public sealed partial class World
     [MemberNotNullWhen(true, nameof(_pluginMachinery))]
     bool CheckAndPrepareForNewPlugin( IActivityMonitor monitor,
                                       string pluginName,
+                                      bool createMode,
                                       [NotNullWhen( true )] out string? shortName,
                                       [NotNullWhen( true )] out string? fullName )
     {
@@ -76,11 +77,14 @@ public sealed partial class World
             return false;
         }
         var localShortName = shortName;
-        var config = DefinitionFile.Plugins.Elements().FirstOrDefault( e => e.Name.LocalName.Equals( localShortName, StringComparison.OrdinalIgnoreCase ) );
-        if( config != null )
+        if( createMode )
         {
-            monitor.Error( $"A Plugin '{config.Name.LocalName}' already exists in <Plugins /> of '{Name.XmlDescriptionFilePath}'." );
-            return false;
+            var config = DefinitionFile.Plugins.Elements().FirstOrDefault( e => e.Name.LocalName.Equals( localShortName, StringComparison.OrdinalIgnoreCase ) );
+            if( config != null )
+            {
+                monitor.Error( $"A Plugin '{config.Name.LocalName}' already exists in <Plugins /> of '{Name.XmlDescriptionFilePath}'." );
+                return false;
+            }
         }
         // Commit Stack before operations.
         if( !_stackRepository.Commit( monitor, $"Before new plugin '{fullName}'." ) )
