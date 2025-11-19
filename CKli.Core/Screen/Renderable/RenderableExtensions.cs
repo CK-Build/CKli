@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace CKli.Core;
@@ -58,6 +59,21 @@ public static class RenderableExtensions
         return r is HyperLink h
                 ? h.WithTarget( target )
                 : new HyperLink( r, target );
+    }
+
+    /// <summary>
+    /// Wraps this renderable into a collapsable.
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <returns>A Collapsable around this renderable.</returns>
+    [return: NotNullIfNotNull( nameof( r ) )]
+    public static Collapsable? Collapsable( this IRenderable? r )
+    {
+        return r is null
+                ? null
+                : r is Collapsable c
+                    ? c.WithContent( r )
+                    : new Collapsable( r );
     }
 
     /// <summary>
