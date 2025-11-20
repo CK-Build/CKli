@@ -9,8 +9,8 @@ sealed class CKliPluginEnable : Command
     public CKliPluginEnable()
         : base( null,
                 "plugin enable",
-                """Enables a plugin or all of them if <name> is "global".""",
-                [("name", """Plugin name to enable or "global".""")],
+                """Enables a plugin that has been disabled.""",
+                [("name", """Plugin name to enable.""")],
                 [], [] )
     {
     }

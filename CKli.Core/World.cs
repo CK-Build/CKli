@@ -124,17 +124,14 @@ public sealed partial class World
         }
         Throw.DebugAssert( worldName != null && definitionFile != null );
         PluginMachinery? machinery = null;
-        if( !definitionFile.IsPluginsDisabled && World.PluginLoader != null )
+        if( World.PluginLoader != null )
         {
             machinery = new PluginMachinery( worldName, definitionFile );
             machinery.Initialize( monitor );
         }
         else
         {
-            monitor.Info( ScreenType.CKliScreenTag,
-                          World.PluginLoader == null
-                            ? "Plugins are disabled because there is no configured World.PluginLoader."
-                            : $"Plugins are globally disabled by configuration in '{worldName.FullName}.xml'." );
+            monitor.Info( ScreenType.CKliScreenTag, "Plugins are disabled because there is no configured World.PluginLoader." );
         }
         var w = new World( stackRepository, screenType, worldName, definitionFile, layout, machinery );
         if( machinery != null

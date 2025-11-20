@@ -70,7 +70,6 @@ public sealed partial class World
                                       [NotNullWhen( true )] out string? shortName,
                                       [NotNullWhen( true )] out string? fullName )
     {
-        Throw.CheckState( !DefinitionFile.IsPluginsDisabled );
         Throw.DebugAssert( _pluginMachinery != null );
         if( !PluginMachinery.EnsureFullPluginName( monitor, pluginName, out shortName, out fullName ) )
         {
@@ -96,7 +95,6 @@ public sealed partial class World
 
     internal bool RemovePlugin( IActivityMonitor monitor, string pluginName )
     {
-        Throw.CheckState( !DefinitionFile.IsPluginsDisabled );
         Throw.DebugAssert( _pluginMachinery != null );
         if( !PluginMachinery.EnsureFullPluginName( monitor, pluginName, out var shortName, out var fullName ) )
         {

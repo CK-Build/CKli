@@ -9,8 +9,8 @@ sealed class CKliPluginDisable : Command
     public CKliPluginDisable()
         : base( null,
                 "plugin disable",
-                """Disables a plugin or all of them if <name> is "global".""",
-                [("name", """Plugin name to disable or "global".""")],
+                """Disables a plugin.""",
+                [("name", """Plugin name to disable.""")],
                 [], [] )
     {
     }

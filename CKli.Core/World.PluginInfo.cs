@@ -66,20 +66,5 @@ public sealed partial class World
         return loaded.Count == 0 || _events.SafeRaiseEvent( monitor, new PluginInfoEvent( monitor, this, infos ) );
     }
 
-    internal string? GetDisabledPluginsHeader()
-    {
-        if( _definitionFile.IsPluginsDisabled )
-        {
-            return $"""
-                    Plugins are disabled by configuration.
-                    Configurations:
-                    {_definitionFile.Plugins}
-                    """;
-        }
-        if( _plugins == null )
-        {
-            return "No configured PluginLoader. Plugins are disabled.";
-        }
-        return null;
-    }
+    internal string? GetDisabledPluginsHeader() => _plugins == null ? "No configured PluginLoader. Plugins are disabled." : null;
 }

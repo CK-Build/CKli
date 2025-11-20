@@ -44,10 +44,6 @@ sealed class CKliPluginAdd : Command
         }
         try
         {
-            if( world.DefinitionFile.IsPluginsDisabled )
-            {
-                return CKliPluginCreate.RequiresEnabledPlugins( monitor );
-            }
             if( !allowLTS && !world.Name.IsDefaultWorld )
             {
                 return CKliRepoAdd.RequiresAllowLTS( monitor, world.Name );

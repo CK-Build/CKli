@@ -36,10 +36,6 @@ sealed class CKliPluginCreate : Command
         }
         try
         {
-            if( world.DefinitionFile.IsPluginsDisabled )
-            {
-                return RequiresEnabledPlugins( monitor );
-            }
             if( !allowLTS && !world.Name.IsDefaultWorld )
             {
                 return CKliRepoAdd.RequiresAllowLTS( monitor, world.Name );
@@ -54,12 +50,5 @@ sealed class CKliPluginCreate : Command
             stack.Dispose();
         }
     }
-
-    internal static bool RequiresEnabledPlugins( IActivityMonitor monitor )
-    {
-        monitor.Error( $"Plugins are disabled for this world." );
-        return false;
-    }
-
 
 }

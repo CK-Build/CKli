@@ -88,11 +88,6 @@ public sealed class WorldDefinitionFile
     public XElement Plugins => _plugins;
 
     /// <summary>
-    /// Gets whether &lt;Plugins Disabled="true" /&gt; is set.
-    /// </summary>
-    public bool IsPluginsDisabled => (bool?)_plugins.Attribute( _xDisabled ) is true;
-
-    /// <summary>
     /// Gets &lt;Plugins CompilationMode="..." /&gt;.
     /// It must exactly be set to "Debug" or "None", any other value (including the lack of attribute)
     /// is <see cref="PluginCompilationMode.Release"/>.
@@ -150,10 +145,10 @@ public sealed class WorldDefinitionFile
     }
 
     /// <summary>
-    /// Enables or disables a plugin or all of them if <paramref name="name"/> is "global".
+    /// Enables or disables a plugin.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="name">The plugin to enable or "global".</param>
+    /// <param name="name">The plugin to enable.</param>
     /// <param name="enable">True to enable, false to disable.</param>
     /// <returns>True on success, false on error.</returns>
     public bool EnablePlugin( IActivityMonitor monitor, string name, bool enable )
@@ -161,40 +156,26 @@ public sealed class WorldDefinitionFile
         var config = ReadPluginsConfiguration( monitor );
         if( config == null ) return false;
         XElement? e = null;
-        string? shortPluginName = null;
-        if( name != "global" )
+        if( !PluginMachinery.EnsureFullPluginName( monitor, name, out string? shortPluginName, out var longPluginName ) )
         {
-            if( !PluginMachinery.EnsureFullPluginName( monitor, name, out shortPluginName, out var longPluginName ) )
-            {
-                return false;
-            }
-            e = config.GetValueOrDefault( name ).Config;
-            if( e == null )
-            {
-                monitor.Error( $"Unable to find Plugin configuration '{shortPluginName}'." );
-                return false;
-            }
-            if( (bool?)_plugins.Attribute( _xDisabled ) is true == !enable )
-            {
-                return true;
-            }
+            return false;
         }
-        else
+        e = config.GetValueOrDefault( name ).Config;
+        if( e == null )
         {
-            e = _plugins;
-            if( IsPluginsDisabled == !enable )
-            {
-                return true;
-            }
+            monitor.Error( $"Unable to find Plugin configuration '{shortPluginName}'." );
+            return false;
+        }
+        if( (bool?)_plugins.Attribute( _xDisabled ) is true == !enable )
+        {
+            return true;
         }
         using( StartEdit() )
         {
             e.SetAttributeValue( _xDisabled, enable ? null : "true" );
         }
         return SaveFile( monitor )
-               && _world.Stack.Commit( monitor, shortPluginName == null
-                                                    ? "Disabling all plugins."
-                                                    : $"Disabling '{shortPluginName}' plugin." );
+               && _world.Stack.Commit( monitor, $"{(enable ? "En" : "Dis")}abling '{shortPluginName}' plugin." );
     }
 
     /// <summary>
