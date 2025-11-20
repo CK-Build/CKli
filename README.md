@@ -149,6 +149,17 @@ To publish this update, a `push` (typically with `--stack-only`) must be execute
 Detects issues and display them or fix the issues that can be automatically fixed when `--fix` is specified.
 When `--all` is specified, this applies to all the Repos of the current World (even if current path is in a Repo).
 
+### `exec ... --ckli-continue-on-error --ckli-all`
+
+This command execute any external process on the current Repo (or all of them if `--ckli-all` is specified).
+By default, whenever a process fails on a repository (by returning a non 0 exit code), the lopp stops: use
+`--ckli-continue-on-error` flag to not stop on the first error.
+
+The flags `--ckli-continue-on-error` and `--ckli-all` are not submitted to the process command line. (They are prefixed
+by `--ckli-` to avoid a name clash with an exisiting process argument.)
+
+Example: `ckli exec dotnet build --ckli-all` builds all the Repo of the Stack.
+
 ## Plugin commands
 
 The core commands of CKli handles Stack, World and Repo (Git repositories).
@@ -195,9 +206,6 @@ The new plugin is added to the `<Plugins />` element of the world definition fil
 The `<MyFirstOne />` element is the plugin configuration: the plugin code can read it to configure
 its behavior and update it.
 
-:warning: Warnings:
-- The plugins must not be globally disabled (see below).
-
 The new plugin will be "published" when `push` (typically with `--stack-only`) is executed.
 
 If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified because
@@ -221,24 +229,19 @@ Adds a new packaged plugin in the current World or updates its version.
 When added, the plugin is added to the `<Plugins />` element of the world definition file,
 just like in the source based scenario.
 
-:warning: Warnings:
-- The plugins must not be globally disabled (see below).
-
 If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified because
 it is weird to add a new plugin to a Long Term Support World.
 
 The new plugin will be "published" when `push` (typically with `--stack-only`) is executed.
 
-### `plugin disable <name>|global`
+### `plugin disable <name>`
 Plugins are enabled by default but can be disabled.
-When `plugin disable global` is used, `IsDisabled="true"` attribute is set on the `<Plugins />` element
-and the whole plugin system is disabled (plugins loader is disabled and plugins can no more be added or removed).
 
-When a name is specified, the attribute is set on the corresponding plugin configuration element.
+A `IsDisabled="true"` attribute is set on the corresponding plugin configuration element.
 ```xml
 <MyWorld>
 
-  <Plugins IsDisabled="true">
+  <Plugins>
     <MyPlugin IsDisabled="true">
       <SomeOption>None</SomeOption>
     </MyPlugin>
@@ -250,8 +253,8 @@ When a name is specified, the attribute is set on the corresponding plugin confi
 ```
 As usual, this modification will be "published" when `push` (typically with `--stack-only`) is executed.
 
-### `plugin enable <name>|global`
-Reverts the `plugin disable` command by removing the `IsDisabled="true"` attribute.
+### `plugin enable <name>`
+Reverts the `plugin disable` command by removing the `IsDisabled="true"` attribute on the plugin configuration element.
 
 As usual, this modification will be "published" when `push` (typically with `--stack-only`) is executed.
 

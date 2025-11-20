@@ -1,4 +1,5 @@
 using CK.Core;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -17,7 +18,8 @@ sealed class CKliExec : Command
                 """,
                 [("process-name","Name of the process to run.")],
                 [],
-                [(["--continue-on-error"], "Continue despite of the process returning a non 0 exit code.")] )
+                [(["--ckli-continue-on-error"], "Continue despite of the process returning a non 0 exit code."),
+                 (["--ckli-all"], "Consider all the Repos of the current World (even if current path is in a Repo).")] )
     {
     }
 
@@ -31,12 +33,13 @@ sealed class CKliExec : Command
             monitor.Error( $"Invalid process name '{processName}'." );
             return ValueTask.FromResult( false );
         }
-        bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
+        bool continueOnError = cmdLine.EatFlag( "--ckli-continue-on-error" );
+        bool all = cmdLine.EatFlag( "--ckli-all" );
         cmdLine.CloseWithRemainingAsProcessStartArgs( out var arguments );
-        return ValueTask.FromResult( DoRun( monitor, context, continueOnError, processName, arguments ) );
+        return ValueTask.FromResult( DoRun( monitor, context, all, continueOnError, processName, arguments ) );
     }
 
-    static bool DoRun( IActivityMonitor monitor, CKliEnv context, bool continueOnError, string processName, string arguments )
+    static bool DoRun( IActivityMonitor monitor, CKliEnv context, bool all, bool continueOnError, string processName, string arguments )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -44,7 +47,9 @@ sealed class CKliExec : Command
         }
         try
         {
-            var repos = world.GetAllDefinedRepo( monitor );
+            IReadOnlyList<Repo>? repos = all
+                                          ? world.GetAllDefinedRepo( monitor )
+                                          : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
             if( repos == null )
             {
                 return false;
