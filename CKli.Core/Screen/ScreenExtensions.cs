@@ -11,6 +11,17 @@ namespace CKli.Core;
 public static class ScreenExtensions
 {
     /// <summary>
+    /// Helper that provides the <see cref="ScreenType"/> to build a renderable and displays it.
+    /// </summary>
+    /// <param name="screen">This screen.</param>
+    /// <param name="renderable">The renderable factory.</param>
+    /// <param name="newLine">False to not append a new line after the renderable.</param>
+    public static void Display( this IScreen screen, Func<ScreenType, IRenderable> renderable, bool newLine = true )
+    {
+        screen.Display( renderable( screen.ScreenType ), newLine );
+    }
+
+    /// <summary>
     /// Displays the command helps on the screen. See <see cref="CreateDisplayHelpHeader"/> and <see cref="CreateDisplayHelp"/>.
     /// </summary>
     /// <param name="screen"></param>

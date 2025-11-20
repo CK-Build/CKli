@@ -189,6 +189,46 @@ public static class CKliCommands
             try
             {
                 success = await cmdLine.FoundCommand.HandleCommandAsync( monitor, context, cmdLine ).ConfigureAwait( false );
+                // The following result handling doesn't throw. We execute it here because on exception it is useless
+                // to analyze the command line. 
+                if( !cmdLine.IsClosed )
+                {
+                    if( success )
+                    {
+                        // The command line has not been closed but the command handler returned true, it is buggy.
+                        // We return false (even if the handler claimed to be successful).
+                        monitor.Error( $"""
+                            The command '{cmdLine.FoundCommand.CommandPath}' implementation in '{cmdLine.FoundCommand.PluginTypeInfo?.TypeName ?? "CKli"}' is buggy.
+                            The command line MUST be closed before executing the command.
+                            """ );
+                        success = false;
+                    }
+                    else
+                    {
+                        // The command failed and the command line has not been closed: this indicates a bad argument/option value
+                        // so we display the command help.
+                        // Before we must clear any remaining aruments otherwise we may display
+                        // a misleading remaining arguments message.
+                        cmdLine.CloseAndForgetRemaingArguments();
+                        context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
+                    }
+                }
+                else if( cmdLine.RemainingCount > 0 )
+                {
+                    // The command line has been closed and there are remaining arguments.
+                    // If the command handler returned true, it is buggy.
+                    if( success )
+                    {
+                        monitor.Error( $"""
+                            The command '{cmdLine.FoundCommand.CommandPath}' implementation in '{cmdLine.FoundCommand.PluginTypeInfo?.TypeName ?? "CKli"}' is buggy.
+                            Arguments remains in the command line but the command handler returned true.
+                            """ );
+                        // We consider that this is an error.
+                        success = false;
+                    }
+                    // This displays the lovely header with remaining arguments.
+                    context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
+                }
             }
             catch( Exception ex )
             {
@@ -196,41 +236,15 @@ public static class CKliCommands
                 {
                     monitor.Error( ex );
                 }
-                return false;
+                success = false;
             }
-
-            if( success && !cmdLine.IsClosed )
+            if( success )
             {
-                // The command line has not been closed but the command handler returned true, it is buggy.
-                // We return false (even if the handler claimed to be successful).
-                monitor.Error( $"""
-                The command '{cmdLine.FoundCommand.CommandPath}' implementation in '{cmdLine.FoundCommand.PluginTypeInfo?.TypeName ?? "CKli"}' is buggy.
-                The command line MUST be closed before executing the command.
-                """ );
-                return false;
+                context.Screen.Display( t => t.Text( "❰✓❱", ConsoleColor.Black, ConsoleColor.DarkGreen ) );
             }
-            if( cmdLine.IsClosed && cmdLine.RemainingCount > 0 )
+            else
             {
-                // The command line has been closed and there are remaining arguments.
-                // If the command handler returned true, it is buggy.
-                if( success )
-                {
-                    monitor.Error( $"""
-                    The command '{cmdLine.FoundCommand.CommandPath}' implementation in '{cmdLine.FoundCommand.PluginTypeInfo?.TypeName ?? "CKli"}' is buggy.
-                    Arguments remains in the command line but the command handler returned true.
-                    """ );
-                }
-                // This displays the lovely header with remaining arguments.
-                context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
-            }
-            else if( !success && !cmdLine.IsClosed )
-            {
-                // The command failed and the command line has not been closed: this indicates a bad argument/option value
-                // so we display the command help.
-                // Before we must clear any remaining aruments otherwise we may display
-                // a misleading remaining arguments message.
-                cmdLine.CloseAndForgetRemaingArguments();
-                context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
+                context.Screen.Display( t => t.Text( "❌ Failed", ConsoleColor.Black, ConsoleColor.Red ) );
             }
             // Not very elegant trick to cleanup 'ckli log' log files.
             if( success && cmdLine.FoundCommand is CKliLog )
