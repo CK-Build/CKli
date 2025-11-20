@@ -97,8 +97,8 @@ public static class CKliCommands
         {
             context.Screen.DisplayHelp( _commands.GetForHelp( context.Screen.ScreenType, helpPath, null ),
                                         cmdLine,
-                                        CKliRootEnv.GlobalOptions?.Invoke() ?? default,
-                                        CKliRootEnv.GlobalFlags?.Invoke() ?? default );
+                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
+                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
             return FinalHandleInteractiveAsync( monitor, context, cmdLine, null, true );
         }
         // If it's a CKli command, we can now execute it.
@@ -123,8 +123,8 @@ public static class CKliCommands
             }
             context.Screen.DisplayHelp( _commands.GetForHelp( context.Screen.ScreenType, helpPath, null ),
                                         cmdLine,
-                                        CKliRootEnv.GlobalOptions?.Invoke() ?? default,
-                                        CKliRootEnv.GlobalFlags?.Invoke() ?? default );
+                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
+                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
             return FinalHandleInteractiveAsync( monitor, context, cmdLine, null, false );
         }
 
@@ -156,8 +156,8 @@ public static class CKliCommands
                     // the one from only the CKli commands: use it.
                     context.Screen.DisplayHelp( world.Commands.GetForHelp( context.Screen.ScreenType, worldHelpPath ?? helpPath, _commands ),
                                                 cmdLine,
-                                                CKliRootEnv.GlobalOptions?.Invoke() ?? default,
-                                                CKliRootEnv.GlobalFlags?.Invoke() ?? default );
+                                                (context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
+                                                (context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
                     return await FinalHandleInteractiveAsync( monitor, context, cmdLine, stack, cmdLine.HasHelp ).ConfigureAwait( false );
                 }
                 // We have a plugin command (and no --help).
