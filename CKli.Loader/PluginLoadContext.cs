@@ -68,9 +68,10 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
         {
             // An exception here indicates that a call to the plugins fails, typically
             // with a missing methond exception. By deleting the CKli.CompiledPlugins.cs generated file,
-            // reflection may do the job.
+            // reflection may do the job. And if it still fails, CKLi switches to "Working without plugins"
+            // mode that allows plugin commands to be executed, typically to upgrade a packaged plugin.
             recoverableError = true;
-            monitor.Warn( $"Error while collecting plugins.", ex );
+            monitor.Info( $"Error while collecting plugins.", ex );
         }
         // Dispose the AssemblyLoadContext but the loader weak reference must not be alive anymore before
         // retrying to compile or obtain the plugins.
@@ -159,7 +160,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
         var r = m.Invoke( null, BindingFlags.DoNotWrapExceptions, null, getOrRegisterArguments, System.Globalization.CultureInfo.InvariantCulture );
         if( r is not IPluginFactory p )
         {
-            monitor.Error( $"Failed CKli.Plugins.Plugins.Register in '{dllPath}'." );
+            monitor.Error( $"Call to 'CKli.Plugins.Plugins.Register' method failed to return a IPluginFactory in '{dllPath}'." );
             return false;
         }
         _pluginFactory = p;
