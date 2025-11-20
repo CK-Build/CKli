@@ -22,7 +22,8 @@ public interface IScreen
     /// Displays the renderable.
     /// </summary>
     /// <param name="renderable">The renderable to display.</param>
-    void Display( IRenderable renderable );
+    /// <param name="newLine">False to not append a new line after the renderable.</param>
+    void Display( IRenderable renderable, bool newLine = true );
 
     /// <summary>
     /// Gets the width of the screen.

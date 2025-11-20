@@ -122,14 +122,14 @@ public sealed partial class InteractiveScreen : IScreen
                                          header.Logs,
                                          header.Footer,
                                          body.Header,
-                                         body.Content,
+                                         body.GetRenderableContent( screenType ),
                                          body.Footer,
                                          footer.Header,
                                          footer.Prompt );
     }
 
     /// <inheritdoc />
-    public void Display( IRenderable renderable ) => _body.Content.Add( renderable );
+    public void Display( IRenderable renderable, bool newLine = true ) => _body.Content.Add( (renderable, newLine) );
 
     /// <inheritdoc />
     public void ScreenLog( LogLevel level, string text ) => _header.Logs.Add( _screen.ScreenType.CreateLog( level, text ) );

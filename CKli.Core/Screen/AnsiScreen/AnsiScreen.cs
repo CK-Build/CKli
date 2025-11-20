@@ -26,9 +26,7 @@ sealed partial class AnsiScreen : IScreen
 
     public ScreenType ScreenType => _screenType;
 
-    public void Display( IRenderable renderable ) => Display( renderable, false );
-
-    public void Display( IRenderable renderable, bool newLine )
+    public void Display( IRenderable renderable, bool newLine = true )
     {
         _animation.Hide();
         if( renderable.Width > _width )

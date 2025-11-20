@@ -26,12 +26,10 @@ public sealed class StringScreen : IScreen
     public ScreenType ScreenType => ScreenType.Default;
 
     /// <inheritdoc />
-    public void Display( IRenderable renderable ) => renderable.Render( _renderer );
+    public void Display( IRenderable renderable, bool newLine = true ) => renderable.Render( _renderer, newLine );
 
     /// <inheritdoc />
     public int Width => IScreen.MaxScreenWidth;
-
-
 
     /// <inheritdoc />
     public void ScreenLog( LogLevel level, string message ) => ScreenType.Default.CreateLog( level, message ).Render( _renderer );

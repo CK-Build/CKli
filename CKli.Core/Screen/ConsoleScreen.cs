@@ -18,13 +18,13 @@ sealed class ConsoleScreen : IScreen
 
     public ScreenType ScreenType => _screenType;
 
-    public void Display( IRenderable renderable )
+    public void Display( IRenderable renderable, bool newLine = true )
     {
         if( renderable.Width > _width )
         {
             renderable = renderable.SetWidth( Width, false );
         }
-        renderable.Render( _target );
+        renderable.Render( _target, newLine );
     }
 
     public int Width => _width ??= GetWindowWidth();

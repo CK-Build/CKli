@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Monitoring.InterProcess;
 using NUnit.Framework;
 using Shouldly;
 using System.IO;
@@ -170,12 +171,13 @@ public class PluginTests
 
         TestEnv.EnsurePluginPackage( "CKli.VSSolutionSample.Plugin" );
 
+        var display = (StringScreen)context.Screen;
         // ckli plugin add VSSolutionSample@version
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "add", $"VSSolutionSample@{TestEnv.CKliPluginsCoreVersion}" )).ShouldBeTrue();
 
+        display.Clear();
         // ckli issue
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue" )).ShouldBeTrue();
-        var display = (StringScreen)context.Screen;
         display.ToString().ShouldBe( """
             > EmptySolution (1)
             │ > Empty solution file.
@@ -186,7 +188,8 @@ public class PluginTests
             > MultipleSolutions (1)
             │ > Multiple solution files found. One of them must be 'MultipleSolutions.sln' (or '.slnx').
             │ │ Found: 'Candidate1.slnx', 'Candidate2.sln', 'SomeOther.slnx'.
-            
+            ❰✓❱
+
             """ );
 
         // cd WithIssues
@@ -199,7 +202,10 @@ public class PluginTests
         display.Clear();
         // ckli issue
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue" )).ShouldBeTrue();
-        display.ToString().ShouldBe( "" );
+        display.ToString().ShouldBe( """
+            ❰✓❱
+
+            """ );
 
         // cd ..
         context = context.ChangeDirectory( ".." );
@@ -212,6 +218,7 @@ public class PluginTests
             │ │ CodeCakeBuilder\CodeCakeBuilder.csproj, SomeJsApp\SomeJsApp.esproj
             > MissingSolution (1)
             │ > No solution found. Expecting 'MissingSolution.sln' (or '.slnx').
+            ❰✓❱
             
             """ );
 

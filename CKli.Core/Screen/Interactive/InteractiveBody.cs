@@ -9,12 +9,12 @@ namespace CKli.Core;
 public sealed class InteractiveBody
 {
     IRenderable? _header;
-    readonly List<IRenderable> _content;
+    readonly List<(IRenderable Renderable, bool NewLine)> _content;
     IRenderable? _footer;
 
     internal InteractiveBody()
     {
-        _content = new List<IRenderable>();
+        _content = new List<(IRenderable Renderable, bool NewLine)>();
     }
 
     /// <summary>
@@ -29,7 +29,33 @@ public sealed class InteractiveBody
     /// <summary>
     /// Gets the content.
     /// </summary>
-    public List<IRenderable> Content => _content;
+    public List<(IRenderable Renderable, bool NewLine)> Content => _content;
+
+    internal IEnumerable<IRenderable> GetRenderableContent( ScreenType screenType )
+    {
+        HorizontalContent? current = null;
+        foreach( var (r, newLine) in _content )
+        {
+            if( current != null )
+            {
+                current.AddRight( r );
+                if( newLine ) yield return current;
+                current = null;
+            }
+            else
+            {
+                if( newLine )
+                {
+                    yield return r;
+                }
+                else
+                {
+                    current = new HorizontalContent( screenType, r );
+                }
+            }
+        }
+        if(  current != null ) yield return current;
+    }
 
     /// <summary>
     /// Gets or sets the optional footer.

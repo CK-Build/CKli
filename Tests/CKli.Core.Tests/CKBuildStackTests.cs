@@ -14,9 +14,10 @@ public class CKBuildStackTests
     public async Task Clone_with_diff_casing_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
+        var display = (StringScreen)context.Screen;
 
         // ckli clone https://github.com/CK-Build/ck-bUILD-stack
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", "https://github.com/CK-Build/ck-bUILD-stack" )).ShouldBeTrue();
+        ( await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", "https://github.com/CK-Build/ck-bUILD-stack" )).ShouldBeTrue();
 
         Directory.EnumerateDirectories( context.CurrentDirectory )
             .Select( path => Path.GetFileName( path ) )
@@ -25,12 +26,14 @@ public class CKBuildStackTests
         // cd CK-Build
         context = context.ChangeDirectory( "CK-Build" );
 
+        display.Clear();
         // ckli repo
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo" )).ShouldBeTrue();
-        ((StringScreen)context.Screen).ToString().ShouldBe( """
+        ( await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo" )).ShouldBeTrue();
+        display.ToString().ShouldBe( """
             ··CSemVer-Net···master·↑0↓0·https://github.com/CK-Build/CSemVer-Net·
             ··SGV-Net·······master·↑0↓0·https://github.com/CK-Build/SGV-Net·····
             ··Cake/CodeCake·master·↑0↓0·https://github.com/CK-Build/CodeCake····
+            ❰✓❱
 
             """.Replace( '·', ' ' ) );
     }

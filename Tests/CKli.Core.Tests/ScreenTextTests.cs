@@ -83,8 +83,8 @@ public class ScreenTextTests
                 """ );
 
         {
-            var bUnk = text.Box( ContentAlign.Unknwon );
-            var bLeft = text.Box( ContentAlign.HLeft );
+            var bUnk = text.Box( align: ContentAlign.Unknwon );
+            var bLeft = text.Box( align: ContentAlign.HLeft );
             string result = """
                 Hello world,··············
                 ··························
@@ -97,7 +97,7 @@ public class ScreenTextTests
             bLeft.RenderAsString().ShouldBe( result );
         }
         {
-            var bRight = text.Box( ContentAlign.HRight );
+            var bRight = text.Box( align: ContentAlign.HRight );
             bRight.RenderAsString().ShouldBe( """
                 ··············Hello world,
                 ··························
@@ -109,7 +109,7 @@ public class ScreenTextTests
                 );
         }
         {
-            var bCenter = text.Box( ContentAlign.HCenter );
+            var bCenter = text.Box( align: ContentAlign.HCenter );
             bCenter.RenderAsString().ShouldBe( """
                 ·······Hello world,·······
                 ··························
@@ -146,7 +146,7 @@ public class ScreenTextTests
                 """ );
         {
             var lineUnk = text.Box().AddRight( bigCell );
-            var lineTop = text.Box( ContentAlign.VTop ).AddRight( bigCell );
+            var lineTop = text.Box( align: ContentAlign.VTop ).AddRight( bigCell );
             string result = """
                 Hello world,··············|1
                 ··························|2
@@ -165,7 +165,7 @@ public class ScreenTextTests
         }
         // VBottom: bigCell (no box) - text
         {
-            var lineBottom = text.Box( ContentAlign.VBottom ).AddLeft( bigCell );
+            var lineBottom = text.Box( align: ContentAlign.VBottom ).AddLeft( bigCell );
             string result = """
                 |1··························
                 |2··························
@@ -183,7 +183,7 @@ public class ScreenTextTests
         }
         // VBottom: bigCell (box) - text
         {
-            var lineBottom = text.Box( ContentAlign.VBottom ).AddLeft( bigCell.Box() );
+            var lineBottom = text.Box( align: ContentAlign.VBottom ).AddLeft( bigCell.Box() );
             string result = """
                 |1 ··························
                 |2 ··························
@@ -201,7 +201,7 @@ public class ScreenTextTests
         }
         // VBottom: bigCell (box margin right 1) - text
         {
-            var lineBottom = text.Box( ContentAlign.VBottom ).AddLeft( bigCell.Box( marginRight: 1 ) );
+            var lineBottom = text.Box( align: ContentAlign.VBottom ).AddLeft( bigCell.Box( marginRight: 1 ) );
             string result = """
                 |1  ··························
                 |2  ··························
@@ -219,7 +219,7 @@ public class ScreenTextTests
         }
         // VMiddle: bigCell (box margin right 1) - text
         {
-            var lineBottom = text.Box( ContentAlign.VMiddle ).AddLeft( bigCell.Box( marginRight: 1 ) );
+            var lineBottom = text.Box( align: ContentAlign.VMiddle ).AddLeft( bigCell.Box( marginRight: 1 ) );
             string result = """
                 |1  ··························
                 |2  ··························
