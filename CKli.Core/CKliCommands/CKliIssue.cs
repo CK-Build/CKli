@@ -113,7 +113,7 @@ sealed class CKliIssue : Command
                                         .HyperLink( new Uri( $"file://{world.Name.WorldRoot}" ) )
                                     : context.Screen.ScreenType.Text( g.Key.DisplayPath )
                                         .HyperLink( new Uri( $"file://{g.Key.WorkingFolder}" ) );
-                        var header = link.Box( marginRight: 1 ).AddRight( context.Screen.ScreenType.Text( $"({g.Count()})", new TextStyle( TextEffect.Italic ) ) );
+                        var header = link.Box( marginRight: 1 ).AddRight( context.Screen.ScreenType.Text( $"({g.Count()})", TextEffect.Italic ) );
                         var repo = header.AddBelow( g.Select( i => i.ToRenderable( context.Screen.ScreenType ) ) );
                         context.Screen.Display( new Collapsable( repo ) );
                     }

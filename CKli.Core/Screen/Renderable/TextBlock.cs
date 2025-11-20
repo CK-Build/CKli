@@ -136,6 +136,52 @@ public abstract class TextBlock : IRenderable
         return new MultiLine( screenType, text, b.MoveToImmutable(), witdh, style );
     }
 
+    /// <summary>
+    /// Creates a mono or multi line block of text.
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="text">The raw text.</param>
+    /// <param name="color">Foreground and background text color.</param>
+    /// <param name="effect">Optional effect.</param>
+    /// <returns>The renderable.</returns>
+    [return: NotNullIfNotNull( nameof( text ) )]
+    public static TextBlock? FromText( ScreenType screenType, string? text, Color color, TextEffect effect = TextEffect.Ignore )
+    {
+        return FromText( screenType, text, new TextStyle( color, effect ) );
+    }
+
+    /// <summary>
+    /// Creates a mono or multi line block of text with no color (<see cref="TextStyle.IgnoreColor"/> is true).
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="text">The raw text.</param>
+    /// <param name="effect">The effect.</param>
+    /// <returns>The renderable.</returns>
+    [return: NotNullIfNotNull( nameof( text ) )]
+    public static TextBlock? FromText( ScreenType screenType, string? text, TextEffect effect )
+    {
+        return FromText( screenType, text, new TextStyle( effect ) );
+    }
+
+    /// <summary>
+    /// Creates a mono or multi line block of text.
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="text">The raw text.</param>
+    /// <param name="foreColor">Foreground text color.</param>
+    /// <param name="backColor">Optional background text color.</param>
+    /// <param name="effect">Optional effect.</param>
+    /// <returns>The renderable.</returns>
+    [return: NotNullIfNotNull( nameof( text ) )]
+    public static TextBlock? FromText( ScreenType screenType,
+                                       string? text,
+                                       ConsoleColor foreColor,
+                                       ConsoleColor backColor = ConsoleColor.Black,
+                                       TextEffect effect = TextEffect.Ignore )
+    {
+        return FromText( screenType, text, new TextStyle( foreColor, backColor, effect ) );
+    }
+
     sealed class MonoLine : TextBlock
     {
         static readonly SearchValues<char> _cutChars = SearchValues.Create( " ,;!-?." );

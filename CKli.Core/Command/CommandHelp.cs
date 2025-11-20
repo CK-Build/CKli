@@ -27,7 +27,7 @@ public sealed class CommandHelp
         _screenType = screenType;
         _command = c;
         _description = screenType.Text( c.Description );
-        var styleCommand = new TextStyle( System.ConsoleColor.DarkGreen, System.ConsoleColor.Black, TextEffect.Italic );
+        var styleCommand = new TextStyle( System.ConsoleColor.DarkGreen, effect: TextEffect.Italic );
         // Arguments.
         var args = new (TextBlock, TextBlock)[c.Arguments.Length];
         for( int i = 0; i < args.Length; i++ )

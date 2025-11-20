@@ -47,12 +47,44 @@ public sealed partial class ContentBox : IRenderable
     public ContentBox( IRenderable content,
                        int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
                        int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0,
-                       ContentAlign align = default, TextStyle style = default )
+                       ContentAlign align = ContentAlign.Unknwon,
+                       TextStyle style = default )
         : this( content,
                 new Filler( paddingTop, paddingLeft, paddingBottom, paddingRight ),
                 new Filler( marginTop, marginLeft, marginBottom, marginRight ),
                 align,
                 style )
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new <see cref="ContentBox"/>.
+    /// </summary>
+    /// <param name="content">The content.</param>
+    /// <param name="foreColor">The content foreground color.</param>
+    /// <param name="backColor">The content background color.</param>
+    /// <param name="effect">The content effect.</param>
+    /// <param name="paddingTop">The top padding.</param>
+    /// <param name="paddingLeft">The left padding.</param>
+    /// <param name="paddingBottom">The bottom padding.</param>
+    /// <param name="paddingRight">The right padding.</param>
+    /// <param name="marginTop">The top margin.</param>
+    /// <param name="marginLeft">The left margin.</param>
+    /// <param name="marginBottom">The bottom margin.</param>
+    /// <param name="marginRight">The right margin.</param>
+    /// <param name="align">The content alignment.</param>
+    public ContentBox( IRenderable content,
+                       ConsoleColor foreColor,
+                       ConsoleColor backColor = ConsoleColor.Black,
+                       TextEffect effect = TextEffect.Ignore,
+                       int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
+                       int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0,
+                       ContentAlign align = ContentAlign.Unknwon )
+        : this( content,
+                new Filler( paddingTop, paddingLeft, paddingBottom, paddingRight ),
+                new Filler( marginTop, marginLeft, marginBottom, marginRight ),
+                align,
+                new TextStyle( foreColor, backColor, effect ) )
     {
     }
 
@@ -288,7 +320,7 @@ public sealed partial class ContentBox : IRenderable
     /// </summary>
     /// <param name="style">The style.</param>
     /// <returns>A new box or this.</returns>
-    public ContentBox WithStyle( TextStyle style ) => _style == style
+    public ContentBox WithStyle( TextStyle style ) => _style == style || style == TextStyle.Default
                                                         ? this
                                                         : _origin == null
                                                             ? new ContentBox( null, _content, _padding, _margin, _align, style )

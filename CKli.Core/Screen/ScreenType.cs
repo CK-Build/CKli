@@ -73,13 +73,46 @@ public sealed class ScreenType
     public TextBlock EmptyString => _emptyString ??= new Empty( this );
 
     /// <summary>
-    /// Shortcut to <see cref="TextBlock.FromText(ScreenType, string?, TextStyle)"/>.
+    /// Creates a mono or multi line block of text.
     /// </summary>
     /// <param name="text">The raw text.</param>
     /// <param name="style">Optional text style.</param>
     /// <returns>The renderable.</returns>
     [return: NotNullIfNotNull( nameof( text ) )]
     public TextBlock? Text( string? text, TextStyle style = default ) => TextBlock.FromText( this, text, style );
+
+    /// <summary>
+    /// Creates a mono or multi line block of text.
+    /// </summary>
+    /// <param name="text">The raw text.</param>
+    /// <param name="color">Foreground and background text color.</param>
+    /// <param name="effect">Optional effect.</param>
+    /// <returns>The renderable.</returns>
+    [return: NotNullIfNotNull( nameof( text ) )]
+    public TextBlock? Text( string? text, Color color, TextEffect effect = TextEffect.Ignore ) => TextBlock.FromText( this, text, color, effect );
+
+    /// <summary>
+    /// Creates a mono or multi line block of text with no color (<see cref="TextStyle.IgnoreColor"/> is true).
+    /// </summary>
+    /// <param name="text">The raw text.</param>
+    /// <param name="effect">The effect.</param>
+    /// <returns>The renderable.</returns>
+    [return: NotNullIfNotNull( nameof( text ) )]
+    public TextBlock? Text( string? text, TextEffect effect ) => TextBlock.FromText( this, text, effect );
+
+    /// <summary>
+    /// Creates a mono or multi line block of text.
+    /// </summary>
+    /// <param name="text">The raw text.</param>
+    /// <param name="foreColor">Foreground text color.</param>
+    /// <param name="backColor">Optional background text color.</param>
+    /// <param name="effect">Optional effect.</param>
+    /// <returns>The renderable.</returns>
+    [return: NotNullIfNotNull( nameof( text ) )]
+    public TextBlock? Text( string? text,
+                            ConsoleColor foreColor,
+                            ConsoleColor backColor = ConsoleColor.Black,
+                            TextEffect effect = TextEffect.Ignore ) => TextBlock.FromText( this, text, foreColor, backColor, effect );
 
     /// <summary>
     /// Creates a renderable log.

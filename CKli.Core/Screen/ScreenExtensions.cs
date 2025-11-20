@@ -55,8 +55,8 @@ public static class ScreenExtensions
                                                                             : r.Argument,
                                                                       r.Remaining
                                                                             ? new TextStyle( TextEffect.Invert )
-                                                                            : new TextStyle( new Color( ConsoleColor.DarkGreen, ConsoleColor.Black ) ) )
-                                                               .Box( marginLeft: 1, color: new Color( ConsoleColor.DarkRed, ConsoleColor.Black ) ) ) )
+                                                                            : new TextStyle( ConsoleColor.DarkGreen, ConsoleColor.Black ) )
+                                                               .Box( marginLeft: 1, foreColor: ConsoleColor.DarkRed ) ) )
                         .AddBelow( screenType.EmptyString );
         }
 
@@ -107,8 +107,8 @@ public static class ScreenExtensions
         // |        --flag, -f              Description
         // 
         int minFirstCol = 0;
-        var helps = screenType.Unit.AddBelow( commands.Select( c => new Collapsable( RenderCommand( c, ref minFirstCol ) )
-                                                                    .AddBelow( screenType.EmptyString ) ) );
+        var helps = screenType.Unit.AddBelow( commands.Select( c => new Collapsable( RenderCommand( c, ref minFirstCol )
+                                                                                     .AddBelow( screenType.EmptyString ) )  ) );
 
         if( !globalOptions.IsDefaultOrEmpty )
         {
@@ -152,7 +152,8 @@ public static class ScreenExtensions
 
     internal static void DisplayPluginInfo( this IScreen screen, string headerText, List<World.DisplayInfoPlugin>? infos )
     {
-        IRenderable display = screen.ScreenType.Text( headerText );
+        var s = screen.ScreenType;
+        IRenderable display = s.Text( headerText );
         if( infos != null )
         {
             // Layout:
@@ -163,18 +164,18 @@ public static class ScreenExtensions
             // |    <Message>
 
             display = display.AddBelow(
-                screen.ScreenType.EmptyString,
+                s.EmptyString,
                 infos.Select(
                     i => new Collapsable(
-                            new ContentBox( screen.ScreenType.Text( i.ShortName )
+                            new ContentBox( s.Text( i.ShortName )
                                             .AddBelow(
-                                                screen.ScreenType.Text( i.Status.GetTextStatus() )
-                                                .AddBelow( screen.ScreenType.Text( i.Version?.Version?.ToString() ?? "<source based>",
-                                                                                   new TextStyle( TextEffect.Italic ) )
+                                                s.Text( i.Status.GetTextStatus() )
+                                                .AddBelow( s.Text( i.Version?.Version?.ToString() ?? "<source based>", TextEffect.Italic )
                                                 ).Box( paddingLeft: 3 ) ), paddingRight: 3 )
-                            .AddRight( screen.ScreenType.Text( i.Configuration?.ToString() ).Collapsable() )
+                            .AddRight( s.Text( i.Configuration?.ToString() ).Collapsable() )
                             .AddBelow( i.Message != null
-                                        ? screen.ScreenType.Text( "Message:" ).AddBelow( i.Message.Box( paddingLeft: 3 ) )
+                                        ? s.Text( "Message:", ConsoleColor.DarkYellow )
+                                           .AddBelow( i.Message.Box( paddingLeft: 3, foreColor: ConsoleColor.Yellow ) )
                                         : null ) ) )
                 );
         }

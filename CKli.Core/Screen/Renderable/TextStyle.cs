@@ -26,8 +26,8 @@ public readonly struct TextStyle : IEquatable<TextStyle>
     /// <summary>
     /// Initializes a new <see cref="TextStyle"/>.
     /// </summary>
-    /// <param name="color">The text color.</param>
-    /// <param name="effect">The text effect.</param>
+    /// <param name="color">Foreground and background text color.</param>
+    /// <param name="effect">Optional text effect.</param>
     public TextStyle( Color color, TextEffect effect = TextEffect.Ignore )
     {
         _color = (effect & TextEffect.Invert) != 0 ? color.Invert() : color;
@@ -40,23 +40,13 @@ public readonly struct TextStyle : IEquatable<TextStyle>
     /// <param name="foreColor">The foreground text color.</param>
     /// <param name="backColor">The background text color.</param>
     /// <param name="effect">The text effect.</param>
-    public TextStyle( ConsoleColor foreColor, ConsoleColor backColor, TextEffect effect = TextEffect.Ignore )
+    public TextStyle( ConsoleColor foreColor, ConsoleColor backColor = ConsoleColor.Black, TextEffect effect = TextEffect.Ignore )
         : this( new Color( foreColor, backColor ), effect )
     {
     }
 
     /// <summary>
-    /// Initializes a new <see cref="TextStyle"/>.
-    /// </summary>
-    /// <param name="foreColor">The foreground text color.</param>
-    /// <param name="effect">The text effect.</param>
-    public TextStyle( ConsoleColor foreColor, TextEffect effect = TextEffect.Ignore )
-        : this( new Color( foreColor, ConsoleColor.Black ), effect )
-    {
-    }
-
-    /// <summary>
-    /// Initializes a new <see cref="TextStyle"/>.
+    /// Initializes a new <see cref="TextStyle"/> without color (<see cref="IgnoreColor"/> is true).
     /// </summary>
     /// <param name="effect">The text effect.</param>
     public TextStyle( TextEffect effect )

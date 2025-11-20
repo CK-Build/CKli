@@ -89,37 +89,40 @@ public static class RenderableExtensions
                 : Core.TableLayout.Create( r, columns );
     }
 
-    /// <summary>
-    /// Applies padding and margin to this renderable by creating a new <see cref="ContentBox"/>
-    /// around this renderable.
-    /// </summary>
-    /// <param name="r">This renderable.</param>
-    /// <param name="paddingTop">Optional top padding.</param>
-    /// <param name="paddingLeft">Optional left padding.</param>
-    /// <param name="paddingBottom">Optional bottom padding.</param>
-    /// <param name="paddingRight">Optional right padding.</param>
-    /// <param name="marginTop">Optional top margin.</param>
-    /// <param name="marginLeft">Optional left margin.</param>
-    /// <param name="marginBottom">Optional bottom margin.</param>
-    /// <param name="marginRight">Optional right margin.</param>
-    /// <returns>A content box.</returns>
-    public static ContentBox Box( this IRenderable r,
-                                  int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
-                                  int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
-    {
-        if( r is ContentBox b ) return b.AddPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
-                                        .AddMargin( marginTop, marginLeft, marginBottom, marginRight );
-        return new ContentBox( r,
-                               paddingTop, paddingLeft, paddingBottom, paddingRight,
-                               marginTop, marginLeft, marginBottom, marginRight );
-    }
+    ///// <summary>
+    ///// Applies padding, margin and/or <see cref="ContentAlign"/> to this renderable by
+    ///// creating a new <see cref="ContentBox"/> around this renderable.
+    ///// </summary>
+    ///// <param name="r">This renderable.</param>
+    ///// <param name="paddingTop">Optional top padding.</param>
+    ///// <param name="paddingLeft">Optional left padding.</param>
+    ///// <param name="paddingBottom">Optional bottom padding.</param>
+    ///// <param name="paddingRight">Optional right padding.</param>
+    ///// <param name="marginTop">Optional top margin.</param>
+    ///// <param name="marginLeft">Optional left margin.</param>
+    ///// <param name="marginBottom">Optional bottom margin.</param>
+    ///// <param name="marginRight">Optional right margin.</param>
+    ///// <param name="align">Optional content alignment.</param>
+    ///// <returns>A content box.</returns>
+    //public static ContentBox Box( this IRenderable r,
+    //                              int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
+    //                              int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0,
+    //                              ContentAlign align = ContentAlign.Unknwon )
+    //{
+    //    if( r is ContentBox b ) return b.AddPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
+    //                                    .AddMargin( marginTop, marginLeft, marginBottom, marginRight )
+    //                                    .WithAlign( align );
+    //    return new ContentBox( r, paddingTop, paddingLeft, paddingBottom, paddingRight,
+    //                              marginTop, marginLeft, marginBottom, marginRight,
+    //                              align );
+    //}
 
     /// <summary>
     /// Applies <see cref="TextStyle"/>, padding, margin and/or <see cref="ContentAlign"/> to this renderable by
     /// creating a new <see cref="ContentBox"/> around this renderable.
     /// </summary>
     /// <param name="r">This renderable.</param>
-    /// <param name="style">Style to apply.</param>
+    /// <param name="style">Optional style to apply.</param>
     /// <param name="paddingTop">Optional top padding.</param>
     /// <param name="paddingLeft">Optional left padding.</param>
     /// <param name="paddingBottom">Optional bottom padding.</param>
@@ -131,7 +134,7 @@ public static class RenderableExtensions
     /// <param name="align">Optional alignment to apply.</param>
     /// <returns>A content box.</returns>
     public static ContentBox Box( this IRenderable r,
-                                  TextStyle style,
+                                  TextStyle style = default,
                                   int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
                                   int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0,
                                   ContentAlign align = default )
@@ -142,36 +145,8 @@ public static class RenderableExtensions
                                         .WithAlign( align );
         return new ContentBox( r, paddingTop, paddingLeft, paddingBottom, paddingRight,
                                   marginTop, marginLeft, marginBottom, marginRight,
-                                  style: style,
-                                  align: align );
-    }
-
-    /// <summary>
-    /// Applies <see cref="ContentAlign"/>, padding and/or margin to this renderable by
-    /// creating a new <see cref="ContentBox"/> around this renderable.
-    /// </summary>
-    /// <param name="r">This renderable.</param>
-    /// <param name="align">Alignment to apply.</param>
-    /// <param name="paddingTop">Optional top padding.</param>
-    /// <param name="paddingLeft">Optional left padding.</param>
-    /// <param name="paddingBottom">Optional bottom padding.</param>
-    /// <param name="paddingRight">Optional right padding.</param>
-    /// <param name="marginTop">Optional top margin.</param>
-    /// <param name="marginLeft">Optional left margin.</param>
-    /// <param name="marginBottom">Optional bottom margin.</param>
-    /// <param name="marginRight">Optional right margin.</param>
-    /// <returns>A content box.</returns>
-    public static ContentBox Box( this IRenderable r,
-                                  ContentAlign align,
-                                  int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
-                                  int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
-    {
-        if( r is ContentBox b ) return b.AddPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
-                                        .AddMargin( marginTop, marginLeft, marginBottom, marginRight )
-                                        .WithAlign( align );
-        return new ContentBox( r, paddingTop, paddingLeft, paddingBottom, paddingRight,
-                                  marginTop, marginLeft, marginBottom, marginRight,
-                                  align: align );
+                                  align,
+                                  style );
     }
 
     /// <summary>
@@ -179,8 +154,8 @@ public static class RenderableExtensions
     /// creating a new <see cref="ContentBox"/> around this renderable.
     /// </summary>
     /// <param name="r">This renderable.</param>
-    /// <param name="color">Text color to apply.</param>
-    /// <param name="effect">Text effect to apply.</param>
+    /// <param name="color">Content color to apply.</param>
+    /// <param name="effect">Optional content effect to apply.</param>
     /// <param name="paddingTop">Optional top padding.</param>
     /// <param name="paddingLeft">Optional left padding.</param>
     /// <param name="paddingBottom">Optional bottom padding.</param>
@@ -189,16 +164,52 @@ public static class RenderableExtensions
     /// <param name="marginLeft">Optional left margin.</param>
     /// <param name="marginBottom">Optional bottom margin.</param>
     /// <param name="marginRight">Optional right margin.</param>
+    /// <param name="align">Optional content alignment.</param>
     /// <returns>A content box.</returns>
     public static ContentBox Box( this IRenderable r,
                                   Color color,
                                   TextEffect effect = TextEffect.Regular,
                                   int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
-                                  int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0 )
+                                  int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0,
+                                  ContentAlign align = ContentAlign.Unknwon )
     {
         return Box( r, new TextStyle( color, effect ),
                        paddingTop, paddingLeft, paddingBottom, paddingRight,
-                       marginTop, marginLeft, marginBottom, marginRight );
+                       marginTop, marginLeft, marginBottom, marginRight,
+                       align );
+    }
+
+
+    /// <summary>
+    /// Applies <see cref="TextStyle"/>, padding and/or margin to this renderable by
+    /// creating a new <see cref="ContentBox"/> around this renderable.
+    /// </summary>
+    /// <param name="r">This renderable.</param>
+    /// <param name="foreColor">Foreground content color to apply.</param>
+    /// <param name="backColor">Background content color to apply.</param>
+    /// <param name="effect">Optional content effect to apply.</param>
+    /// <param name="paddingTop">Optional top padding.</param>
+    /// <param name="paddingLeft">Optional left padding.</param>
+    /// <param name="paddingBottom">Optional bottom padding.</param>
+    /// <param name="paddingRight">Optional right padding.</param>
+    /// <param name="marginTop">Optional top margin.</param>
+    /// <param name="marginLeft">Optional left margin.</param>
+    /// <param name="marginBottom">Optional bottom margin.</param>
+    /// <param name="marginRight">Optional right margin.</param>
+    /// <param name="align">Optional content alignment.</param>
+    /// <returns>A content box.</returns>
+    public static ContentBox Box( this IRenderable r,
+                                  ConsoleColor foreColor,
+                                  ConsoleColor backColor = ConsoleColor.Black,
+                                  TextEffect effect = TextEffect.Regular,
+                                  int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
+                                  int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0,
+                                  ContentAlign align = ContentAlign.Unknwon )
+    {
+        return Box( r, new TextStyle( foreColor, backColor, effect ),
+                       paddingTop, paddingLeft, paddingBottom, paddingRight,
+                       marginTop, marginLeft, marginBottom, marginRight,
+                       align );
     }
 
     /// <summary>
