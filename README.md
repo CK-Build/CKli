@@ -152,7 +152,7 @@ When `--all` is specified, this applies to all the Repos of the current World (e
 ### `exec ... --ckli-continue-on-error --ckli-all`
 
 This command execute any external process on the current Repo (or all of them if `--ckli-all` is specified).
-By default, whenever a process fails on a repository (by returning a non 0 exit code), the lopp stops: use
+By default, whenever a process fails on a repository (by returning a non 0 exit code), the loop stops: use
 `--ckli-continue-on-error` flag to not stop on the first error.
 
 The flags `--ckli-continue-on-error` and `--ckli-all` are not submitted to the process command line. (They are prefixed
