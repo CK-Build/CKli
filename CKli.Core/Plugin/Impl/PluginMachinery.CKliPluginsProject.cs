@@ -96,8 +96,8 @@ sealed partial class PluginMachinery
             {
                 _csFirstItemGroup.Add( new XElement( "ProjectReference",
                                         new XAttribute( "Include", projectPath ) ) );
-                AddRegisterCall( shortPluginName );
             }
+            EnsureRegisterCall( shortPluginName );
             return true;
         }
 
@@ -142,7 +142,7 @@ sealed partial class PluginMachinery
             }
             if( added )
             {
-                AddRegisterCall( shortPluginName );
+                EnsureRegisterCall( shortPluginName );
             }
             return true;
         }
@@ -193,6 +193,12 @@ sealed partial class PluginMachinery
                 monitor.Error( "While saving CKli.Plugins project.", ex );
                 return false;
             }
+        }
+
+        void EnsureRegisterCall( string shortPluginName )
+        {
+            RemoveRegisterCall( shortPluginName );
+            AddRegisterCall( shortPluginName );
         }
 
         void AddRegisterCall( string shortPluginName )
