@@ -1,4 +1,5 @@
 using CK.Core;
+using System;
 
 namespace CKli.Core;
 
@@ -6,6 +7,10 @@ namespace CKli.Core;
 /// The immutable command context reflects the <see cref="CKliRootEnv"/>: <see cref="CKliRootEnv.DefaultCKliEnv"/>
 /// should almost always be used unless the default context needs to be overridden. This is the case in tests: 
 /// <see cref="ChangeDirectory(NormalizedPath)"/> is used to change the <see cref="CurrentDirectory"/> (and potentially the <see cref="CurrentStackPath"/>).
+/// <para>
+/// This object is not really immutable: <see cref="StartCommandHandlingLocalTime"/> and <see cref="StartCommandHandlingUtc"/> are internally updated:
+/// command handlers use this to rely on a shared time for the currently executed command.
+/// </para>
 /// </summary>
 public sealed class CKliEnv
 {
@@ -13,18 +18,29 @@ public sealed class CKliEnv
     readonly ISecretsStore _secretsStore;
     readonly NormalizedPath _currentDirectory;
     readonly NormalizedPath _currentStackPath;
+    DateTimeOffset _startCommandHandlingLocalTime;
 
-    // CKliRootEnv.DefaultCommandContext & CKliCommands.ExecuteAsync that sets an interactive screen.
-    internal CKliEnv( IScreen screen, ISecretsStore secretsStore, NormalizedPath currentDirectory, NormalizedPath currentStackPath )
+    internal CKliEnv( IScreen screen,
+                      ISecretsStore secretsStore,
+                      NormalizedPath currentDirectory,
+                      NormalizedPath currentStackPath,
+                      DateTimeOffset startCommandHandlingLocalTime )
     {
         _screen = screen;
         _secretsStore = secretsStore;
         _currentDirectory = currentDirectory;
         _currentStackPath = currentStackPath;
+        _startCommandHandlingLocalTime = startCommandHandlingLocalTime;
+    }
+
+    internal void OnStartCommandHandling()
+    {
+        _startCommandHandlingLocalTime = DateTimeOffset.Now;
     }
 
     /// <summary>
-    /// Initialize a <see cref="CKliEnv"/> that is not the default <see cref="CKliRootEnv.DefaultCKliEnv"/>. 
+    /// Initialize a <see cref="CKliEnv"/> that is not the default <see cref="CKliRootEnv.DefaultCKliEnv"/>.
+    /// Mainly to support tests.
     /// </summary>
     /// <param name="currentDirectory">Current directory to consider.</param>
     /// <param name="secretsStore">Optional secrets store (overrides the default <see cref="CKliRootEnv.SecretsStore"/>).</param>
@@ -70,8 +86,22 @@ public sealed class CKliEnv
     /// </summary>
     /// <param name="path">The path. Usually relative but may be absolute.</param>
     /// <returns>A new context.</returns>
-    public CKliEnv ChangeDirectory( NormalizedPath path ) => path.IsEmptyPath
-                                                                ? this
-                                                                : new CKliEnv( _currentDirectory.Combine( path ).ResolveDots(), _secretsStore, _screen );
+    public CKliEnv ChangeDirectory( NormalizedPath path )
+    {
+        if( path.IsEmptyPath ) return this;
+        var currentDirectory = _currentDirectory.Combine( path ).ResolveDots();
+        var currentStackPath = StackRepository.FindGitStackPath( currentDirectory );
+        return new CKliEnv( _screen, _secretsStore, currentDirectory, currentStackPath, _startCommandHandlingLocalTime );
+    }
+
+    /// <summary>
+    /// Gets the UTC start date and time of the current command handling.
+    /// </summary>
+    public DateTime StartCommandHandlingUtc => _startCommandHandlingLocalTime.UtcDateTime;
+
+    /// <summary>
+    /// Gets the local start date and time of the current command handling.
+    /// </summary>
+    public DateTimeOffset StartCommandHandlingLocalTime => _startCommandHandlingLocalTime;
 
 }

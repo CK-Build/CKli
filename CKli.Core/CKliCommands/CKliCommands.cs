@@ -69,6 +69,7 @@ public static class CKliCommands
                                                       CommandLineArguments cmdLine )
     {
         monitor.Info( $"Executing '{cmdLine.InitialAsStringArguments}'." );
+        context.OnStartCommandHandling();
 
         // Honor the "ckli i" if specified.
         // The command will be handled below but with the InteractiveSreen (the command may use it)

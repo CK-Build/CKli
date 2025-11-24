@@ -34,7 +34,11 @@ public sealed partial class InteractiveScreen : IScreen
         _screen = screen;
         _target = target;
         _nextScreenBuilder = _defaultScreenBuilder = defaultScreenBuilder ?? DefaultScreenBuilder;
-        _context = new CKliEnv( this, initialContext.SecretsStore, initialContext.CurrentDirectory, initialContext.CurrentStackPath );
+        _context = new CKliEnv( this,
+                                initialContext.SecretsStore,
+                                initialContext.CurrentDirectory,
+                                initialContext.CurrentStackPath,
+                                initialContext.StartCommandHandlingLocalTime );
         _driver = driver;
         _history = new List<CommandLineArguments>();
         _header = new InteractiveHeader();

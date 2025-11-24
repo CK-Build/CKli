@@ -98,7 +98,7 @@ public static partial class CKliRootEnv
             SetAndWriteDefaultConfig();
         }
 
-        _defaultCommandContext = new CKliEnv( _screen, _secretsStore, _currentDirectory, _currentStackPath );
+        _defaultCommandContext = new CKliEnv( _screen, _secretsStore, _currentDirectory, _currentStackPath, DateTimeOffset.MinValue );
 
         [MemberNotNull( nameof( _secretsStore ) )]
         static void SetAndWriteDefaultConfig()
