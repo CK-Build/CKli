@@ -390,9 +390,30 @@ public sealed partial class PluginMachinery
     {
         using var gLog = monitor.OpenTrace( $"Creating plugin '{fullPluginName}'." );
         var projectPath = Root.AppendPart( fullPluginName );
+        var projectCSProjPath = projectPath.AppendPart( $"{fullPluginName}.csproj" );
+        var projectPrimaryPluginPath = projectPath.AppendPart( $"{shortPluginName}Plugin.cs" );
+
+        bool alreadyHere = false;
         if( Directory.Exists( projectPath ) )
         {
-            monitor.Error( $"Directory '{projectPath}' already exists." );
+            bool hasProject = File.Exists( projectCSProjPath );
+            bool hasPlugin = File.Exists( projectPrimaryPluginPath );
+            if( hasProject && hasPlugin ) 
+            {
+                monitor.Trace( $"""
+                    Directory '{projectPath}', '{projectCSProjPath.LastPart}' and '{projectPrimaryPluginPath.LastPart}' files already exists.
+                    Considering that the plugin project has already been created.
+                    """ );
+                alreadyHere = true;
+            }
+            else
+            {
+                using( monitor.OpenError( $"Directory '{projectPath}' already exists, but..." ) )
+                {
+                    if( !hasProject ) monitor.Error( $"Expecting existing '{projectCSProjPath.LastPart}' file." );
+                    if( !hasPlugin ) monitor.Error( $"Expecting existing '{projectPrimaryPluginPath.LastPart}' file." );
+                }
+            }
             return false;
         }
         // First, try to add the plugin registration to the central CKli.Plugins project.
@@ -405,47 +426,51 @@ public sealed partial class PluginMachinery
             return false;
         }
         _definitionFile.EnsurePluginConfiguration( monitor, shortPluginName );
-        Directory.CreateDirectory( projectPath );
-        File.WriteAllText( projectPath.AppendPart( $"{fullPluginName}.csproj" ), $$"""
-            <Project Sdk="Microsoft.NET.Sdk">
-                <ItemGroup>
-                    <PackageReference Include="CKli.Plugins.Core" />
-                </ItemGroup>
-            </Project>
-            """ );
-        File.WriteAllText( projectPath.AppendPart( $"{shortPluginName}Plugin.cs" ), $$"""
-            using CK.Core;
-            using CKli.Core;
-            using System;
-            using System.IO;
-            using System.Linq;
-            using System.Collections.Generic;
+        if( !alreadyHere )
+        {
+            Directory.CreateDirectory( projectPath );
+            File.WriteAllText( projectCSProjPath, $$"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                    <ItemGroup>
+                        <PackageReference Include="CKli.Plugins.Core" />
+                    </ItemGroup>
+                </Project>
+                """ );
+            File.WriteAllText( projectPrimaryPluginPath, $$"""
+                using CK.Core;
+                using CKli.Core;
+                using System;
+                using System.IO;
+                using System.Linq;
+                using System.Collections.Generic;
 
-            namespace CKli.{{shortPluginName}}.Plugin;
+                namespace CKli.{{shortPluginName}}.Plugin;
 
-            public sealed class {{shortPluginName}}Plugin : PrimaryPluginBase
-            {
-                /// <summary>
-                /// This is a primary plugin. <see cref="PrimaryPluginBase.PrimaryPluginContext"/>
-                /// is always available (as well as the <see cref="PluginBase.World"/>).
-                /// </summary>
-                public {{shortPluginName}}Plugin( PrimaryPluginContext primaryContext )
-                    : base( primaryContext )
+                public sealed class {{shortPluginName}}Plugin : PrimaryPluginBase
                 {
-                    primaryContext.World.Events.PluginInfo += e =>
+                    /// <summary>
+                    /// This is a primary plugin. <see cref="PrimaryPluginBase.PrimaryPluginContext"/>
+                    /// is always available (as well as the <see cref="PluginBase.World"/>).
+                    /// </summary>
+                    public {{shortPluginName}}Plugin( PrimaryPluginContext primaryContext )
+                        : base( primaryContext )
                     {
-                        Throw.CheckState( PrimaryPluginContext.PluginInfo.FullPluginName == "{{fullPluginName}}" );
-                        Throw.CheckState( World == e.World );
-                        Throw.CheckState( PrimaryPluginContext.World == e.World );
-                        e.AddMessage( PrimaryPluginContext, e.ScreenType.Text( "Message from '{{shortPluginName}}' plugin." ) );
-                        e.Monitor.Info( $"New '{{shortPluginName}}' in world '{e.World.Name}' plugin certainly requires some development." );
-                        Console.WriteLine( $"Hello from '{{shortPluginName}}' plugin." );
-                    };
+                        primaryContext.World.Events.PluginInfo += e =>
+                        {
+                            Throw.CheckState( PrimaryPluginContext.PluginInfo.FullPluginName == "{{fullPluginName}}" );
+                            Throw.CheckState( World == e.World );
+                            Throw.CheckState( PrimaryPluginContext.World == e.World );
+                            e.AddMessage( PrimaryPluginContext, e.ScreenType.Text( "Message from '{{shortPluginName}}' plugin." ) );
+                            e.Monitor.Info( $"New '{{shortPluginName}}' in world '{e.World.Name}' plugin certainly requires some development." );
+                            Console.WriteLine( $"Hello from '{{shortPluginName}}' plugin." );
+                        };
+                    }
                 }
-            }
             
-            """ );
-        // Uses dotnet tooling to add the project to the sln.
+                """ );
+        }
+        // Uses dotnet tooling to add the project to the sln: this doesn't fail (ExitCode is 0) if the project is
+        // already in the .sln or .slnx (and this is fine).
         // We don't care if it takes time here and this acts as a check.
         if( ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", $"sln add {fullPluginName}", Root, null ) != 0 )
         {
