@@ -180,13 +180,13 @@ public class PluginTests
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue" )).ShouldBeTrue();
         display.ToString().ShouldBe( """
             > EmptySolution (1)
-            │ > Empty solution file.
+            │ > ✋ Empty solution file.
             │ │ Ignoring 2 projects:
             │ │ CodeCakeBuilder\CodeCakeBuilder.csproj, SomeJsApp\SomeJsApp.esproj
             > MissingSolution (1)
-            │ > No solution found. Expecting 'MissingSolution.sln' (or '.slnx').
+            │ > ✋ No solution found. Expecting 'MissingSolution.sln' (or '.slnx').
             > MultipleSolutions (1)
-            │ > Multiple solution files found. One of them must be 'MultipleSolutions.sln' (or '.slnx').
+            │ > ✋ Multiple solution files found. One of them must be 'MultipleSolutions.sln' (or '.slnx').
             │ │ Found: 'Candidate1.slnx', 'Candidate2.sln', 'SomeOther.slnx'.
             ❰✓❱
 
@@ -213,11 +213,11 @@ public class PluginTests
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue" )).ShouldBeTrue();
         display.ToString().ShouldBe( """
             > EmptySolution (1)
-            │ > Empty solution file.
+            │ > ✋ Empty solution file.
             │ │ Ignoring 2 projects:
             │ │ CodeCakeBuilder\CodeCakeBuilder.csproj, SomeJsApp\SomeJsApp.esproj
             > MissingSolution (1)
-            │ > No solution found. Expecting 'MissingSolution.sln' (or '.slnx').
+            │ > ✋ No solution found. Expecting 'MissingSolution.sln' (or '.slnx').
             ❰✓❱
             
             """ );

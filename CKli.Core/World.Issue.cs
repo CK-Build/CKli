@@ -52,7 +52,7 @@ public sealed partial class World
         public Repo? Repo => _repo;
 
         /// <summary>
-        /// Gets whether this issue cannot be fixed automatically.
+        /// Gets whether this issue cannot be fixed automatically (a ✋ appears).
         /// Use <see cref="CreateManual(string, IRenderable, Repo?)"/> to create such issues.
         /// </summary>
         public bool ManualFix => _manualFix;
@@ -90,7 +90,9 @@ public sealed partial class World
 
         internal IRenderable ToRenderable( ScreenType screenType )
         {
-            return new Collapsable( screenType.Text( _title ).AddBelow( _body ) );
+            var title = _title;
+            if( _manualFix ) title = "✋ " + title; 
+            return new Collapsable( screenType.Text( title ).AddBelow( _body ) );
         }
     }
 
