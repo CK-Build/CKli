@@ -14,9 +14,9 @@ sealed class CKliExec : Command
                 "exec",
                 """
                 Executes an external process on each Repo (the working directory is the repository working folder).
-                After the required <process-name> argument, the remaining arguments are the process arguments, for example: 'ckli exec dotnet test'.
+                The <process-name-and-args> contains the whole command line, for example: 'ckli exec dotnet test'.
                 """,
-                [("process-name","Name of the process to run.")],
+                [("process-name-and-args", "Name of the process to run and its arguments.")],
                 [],
                 [(["--ckli-continue-on-error"], "Continue despite of the process returning a non 0 exit code."),
                  (["--ckli-all"], "Consider all the Repos of the current World (even if current path is in a Repo).")] )

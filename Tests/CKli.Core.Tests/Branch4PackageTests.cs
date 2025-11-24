@@ -8,7 +8,7 @@ using System.Linq;
 namespace CKli.Core.Tests;
 
 [TestFixture]
-public class Branch4Tests
+public class Branch4PackageTests
 {
     [Test]
     public void version_ordering_pattern()
@@ -111,15 +111,14 @@ public class Branch4Tests
         //
         // What does "upgrade" means? Whether the build is recursive or not, we end up with a set of dependencies
         // whose versions must be updated in the Repo's projects (.csproj or Directory.Packages.props). This is obvious.
-        // But the Branch4 model introduces another kind of dependency: the fact that "alpha" is based on "beta" which is based on "preview" which is
-        // based on "rc" which is ultimately based on "stable".
+        // But the Branch4Package model introduces another kind of dependency: the fact that "alpha" is based on "beta" which is
+        // based on "preview" which is based on "rc" which is ultimately based on "stable".
         // Upgrading the Repo A in "alpha" may also means that if new stuff appeared in "rc", "preview" or "beta", then
         // this must appear in the new "alpha"...
         // Technically, this should be a Git rebase on the base branch (but this can also be done with a merge).
         // Is this "too strong"? May be. We may need some option to keep a branch independent of its base but eventually
         // all the work will be merged into a future stable. The sooner the better can be a not so bad approach.
-        // We should at least consider rebasing on the last produced commits of the base branches: this would be the
-        // "build". And with "*build", we rebase on the tip of the base branch.
+        // We should at least consider rebasing on the last relesed commits of the base branches.
         //
         // These very simple workflows requires a rather strong condition: we must be able to:
         //  - Decide whether new packages must be produced for a repo (or to use the last produced packages).
@@ -131,9 +130,8 @@ public class Branch4Tests
         // or (Major,Minor,Patch+1) of the greater stable existing version.
         //
         // Thanks to the CSemVer "Post Release" feature, the "current" repository version (the greatest Major.Minor.Patch
-        // that can be found in all versio tags) de facto memorizes the future stable version number.
+        // that can be found in all version tags) de facto memorizes the future stable version number.
         //
-        // The greatest stable version can easily be determined for any Repo.
         // An issue that a plugin should implement is that one cannot find an existing artifact in the feeds with the
         // greatest non prerelease version tag of a Repo. More generally, one should be able to have an issue for
         // any version tag that doesn't find its artifacts. Question: BuildAlyzer can be used to produce the expected
@@ -150,29 +148,99 @@ public class Branch4Tests
         //  - "beta" and "beta-dev"
         //  - "alpha" and "alpha-dev"
         //
-        // The build worflow is the same as the current, basic, workflow "master/develop". Developments occur in the "-dev" branch,
-        // commits produce ci artifacts and "release" is made by merging the "XXX-dev" branch into "XXX". 
+        // Decision: we choose the "XXX/dev" pattern to prepare for future "topic-branches" that will be 0.0.0 prerelease versions
+        // (with a prerelease name that is a "topic" and may be a timed-base part).
+        // A topic branch will be "based" on one of our branch, the path separator better convey the subordination semantics.
+        //  
+        // The build worflow is the same as the current, basic, workflow "master/develop". Developments occur in the "/dev" branch,
+        // commits can produce ci artifacts and a "release" is made by merging the "XXX/dev" branch into "XXX".
+        // Because developers have a mental representation of a repository and its state, it is important to enforce some principles.
+        // We should avoid a "XXX" branch and its "XXX/dev" to point to the same commit. Instead we should always have:
+        //
+        //      + [stable]
+        //      |\
+        //      | \
+        //      |  + [stable/dev]
+        //      |  |
+        //
+        // Fundamental invariant here, this is the "released state" of a branch: at this point, the 2 commits must contain exactly
+        // the same code (the "content sha" - the sha of the merckle tree - of the 2 commits must be the same).
+        // The "released state" usually has a version tag on the base branch (but this is not required).
+        //
+        // If a Repo has no need for a "rc", "pre", "beta" or "alpha" branches, these should not exist. These prerelease branches
+        // should be managed by command. For instance "ckli branch ensure rc" should result in:
+        //
+        //      + [stable]
+        //      |\
+        //      | \     + [rc]
+        //      |  \   /
+        //      |   \ /
+        //      |    + [stable/dev]
+        //      |    |
+        //
+        // The "rc" branch is created from the "stable/dev" and an empty commit point "Starting rc branch" is made in it. But "rc"
+        // must always have its associated "rc/dev". The result must actually be: 
+        // 
+        //      + [stable]
+        //      |\
+        //      | \     + [rc]
+        //      |  \     \
+        //      |   \     + [rc/dev]
+        //      |    \   /
+        //      |     \ /
+        //      |      + [stable/dev]
+        //      |      |
+        //
+        // Let's now run "ckli branch ensure pre":
+        // 
+        //      + [stable]
+        //      |\
+        //      | \     + [rc]
+        //      |  \     \
+        //      |   \     \     + [pre]
+        //      |    \     \     \
+        //      |     \     \     + [pre/dev]
+        //      |      \     \   /
+        //      |       \     \ /
+        //      |        \     + [rc/dev]
+        //      |         \   /
+        //      |          \ /
+        //      |           + [stable/dev]
+        //      |           |
+        //
+        // This is how prerelease branches are created (if we now run "ckli branch ensure alpha", the "beta" and "beta/dev" appear: a
+        // subordinate branch implies the existence of its base branches.
+        // There are 2 ways to supress a prerelease branch: the regular case is that the branch contains good enough code and it can be
+        // integrated into its base branch, the less frequent case is that we want to forget it.
+        //
+        // A prerelease branch can be killed/forgotten only if it has no subordinated branch ("alpha" must first be killed/forgotten
+        // before "beta", etc.). This is basically a "git -D branch". 
+        //
+        // "Integration" is basically a merge into the base branch. The branch to integrate should be in the "released state". It may
+        // be possible to skip intermediate base branch: "ckli branch integrate alpha --into rc".
+        // After the integration, the branch is deleted if it has no subordinated branch or the initial pattern above is recreated (as if
+        // the branch has been created).
         //
         // The CKli.Build.Plugin is able to compute the version numbers and dosn't use SimpleGitVersion. It uses CSemVer for its
-        // SVersion and the new CSVersion4 that encapsulates the Branch4 model versions.
+        // SVersion and the new CSVersion4 that encapsulates the B4P model versions.
         // Not using SimpleGitVersion means that a remote CI can no more build/test/package a commit point.
         // This tool will be developed later.
         //
-        // ckli build           Current Repo must be on the "stable", "stable-dev", "rc", "rc-dev", "pre", "pre-dev", "beta",
-        //                      "beta-dev", "alpha" or "alpha-dev" branch.
+        // ckli build           Current Repo must be on the "stable", "stable/dev", "rc", "rc/dev", "pre", "pre/dev", "beta",
+        //                      "beta/dev", "alpha" or "alpha/dev" branch and must not be dirty.
         //                      If not it is an error.
         //
         // Steps:
-        //  0 - If the --branch is specified, set the current branch (the current Repo must not be dirty otherise it is an error).
+        //  0 - If the --branch is specified, checkout the branch.
         //  1 - Branch rebase:
-        //      - If on a "-dev" branch, it is a CI build:
-        //          - If on "stable-dev", there is no branch rebase to do.
+        //      - If on a "/dev" branch, it is a CI build:
+        //          - If on "stable/dev", there is no branch rebase to do.
         //          - Otherwise, different rebase strategies exist:
         //              - none: no branch rebase.
         //              - full-dev: the branch is rebased on all the "-dev" branches of its base branches.
         //              - full: the branch is rebased on all its base branches at their current tip.
         //              - released: the branch is rebased on the most recent commit with a version tag of all its base branches.
-        //      - If on a non "-dev" branch
+        //      - If on a non "/dev" branch
         //          - If on "stable", there is no branch rebase to do.
         //          - Otherwise, the rebase strategy can be:
         //              - full: the branch is rebased on all its base branches at their current tip.
@@ -182,39 +250,31 @@ public class Branch4Tests
         //  2 - The package references are collected.
         //  3 - Projects package references to Stack's Repos (these are the upstream Repos).
         //  4 - For each upstream Repo, obtain the last produced version in the preference order of the base branches,
-        //      accounting .ci packages (if on a "-dev" branch).
+        //      (accounting .ci packages if on a "-dev" branch).
         //              There is an issue here regarding missing base branches.
         //                 - A "1.0.0-01-01-01-01-alpha" has been produced
-        //                 - Later, the "rc" branch is deleted because it has been integrated into the "stable-dev" branch.
+        //                 - Later, the "rc" branch is deleted because it has been integrated into the "stable/dev" branch.
         //                 - A second alpha appears: its number MUST NOT be "1.0.0-00-01-01-02-alpha" but "1.0.0-01-01-01-02-alpha"
         //                   (the rc 01 slot must be kept).
         //                   This will be discussed in the Branch Management section below.
-        // 5 - Update the package references in the current Repo.
+        // 5 - Update the package references in the current Repo and create a commit if something changed.
         // 6 - Compute the base version V = (VMajor,VMinor,VPatch):
         //      - When --version is not specified, "patch" is assumed.
-        //      - Considering the last stable version tag S = (SMajor,SMinor,SPatch) and the
-        //        greatest version tag (including prereleases) G = (GMajor,GMinor,GPatch).
-        //      - If GMajor < SMajor or GMajor > SMajor + 1 or GMinor > SMinor + 1 or GPatch > SPatch + 1
-        //        this is an error.
-        //      - If GMajor == SMajor + 1
-        //          - GMinor and GPatch must be 0 otherwise it is an error.
-        //          - V = (GMajor,0,0)
-        //        else (GMajor == SMajor)
-        //          - If GMinor < SMinor this is an error.
-        //          - If GMinor == SMinor + 1
-        //              - If GPatch > 0 this is an error.
-        //                else if GPatch < SPatch this is an error.
-        //          - If --version is "major", V = (SMajor+1,0,0)
-        //            else, search for the string "[Breaking]" (and "[Feature]" if --version is "patch") in all commit messages
-        //            for commits between head and S.
-        //              - If head is not a parent of S, this is an error. 
-        //            If "[Breaking]" is found, V = (SMajor+1,0,0)
-        //            else if --version is "minor" or "[Feature]" is found V = (SMajor,SMinor+1,0)
-        //            else V = (SMajor,SMinor,SPatch+1).
+        //      - Considering the last stable commit cS and its version tag S = (SMajor,SMinor,SPatch)
+        //      - If head is not a parent of cS, this is an error. 
+        //      - If --version is "major", V = (SMajor+1,0,0)
+        //        Else, V = --version == "minor" ? (SMajor,SMinor+1,0) : (SMajor,SMinor,SPatch+1).
+        //        Consider the set of commits from head to cS (not that easy):
+        //          - On each commit:
+        //              - If message contains the string "[Breaking]" or "[Major]" or a version tag (SMajor+1,0,0) exists,
+        //                V = (SMajor+1,0,0) and we are done.
+        //              - If --version is "patch" and message contains "[Feature]" or "[Minor]" or a version tag (SMajor,SMinor+1,0) exists
+        //                V is updated to (SMajor,SMinor+1,0).
         // 7 - Compute the final version VF:
-        //      - If on the "stable" branch, VF = v.
+        //      - If on the "stable" branch, VF = V.
         //        else compute the commit depth (up to 9999) and generate VF for the current branch (see below).
         // 8 - Run the build/test/package (with version VF).
+        // 9 - On success, tag the commit point (should we do this also on "-dev" branches? We may not.)
         //
         // The "ckli *build" 
     }

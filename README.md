@@ -156,7 +156,7 @@ By default, whenever a process fails on a repository (by returning a non 0 exit 
 `--ckli-continue-on-error` flag to not stop on the first error.
 
 The flags `--ckli-continue-on-error` and `--ckli-all` are not submitted to the process command line. (They are prefixed
-by `--ckli-` to avoid a name clash with an exisiting process argument.)
+by `--ckli-` to avoid a name clash with an existing process argument.)
 
 Example: `ckli exec dotnet build --ckli-all` builds all the Repo of the Stack.
 
