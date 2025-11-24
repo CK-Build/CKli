@@ -398,23 +398,20 @@ public sealed partial class PluginMachinery
         {
             bool hasProject = File.Exists( projectCSProjPath );
             bool hasPlugin = File.Exists( projectPrimaryPluginPath );
-            if( hasProject && hasPlugin ) 
-            {
-                monitor.Trace( $"""
-                    Directory '{projectPath}', '{projectCSProjPath.LastPart}' and '{projectPrimaryPluginPath.LastPart}' files already exists.
-                    Considering that the plugin project has already been created.
-                    """ );
-                alreadyHere = true;
-            }
-            else
+            if( !hasProject || !hasPlugin )
             {
                 using( monitor.OpenError( $"Directory '{projectPath}' already exists, but..." ) )
                 {
                     if( !hasProject ) monitor.Error( $"Expecting existing '{projectCSProjPath.LastPart}' file." );
                     if( !hasPlugin ) monitor.Error( $"Expecting existing '{projectPrimaryPluginPath.LastPart}' file." );
                 }
+                return false;
             }
-            return false;
+            monitor.Trace( $"""
+                Directory '{projectPath}', '{projectCSProjPath.LastPart}' and '{projectPrimaryPluginPath.LastPart}' files already exists.
+                Considering that the plugin project has already been created.
+                """ );
+            alreadyHere = true;
         }
         // First, try to add the plugin registration to the central CKli.Plugins project.
         // If something fails, there is no side effect.
