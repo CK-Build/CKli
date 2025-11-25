@@ -11,6 +11,7 @@ public abstract class PluginCommand : Command
     readonly string _methodName;
     readonly MethodAsyncReturn _returnType;
     internal object? _instance;
+    readonly bool _hasCKliEnvParameter;
 
     /// <summary>
     /// Initializes a new <see cref="PluginCommand"/>.
@@ -18,6 +19,7 @@ public abstract class PluginCommand : Command
     /// <param name="typeInfo">The type info.</param>
     /// <param name="commandPath">The command path.</param>
     /// <param name="description">The command description.</param>
+    /// <param name="hasCKliEnvParameter">True if the second parameter is the <see cref="CKliEnv"/>.</param>
     /// <param name="arguments">The command arguments.</param>
     /// <param name="options">The command options.</param>
     /// <param name="flags">The command flags.</param>
@@ -26,6 +28,7 @@ public abstract class PluginCommand : Command
     protected PluginCommand( IPluginTypeInfo typeInfo,
                              string commandPath,
                              string description,
+                             bool hasCKliEnvParameter,
                              ImmutableArray<(string Name, string Description)> arguments,
                              ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
                              ImmutableArray<(ImmutableArray<string> Names, string Description)> flags,
@@ -35,6 +38,7 @@ public abstract class PluginCommand : Command
     {
         _methodName = methodName;
         _returnType = returnType;
+        _hasCKliEnvParameter = hasCKliEnvParameter;
     }
 
     /// <summary>
@@ -51,6 +55,12 @@ public abstract class PluginCommand : Command
     /// Gets the type of return of the method.
     /// </summary>
     public MethodAsyncReturn ReturnType => _returnType;
+
+    /// <summary>
+    /// Gets whether the second parameter of <see cref="MethodName"/> is the <see cref="CKliEnv"/>
+    /// (the first parameter is always the <see cref="IActivityMonitor"/>).
+    /// </summary>
+    public bool HasCKliEnvParameter => _hasCKliEnvParameter;
 
     /// <summary>
     /// Gets the instance that implements the command.

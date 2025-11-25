@@ -76,10 +76,10 @@ public class PluginTests
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "echo", "hello n°1" )).ShouldBeTrue();
-            logs.ShouldContain( "echo: hello n°1" );
+            logs.ShouldContain( $"echo: hello n°1 - {context.StartCommandHandlingLocalTime}" );
 
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "echo", "hello n°2", "--upper-case" )).ShouldBeTrue();
-            logs.ShouldContain( "echo: HELLO N°2" );
+            logs.ShouldContain( $"echo: HELLO N°2 - {context.StartCommandHandlingLocalTime}" );
 
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "get-world-name" )).ShouldBeTrue();
             logs.ShouldContain( "get-world-name: One" );
@@ -94,10 +94,10 @@ public class PluginTests
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "echo", "hello n°1" )).ShouldBeTrue();
-            logs.ShouldContain( "echo: hello n°1" );
+            logs.ShouldContain( $"echo: hello n°1 - {context.StartCommandHandlingLocalTime}" );
 
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "echo", "hello n°2", "--upper-case" )).ShouldBeTrue();
-            logs.ShouldContain( "echo: HELLO N°2" );
+            logs.ShouldContain( $"echo: HELLO N°2 - {context.StartCommandHandlingLocalTime}" );
 
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "get-world-name" )).ShouldBeTrue();
             logs.ShouldContain( "get-world-name: One" );

@@ -66,11 +66,20 @@ sealed partial class CommandCollector
         var arguments = ImmutableArray.CreateBuilder<(string Name, string Description)>();
         var options = ImmutableArray.CreateBuilder<(ImmutableArray<string> Names, string Description, bool Multiple)>();
         var flags = ImmutableArray.CreateBuilder<(ImmutableArray<string> Names, string Description)>();
-        int iP;
+        bool hasCKliEnvParameter = false;
+        int iP = 1;
+        if( parameters.Length > 1 )
+        {
+            if( parameters[1].ParameterType == typeof( CKliEnv ) )
+            {
+                hasCKliEnvParameter = true;
+                iP = 2;
+            }
+        }
         // Arguments: Eats strings until they become optional,
         // or until an array of strings is found,
         // or a boolean is found.
-        for( iP = 1; iP < parameters.Length; iP++ )
+        for( ; iP < parameters.Length; iP++ )
         {
             var p = parameters[iP];
             if( p.ParameterType == typeof( string ) )
@@ -122,6 +131,7 @@ sealed partial class CommandCollector
         var cmd = new ReflectionPluginCommand( typeInfo,
                                                commandPath,
                                                description,
+                                               hasCKliEnvParameter,
                                                arguments.DrainToImmutable(),
                                                options.DrainToImmutable(),
                                                flags.DrainToImmutable(),
@@ -188,6 +198,13 @@ sealed partial class CommandCollector
         {
             if( p.ParameterType != typeof( bool ) )
             {
+                if( p.ParameterType == typeof(CKliEnv) )
+                {
+                    Throw.CKException( $"""
+                    Invalid parameter order. 'CKliEnv {p.Name}' in command method '{typeInfo.TypeName}.{method.Name}'.
+                    The CKliEnv parameter, when specified, must appear as the second argument (after the IActivityMonitor).
+                    """ );
+                }
                 Throw.CKException( $"""
                     Invalid parameter type '{p.ParameterType.Name} {p.Name}' in command method '{typeInfo.TypeName}.{method.Name}'.
                     Only strings without default value (arguments), strings with a default value (options) and boolean (flags) are currently allowed

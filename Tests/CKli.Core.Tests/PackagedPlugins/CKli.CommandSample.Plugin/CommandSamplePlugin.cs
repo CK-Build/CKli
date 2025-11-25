@@ -29,13 +29,14 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
     [CommandPath( "test echo" )]
     [Description( "Echoes the message, optionnaly in upper case." )]
     public bool Echo( IActivityMonitor monitor,
+                      CKliEnv context,
                       [Description("The message to write.")]
                       string message,
                       [Description("Writes the message in upper case.")]
                       bool upperCase )
     {
         var m = upperCase ? message.ToUpperInvariant() : message;
-        monitor.Info( $"echo: {m}" );
+        monitor.Info( $"echo: {m} - {context.StartCommandHandlingLocalTime}" );
         Console.WriteLine( m );
         return true;
     }

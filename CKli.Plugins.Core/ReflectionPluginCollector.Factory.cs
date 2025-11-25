@@ -232,6 +232,7 @@ sealed partial class ReflectionPluginCollector
             offset += 8;
             AppendSourceString( b.Append( ' ', offset ), c.CommandPath ).Append( ',' ).AppendLine();
             AppendSourceString( b.Append( ' ', offset ), c.Description ).Append( ',' ).AppendLine();
+            b.Append( ' ', offset ).Append( c.HasCKliEnvParameter ? "true," : "false," ).AppendLine();
 
             // Arguments
             b.Append( ' ', offset ).Append( "arguments: [" ).AppendLine();
@@ -330,6 +331,10 @@ sealed partial class ReflectionPluginCollector
             {
                 b.Append( "((" ).Append( c.PluginTypeInfo.TypeName ).Append( ")Instance)." ).Append( c.MethodName ).Append( '(' ).AppendLine();
                 b.Append( ' ', offset ).Append( "monitor" );
+                if( c.HasCKliEnvParameter )
+                {
+                    b.Append( ", context" );
+                }
                 for( int i = 0; i < c.Arguments.Length; i++ )
                 {
                     b.Append( ", a" ).Append( i );

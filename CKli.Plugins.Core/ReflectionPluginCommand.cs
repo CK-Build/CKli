@@ -13,13 +13,14 @@ sealed class ReflectionPluginCommand : PluginCommand
     public ReflectionPluginCommand( IPluginTypeInfo typeInfo,
                                     string commandPath,
                                     string description,
+                                    bool hasCKliEnvParameter,
                                     ImmutableArray<(string Name, string Description)> arguments,
                                     ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
                                     ImmutableArray<(ImmutableArray<string> Names, string Description)> flags,
                                     MethodInfo method,
                                     int parameterCount,
                                     MethodAsyncReturn returnType )
-        : base( typeInfo, commandPath, description, arguments, options, flags, method.Name, returnType )
+        : base( typeInfo, commandPath, description, hasCKliEnvParameter, arguments, options, flags, method.Name, returnType )
     {
         _method = method;
         _parameterCount = parameterCount;
@@ -30,6 +31,10 @@ sealed class ReflectionPluginCommand : PluginCommand
         var args = new object?[_parameterCount];
         args[0] = monitor;
         int iParam = 1;
+        if( HasCKliEnvParameter )
+        {
+            args[iParam++] = context;
+        }
         for( int i = 0; i < Arguments.Length; i++ )
         {
             args[iParam++] = cmdLine.EatArgument();
