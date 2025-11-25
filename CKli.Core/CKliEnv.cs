@@ -1,4 +1,5 @@
 using CK.Core;
+using LibGit2Sharp;
 using System;
 
 namespace CKli.Core;
@@ -9,7 +10,7 @@ namespace CKli.Core;
 /// <see cref="ChangeDirectory(NormalizedPath)"/> is used to change the <see cref="CurrentDirectory"/> (and potentially the <see cref="CurrentStackPath"/>).
 /// <para>
 /// This object is not really immutable: <see cref="StartCommandHandlingLocalTime"/> and <see cref="StartCommandHandlingUtc"/> are internally updated:
-/// command handlers use this to rely on a shared time for the currently executed command.
+/// command handlers use this to rely on a shared time for the currently executed command and <see cref="Committer"/> uses it. 
 /// </para>
 /// </summary>
 public sealed class CKliEnv
@@ -19,6 +20,7 @@ public sealed class CKliEnv
     readonly NormalizedPath _currentDirectory;
     readonly NormalizedPath _currentStackPath;
     DateTimeOffset _startCommandHandlingLocalTime;
+    Signature? _committer;
 
     internal CKliEnv( IScreen screen,
                       ISecretsStore secretsStore,
@@ -104,4 +106,22 @@ public sealed class CKliEnv
     /// </summary>
     public DateTimeOffset StartCommandHandlingLocalTime => _startCommandHandlingLocalTime;
 
+    /// <summary>
+    /// Gets the git signature of "CKli" ("none" email) with <see cref="Signature.When"/>
+    /// that is this <see cref="StartCommandHandlingLocalTime"/>.
+    /// <para>
+    /// This should be used as the committer identity but may be used a the author as well.
+    /// </para>
+    /// </summary>
+    public Signature Committer
+    {
+        get
+        {
+            if( _committer == null || _committer.When != _startCommandHandlingLocalTime )
+            {
+                _committer = new Signature( "CKli", "none", _startCommandHandlingLocalTime );
+            }
+            return _committer;
+        }
+    }
 }
