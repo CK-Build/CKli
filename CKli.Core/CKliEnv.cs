@@ -110,7 +110,7 @@ public sealed class CKliEnv
     /// Gets the git signature of "CKli" ("none" email) with <see cref="Signature.When"/>
     /// that is this <see cref="StartCommandHandlingLocalTime"/>.
     /// <para>
-    /// This should be used as the committer identity but may be used a the author as well.
+    /// This should be used as the committer identity but may be also used as the author.
     /// </para>
     /// </summary>
     public Signature Committer

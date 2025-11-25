@@ -600,6 +600,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
                            out List<string>? remainingUntrackedFiles,
                            bool tryDeleteUntrackedFiles = true )
     {
+        using var _ = monitor.OpenInfo( $"Hard reset of '{DisplayPath}'." );
         remainingUntrackedFiles = null;
         try
         {
@@ -610,7 +611,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
             {
                 if( tryDeleteUntrackedFiles )
                 {
-                    using( monitor.OpenTrace( $"ResetHard: Attempting to delete {untrackedCount} untracked files." ) )
+                    using( monitor.OpenTrace( $"Attempting to delete {untrackedCount} untracked files." ) )
                     {
                         foreach( var e in status.Untracked )
                         {
