@@ -260,9 +260,10 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="branchName">The branch name.</param>
     /// <param name="createLocalLogLevel">Log level to log branch creation.</param>
-    public void EnsureBranch( IActivityMonitor monitor, string branchName, LogLevel createLocalLogLevel = LogLevel.Info )
+    /// <returns>The branch.</returns>
+    public Branch EnsureBranch( IActivityMonitor monitor, string branchName, LogLevel createLocalLogLevel = LogLevel.Info )
     {
-        DoEnsureBranch( monitor, _git, branchName, createLocalLogLevel, DisplayPath, out var _ );
+        return DoEnsureBranch( monitor, _git, branchName, createLocalLogLevel, DisplayPath, out var _ );
     }
 
     /// <summary>
