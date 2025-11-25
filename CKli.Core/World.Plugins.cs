@@ -18,14 +18,14 @@ public sealed partial class World
         }
     }
 
-    internal bool SetPluginCompilationMode( IActivityMonitor monitor, PluginCompilationMode mode )
+    internal bool SetPluginCompileMode( IActivityMonitor monitor, PluginCompileMode mode )
     {
-        Throw.DebugAssert( mode != DefinitionFile.CompilationMode );
+        Throw.DebugAssert( mode != DefinitionFile.CompileMode );
         if( _pluginMachinery != null )
         {
-            return _pluginMachinery.SetPluginCompilationMode( monitor, this, mode );
+            return _pluginMachinery.SetPluginCompileMode( monitor, this, mode );
         }
-        _definitionFile.SetPluginCompilationMode( monitor, mode );
+        _definitionFile.SetPluginCompileMode( monitor, mode );
         return true;
     }
 

@@ -29,10 +29,10 @@ sealed class CKliPlugin : Command
                                                                     CommandLineArguments cmdLine )
     {
         string? sCompileMode = cmdLine.EatSingleOption( "--compile-mode" );
-        PluginCompilationMode? compileMode = default;
+        PluginCompileMode? compileMode = default;
         if( sCompileMode != null )
         {
-            if( !Enum.TryParse<PluginCompilationMode>( sCompileMode, ignoreCase: true, out var mode ) )
+            if( !Enum.TryParse<PluginCompileMode>( sCompileMode, ignoreCase: true, out var mode ) )
             {
                 monitor.Error( $"Invalid '--compile-mode'. Must be None, Debug or Release." );
             }
@@ -44,7 +44,7 @@ sealed class CKliPlugin : Command
 
     static bool Plugin( IActivityMonitor monitor,
                         CKliEnv context,
-                        PluginCompilationMode? compileMode )
+                        PluginCompileMode? compileMode )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -53,8 +53,8 @@ sealed class CKliPlugin : Command
         try
         {
             if( compileMode.HasValue
-                && compileMode.Value != world.DefinitionFile.CompilationMode
-                && !world.SetPluginCompilationMode( monitor, compileMode.Value ) )
+                && compileMode.Value != world.DefinitionFile.CompileMode
+                && !world.SetPluginCompileMode( monitor, compileMode.Value ) )
             {
                 return false;
             }

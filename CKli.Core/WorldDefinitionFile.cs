@@ -18,7 +18,7 @@ public sealed class WorldDefinitionFile
     readonly LocalWorldName _world;
     List<(NormalizedPath, Uri)>? _layout;
     Dictionary<string, (XElement Config, bool IsDisabled)>? _pluginsConfiguration;
-    PluginCompilationMode? _compilationMode;
+    PluginCompileMode? _compileMode;
     bool _allowEdit;
     bool _isDirty;
 
@@ -88,24 +88,24 @@ public sealed class WorldDefinitionFile
     public XElement Plugins => _plugins;
 
     /// <summary>
-    /// Gets &lt;Plugins CompilationMode="..." /&gt;.
+    /// Gets &lt;Plugins CompileMode="..." /&gt;.
     /// It must exactly be set to "Debug" or "None", any other value (including the lack of attribute)
-    /// is <see cref="PluginCompilationMode.Release"/>.
+    /// is <see cref="PluginCompileMode.Release"/>.
     /// </summary>
-    public PluginCompilationMode CompilationMode
+    public PluginCompileMode CompileMode
     {
         get
         {
-            if( !_compilationMode.HasValue )
+            if( !_compileMode.HasValue )
             {
-                _compilationMode = _plugins.Attribute( _xCompilationMode )?.Value switch
+                _compileMode = _plugins.Attribute( _xCompileMode )?.Value switch
                 {
-                    "Debug" => PluginCompilationMode.Debug,
-                    "None" => PluginCompilationMode.None,
-                    _ => PluginCompilationMode.Release
+                    "Debug" => PluginCompileMode.Debug,
+                    "None" => PluginCompileMode.None,
+                    _ => PluginCompileMode.Release
                 };
             }
-            return _compilationMode.Value;
+            return _compileMode.Value;
         }
     }
 
@@ -223,12 +223,12 @@ public sealed class WorldDefinitionFile
         return Util.CreateDisposableAction( () => _allowEdit = false );
     }
 
-    internal void SetPluginCompilationMode( IActivityMonitor monitor, PluginCompilationMode mode )
+    internal void SetPluginCompileMode( IActivityMonitor monitor, PluginCompileMode mode )
     {
         using( StartEdit() )
         {
-            _plugins.SetAttributeValue( _xCompilationMode, mode != PluginCompilationMode.Release ? mode.ToString() : null );
-            _compilationMode = mode;
+            _plugins.SetAttributeValue( _xCompileMode, mode != PluginCompileMode.Release ? mode.ToString() : null );
+            _compileMode = mode;
         }
     }
 
@@ -412,7 +412,7 @@ public sealed class WorldDefinitionFile
 
     static readonly XName _xPlugins = XNamespace.None + "Plugins";
     static readonly XName _xDisabled = XNamespace.None + "Disabled";
-    static readonly XName _xCompilationMode = XNamespace.None + "CompilationMode";
+    static readonly XName _xCompileMode = XNamespace.None + "CompileMode";
     static readonly XName _xRepository = XNamespace.None + "Repository";
     static readonly XName _xFolder = XNamespace.None + "Folder";
     static readonly XName _xName = XNamespace.None + "Name";

@@ -19,7 +19,7 @@ public sealed partial class PluginMachinery
             }
         }
 
-        public PluginCompilationMode CompilationMode => PluginCompilationMode.Release;
+        public PluginCompileMode CompileMode => PluginCompileMode.Release;
 
         public PluginCollection Create( IActivityMonitor monitor, World world ) => new EmptyPluginCollection();
 

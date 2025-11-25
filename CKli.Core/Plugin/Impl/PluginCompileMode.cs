@@ -3,7 +3,7 @@ namespace CKli.Core;
 /// <summary>
 /// Defines how plugins are handled.
 /// </summary>
-public enum PluginCompilationMode
+public enum PluginCompileMode
 {
     /// <summary>
     /// Plugins are not compiled (uses reflection).

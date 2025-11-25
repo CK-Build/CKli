@@ -39,7 +39,7 @@ sealed partial class ReflectionPluginCollector
             return PluginCollectionImpl.CreateAndBindCommands( instantiated, _pluginInfos, _commands, _pluginCommands );
         }
 
-        public PluginCompilationMode CompilationMode => PluginCompilationMode.None;
+        public PluginCompileMode CompileMode => PluginCompileMode.None;
 
         public void Dispose()
         {
@@ -103,12 +103,12 @@ sealed partial class ReflectionPluginCollector
                 }
                 
             #if DEBUG
-                public PluginCompilationMode CompilationMode => PluginCompilationMode.Debug;
+                public PluginCompileMode CompileMode => PluginCompileMode.Debug;
             #else
-                public PluginCompilationMode CompilationMode => PluginCompilationMode.Release;
+                public PluginCompileMode CompileMode => PluginCompileMode.Release;
             #endif
 
-                public string GenerateCode() => throw new InvalidOperationException( "CompilationMode is not PluginCompilationMode.None" );
+                public string GenerateCode() => throw new InvalidOperationException( "CompileMode is not PluginCompileMode.None" );
 
                 public PluginCollection Create( IActivityMonitor monitor, World world )
                 {

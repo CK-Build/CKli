@@ -200,12 +200,12 @@ public sealed partial class PluginMachinery
             return false;
         }
         // Decide whether a recompilation is required. 
-        if( pluginFactory.CompilationMode != _definitionFile.CompilationMode )
+        if( pluginFactory.CompileMode != _definitionFile.CompileMode )
         {
-            if( _definitionFile.CompilationMode == PluginCompilationMode.None )
+            if( _definitionFile.CompileMode == PluginCompileMode.None )
             {
                 monitor.Trace( """
-                    Deleting Compiled plugins file (CompilationMode = None).
+                    Deleting Compiled plugins file (CompileMode = None).
                     CKli.Plugins will be recompiled without compiled plugins. Only reflection will be used for subsequent loads.
                     """ );
                 if( !FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile ) )
@@ -215,10 +215,10 @@ public sealed partial class PluginMachinery
             }
             else
             {
-                if( pluginFactory.CompilationMode == PluginCompilationMode.None )
+                if( pluginFactory.CompileMode == PluginCompileMode.None )
                 {
                     monitor.Trace( $"""
-                        Generating Compiled plugins file (CompilationMode = {_definitionFile.CompilationMode}).
+                        Generating Compiled plugins file (CompileMode = {_definitionFile.CompileMode}).
                         CKli.Plugins will be recompiled with compiled plugins.
                         """ );
                     File.WriteAllText( CKliCompiledPluginsFile, pluginFactory.GenerateCode() );
@@ -226,8 +226,8 @@ public sealed partial class PluginMachinery
                 else
                 {
                     monitor.Trace( $"""
-                        CKli.Plugins is compiled in '{pluginFactory.CompilationMode}'.
-                        Recompiling it in '{_definitionFile.CompilationMode}'.
+                        CKli.Plugins is compiled in '{pluginFactory.CompileMode}'.
+                        Recompiling it in '{_definitionFile.CompileMode}'.
                         """ );
                 }
             }
@@ -361,7 +361,7 @@ public sealed partial class PluginMachinery
         var args = new StringBuilder( "build ", 256 );
         args.Append( CKliPluginsCSProj.LastPart );
         args.Append( " --tl:off" );
-        args.Append( " -c " ).Append( _definitionFile.CompilationMode == PluginCompilationMode.Debug ? "Debug" : "Release" );
+        args.Append( " -c " ).Append( _definitionFile.CompileMode == PluginCompileMode.Debug ? "Debug" : "Release" );
         using var gLog = monitor.OpenTrace( $"""
             Compiling '{CKliPluginsCSProj.LastPart}'
             dotnet {args}.
@@ -379,10 +379,10 @@ public sealed partial class PluginMachinery
         return true;
     }
 
-    internal bool SetPluginCompilationMode( IActivityMonitor monitor, World world, PluginCompilationMode mode )
+    internal bool SetPluginCompileMode( IActivityMonitor monitor, World world, PluginCompileMode mode )
     {
-        Throw.DebugAssert( mode != _definitionFile.CompilationMode );
-        _definitionFile.SetPluginCompilationMode( monitor, mode );
+        Throw.DebugAssert( mode != _definitionFile.CompileMode );
+        _definitionFile.SetPluginCompileMode( monitor, mode );
         return OnPluginChanged( monitor, world, false, false ); 
     }
 
@@ -542,9 +542,9 @@ public sealed partial class PluginMachinery
             return false;
         }
         // When plugins change, the 4 possible reasons are:
-        // - SetPluginCompilationMode: This doesn't change anything (at least should not).
-        //                             There's no reason to reload the plugin instances.
-        //                             => reloadPlugins is false.
+        // - SetPluginCompileMode: This doesn't change anything (at least should not).
+        //                         There's no reason to reload the plugin instances.
+        //                         => reloadPlugins is false.
         //
         // - CreatePlugin: The new plugin does nothing (it doesn't touch its empty configuration element)
         //                 and necessarily works. There's no reason to reload the plugin instances.

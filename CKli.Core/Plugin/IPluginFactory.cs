@@ -23,11 +23,11 @@ public interface IPluginFactory : IDisposable
     /// <summary>
     /// Gets this factory compilation mode.
     /// </summary>
-    PluginCompilationMode CompilationMode { get; }
+    PluginCompileMode CompileMode { get; }
 
     /// <summary>
     /// Generates the CompiledPlugins code.
-    /// Must be called only when <see cref="CompilationMode"/> is <see cref="PluginCompilationMode.None"/>.
+    /// Must be called only when <see cref="CompileMode"/> is <see cref="PluginCompileMode.None"/>.
     /// </summary>
     /// <returns>The static class CompiledPlugins source code.</returns>
     string GenerateCode();
