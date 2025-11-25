@@ -88,8 +88,8 @@ public class PluginTests
             logs.ShouldContain( "get-world-name: one" );
         }
 
-        // ckli plugin --compile-mode None
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "--compile-mode", "None" )).ShouldBeTrue();
+        // ckli plugin --compile-mode none
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "--compile-mode", "none" )).ShouldBeTrue();
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {

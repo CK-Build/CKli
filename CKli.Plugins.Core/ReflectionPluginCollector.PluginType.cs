@@ -92,7 +92,7 @@ sealed partial class ReflectionPluginCollector
                 }
                 else
                 {
-                    _arguments[i] = instantiated[i];
+                    _arguments[i] = instantiated[iInstance];
                 }
             }
             return _ctor.Invoke( _arguments );

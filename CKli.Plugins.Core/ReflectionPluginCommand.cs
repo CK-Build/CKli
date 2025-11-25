@@ -28,20 +28,22 @@ sealed class ReflectionPluginCommand : PluginCommand
     protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
     {
         var args = new object?[_parameterCount];
+        args[0] = monitor;
+        int iParam = 1;
         for( int i = 0; i < Arguments.Length; i++ )
         {
-            args[i] = cmdLine.EatArgument();
+            args[iParam++] = cmdLine.EatArgument();
         }
         for( int i = 0; i < Options.Length; i++ )
         {
             var o = Options[i];
-            args[i + Arguments.Length] = o.Multiple
+            args[iParam++] = o.Multiple
                                             ? cmdLine.EatMultipleOption( o.Names )
                                             : cmdLine.EatSingleOption( o.Names );
         }
         for( int i = 0; i < Flags.Length; i++ )
         {
-            args[i + Arguments.Length + Options.Length] = cmdLine.EatFlag( Flags[i].Names );
+            args[iParam++] = cmdLine.EatFlag( Flags[i].Names );
         }
         if( !cmdLine.Close( monitor ) ) return ValueTask.FromResult( false );
         switch( ReturnType )
