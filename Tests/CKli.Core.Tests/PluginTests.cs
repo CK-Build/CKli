@@ -86,11 +86,25 @@ public class PluginTests
 
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "get-world-name", "-l" )).ShouldBeTrue();
             logs.ShouldContain( "get-world-name: one" );
-
         }
 
-        // ckli plugin remove CommandSample
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "remove", "CommandSample" )).ShouldBeTrue();
+        // ckli plugin --compile-mode None
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "--compile-mode", "None" )).ShouldBeTrue();
+
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "echo", "hello n°1" )).ShouldBeTrue();
+            logs.ShouldContain( "echo: hello n°1" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "echo", "hello n°2", "--upper-case" )).ShouldBeTrue();
+            logs.ShouldContain( "echo: HELLO N°2" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "get-world-name" )).ShouldBeTrue();
+            logs.ShouldContain( "get-world-name: One" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "get-world-name", "-l" )).ShouldBeTrue();
+            logs.ShouldContain( "get-world-name: one" );
+        }
 
     }
 
