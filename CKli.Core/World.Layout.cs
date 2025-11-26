@@ -237,7 +237,7 @@ sealed partial class World
                 }
                 else
                 {
-                    var repo = world.CreateRepo( world.Layout.IndexOf( e => e.Path == c.Path ), cloned );
+                    var repo = world.CreateRepo( monitor, world.Layout.IndexOf( e => e.Path == c.Path ), cloned );
                     newClones ??= new List<Repo>();
                     newClones.Add( repo );
                 }

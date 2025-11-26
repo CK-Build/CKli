@@ -12,14 +12,16 @@ public sealed class Repo
     // World.Dispose() disposes the Git repository.
     internal readonly GitRepository _git;
     readonly int _index;
+    readonly ulong _ckliRepoId;
     internal readonly Repo? _nextRepo;
     GitRepository.SimpleStatusInfo _status;
 
-    internal Repo( World world, GitRepository git, int index, Repo? nextRepo )
+    internal Repo( World world, GitRepository git, int index, ulong ckliRepoId, Repo? nextRepo )
     {
         _world = world;
         _git = git;
         _index = index;
+        _ckliRepoId = ckliRepoId;
         _nextRepo = nextRepo;
     }
 
@@ -71,6 +73,20 @@ public sealed class Repo
     /// Gets the index of this Repo in the World according to <see cref="WorldDefinitionFile.RepoOrder"/>.
     /// </summary>
     public int Index => _index;
+
+    /// <summary>
+    /// Gets a unique identifier (randomly generated) for this Repo.
+    /// <para>
+    /// This is stored in the git repository in the "CKli-Repo" annotated tag: this identifier is independent
+    /// of any names (origin url, name of the stack, etc.): it should be used as a the identifier of a Repo
+    /// when data must be externally associated to it.
+    /// </para>
+    /// <para>
+    /// The "CKli-Repo" tag also contains the <see cref="StackRepository.OriginUrl"/> of the stack that contains
+    /// this Repo. The tag is updated if the Stack url changes (this is currently only for information). 
+    /// </para>
+    /// </summary>
+    public ulong CKliRepoId => _ckliRepoId;
 
     /// <summary>
     /// Pull-Merge the current head from the remote using the default fast-forward strategy

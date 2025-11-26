@@ -45,13 +45,20 @@ public sealed partial class StackRepository : IDisposable
 
     readonly GitRepository _git;
     readonly NormalizedPath _stackRoot;
-    readonly ISecretsStore _secretsStore;
+    readonly CKliEnv _context;
     readonly NormalizedPath _localProxyRepositoriesPath;
     // No DuplicatePrefix here.
     readonly string _stackName;
     LocalWorldName? _defaultWorldName;
     ImmutableArray<LocalWorldName> _worldNames;
     World? _world;
+
+    /// <summary>
+    /// Internal access to the CKliEnv: this is only used to obtain the <see cref="CKliEnv.Committer"/> when
+    /// initializing "CKli-Repo" tag. CKliEnv must be parameter injected everywhere it is needed for better
+    /// maintanability.
+    /// </summary>
+    internal CKliEnv Context => _context;
 
     /// <summary>
     /// Gets the root path of the stack (the parent folder of the ".PrivateStack" or ".PublicStack" folder).
@@ -107,7 +114,7 @@ public sealed partial class StackRepository : IDisposable
     /// <summary>
     /// Gets the secrets store.
     /// </summary>
-    public ISecretsStore SecretsStore => _secretsStore;
+    public ISecretsStore SecretsStore => _context.SecretsStore;
 
     /// <summary>
     /// Gets the default world name (no <see cref="WorldName.LTSName"/>).
@@ -240,11 +247,11 @@ public sealed partial class StackRepository : IDisposable
         return result != CommitResult.Error && _git.Push( monitor );
     }
 
-    StackRepository( GitRepository git, in NormalizedPath stackRoot, ISecretsStore secretsStore, string stackName )
+    StackRepository( GitRepository git, in NormalizedPath stackRoot, CKliEnv context, string stackName )
     {
         _git = git;
         _stackRoot = stackRoot;
-        _secretsStore = secretsStore;
+        _context = context;
         _stackName = stackName;
         var originUrl = git.OriginUrl;
         if( originUrl.IsFile )
@@ -310,7 +317,7 @@ public sealed partial class StackRepository : IDisposable
                 }
                 if( !error && git.SetCurrentBranch( monitor, stackBranchName, skipPullStack ) )
                 {
-                    return new StackRepository( git, stackRoot, context.SecretsStore, stackNameFromUrl );
+                    return new StackRepository( git, stackRoot, context, stackNameFromUrl );
                 }
             }
             git.Dispose();
@@ -432,25 +439,29 @@ public sealed partial class StackRepository : IDisposable
     /// from a stack repository.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="secretsStore">The secret key store.</param>
+    /// <param name="context">
+    /// The context. <see cref="CKliEnv.CurrentStackPath"/> must be empty (since the <see cref="StackRoot"/> will be created
+    /// in <see cref="CKliEnv.CurrentDirectory"/>). This context is immutable. To open the newly cloned stack, a new CKLiEnv must be
+    /// obtained (for instance by calling <see cref="CKliEnv.ChangeDirectory(NormalizedPath)"/>).
+    /// </param>
     /// <param name="url">The url of the remote.</param>
     /// <param name="isPublic">Whether this repository is public.</param>
-    /// <param name="parentPath">The path where the root stack folder will be created. Must be rooted.</param>
     /// <param name="allowDuplicateStack">True to create a "DuplicateOf-XX" stack folder if the stack is already available on this machine.</param>
     /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branches in a stack repository.</param>
     /// <returns>The repository or null on error.</returns>
     public static StackRepository? Clone( IActivityMonitor monitor,
-                                          ISecretsStore secretsStore,
+                                          CKliEnv context,
                                           Uri url,
                                           bool isPublic,
-                                          in NormalizedPath parentPath,
                                           bool allowDuplicateStack = false,
                                           string stackBranchName = "main" )
     {
         Throw.CheckNotNullArgument( monitor );
-        Throw.CheckNotNullArgument( secretsStore );
+        Throw.CheckNotNullArgument( context );
+        Throw.CheckArgument( context.CurrentStackPath.IsEmptyPath );
         Throw.CheckNotNullArgument( url );
         Throw.CheckNotNullArgument( stackBranchName );
+        var parentPath = context.CurrentDirectory;
         if( !parentPath.IsRooted
             || parentPath.Parts.Count < 2
             || parentPath.LastPart.Equals( PublicStackName, StringComparison.OrdinalIgnoreCase )
@@ -503,7 +514,7 @@ public sealed partial class StackRepository : IDisposable
 
         NormalizedPath gitPath = stackRoot.AppendPart( isPublic ? PublicStackName : PrivateStackName );
 
-        var stackGitKey = new GitRepositoryKey( secretsStore, url, isPublic );
+        var stackGitKey = new GitRepositoryKey( context.SecretsStore, url, isPublic );
         var git = GitRepository.Clone( monitor,
                                        stackGitKey,
                                        gitPath,
@@ -543,8 +554,8 @@ public sealed partial class StackRepository : IDisposable
                 }
                 SetupNewLocalDirectory( gitPath );
                 Registry.RegisterNewStack( monitor, gitPath, url );
-                var result = new StackRepository( git, stackRoot, secretsStore, stackNameFromUrl );
-                if( CloneWorld( monitor, result, secretsStore, result.DefaultWorldName ) )
+                var result = new StackRepository( git, stackRoot, context, stackNameFromUrl );
+                if( CloneWorld( monitor, result, result.DefaultWorldName ) )
                 {
                     return result;
                 }
@@ -613,7 +624,7 @@ public sealed partial class StackRepository : IDisposable
         }
     }
 
-    static bool CloneWorld( IActivityMonitor monitor, StackRepository stack, ISecretsStore secretsStore, LocalWorldName world )
+    static bool CloneWorld( IActivityMonitor monitor, StackRepository stack, LocalWorldName world )
     {
         var definitionFile = world.LoadDefinitionFile( monitor );
         if( definitionFile == null ) return false;
@@ -625,7 +636,7 @@ public sealed partial class StackRepository : IDisposable
             foreach( var (subPath, url) in layout )
             {
                 using( var r = GitRepository.CloneWorkingFolder( monitor,
-                                                                 new GitRepositoryKey( secretsStore, url, stack.IsPublic ),
+                                                                 new GitRepositoryKey( stack.SecretsStore, url, stack.IsPublic ),
                                                                  world.WorldRoot.Combine( subPath ) ) )
                 {
                     success &= r != null;

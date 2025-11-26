@@ -20,10 +20,9 @@ public class StackRepositoryTests
 
         var remotes = TestEnv.UseReadOnly( "CKt" );
         using var stack = StackRepository.Clone( TestHelper.Monitor,
-                                                 context.SecretsStore,
+                                                 context,
                                                  remotes.StackUri,
                                                  isPublic: true,
-                                                 context.CurrentDirectory,
                                                  allowDuplicateStack: false );
         stack.ShouldNotBeNull();
         stack.StackWorkingFolder.LastPart.ShouldBe( ".PublicStack" );
@@ -43,10 +42,9 @@ public class StackRepositoryTests
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "CKt" );
         using( var stack = StackRepository.Clone( TestHelper.Monitor,
-                                                  context.SecretsStore,
+                                                  context,
                                                   remotes.StackUri,
                                                   isPublic: true,
-                                                  context.CurrentDirectory,
                                                   allowDuplicateStack: false ) )
         {
             stack.ShouldNotBeNull();
@@ -90,10 +88,9 @@ public class StackRepositoryTests
         var remotes = TestEnv.UseReadOnly( "CKt" );
 
         using( var clone = StackRepository.Clone( TestHelper.Monitor,
-                                                  context.SecretsStore,
+                                                  context,
                                                   remotes.StackUri,
                                                   isPublic: true,
-                                                  context.CurrentDirectory,
                                                   allowDuplicateStack: false ) )
         {
             clone.ShouldNotBeNull();
@@ -110,6 +107,10 @@ public class StackRepositoryTests
         stack.ShouldNotBeNull();
         world.ShouldNotBeNull();
         error.ShouldBeFalse();
+        var cktCoreRepo = world.GetDefinedRepo( TestHelper.Monitor, inCKt.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core" ) )
+                               .ShouldNotBeNull();
+        ulong cktCoreRepoId = cktCoreRepo.CKliRepoId;
+        cktCoreRepoId.ShouldNotBe( 0UL );
         stack.Dispose();
 
         var inCKtProject = context.ChangeDirectory( "CKt/CK-Core-Projects" );
@@ -117,6 +118,9 @@ public class StackRepositoryTests
         stack.ShouldNotBeNull();
         world.ShouldNotBeNull();
         error.ShouldBeFalse();
+        cktCoreRepo = world.GetDefinedRepo( TestHelper.Monitor, inCKtProject.CurrentDirectory.Combine( "CKt-Core" ) )
+                           .ShouldNotBeNull();
+        cktCoreRepo.CKliRepoId.ShouldBe( cktCoreRepoId );
         stack.Dispose();
 
         var inCKtProjectCore = context.ChangeDirectory( "CKt/CK-Core-Projects/CKt-Core" );
@@ -124,6 +128,8 @@ public class StackRepositoryTests
         stack.ShouldNotBeNull();
         world.ShouldNotBeNull();
         error.ShouldBeFalse();
+        cktCoreRepo = world.GetDefinedRepo( TestHelper.Monitor, inCKtProjectCore.CurrentDirectory ).ShouldNotBeNull();
+        cktCoreRepo.CKliRepoId.ShouldBe( cktCoreRepoId );
         stack.Dispose();
 
         var inCKtProjectCoreTests = context.ChangeDirectory( "CKt/CK-Core-Projects/CKt-Core/Tests" );
@@ -131,6 +137,10 @@ public class StackRepositoryTests
         stack.ShouldNotBeNull();
         world.ShouldNotBeNull();
         error.ShouldBeFalse();
+        // GetDefinedRepo works for sub paths.
+        cktCoreRepo = world.GetDefinedRepo( TestHelper.Monitor, inCKtProjectCoreTests.CurrentDirectory )
+                           .ShouldNotBeNull();
+        cktCoreRepo.CKliRepoId.ShouldBe( cktCoreRepoId );
         stack.Dispose();
     }
 
@@ -141,10 +151,9 @@ public class StackRepositoryTests
         var remotes = TestEnv.UseReadOnly( "CKt" );
 
         using( var clone = StackRepository.Clone( TestHelper.Monitor,
-                                                  context.SecretsStore,
+                                                  context,
                                                   remotes.StackUri,
                                                   isPublic: true,
-                                                  context.CurrentDirectory,
                                                   allowDuplicateStack: false ) )
         {
             clone.ShouldNotBeNull();
@@ -271,10 +280,9 @@ public class StackRepositoryTests
 
         // ckli clone file:///.../CKt-Stack -p Duplicate1 --allow-duplicate
         using( var stack = StackRepository.Clone( TestHelper.Monitor,
-                                                  duplicate1.SecretsStore,
+                                                  duplicate1,
                                                   remotes.StackUri,
                                                   isPublic: true,
-                                                  duplicate1.CurrentDirectory,
                                                   allowDuplicateStack: true ) )
         {
             stack.ShouldNotBeNull();

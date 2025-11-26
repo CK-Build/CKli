@@ -40,7 +40,7 @@ sealed class CKliClone : Command
         {
             return ValueTask.FromResult( false );
         }
-        using( var stack = StackRepository.Clone( monitor, context.SecretsStore, uri, !p, context.CurrentDirectory, a ) )
+        using( var stack = StackRepository.Clone( monitor, context, uri, !p, a ) )
         {
             return ValueTask.FromResult( stack != null );
         }

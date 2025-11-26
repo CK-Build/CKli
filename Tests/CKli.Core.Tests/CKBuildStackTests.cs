@@ -17,7 +17,7 @@ public class CKBuildStackTests
         var display = (StringScreen)context.Screen;
 
         // ckli clone https://github.com/CK-Build/ck-bUILD-stack
-        ( await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", "https://github.com/CK-Build/ck-bUILD-stack" )).ShouldBeTrue();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", "https://github.com/CK-Build/ck-bUILD-stack" )).ShouldBeTrue();
 
         Directory.EnumerateDirectories( context.CurrentDirectory )
             .Select( path => Path.GetFileName( path ) )

@@ -1,8 +1,14 @@
 using CK.Core;
 using CSemVer;
+using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+using static CK.Core.CheckedWriteStream;
 
 namespace CKli.Core;
 
@@ -446,7 +452,7 @@ public sealed partial class World
                                                  _stackRepository.IsPublic );
             if( repository != null )
             {
-                repo = CreateRepo( index, repository );
+                repo = CreateRepo( monitor, index, repository );
             }
         }
         if( repo == null && mustExist )
@@ -466,7 +472,7 @@ public sealed partial class World
                                                          _stackRepository.IsPublic );
                     if( repository != null )
                     {
-                        repo = CreateRepo( index, repository );
+                        repo = CreateRepo( monitor, index, repository );
                     }
                 }
             }
@@ -474,13 +480,69 @@ public sealed partial class World
         return repo;
     }
 
-    Repo CreateRepo( int index, GitRepository repository )
+    Repo CreateRepo( IActivityMonitor monitor, int index, GitRepository repository )
     {
-        Repo? repo = new Repo( this, repository, index, _firstRepo );
+        if( !TryReadCkliRepoTag( monitor, repository, _stackRepository, out var ckliRepoId) )
+        {
+            Span<byte> bytes = MemoryMarshal.AsBytes( new Span<ulong>( ref ckliRepoId ) );
+            do
+            {
+                System.Security.Cryptography.RandomNumberGenerator.Fill( bytes );
+            }
+            while( ckliRepoId == 0 );
+            CreateOrUpdateCkliRepoTag( repository.Repository, _stackRepository, ckliRepoId );
+        }
+        Repo? repo = new Repo( this, repository, index, ckliRepoId, _firstRepo );
         _firstRepo = repo;
         _cachedRepositories[repository.WorkingFolder] = repo;
         _cachedRepositories[repository.OriginUrl.ToString()] = repo;
         return repo;
+
+        static bool TryReadCkliRepoTag( IActivityMonitor monitor, GitRepository git, StackRepository stackRepository, out ulong ckliRepoId )
+        {
+            ckliRepoId = 0L;
+            var message = git.Repository.Tags["CKli-Repo"]?.Annotation?.Message;
+            if( message == null )
+            {
+                monitor.Info( $"No 'CKli-Repo' tag found for '{git.DisplayPath}'. A new CKliRepoId will be created." );
+                return false;
+            }
+            var s = message.AsSpan();
+            if( s.TryMatch( "Id: " )
+                && s.TryMatchInteger( out ckliRepoId )
+                && ckliRepoId != 0UL
+                && s.SkipWhiteSpaces()
+                && s.TryMatch( "Stack: " )
+                && s.TryMatch( stackRepository.OriginUrl.ToString() )
+                && s.SkipWhiteSpaces()
+                && s.Length == 0 )
+            {
+                return true;
+            }
+            var msg = ckliRepoId == 0UL
+                        ? "The message cannot be parsed. A new CKliRepoId will be created."
+                        : $"""
+                        The message contains a Stack that is not '{stackRepository.OriginUrl}'.
+                        It will be updated.
+                        """;
+            monitor.Warn( $"""
+                The 'CKli-Repo' tag in '{git.DisplayPath}' is:
+                {message}
+
+                {msg}
+                """ );
+            return false;
+        }
+
+        static void CreateOrUpdateCkliRepoTag( Repository r, StackRepository stackRepository, ulong ckliRepoId )
+        {
+            r.Tags.Add( "CKli-Repo", r.Head.Tip, stackRepository.Context.Committer, $"""
+                Id: {ckliRepoId}
+                Stack: {stackRepository.OriginUrl}
+
+                """,
+                allowOverwrite: true );
+        }
     }
 
     /// <inheritdoc cref="WorldName.ToString"/>
