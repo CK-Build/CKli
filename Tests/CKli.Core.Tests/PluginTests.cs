@@ -17,6 +17,7 @@ public class PluginTests
     {
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "One" );
+        var display = (StringScreen)context.Screen;
 
         // ckli clone file:///.../One-Stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
@@ -28,13 +29,13 @@ public class PluginTests
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
+            display.Clear();
             // ckli plugin
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin" )).ShouldBeTrue();
 
             logs.ShouldContain( "New 'MyFirstOne' in world 'One' plugin certainly requires some development." );
 
-            var screen = context.Screen.ToString();
-            screen.ShouldContain( """
+            display.ToString().ShouldBe( """
                 1 loaded plugins, 1 configured plugins.
 
                 > MyFirstOne          > <MyFirstOne />
@@ -42,18 +43,43 @@ public class PluginTests
                 │    <source based>   │ 
                 │ Message:
                 │    Message from 'MyFirstOne' plugin.
-                
+                ❰✓❱
+
                 """ );
         }
+
+        display.Clear();
+        // ckli plugin
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "--compile-mode", "Debug" )).ShouldBeTrue();
+
+        display.ToString().ShouldBe( """
+            1 loaded plugins, 1 configured plugins. (CompileMode: Debug)
+
+            > MyFirstOne          > <MyFirstOne />
+            │    Available        │ 
+            │    <source based>   │ 
+            │ Message:
+            │    Message from 'MyFirstOne' plugin.
+            ❰✓❱
+
+            """ );
 
         // ckli plugin remove MyFirstOne
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "remove", "MyFirstOne" )).ShouldBeTrue();
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
+            display.Clear();
             // ckli plugin
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin" )).ShouldBeTrue();
             logs.ShouldNotContain( "New 'MyFirstOne' in world 'One' plugin certainly requires some development." );
+
+            display.ToString().ShouldBe( """
+                0 loaded plugins, 0 configured plugins. (CompileMode: Debug)
+
+                ❰✓❱
+
+                """ );
         }
     }
 
@@ -176,6 +202,7 @@ public class PluginTests
     {
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "WithIssues" );
+        var display = (StringScreen)context.Screen;
 
         // ckli clone file:///.../WithIssues-Stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
@@ -185,7 +212,6 @@ public class PluginTests
 
         TestEnv.EnsurePluginPackage( "CKli.VSSolutionSample.Plugin" );
 
-        var display = (StringScreen)context.Screen;
         // ckli plugin add VSSolutionSample@version
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "add", $"VSSolutionSample@{TestEnv.CKliPluginsCoreVersion}" )).ShouldBeTrue();
 

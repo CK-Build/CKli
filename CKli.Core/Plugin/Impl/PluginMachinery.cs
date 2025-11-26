@@ -360,7 +360,7 @@ public sealed partial class PluginMachinery
     {
         var args = new StringBuilder( "build ", 256 );
         args.Append( CKliPluginsCSProj.LastPart );
-        args.Append( " --tl:off" );
+        args.Append( " --tl:off --nologo" );
         args.Append( " -c " ).Append( _definitionFile.CompileMode == PluginCompileMode.Debug ? "Debug" : "Release" );
         using var gLog = monitor.OpenTrace( $"""
             Compiling '{CKliPluginsCSProj.LastPart}'
@@ -383,7 +383,7 @@ public sealed partial class PluginMachinery
     {
         Throw.DebugAssert( mode != _definitionFile.CompileMode );
         _definitionFile.SetPluginCompileMode( monitor, mode );
-        return OnPluginChanged( monitor, world, false, false ); 
+        return OnPluginChanged( monitor, world, false, true ); 
     }
 
     internal bool CreatePlugin( IActivityMonitor monitor, World world, string shortPluginName, string fullPluginName )
@@ -543,8 +543,9 @@ public sealed partial class PluginMachinery
         }
         // When plugins change, the 4 possible reasons are:
         // - SetPluginCompileMode: This doesn't change anything (at least should not).
-        //                         There's no reason to reload the plugin instances.
-        //                         => reloadPlugins is false.
+        //                         There should be no reason to reload the plugin instances except that the "ckli plugin --compile-mode"
+        //                         displays the plugin infos atfer the mode change.
+        //                         => reloadPlugins is true.
         //
         // - CreatePlugin: The new plugin does nothing (it doesn't touch its empty configuration element)
         //                 and necessarily works. There's no reason to reload the plugin instances.
