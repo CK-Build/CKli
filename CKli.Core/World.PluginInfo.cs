@@ -62,9 +62,13 @@ public sealed partial class World
                          .ToList();
 
         headerText = $"{loaded.Count} loaded plugins, {config.Count} configured plugins.";
+        if( _definitionFile.CompileMode != PluginCompileMode.Release )
+        {
+            headerText += $" (CompileMode: {_definitionFile.CompileMode})";
+        }
         // Even if something fails, we want to display the plugin information.
         return loaded.Count == 0 || _events.SafeRaiseEvent( monitor, new PluginInfoEvent( monitor, this, infos ) );
     }
 
-    internal string? GetDisabledPluginsHeader() => _plugins == null ? "No configured PluginLoader. Plugins are disabled." : null;
+    internal string? GetDisabledPluginsHeader() => _plugins == null ? "Failed to load Plugins." : null;
 }
