@@ -1,7 +1,9 @@
 using CK.Core;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
 
 namespace CKli.Core;
 
@@ -10,89 +12,108 @@ namespace CKli.Core;
 /// </summary>
 public static class ProcessRunner
 {
-    static readonly CKTrait _stdErrTag = ActivityMonitor.Tags.Register( "StdErr" );
-    static readonly CKTrait _stdOutTag = ActivityMonitor.Tags.Register( "StdOut" );
+    /// <summary>
+    /// Tag for <see cref="Process.StandardError"/> log lines.
+    /// </summary>
+    public static readonly CKTrait StdErrTag = ActivityMonitor.Tags.Register( "StdErr" );
 
     /// <summary>
-    /// Starts and wait for the end of an external process.
+    /// Tag for <see cref="Process.StandardOutput"/> log lines.
+    /// </summary>
+    public static readonly CKTrait StdOutTag = ActivityMonitor.Tags.Register( "StdOut" );
+
+    /// <summary>
+    /// Starts and wait for the end of an external process, optionally handles a tiemout and
+    /// standard output and/or error capture. Always log the output and error as <see cref="LogLevel.Trace"/>
+    /// and <see cref="StdOutTag"/> or <see cref="StdErrTag"/>.
+    /// <para>
+    /// This is a very basic helper that suits our needs.
+    /// For more complex needs, you'd better use Cli.Wrap (https://github.com/Tyrrrz/CliWrap).
+    /// </para>
     /// </summary>
     /// <param name="logger">The logger to use. Will receive standard errors and outputs.</param>
     /// <param name="fileName">The file name to run.</param>
     /// <param name="arguments">Command line arguments.</param>
     /// <param name="workingDirectory">Working directory.</param>
     /// <param name="environmentVariables">Optional environment variables to configure.</param>
-    /// <returns>The exit status code.</returns>
-    public static int RunProcess( IActivityLineEmitter logger,
-                                  string fileName,
-                                  string arguments,
-                                  string workingDirectory,
-                                  Dictionary<string, string>? environmentVariables )
-    {
-        using Process process = DoRun( logger, fileName, arguments, workingDirectory, environmentVariables, Encoding.UTF8 );
-        process.WaitForExit();
-        return process.ExitCode;
-    }
-
-
-    /// <summary>
-    /// Starts and wait for the end of an external process until a <paramref name="timemout"/> occurs.
-    /// </summary>
-    /// <param name="logger">The logger to use. Will receive standard errors and outputs.</param>
-    /// <param name="fileName">The file name to run.</param>
-    /// <param name="arguments">Command line arguments.</param>
-    /// <param name="workingDirectory">Working directory.</param>
-    /// <param name="environmentVariables">Optional environment variables to configure.</param>
-    /// <param name="timemout">Timeout in milliseconds.</param>
-    /// <returns>The exit status code.</returns>
+    /// <param name="timeout">Optional timeout in milliseconds.</param>
+    /// <param name="stdOut">Optional standard output collector.</param>
+    /// <param name="stdErr">Optional standard error collector.</param>
+    /// <returns>The exit status code or null if timeout occured.</returns>
     public static int? RunProcess( IActivityLineEmitter logger,
                                    string fileName,
                                    string arguments,
                                    string workingDirectory,
-                                   Dictionary<string, string>? environmentVariables,
-                                   int timemout )
-    {
-        using Process process = DoRun( logger, fileName, arguments, workingDirectory, environmentVariables, Encoding.UTF8 );
-        bool exited = process.WaitForExit( timemout );
-        if( exited )
-        {
-            // Ensure completed asynchronous event handling.
-            // See https://github.com/NuGet/Home/issues/10189
-            process.WaitForExit();
-        }
-        return exited ? process.ExitCode : null;
-    }
-
-    static Process DoRun( IActivityLineEmitter logger,
-                          string fileName,
-                          string arguments,
-                          string workingDirectory,
-                          Dictionary<string, string>? environmentVariables,
-                          Encoding outputEncoding )
+                                   Dictionary<string, string>? environmentVariables = null,
+                                   int timeout = Timeout.Infinite,
+                                   StringBuilder? stdOut = null,
+                                   StringBuilder? stdErr = null )
     {
         var info = new ProcessStartInfo( fileName, arguments )
         {
             WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            StandardOutputEncoding = outputEncoding,
-            StandardErrorEncoding = outputEncoding
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
         };
         if( environmentVariables != null && environmentVariables.Count > 0 )
         {
             foreach( var kv in environmentVariables ) info.EnvironmentVariables.Add( kv.Key, kv.Value );
         }
-        var process = new Process { StartInfo = info };
-        process.OutputDataReceived += ( sender, data ) =>
+        using var process = new Process { StartInfo = info };
+        if( stdOut == null )
         {
-            if( data.Data != null ) logger.Trace( _stdOutTag, data.Data );
-        };
-        process.ErrorDataReceived += ( sender, data ) =>
+            process.OutputDataReceived += ( sender, data ) =>
+            {
+                if( data.Data != null ) logger.Trace( StdOutTag, data.Data );
+            };
+        }
+        else
         {
-            if( data.Data != null ) logger.Trace( _stdErrTag, data.Data );
-        };
+            process.OutputDataReceived += ( sender, data ) =>
+            {
+                if( data.Data != null )
+                {
+                    logger.Trace( StdOutTag, data.Data );
+                    stdOut.AppendLine( data.Data );
+                }
+            };
+        }
+        if( stdErr == null )
+        {
+            process.ErrorDataReceived += ( sender, data ) =>
+            {
+                if( data.Data != null ) logger.Trace( StdErrTag, data.Data );
+            };
+        }
+        else
+        {
+            process.ErrorDataReceived += ( sender, data ) =>
+            {
+                if( data.Data != null )
+                {
+                    logger.Trace( StdErrTag, data.Data );
+                    stdErr.AppendLine( data.Data );
+                }
+            };
+        }
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
-        return process;
+        if( timeout > 0 )
+        {
+            bool exited = process.WaitForExit( timeout );
+            if( exited )
+            {
+                // Ensure completed asynchronous event handling.
+                // See https://github.com/NuGet/Home/issues/10189
+                process.WaitForExit();
+            }
+            return exited ? process.ExitCode : null;
+        }
+        process.WaitForExit();
+        return process.ExitCode;
     }
+
 }

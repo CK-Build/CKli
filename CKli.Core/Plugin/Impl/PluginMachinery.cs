@@ -366,11 +366,10 @@ public sealed partial class PluginMachinery
             Compiling '{CKliPluginsCSProj.LastPart}'
             dotnet {args}.
             """ );
-        int exitCode = ProcessRunner.RunProcess( monitor.ParallelLogger,
-                                                 "dotnet",
-                                                 args.ToString(),
-                                                 CKliPluginsFolder,
-                                                 environmentVariables: null );
+        int? exitCode = ProcessRunner.RunProcess( monitor.ParallelLogger,
+                                                  "dotnet",
+                                                  args.ToString(),
+                                                  CKliPluginsFolder );
         if( exitCode != 0 )
         {
             monitor.CloseGroup( $"Failed to build '{Name}' solution. Exit code = '{exitCode}'." );
