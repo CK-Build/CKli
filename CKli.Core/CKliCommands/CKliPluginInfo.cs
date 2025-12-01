@@ -5,11 +5,11 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliPlugin : Command
+sealed class CKliPluginInfo : Command
 {
-    public CKliPlugin()
+    public CKliPluginInfo()
         : base( null,
-                "plugin",
+                "plugin info",
                 "Handles CKli plugins compilation mode and provides informations.",
                 arguments: [],
                 options: [(["--compile-mode"],

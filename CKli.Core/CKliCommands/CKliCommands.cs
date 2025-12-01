@@ -16,26 +16,42 @@ public static class CKliCommands
 
     static CKliCommands()
     {
+        var cmds = new Dictionary<string, Command?>();
+        Add( cmds, new CKliLog() );
+        Add( cmds, new CKliClone() );
+        Add( cmds, new CKliIssue() );
+        Add( cmds, new CKliExec() );
+        Add( cmds, new CKliPull() );
+        Add( cmds, new CKliFetch() );
+        Add( cmds, new CKliPush() );
+        cmds.Add( "layout", null );
+        Add( cmds, new CKliLayoutFix() );
+        Add( cmds, new CKliLayoutXif() );
+        cmds.Add( "repo", null );
+        Add( cmds, new CKliRepoList() );
+        Add( cmds, new CKliRepoAdd() );
+        Add( cmds, new CKliRepoRemove() );
+        cmds.Add( "plugin", null );
+        Add( cmds, new CKliPluginInfo() );
+        Add( cmds, new CKliPluginCreate() );
+        Add( cmds, new CKliPluginRemove() );
+        Add( cmds, new CKliPluginAdd() );
+        Add( cmds, new CKliPluginEnable() );
+        Add( cmds, new CKliPluginDisable() );
+
+        static void Add( Dictionary<string, Command?> commands, Command c ) => commands.Add( c.CommandPath, c );
+
+        _commands = CommandNamespace.UnsafeCreate( cmds );
+
+#if DEBUG
         var c = new CommandNamespaceBuilder();
-        c.Add( new CKliLog() );
-        c.Add( new CKliClone() );
-        c.Add( new CKliIssue() );
-        c.Add( new CKliExec() );
-        c.Add( new CKliPull() );
-        c.Add( new CKliFetch() );
-        c.Add( new CKliPush() );
-        c.Add( new CKliLayoutFix() );
-        c.Add( new CKliLayoutXif() );
-        c.Add( new CKliRepo() );
-        c.Add( new CKliRepoAdd() );
-        c.Add( new CKliRepoRemove() );
-        c.Add( new CKliPlugin() );
-        c.Add( new CKliPluginCreate() );
-        c.Add( new CKliPluginRemove() );
-        c.Add( new CKliPluginAdd() );
-        c.Add( new CKliPluginEnable() );
-        c.Add( new CKliPluginDisable() );
-        _commands = c.Build();
+        foreach( var (path,cmd) in cmds )
+        {
+            if( cmd != null ) c.Add( cmd );
+        }
+        var safeBuild = c.Build();
+        Throw.DebugAssert( _commands.Namespace.Keys.Concatenate() == safeBuild.Namespace.Keys.Concatenate() );
+#endif
     }
 
     /// <summary>
@@ -145,7 +161,7 @@ public static class CKliCommands
                     || cmdLine.FoundCommand == null
                     || cmdLine.HasHelp )
                 {
-                    if( cmdLine.FoundCommand == null && cmdLine.ExpectCommand )
+                    if( cmdLine.FoundCommand == null && cmdLine.ExpectCommand && !cmdLine.HasHelp )
                     {
                         monitor.Error( $"Unknown command '{cmdLine.InitialAsStringArguments}'." );
                     }

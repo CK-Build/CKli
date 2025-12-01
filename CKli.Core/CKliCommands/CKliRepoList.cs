@@ -5,11 +5,11 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliRepo : Command
+sealed class CKliRepoList : Command
 {
-    public CKliRepo()
+    public CKliRepoList()
         : base( null,
-                "repo",
+                "repo list",
                 "Lists the World's Repos folder, current branch name, remote commit diffs and remote origin url.",
                 [], [],
                 [
@@ -51,7 +51,7 @@ sealed class CKliRepo : Command
                          .OrderBy( g => g.Key )
                          .Select( g => new Collapsable(
                              screenType.Text( g.Key )
-                             .AddBelow( screenType.Unit.AddBelow( g.Select( r => r.ToRenderable( screenType, true, true, true ) ) )
+                             .AddBelow( screenType.Unit.AddBelow( g.Select( r => r.ToRenderable( screenType, false, true, true ) ) )
                                                        .TableLayout() ) )
                          ) );
             }

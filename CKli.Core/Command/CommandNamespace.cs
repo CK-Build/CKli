@@ -24,6 +24,13 @@ public sealed class CommandNamespace
     }
 
     /// <summary>
+    /// Initializes a new command namespace without checks.
+    /// This is used by compiled plugins (and by intrinsic CKli commands in Release).
+    /// </summary>
+    /// <param name="commands">The already built command namespace.</param>
+    public static CommandNamespace UnsafeCreate( Dictionary<string, Command?> commands ) => new CommandNamespace( commands );
+
+    /// <summary>
     /// Finds a command from its command path.
     /// </summary>
     /// <param name="commandPath">The command path.</param>
@@ -53,7 +60,10 @@ public sealed class CommandNamespace
         return commands.OrderBy( c => c.CommandPath ).Select( c => new CommandHelp( screenType, c ) ).ToList();
     }
 
-    internal Dictionary<string, Command?> InternalCommands => _commands;
+    /// <summary>
+    /// Gets the commands and the pure namespace entries.
+    /// </summary>
+    public IReadOnlyDictionary<string, Command?> Namespace => _commands;
 
     internal void Clear() => _commands.Clear();
 
@@ -102,5 +112,4 @@ public sealed class CommandNamespace
             cmdLine.SetFoundCommand( cmd, pathCount );
         }
     }
-
 }

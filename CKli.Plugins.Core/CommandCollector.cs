@@ -138,15 +138,8 @@ sealed partial class CommandCollector
                                                method,
                                                parameters.Length,
                                                retType );
-        if( !_commands.TryAdd( cmd, out var exists ) )
-        {
-            Throw.CKException( $"""
-                Duplicate [CommandPath( "{commandPath}" )] on '{cmd}' method.
-                This path is already defined by '{exists}'.
-                """ );
-        }
+        _commands.Add( cmd );
         _pluginCommands.Add( cmd );
-
 
         static string GetDescription( IList<CustomAttributeData> attributes )
         {

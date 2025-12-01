@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 
 namespace CKli;
 
@@ -27,42 +28,48 @@ public sealed class CommandNamespaceBuilder
     public CommandNamespace Build() => new CommandNamespace( _commands );
 
     /// <summary>
-    /// Adds or throw on already existing command.
+    /// Adds or throw on already existing command or if the new command is not below a pure
+    /// namespace.
     /// </summary>
     /// <param name="c">The command to add.</param>
     public void Add( Command c )
     {
-        if( !TryAdd( c, out var conflict ) )
+        if( _commands.TryGetValue( c.CommandPath, out var conflict ) )
         {
-            Throw.InvalidOperationException( $"Command '{c.CommandPath}' is already registered." );
+            if( conflict != null )
+            {
+                Throw.CKException( $"Invalid command '{c.CommandPath}': this command path already exists." );
+            }
+            var prefix = c.CommandPath + ' ';
+            var paths = _commands.Where( kv => kv.Value != null ).Select( kv => kv.Value!.CommandPath )
+                                    .Where( p => p == prefix || p.StartsWith( prefix ) )
+                                    .Order();
+            Throw.CKException( $"""
+                Invalid command '{c.CommandPath}' would hide already registered commands:
+                '{paths.Concatenate( "', '" )}'.
+                """ );
         }
+        // The new command must not appear below an actual command.
+        CheckParentNoCommand( GetPath( c.CommandPath ), c );
+        _commands.Add( c.CommandPath, c );
     }
 
-    /// <summary>
-    /// Tries to add the command.
-    /// </summary>
-    /// <param name="c">The command to add.</param>
-    /// <param name="conflict">The non null existing command on success.</param>
-    /// <returns>True on success, false otherwise.</returns>
-    public bool TryAdd( Command c, [NotNullWhen(false)]out Command? conflict )
+    void CheckParentNoCommand( string? commandPath, Command leaf )
     {
-        if( _commands.TryGetValue( c.CommandPath, out conflict ) )
+        if( commandPath == null ) return;
+        CheckParentNoCommand( GetPath( commandPath ), leaf );
+        if( _commands.TryGetValue( commandPath, out var parentCommand ) )
         {
-            if( conflict == null )
+            if( parentCommand != null )
             {
-                _commands[c.CommandPath] = c;
-                return true;
+                Throw.CKException( $"Command '{leaf.CommandPath}' cannot be defined: '{commandPath}' is an actual command and not a namespace." );
             }
-            return false;
         }
-        _commands.Add( c.CommandPath, c );
-        var parent = GetPath( c.CommandPath );
-        while( parent != null )
+        else
         {
-            if( !_commands.TryAdd( parent, null ) ) break;
-            parent = GetPath( parent );
+            // Declares the namespace.
+            _commands.Add( commandPath, null );
         }
-        return true;
     }
 
     static string? GetPath( string commandPath )

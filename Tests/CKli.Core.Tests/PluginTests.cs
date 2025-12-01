@@ -30,8 +30,8 @@ public class PluginTests
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
             display.Clear();
-            // ckli plugin
-            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin" )).ShouldBeTrue();
+            // ckli plugin info
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "info" )).ShouldBeTrue();
 
             logs.ShouldContain( "New 'MyFirstOne' in world 'One' plugin certainly requires some development." );
 
@@ -49,8 +49,8 @@ public class PluginTests
         }
 
         display.Clear();
-        // ckli plugin
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "--compile-mode", "Debug" )).ShouldBeTrue();
+        // ckli plugin info --compile-mode debug
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "info", "--compile-mode", "debug" )).ShouldBeTrue();
 
         display.ToString().ShouldBe( """
             1 loaded plugins, 1 configured plugins. (CompileMode: Debug)
@@ -70,8 +70,8 @@ public class PluginTests
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
             display.Clear();
-            // ckli plugin
-            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin" )).ShouldBeTrue();
+            // ckli plugin info
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "info" )).ShouldBeTrue();
             logs.ShouldNotContain( "New 'MyFirstOne' in world 'One' plugin certainly requires some development." );
 
             display.ToString().ShouldBe( """
@@ -114,8 +114,8 @@ public class PluginTests
             logs.ShouldContain( "get-world-name: one" );
         }
 
-        // ckli plugin --compile-mode none
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "--compile-mode", "none" )).ShouldBeTrue();
+        // ckli plugin info --compile-mode none
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "info", "--compile-mode", "none" )).ShouldBeTrue();
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {

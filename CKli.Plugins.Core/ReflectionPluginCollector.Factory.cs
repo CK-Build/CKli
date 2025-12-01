@@ -80,12 +80,23 @@ sealed partial class ReflectionPluginCollector
             GeneratePluginCommandsArray( b );
 
             b.Append( """
-                    var commandBuilder = new CommandNamespaceBuilder();
+                    var cmds = new Dictionary<string,Command?>();
                     foreach( var c in pluginCommands )
                     {
-                        commandBuilder.Add( c );
+                        cmds.Add( c.CommandPath, c );
                     }
-                    return new Generated( infos, pluginCommands, commandBuilder.Build() );
+
+            """ );
+
+            foreach( var (path, cmd) in _commands.Namespace )
+            {
+                if( cmd == null )
+                {
+                    b.Append( "       cmds.Add( \"" ).Append( path ).Append("\", null );" ).AppendLine();
+                }
+            }
+            b.Append( """
+                    return new Generated( infos, pluginCommands, CommandNamespace.UnsafeCreate( cmds ) );
                 }
             }
 

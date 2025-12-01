@@ -27,8 +27,8 @@ public class CKBuildStackTests
         context = context.ChangeDirectory( "CK-Build" );
 
         display.Clear();
-        // ckli repo
-        ( await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo" )).ShouldBeTrue();
+        // ckli repo list
+        ( await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo", "list" )).ShouldBeTrue();
         display.ToString().ShouldBe( """
             ··CSemVer-Net···master·↑0↓0·https://github.com/CK-Build/CSemVer-Net·
             ··SGV-Net·······master·↑0↓0·https://github.com/CK-Build/SGV-Net·····
