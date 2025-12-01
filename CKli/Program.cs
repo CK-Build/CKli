@@ -8,7 +8,7 @@ using System.IO;
 
 var arguments = new CommandLineArguments( args );
 
-if( arguments.HasDebugLaunchFlag )
+if( arguments.HasCKliDebugFlag )
 {
     if( !Debugger.IsAttached ) Debugger.Launch();
 }
@@ -54,13 +54,19 @@ await CKliRootEnv.CloseAsync( monitor, arguments ).ConfigureAwait( false );
 
 static ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> GetGlobalOptions()
 {
-    return [(["--path", "-p"], "Sets the working path. This overrides the current directory.", Multiple:false)];
+    return [(["--path", "-p"], """
+        Sets the working path. This overrides the current directory.
+        This must appear at the start of the command: when "--path" or "-p" appears after, this is considered an option of the command.
+        """, Multiple:false)];
 }
 
 static ImmutableArray<(ImmutableArray<string> Names, string Description)> GetGlobalFlags() => [
-        (["--version"], "Displays this CKli version."),
-        (["--screen"], """
-                        Change the screen display. Can be:
+        (["--version, -v"], """
+        Displays this CKli version. 
+        This flag must come first and excludes anything else.
+        """),
+        (["--ckli-screen"], """
+                        Changes the screen display. Can be:
                         - none: No display at all.
                         - no-color (or no_color): Basic display, no animation.
                         - force-ansi: Always consider an Ansi terminal.
@@ -69,7 +75,8 @@ static ImmutableArray<(ImmutableArray<string> Names, string Description)> GetGlo
                         See https://no-color.org/.
                         Any other values are ignored: the default detection is applied.
              """),
-        (["--debug-launch"], "Launches a debugger when starting.")
+        (["--ckli-debug"], "Launches a debugger when starting."),
+        (["--help, -?, -h, ?"], "Displays the help. This must be the last argument.")
     ];
 
 

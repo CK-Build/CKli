@@ -39,7 +39,7 @@ public sealed partial class InteractiveScreen
             {
                 return null;
             }
-            if( line == "debug" || line == "debug-launch" || line == "-debug-launch" )
+            if( line == "debug" || line == "--ckli-debug" || line == "--debug" )
             {
                 if( !Debugger.IsAttached ) Debugger.Launch();
             }

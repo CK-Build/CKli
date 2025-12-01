@@ -12,19 +12,34 @@ namespace CKli.Core;
 /// </summary>
 public sealed class CommandLineArguments
 {
+    static CommandLineArguments? _empty;
+
+    /// <summary>
+    /// A singleton empty command line.
+    /// </summary>
+    public static CommandLineArguments Empty => _empty ??= new CommandLineArguments();
+
     readonly ImmutableArray<string> _initial;
     readonly List<string> _args;
     readonly bool _hasHelp;
-    readonly bool _hasDebugLaunch;
+    readonly bool _hasCKliDebug;
     readonly bool _hasVersion;
     readonly string? _explicitPath;
-    readonly string? _screen;
+    readonly string? _ckliScreen;
     readonly bool _hasInteractive;
     readonly bool _expectCommand;
     string? _initialAsStringArguments;
     Command? _foundCommand;
     HashSet<string>? _optionOrFlagNames;
     ImmutableArray<(string Argument, bool Remaining)> _remainingArguments;
+
+    CommandLineArguments()
+    {
+        _initial = [];
+        _args = [];
+        _initialAsStringArguments = string.Empty;
+        _remainingArguments = [];
+    }
 
     /// <summary>
     /// Initializes a new <see cref="CommandLineArguments"/> from an argument string.
@@ -43,60 +58,121 @@ public sealed class CommandLineArguments
     public CommandLineArguments( string[] arguments )
     {
         _initial = [..arguments];
-        if( arguments.Length > 0
-            && (arguments[0] == "i" || arguments[0] == "interactive") )
+        var args = arguments.AsSpan();
+
+
+        // If there is no argument at all, help is assumed.
+        if( args.Length == 0 )
         {
-            _hasInteractive = true;
-            _args = [.. arguments.Skip( 1 )];
+            _hasHelp = true;
+            _args = [];
         }
         else
         {
-            _args = [.. arguments];
+            // --help, -?, -h or ? must be the last arguments.
+            // Otherwise we consider it to be handled by the command (this enable exec command to use it).
+            _hasHelp = args.IndexOfAny( ["--help", "-?", "-h", "?"] ) == args.Length - 1;
+            if( _hasHelp ) args = args.Slice( 0, args.Length - 1 );
+            if( args.Length > 0 )
+            {
+                // If --version or -v is specified, it must comes first.
+                // In such case, other arguments are simply ignored.
+                // This frees any command to use --version or -v.
+                if( args[0] == "--version" || args[0] == "-v" )
+                {
+                    _hasVersion = true;
+                    args = args.Slice( 0, args.Length - 1 );
+                }
+                else
+                {
+                    Throw.DebugAssert( args.Length > 0 );
+                    // We want to allow:
+                    //  - ckli --path <path> ...
+                    //  - ckli i[nteractive] --path <path> ...
+                    //  - ckli --path <path> i[nteractive] ...
+                    //  - ckli i[nteractive] ...
+                    // At the start of the command to allow commands to use these rather common arguments.
+                    _explicitPath = StartsWithPath( ref args );
+                    _hasInteractive = StartsWithInteractive( ref args );
+                    if( _hasInteractive && _explicitPath == null )
+                    {
+                        _explicitPath = StartsWithPath( ref args );
+                    }
+                }
+            }
+            _args = [.. args];
         }
-        _hasHelp = EatFlag( "--help", "-h", "-?" );
-        _hasDebugLaunch = EatFlag( "--debug-launch" );
-        _hasVersion = EatFlag( "--version" );
-        _explicitPath = EatSingleOption( "--path", "-p" );
-        _screen = EatSingleOption( "--screen" );
 
+        // --ckli-debug and --ckli-screen can appear anywhere: their --ckli prefix should be enough.
+        _hasCKliDebug = EatFlag( "--ckli-debug" );
+        _ckliScreen = EatSingleOption( "--ckli-screen" );
         _expectCommand = _args.Count > 0;
+
+        static string? StartsWithPath( ref Span<string> args )
+        {
+            if( args.Length > 0 && args[0] == "-p" || args[0] == "--path" )
+            {
+                args = args.Slice( 1 );
+                return args.Length == 0 ? "" : args[0];
+            }
+            return null;
+        }
+
+        static bool StartsWithInteractive( ref Span<string> args )
+        {
+            if( args.Length > 0 && args[0] == "i" || args[0] == "interactive" )
+            {
+                args = args.Slice( 1 );
+                return true;
+            }
+            return false;
+        }
+
     }
 
     /// <summary>
-    /// Gets whether "--help", "-h" or "-?" was in the command line.
+    /// Gets whether "--help", "-h", "-?" or "?" appeared at the end of the command line.
     /// </summary>
     public bool HasHelp => _hasHelp;
 
     /// <summary>
     /// Gets whether debugger must be launched.
     /// </summary>
-    public bool HasDebugLaunchFlag => _hasDebugLaunch;
+    public bool HasCKliDebugFlag => _hasCKliDebug;
 
     /// <summary>
-    /// Gets whether the "--version" flag was specified.
+    /// Gets whether the "--version" or "-v" flag was specified as the first argument.
+    /// Other arguments are ignored.
     /// </summary>
     public bool HasVersionFlag => _hasVersion;
 
     /// <summary>
-    /// Gets whether the command line started with "i ..." or "interactive ..." .
+    /// Gets whether the command line started with "i ..." or "interactive ..." (may be after <see cref="ExplicitPathOption"/>).
+    /// <para>
+    /// When "i" or "interactive" appears after, this is considered an option of the command.
+    /// </para>
     /// </summary>
     public bool HasInteractiveArgument => _hasInteractive;
 
     /// <summary>
-    /// Gets the "--path" or "-p" option.
+    /// Gets the "--path" or "-p" option that must appear before or right after <see cref="HasInteractiveArgument"/>
+    /// but not after other arguments.
+    /// <para>
+    /// When "--path" or "-p" appears after, this is considered an option of the command.
+    /// </para>
     /// </summary>
     public string? ExplicitPathOption => _explicitPath;
 
     /// <summary>
-    /// Gets whether the command line is initially empty after having handled <see cref="HasHelp"/>
-    /// and <see cref="HasInteractiveArgument"/>.
+    /// Gets whether the command line is initially not empty after having handled <see cref="HasHelp"/>,
+    /// <see cref="ExplicitPathOption"/> and <see cref="HasInteractiveArgument"/>.
     /// </summary>
     public bool ExpectCommand => _expectCommand;
 
     /// <summary>
-    /// Gets the "--screen" option if any.
+    /// Gets the "--ckli-screen" option if any.
     /// </summary>
-    public string? ScreenOption => _screen;
+    public string? ScreenOption => _ckliScreen;
 
     /// <summary>
     /// Gets whether all arguments have been eaten.
@@ -213,7 +289,7 @@ public sealed class CommandLineArguments
         }
         // We dont' know the command. Use the hyphen as a discriminator.
         // This doesn't really matter: when the command is not found, arguments analysis is not done:
-        // this is mainly for coherenrency (and to ease test: no command needed).
+        // this is mainly for coherency (and to ease test: no command needed).
         return candidate[0] == '-';
     }
 
