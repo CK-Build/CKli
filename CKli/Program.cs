@@ -33,6 +33,7 @@ if( arguments.HasVersionFlag )
 {
     var info = CSemVer.InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() );
     Console.WriteLine( $"CKli - {info.Version} - {info.OriginalInformationalVersion}." );
+    return;
 }
 // Initializes the root environment.
 World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
