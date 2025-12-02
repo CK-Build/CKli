@@ -56,7 +56,8 @@ static ImmutableArray<(ImmutableArray<string> Names, string Description, bool Mu
 {
     return [(["--path", "-p"], """
         Sets the working path. This overrides the current directory.
-        This must appear at the start of the command: when "--path" or "-p" appears after, this is considered an option of the command.
+        This must appear at the start of the command.
+        When "--path" or "-p" appears after, it is an option of the command.
         """, Multiple:false)];
 }
 

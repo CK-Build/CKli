@@ -24,6 +24,7 @@ public static class CKliCommands
         Add( cmds, new CKliPull() );
         Add( cmds, new CKliFetch() );
         Add( cmds, new CKliPush() );
+        Add( cmds, new CKliUpdate() );
         cmds.Add( "layout", null );
         Add( cmds, new CKliLayoutFix() );
         Add( cmds, new CKliLayoutXif() );
