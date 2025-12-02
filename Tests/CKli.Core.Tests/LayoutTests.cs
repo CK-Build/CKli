@@ -15,7 +15,7 @@ public class LayoutTests
     public async Task layout_fix_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
-        var remotes = TestEnv.UseReadOnly( "CKt" );
+        var remotes = TestEnv.OpenRemotes( "CKt" );
 
         // ckli clone file:///.../CKt-Stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
@@ -52,7 +52,7 @@ public class LayoutTests
     public async Task layout_xif_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
-        var remotes = TestEnv.UseReadOnly( "CKt" );
+        var remotes = TestEnv.OpenRemotes( "CKt" );
 
         // ckli clone file:///.../CKt-Stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();

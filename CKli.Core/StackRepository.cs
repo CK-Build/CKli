@@ -586,7 +586,7 @@ public sealed partial class StackRepository : IDisposable
         }
     }
 
-    static bool GetActualStackName( IActivityMonitor monitor, GitRepository gitStack, string stackNameFromUrl, [NotNullWhen(true)]out string? actualStackName )
+    static bool GetActualStackName( IActivityMonitor monitor, GitRepository gitStack, string stackNameFromUrl, [NotNullWhen( true )] out string? actualStackName )
     {
         actualStackName = null;
         var definitionFilePath = gitStack.WorkingFolder.AppendPart( $"{stackNameFromUrl}.xml" );
@@ -729,8 +729,8 @@ public sealed partial class StackRepository : IDisposable
     }
 
     static bool CheckOriginUrlStackSuffix( IActivityMonitor monitor,
-                                           [NotNullWhen(true)]ref Uri? stackUrl,
-                                           [NotNullWhen(true)]out string? stackNameFromUrl )
+                                           [NotNullWhen( true )] ref Uri? stackUrl,
+                                           [NotNullWhen( true )] out string? stackNameFromUrl )
     {
         stackNameFromUrl = null;
         stackUrl = GitRepositoryKey.CheckAndNormalizeRepositoryUrl( monitor, stackUrl, out stackNameFromUrl );

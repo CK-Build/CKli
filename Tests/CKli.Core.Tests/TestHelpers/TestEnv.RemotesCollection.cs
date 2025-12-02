@@ -1,56 +1,42 @@
 using CK.Core;
+using Shouldly;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace CKli.Core.Tests;
 
 static partial class TestEnv
 {
-    sealed partial class RemotesCollection : IRemotesCollection
+    public sealed partial class RemotesCollection
     {
         readonly string _name;
-        readonly NormalizedPath _path;
-        readonly Dictionary<string, NormalizedPath> _repositories;
+        readonly string[] _repositoryNames;
         readonly Uri _stackUri;
-        readonly bool _isReadOnly;
 
-        internal RemotesCollection( NormalizedPath path, bool readOnly )
+        internal RemotesCollection( string name, string[] repositoryNames )
         {
-            _name = Path.GetFileName( path );
-            _path = path;
-            _isReadOnly = readOnly;
-            _repositories = new Dictionary<string, NormalizedPath>();
-            foreach( var d in Directory.EnumerateDirectories( path ) )
-            {
-                var r = Path.GetFileName( d );
-                _repositories.Add( r, d );
-                if( readOnly )
-                {
-                    File.WriteAllText( Path.Combine( d, ".git", "hooks", "pre-receive.bat" ), "exit 1" );
-                }
-            }
+            _name = name;
+            _repositoryNames = repositoryNames;
             _stackUri = GetUriFor( _name + "-Stack" );
         }
 
         public string Name => _name;
 
-        public bool IsReadOnly => _isReadOnly;
-
         public Uri StackUri => _stackUri;
 
-        public IReadOnlyDictionary<string, NormalizedPath> Repositories => _repositories;
+        public IReadOnlyList<string> Repositories => _repositoryNames;
 
         public Uri GetUriFor( string repositoryName )
         {
-            var path = _repositories.GetValueOrDefault( repositoryName );
-            var safe =  path.IsEmptyPath
-                            ? $"Missing '{repositoryName}' repository in '{_name}' remotes"
-                            : path.Path;
-            return new Uri( "file:///" + safe, UriKind.Absolute );
+            var safe = _repositoryNames.Contains( repositoryName )
+                            ? $"file:///{_barePath}/{_name}/{repositoryName}"
+                            : $"file:///Missing '{repositoryName}' repository in '{_name}' remotes";
+            return new Uri( safe, UriKind.Absolute );
         }
 
-        public override string ToString() => $"{_name} ({(_isReadOnly ? "read only" : "allow push")}) - {_repositories.Count} repositories";
+        public override string ToString() => $"{_name} - {_repositoryNames.Length} repositories";
     }
 
 }

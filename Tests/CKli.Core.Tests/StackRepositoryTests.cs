@@ -18,7 +18,7 @@ public class StackRepositoryTests
         var context = TestEnv.EnsureCleanFolder();
         File.Exists( context.CurrentDirectory.Combine( "CKt/CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeFalse();
 
-        var remotes = TestEnv.UseReadOnly( "CKt" );
+        var remotes = TestEnv.OpenRemotes( "CKt" );
         using var stack = StackRepository.Clone( TestHelper.Monitor,
                                                  context,
                                                  remotes.StackUri,
@@ -40,7 +40,7 @@ public class StackRepositoryTests
     public void Clone_and_OpenFrom()
     {
         var context = TestEnv.EnsureCleanFolder();
-        var remotes = TestEnv.UseReadOnly( "CKt" );
+        var remotes = TestEnv.OpenRemotes( "CKt" );
         using( var stack = StackRepository.Clone( TestHelper.Monitor,
                                                   context,
                                                   remotes.StackUri,
@@ -85,7 +85,7 @@ public class StackRepositoryTests
     public void Clone_and_TryOpenWorldFrom()
     {
         var context = TestEnv.EnsureCleanFolder();
-        var remotes = TestEnv.UseReadOnly( "CKt" );
+        var remotes = TestEnv.OpenRemotes( "CKt" );
 
         using( var clone = StackRepository.Clone( TestHelper.Monitor,
                                                   context,
@@ -148,7 +148,7 @@ public class StackRepositoryTests
     public void Clone_and_OpenWorldFrom()
     {
         var context = TestEnv.EnsureCleanFolder();
-        var remotes = TestEnv.UseReadOnly( "CKt" );
+        var remotes = TestEnv.OpenRemotes( "CKt" );
 
         using( var clone = StackRepository.Clone( TestHelper.Monitor,
                                                   context,
@@ -200,7 +200,7 @@ public class StackRepositoryTests
     public async Task Add_new_repository_to_Default_World_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
-        var remotes = TestEnv.UseReadOnly( "CKt" );
+        var remotes = TestEnv.OpenRemotes( "CKt" );
 
         // ckli clone file:///.../CKt-Stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
@@ -261,7 +261,7 @@ public class StackRepositoryTests
     public async Task DuplicateOf_detection_Async()
     {
         var root = TestEnv.EnsureCleanFolder();
-        var remotes = TestEnv.UseReadOnly( "CKt" );
+        var remotes = TestEnv.OpenRemotes( "CKt" );
 
         var initialPath = root.ChangeDirectory( "Initial" );
         var duplicate1 = root.ChangeDirectory( "Duplicate1" );
@@ -288,5 +288,33 @@ public class StackRepositoryTests
             stack.ShouldNotBeNull();
             stack.IsDuplicate.ShouldBeTrue();
         }
+    }
+
+    [Test]
+    public async Task Clone_with_diff_casing_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var display = (StringScreen)context.Screen;
+
+        // ckli clone https://github.com/CK-Build/ck-bUILD-stack
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", "https://github.com/CK-Build/ck-bUILD-stack" )).ShouldBeTrue();
+
+        Directory.EnumerateDirectories( context.CurrentDirectory )
+            .Select( path => Path.GetFileName( path ) )
+            .ShouldContain( "CK-Build", "The folder name has been fixed." );
+
+        // cd CK-Build
+        context = context.ChangeDirectory( "CK-Build" );
+
+        display.Clear();
+        // ckli repo list
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo", "list" )).ShouldBeTrue();
+        display.ToString().ShouldBe( """
+            ··CSemVer-Net···master·↑0↓0·https://github.com/CK-Build/CSemVer-Net·
+            ··SGV-Net·······master·↑0↓0·https://github.com/CK-Build/SGV-Net·····
+            ··Cake/CodeCake·master·↑0↓0·https://github.com/CK-Build/CodeCake····
+            ❰✓❱
+
+            """.Replace( '·', ' ' ) );
     }
 }

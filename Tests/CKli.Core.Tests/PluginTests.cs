@@ -16,7 +16,7 @@ public class PluginTests
     public async Task create_plugin_request_Info_and_remove_it_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
-        var remotes = TestEnv.UseReadOnly( "One" );
+        var remotes = TestEnv.OpenRemotes( "One" );
         var display = (StringScreen)context.Screen;
 
         // ckli clone file:///.../One-Stack
@@ -87,7 +87,7 @@ public class PluginTests
     public async Task CommandSample_package_echo_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
-        var remotes = TestEnv.UseReadOnly( "One" );
+        var remotes = TestEnv.OpenRemotes( "One" );
 
         TestEnv.EnsurePluginPackage( "CKli.CommandSample.Plugin" );
 
@@ -138,7 +138,7 @@ public class PluginTests
     public async Task CommandSample_package_config_edit_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
-        var remotes = TestEnv.UseReadOnly( "One" );
+        var remotes = TestEnv.OpenRemotes( "One" );
 
         TestEnv.EnsurePluginPackage( "CKli.CommandSample.Plugin" );
 
@@ -201,7 +201,7 @@ public class PluginTests
     public async Task VSSolutionSample_issues_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
-        var remotes = TestEnv.UseReadOnly( "WithIssues" );
+        var remotes = TestEnv.OpenRemotes( "WithIssues" );
         var display = (StringScreen)context.Screen;
 
         // ckli clone file:///.../WithIssues-Stack

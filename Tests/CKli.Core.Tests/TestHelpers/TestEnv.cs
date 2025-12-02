@@ -1,6 +1,8 @@
 using CK.Core;
 using CSemVer;
+using LibGit2Sharp;
 using NUnit.Framework;
+using NUnit.Framework.Internal.Execution;
 using Shouldly;
 using System;
 using System.Collections.Generic;
@@ -8,6 +10,8 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 
@@ -17,6 +21,7 @@ namespace CKli.Core.Tests;
 static partial class TestEnv
 {
     readonly static NormalizedPath _remotesPath = TestHelper.TestProjectFolder.AppendPart( "Remotes" );
+    readonly static NormalizedPath _barePath = _remotesPath.AppendPart( "bare" );
     readonly static NormalizedPath _nugetSourcePath = TestHelper.TestProjectFolder.AppendPart( "NuGetSource" );
     readonly static NormalizedPath _packagedPluginsPath = TestHelper.TestProjectFolder.AppendPart( "PackagedPlugins" );
     static NormalizedPath _clonedPath = TestHelper.TestProjectFolder.AppendPart( "Cloned" );
@@ -24,7 +29,6 @@ static partial class TestEnv
     static SVersion? _cKliPluginsCoreVersion;
     static XDocument? _packagedDirectoryPackagesProps;
     static Dictionary<string, RemotesCollection>? _readOnlyRemotes;
-    static RemotesCollection? _inUse;
 
     [OneTimeSetUp]
     public static void SetupEnv() => TestHelper.OnlyOnce( Initialize );
@@ -94,6 +98,8 @@ static partial class TestEnv
 
     static void InitializeRemotes()
     {
+        var remoteIndexPath = _barePath.AppendPart( "Remotes.txt" );
+
         var zipPath = _remotesPath.AppendPart( "Remotes.zip" );
         var zipTime = File.GetLastWriteTimeUtc( zipPath );
         if( !Directory.EnumerateDirectories( _remotesPath ).Any()
@@ -101,24 +107,14 @@ static partial class TestEnv
         {
             using( TestHelper.Monitor.OpenInfo( $"Last write time of 'Remotes/' differ from 'Remotes/Remotes.zip'. Restoring remotes from zip." ) )
             {
-                foreach( var stack in Directory.EnumerateDirectories( _remotesPath ) )
-                {
-                    foreach( var repository in Directory.EnumerateDirectories( stack ) )
-                    {
-                        if( !FileHelper.DeleteClonedFolderOnly( TestHelper.Monitor, repository, out var _ ) )
-                        {
-                            TestHelper.Monitor.Warn( $"Folder '{repository}' didn't contain a .git folder. All folders in Remotes/<stack> should be git working folders." );
-                        }
-                    }
-                }
-                // Allow overwriting .gitignore file.
-                ZipFile.ExtractToDirectory( zipPath, _remotesPath, overwriteFiles: true );
-                SetLastWriteTime( zipTime );
+                RestoreRemotesZipAndCreateBareRepositories( remoteIndexPath, zipPath, zipTime );
             }
         }
-        _readOnlyRemotes = Directory.EnumerateDirectories( _remotesPath )
-                                    .Select( d => new RemotesCollection( d, true ) )
-                                    .ToDictionary( r => r.Name );
+        _readOnlyRemotes = File.ReadAllLines( remoteIndexPath )
+                               .Select( l => l.Split( '/' ) )
+                               .GroupBy( names => names[0], names => names[1] )
+                               .Select( g => new RemotesCollection( g.Key, g.ToArray() ) ).
+                               ToDictionary( r => r.Name ); 
 
         static bool LastWriteTimeChanged( DateTime zipTime )
         {
@@ -144,35 +140,90 @@ static partial class TestEnv
                 Directory.SetLastWriteTimeUtc( sub, zipTime );
             }
         }
+
+        static void RestoreRemotesZipAndCreateBareRepositories( NormalizedPath remoteIndexPath, NormalizedPath zipPath, DateTime zipTime )
+        {
+            // Cleanup "bare/" content if it exists and delete any existing unzipped repositories.
+            foreach( var stack in Directory.EnumerateDirectories( _remotesPath ) )
+            {
+                var stackName = Path.GetFileName( stack.AsSpan() );
+                if( stackName.Equals( "bare", StringComparison.OrdinalIgnoreCase ) )
+                {
+                    foreach( var openedBare in Directory.EnumerateDirectories( stack ) )
+                    {
+                        DeleteFolder( openedBare );
+                    }
+                    foreach( var zippedBareOrRemotesIndex in Directory.EnumerateFiles( stack ) )
+                    {
+                        Throw.Assert( Path.GetFileName( zippedBareOrRemotesIndex ) == "Remotes.txt"
+                                      || zippedBareOrRemotesIndex.EndsWith( ".zip" ) );
+                        DeleteFile( zippedBareOrRemotesIndex );
+                    }
+                }
+                else
+                {
+                    foreach( var repository in Directory.EnumerateDirectories( stack ) )
+                    {
+                        if( !FileHelper.DeleteClonedFolderOnly( TestHelper.Monitor, repository, out var _ ) )
+                        {
+                            TestHelper.Monitor.Warn( $"Folder '{repository}' didn't contain a .git folder. All folders in Remotes/<stack> should be git working folders." );
+                        }
+                    }
+                }
+            }
+
+            // Extracts Remotes.zip content.
+            // Disallow overwriting: .gitignore file and README.md must not be in the Zip archive.
+            ZipFile.ExtractToDirectory( zipPath, _remotesPath, overwriteFiles: false );
+            SetLastWriteTime( zipTime );
+            // Fills the bare/ with the .zip of the bare repositories and creates the Remotes.txt
+            // index file.
+            var remotesContent = new StringBuilder();
+            Directory.CreateDirectory( _barePath );
+            foreach( var stack in Directory.EnumerateDirectories( _remotesPath ) )
+            {
+                var stackName = Path.GetFileName( stack.AsSpan() );
+                if( !stackName.Equals( "bare", StringComparison.OrdinalIgnoreCase ) )
+                {
+                    var bareStack = Path.Combine( _barePath, new string( stackName ) );
+                    foreach( var repository in Directory.EnumerateDirectories( stack ) )
+                    {
+                        var src = new DirectoryInfo( Path.Combine( repository, ".git" ) );
+                        var dst = Path.Combine( bareStack, Path.GetFileName( repository ), ".git" );
+                        var target = new DirectoryInfo( dst );
+                        FileUtil.CopyDirectory( src, target );
+                        var exitCode = ProcessRunner.RunProcess( TestHelper.Monitor.ParallelLogger,
+                                                                 "git",
+                                                                 "config core.bare true",
+                                                                 dst );
+                        if( exitCode != 0 )
+                        {
+                            Throw.CKException( $"Failed to configure bare repository '{dst}'." );
+                        }
+                        remotesContent.AppendLine( $"{stackName}/{Path.GetFileName( repository )}" );
+                    }
+                    ZipFile.CreateFromDirectory( bareStack, bareStack + ".zip" );
+                }
+            }
+            File.WriteAllText( remoteIndexPath, remotesContent.ToString() );
+        }
     }
 
     /// <summary>
-    /// Activates the <see cref="IRemotesCollection"/> that must exist.
+    /// Obtains a clean (unmodified) <see cref="RemotesCollection"/> that must exist.
     /// </summary>
     /// <param name="name">The <see cref="IRemotesCollection.Name"/> to use.</param>
     /// <returns>The active remotes collection.</returns>
-    public static IRemotesCollection UseReadOnly( string name )
+    public static RemotesCollection OpenRemotes( string name )
     {
         Throw.DebugAssert( _readOnlyRemotes != null );
-        if( _inUse != null )
-        {
-            if( _inUse.Name == name ) return _inUse;
-            if( !_inUse.IsReadOnly )
-            {
-                // Close Current. TODO.
-            }
-        }
-        var newOne = _readOnlyRemotes[name];
-        //
-        // Now useless (but still possible):
-        // "Repositories Proxy" has been integrated in WorldDefinitionFile.
-        //
-        //  // Allows Url to already be Url (to support tests that alter the definition files).
-        //  WorldDefinitionFile.RepositoryUrlHook = ( monitor, sUri ) => Uri.TryCreate( sUri, UriKind.Absolute, out var uri )
-        //                                                               ? sUri
-        //                                                               : newOne.GetUriFor( sUri ).ToString();
-
-        return _inUse = newOne;
+        var r = _readOnlyRemotes[name];
+        // Deletes the current repository that may have been modified
+        // and extracts a brand new bare git repository.
+        var path = _barePath.AppendPart( r.Name );
+        DeleteFolder( path );
+        ZipFile.ExtractToDirectory( path + ".zip", path, overwriteFiles: false );
+        return r;
     }
 
     /// <summary>
@@ -282,9 +333,18 @@ static partial class TestEnv
     /// Ensures that <see cref="FileHelper.DeleteFolder(IActivityMonitor, string)"/> succeeds.
     /// </summary>
     /// <param name="path">The folder path to delete.</param>
-    public static void DeleteFolder( NormalizedPath path )
+    public static void DeleteFolder( string path )
     {
         FileHelper.DeleteFolder( TestHelper.Monitor, path ).ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// Ensures that <see cref="FileHelper.DeleteFile(IActivityMonitor, string)"/> succeeds.
+    /// </summary>
+    /// <param name="path">The file path to delete.</param>
+    public static void DeleteFile( string path )
+    {
+        FileHelper.DeleteFile( TestHelper.Monitor, path ).ShouldBeTrue();
     }
 
 }

@@ -47,7 +47,7 @@ sealed class CKliUpdate : Command
             {updateCmd}
             """ );
 
-        // This uses powershell and this is not ideal.
+        // This uses PowerShell and this is not ideal.
         // IMO, the cmd approach is insane (and not portable).
         // See https://stackoverflow.com/questions/22558869/wait-for-process-to-end-in-windows-batch-file
         // I'd rather use a C# 10 file-based application...
