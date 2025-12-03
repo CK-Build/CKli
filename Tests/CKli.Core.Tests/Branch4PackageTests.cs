@@ -1,8 +1,6 @@
 using CSemVer;
-using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;
-using System;
 using System.Linq;
 
 namespace CKli.Core.Tests;

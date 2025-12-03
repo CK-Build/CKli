@@ -288,13 +288,14 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
 
                 foreach( Remote remote in _git.Network.Remotes.Where( r => !originOnly || r.Name == "origin" ) )
                 {
-                    if( !originOnly ) monitor.Info( $"Fetching remote '{remote.Name}'." );
-                    IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification ).ToArray();
+                    var logMsg = $"Fetching remote '{remote.Name}'.";
+                    if( !originOnly ) monitor.Info( logMsg );
+                    IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
                     Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                     {
                         CredentialsProvider = ( url, user, types ) => creds,
                         TagFetchMode = TagFetchMode.All
-                    }, $"Fetching remote '{remote.Name}'." );
+                    }, logMsg );
                 }
                 return true;
             }

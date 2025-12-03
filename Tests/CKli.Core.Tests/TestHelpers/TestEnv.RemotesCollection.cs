@@ -1,8 +1,5 @@
-using CK.Core;
-using Shouldly;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 
 namespace CKli.Core.Tests;

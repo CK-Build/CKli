@@ -1,5 +1,4 @@
 using CK.Core;
-using CK.Monitoring.InterProcess;
 using NUnit.Framework;
 using Shouldly;
 using System.IO;

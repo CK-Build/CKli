@@ -1,8 +1,6 @@
 using CK.Core;
 using CSemVer;
-using LibGit2Sharp;
 using NUnit.Framework;
-using NUnit.Framework.Internal.Execution;
 using Shouldly;
 using System;
 using System.Collections.Generic;
@@ -10,7 +8,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
