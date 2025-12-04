@@ -338,34 +338,34 @@ public class ScreenTableLayoutTests
             │                            display.   
             │                            (text is   
             │                            trimmed.)  
-            │     <a1>                   Argument   
+            │   <a1>                     Argument   
             │                            n°1 is     
             │                            required   
             │                            like       
             │                            all        
             │                            arguments.   
-            │     Options:                         
-            │      --options, -o         [Multiple] 
+            │   Options:                           
+            │    --options, -o           [Multiple] 
             │                            This       
             │                            description
             │                            should be  
             │                            prefixed   
             │                            with       
             │                            [Multiple].
-            │      --single, -s          This       
+            │    --single, -s            This       
             │                            description
             │                            "single" is
             │                            not        
             │                            multiple.  
-            │      --others, -o2         [Multiple] 
+            │    --others, -o2           [Multiple] 
             │                            Also       
             │                            multiple   
             │                            and        
             │                            on multiple
             │                            lines.     
-            │     Flags:                           
-            │      --flag1, -f1          Flag n°1.  
-            │      --flag2, -f2          Flag n°2.
+            │   Flags:                             
+            │    --flag1, -f1            Flag n°1.  
+            │    --flag2, -f2            Flag n°2.
             """ );
     }
 

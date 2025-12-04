@@ -52,7 +52,7 @@ public static class ScreenExtensions
     /// </para>
     /// </summary>
     /// <param name="screenType">The screen type.</param>
-    /// <param name="cmdLine">The command line that should have renamint arguments.</param>
+    /// <param name="cmdLine">The command line that should have remaining arguments.</param>
     /// <returns>The renderable. May be <see cref="ScreenType.Unit"/>.</returns>
     public static IRenderable CreateDisplayHelpHeader( ScreenType screenType, CommandLineArguments cmdLine )
     {
@@ -61,13 +61,17 @@ public static class ScreenExtensions
         {
             var args = cmdLine.GetRemainingArguments();
             header = screenType.Text( "Arguments:" ).Box()
-                        .AddRight( args.Select( r => screenType.Text( r.Remaining
-                                                                            ? $"{r.Argument}{Environment.NewLine}└{new string( '─', r.Argument.Length-2)}┘"
-                                                                            : r.Argument,
-                                                                      r.Remaining
-                                                                            ? new TextStyle( TextEffect.Invert )
-                                                                            : new TextStyle( ConsoleColor.DarkGreen, ConsoleColor.Black ) )
-                                                               .Box( marginLeft: 1, foreColor: ConsoleColor.DarkRed ) ) )
+                        .AddRight( args.Select(
+                                    r => screenType.Text( r.Remaining
+                                                            ? (r.Argument.Length > 1
+                                                                ? $"{r.Argument}{Environment.NewLine}└{new string( '─', r.Argument.Length-2)}┘"
+                                                                : $"{r.Argument}{Environment.NewLine}^"
+                                                              )
+                                                            : r.Argument,
+                                                          r.Remaining
+                                                            ? new TextStyle( TextEffect.Invert )
+                                                            : new TextStyle( ConsoleColor.DarkGreen, ConsoleColor.Black ) )
+                                                    .Box( marginLeft: 1, foreColor: ConsoleColor.DarkRed ) ) )
                         .AddBelow( screenType.EmptyString );
         }
 
@@ -143,17 +147,17 @@ public static class ScreenExtensions
             if( head.Width > minFirstCol ) minFirstCol = head.Width;
 
             head = head.AddRight( c.Description )
-                       .AddBelow( c.Arguments.Select( a => a.Name.Box( marginLeft: 4 ).AddRight( a.Description ) ) );
+                       .AddBelow( c.Arguments.Select( a => a.Name.Box( marginLeft: 2, marginRight: 1 ).AddRight( a.Description ) ) );
 
             if( c.Options.Length > 0 )
             {
-                head = head.AddBelow( c.ScreenType.Text( "Options:" ).Box( marginLeft: 4 ) )
-                           .AddBelow( c.Options.Select( o => o.Names.Box( marginLeft: 5 ).AddRight( o.Description ) ) );
+                head = head.AddBelow( c.ScreenType.Text( "Options:" ).Box( marginLeft: 2 ) )
+                           .AddBelow( c.Options.Select( o => o.Names.Box( marginLeft: 3, marginRight: 1 ).AddRight( o.Description ) ) );
             }
             if( c.Flags.Length > 0 )
             {
-                head = head.AddBelow( c.ScreenType.Text( "Flags:" ).Box( marginLeft: 4 ) )
-                           .AddBelow( c.Flags.Select( f => f.Names.Box( marginLeft: 5 ).AddRight( f.Description ) ) );
+                head = head.AddBelow( c.ScreenType.Text( "Flags:" ).Box( marginLeft: 2 ) )
+                           .AddBelow( c.Flags.Select( f => f.Names.Box( marginLeft: 3, marginRight: 1 ).AddRight( f.Description ) ) );
             }
             return head;
         }
