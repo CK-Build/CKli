@@ -276,7 +276,7 @@ static partial class TestEnv
     }
 
     /// <summary>
-    /// Compiles and packs the specified "PcackgedPlugins/<paramref name="projectName"/>" and
+    /// Compiles and packs the specified "PackagedPlugins/<paramref name="projectName"/>" and
     /// make it available in the "NuGetSource" folder.
     /// </summary>
     /// <param name="projectName">The project name (in Plugins/ folder).</param>

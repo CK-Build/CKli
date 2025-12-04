@@ -155,12 +155,11 @@ public sealed class WorldDefinitionFile
     {
         var config = ReadPluginsConfiguration( monitor );
         if( config == null ) return false;
-        XElement? e = null;
         if( !PluginMachinery.EnsureFullPluginName( monitor, name, out string? shortPluginName, out var longPluginName ) )
         {
             return false;
         }
-        e = config.GetValueOrDefault( name ).Config;
+        XElement? e = config.GetValueOrDefault( name ).Config;
         if( e == null )
         {
             monitor.Error( $"Unable to find Plugin configuration '{shortPluginName}'." );
@@ -215,7 +214,7 @@ public sealed class WorldDefinitionFile
         return sName.Length > 0 && FileUtil.IndexOfInvalidFileNameChars( sName ) < 0;
     }
 
-    // World.XifLayout uses this before multiple calls to Remove/AddRepostiory.
+    // World.XifLayout uses this before multiple calls to Remove/AddRepository.
     internal IDisposable StartEdit()
     {
         Throw.DebugAssert( !_allowEdit );
@@ -452,7 +451,7 @@ public sealed class WorldDefinitionFile
         foreach( var (path, url) in list )
         {
             // These 2 checks guaranties that path <-> url is unique
-            // and that repo
+            // and that repo name (the path.LastPart) is also unique.
             if( !uniqueCheck.TryAdd( path, url ) )
             {
                 if( url == uniqueCheck[path] )
@@ -601,7 +600,7 @@ public sealed class WorldDefinitionFile
                     monitor.Warn( $"""
                         Unexpected element:
                         {c}
-                        Only <Folder Name="..."> ... </Folder> and <Repository Url="..." /> are handled. Element is ignored.
+                        Only <Plugins />, <Folder Name="..."> ... </Folder> and <Repository Url="..." /> are handled. Element is ignored.
                         """ );
                 }
             }

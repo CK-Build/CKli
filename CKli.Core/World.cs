@@ -33,7 +33,7 @@ public sealed partial class World
     /// </param>
     /// <param name="loader">
     /// Outputs a weak reference on the PluginLoadContext that may have been instantiated (and disposed) even if
-    /// this fails and returns null: <see cref="WeakReference.IsAlive"/> must be false before trying to reoad or
+    /// this fails and returns null: <see cref="WeakReference.IsAlive"/> must be false before trying to reload or
     /// recompile plugins.
     /// </param>
     /// <returns>The plugin factory on success, null on error.</returns>
@@ -286,7 +286,7 @@ public sealed partial class World
 
     /// <summary>
     /// Gets whether a full path or a origin url is defined in this <see cref="Layout"/>.
-    /// The lookup is case insenitive.
+    /// The lookup is case insensitive.
     /// </summary>
     /// <param name="uriOrPath">The origin url or a full path that can be below one of the defined <see cref="Repo.WorkingFolder"/>.</param>
     /// <param name="workingFolder">Outputs the non empty <see cref="Repo.WorkingFolder"/> if the repository is defined. The empty path otherwise.</param>
@@ -422,12 +422,9 @@ public sealed partial class World
     {
         if( FindDefinedRepo( key, out var workingFolder, out var repo, out var index ) )
         {
-            if( repo == null )
-            {
-                // We found the key in the layout (the url or a workingFolder): it logically
-                // exists, we must try to fix the layout if we can't open the working folder.
-                repo = DoLoadGitRepository( monitor, workingFolder, index, mustExist: true );
-            }
+            // We found the key in the layout (the url or a workingFolder): it logically
+            // exists, we must try to fix the layout if we can't open the working folder.
+            repo ??= DoLoadGitRepository( monitor, workingFolder, index, mustExist: true );
         }
         else if( mustExist )
         {
@@ -478,7 +475,7 @@ public sealed partial class World
 
     Repo CreateRepo( IActivityMonitor monitor, int index, GitRepository repository )
     {
-        if( !TryReadCkliRepoTag( monitor, repository, _stackRepository, out var ckliRepoId) )
+        if( !TryReadCKliRepoTag( monitor, repository, _stackRepository, out var ckliRepoId) )
         {
             Span<byte> bytes = MemoryMarshal.AsBytes( new Span<ulong>( ref ckliRepoId ) );
             do
@@ -494,7 +491,7 @@ public sealed partial class World
         _cachedRepositories[repository.OriginUrl.ToString()] = repo;
         return repo;
 
-        static bool TryReadCkliRepoTag( IActivityMonitor monitor, GitRepository git, StackRepository stackRepository, out ulong ckliRepoId )
+        static bool TryReadCKliRepoTag( IActivityMonitor monitor, GitRepository git, StackRepository stackRepository, out ulong ckliRepoId )
         {
             ckliRepoId = 0L;
             var message = git.Repository.Tags["CKli-Repo"]?.Annotation?.Message;

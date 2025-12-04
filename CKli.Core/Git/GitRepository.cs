@@ -702,7 +702,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
                         }
                     };
                     _git.Network.Push( b, options );
-                    if( errors.Count > 0 )
+                    if( !errors.IsEmpty )
                     {
                         foreach( var error in errors )
                         {

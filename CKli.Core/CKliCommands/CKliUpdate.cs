@@ -16,7 +16,7 @@ sealed class CKliUpdate : Command
                 [],
                 [],
                 [
-                    (["--prerelease"], "Consider prerelease versions (inclduing CI builds).")
+                    (["--prerelease"], "Consider prerelease versions (including CI builds).")
                 ] )
     {
     }
@@ -51,7 +51,7 @@ sealed class CKliUpdate : Command
         // IMO, the cmd approach is insane (and not portable).
         // See https://stackoverflow.com/questions/22558869/wait-for-process-to-end-in-windows-batch-file
         // I'd rather use a C# 10 file-based application...
-        var pid = Process.GetCurrentProcess().Id;
+        var pid = System.Environment.ProcessId;
         var cmd = $@"Wait-Process -Id {pid} -Timeout 20 -ErrorAction SilentlyContinue; {updateCmd}";
         Process.Start( new ProcessStartInfo
         {

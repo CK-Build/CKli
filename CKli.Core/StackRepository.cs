@@ -693,7 +693,7 @@ public sealed partial class StackRepository : IDisposable
     /// </para>
     /// </summary>
     /// <param name="monitor">The required monitor.</param>
-    /// <returns>True on success, false if an error occured when saving the definition file.</returns>
+    /// <returns>True on success, false if an error occurred when saving the definition file.</returns>
     public bool Close( IActivityMonitor monitor )
     {
         bool success = true;
@@ -712,7 +712,7 @@ public sealed partial class StackRepository : IDisposable
 
     /// <summary>
     /// Close this world. This doesn't handle the save of the <see cref="WorldDefinitionFile"/>: use <see cref="Close(IActivityMonitor)"/>
-    /// if the definition file must be saved and comitted.
+    /// if the definition file must be saved and committed.
     /// </summary>
     public void Dispose()
     {

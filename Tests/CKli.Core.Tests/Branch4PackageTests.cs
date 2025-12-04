@@ -96,7 +96,7 @@ public class Branch4PackageTests
         // in the corresponding branch (that must be created if it doesn't exist), downstream repos must be built
         // and recursively propagates their produced packages.
         // Should the build of downstream repos be a "simple build" or a "full build"?
-        // To limit the complexity, we sould consider that the initial "command" applies:
+        // To limit the complexity, we should consider that the initial "command" applies:
         // "simply build this repo and propagate" triggers a simple build of the downstream's dependencies (don't
         // try to produce new, unrelated, packages that can be produced by upstreams of downstreams, just upgrade to the existing ones)
         // whereas "fully build this repo and propagate" triggers the production of new packages.
@@ -105,7 +105,7 @@ public class Branch4PackageTests
         // - build: upgrade, compile, test, package
         // - *build: recursive downstream build.
         // - build*: recursive upstream build and propagation.
-        // - *build*: recusively combines *build and build*.
+        // - *build*: recursively combines *build and build*.
         //
         // What does "upgrade" means? Whether the build is recursive or not, we end up with a set of dependencies
         // whose versions must be updated in the Repo's projects (.csproj or Directory.Packages.props). This is obvious.
@@ -116,14 +116,14 @@ public class Branch4PackageTests
         // Technically, this should be a Git rebase on the base branch (but this can also be done with a merge).
         // Is this "too strong"? May be. We may need some option to keep a branch independent of its base but eventually
         // all the work will be merged into a future stable. The sooner the better can be a not so bad approach.
-        // We should at least consider rebasing on the last relesed commits of the base branches.
+        // We should at least consider rebasing on the last released commits of the base branches.
         //
         // These very simple workflows requires a rather strong condition: we must be able to:
         //  - Decide whether new packages must be produced for a repo (or to use the last produced packages).
         //  - Automatically produce a version number for the new packages.
         // On prerealease branches, the version number can simply be incremented. But on "stable" we have to know
-        // if the release is a Breacking (Major+1), Feature (Minor+1) or Fix (Patch+1). This may be generalized
-        // if we consider that we always build a branch with Breacking/Feature/Fix indicator.
+        // if the release is a Breaking (Major+1), Feature (Minor+1) or Fix (Patch+1). This may be generalized
+        // if we consider that we always build a branch with Breaking/Feature/Fix indicator.
         // The Major.Minor.Patch version of any new version cannot be greater than the (Major+1,0,0), (Major,Minor+1,0)
         // or (Major,Minor,Patch+1) of the greater stable existing version.
         //
@@ -219,7 +219,7 @@ public class Branch4PackageTests
         // After the integration, the branch is deleted if it has no subordinated branch or the initial pattern above is recreated (as if
         // the branch has been created).
         //
-        // The CKli.Build.Plugin is able to compute the version numbers and dosn't use SimpleGitVersion. It uses CSemVer for its
+        // The CKli.Build.Plugin is able to compute the version numbers and doesn't use SimpleGitVersion. It uses CSemVer for its
         // SVersion and the new CSVersion4 that encapsulates the B4P model versions.
         // Not using SimpleGitVersion means that a remote CI can no more build/test/package a commit point.
         // This tool will be developed later.

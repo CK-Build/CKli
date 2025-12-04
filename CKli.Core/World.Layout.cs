@@ -24,9 +24,9 @@ sealed partial class World
     ///     <item>The uri must be a valid absolute url.</item>
     ///     <item>No existing repository must exist with the same repository name.</item>
     ///     <item>The path must be <see cref="LocalWorldName.WorldRoot"/> or starts with it (it should not end with the repository name).</item>
-    ///     <item>The path must not be below any exisiting repository.</item>
+    ///     <item>The path must not be below any existing repository.</item>
     ///     <item>The repository is cloned.</item>
-    ///     <item>The world definition file is updated, saved and comitted in the Stack repository.</item>
+    ///     <item>The world definition file is updated, saved and committed in the Stack repository.</item>
     /// </list>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -100,7 +100,7 @@ sealed partial class World
         {
             monitor.Error( $"""
                     Unable to add repository at '{folderPath}'.
-                    The folder already exixts.
+                    The folder already exists.
                     """ );
             return false;
         }
@@ -356,19 +356,19 @@ sealed partial class World
 
     abstract record LayoutAction( NormalizedPath Path, Uri Uri )
     {
-        public abstract string ToString( int skipedPathParts );
+        public abstract string ToString( int skippedPathParts );
     }
     sealed record Clone( NormalizedPath Path, Uri Uri ) : LayoutAction( Path, Uri )
     {
-        public override string ToString( int skipedPathParts ) => $"New repository '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' ({Uri})";
+        public override string ToString( int skippedPathParts ) => $"New repository '{Path.Parts.Skip( skippedPathParts ).Concatenate( '/' )}' ({Uri})";
     }
     sealed record Suppress( NormalizedPath Path, Uri Uri ) : LayoutAction( Path, Uri )
     {
-        public override string ToString( int skipedPathParts ) => $"Suppressing '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' ({Uri})";
+        public override string ToString( int skippedPathParts ) => $"Suppressing '{Path.Parts.Skip( skippedPathParts ).Concatenate( '/' )}' ({Uri})";
     }
     sealed record Move( NormalizedPath Path, Uri Uri, NormalizedPath NewPath, bool FixedCase ) : LayoutAction( Path, Uri )
     {
-        public override string ToString( int skipedPathParts ) => $"{(FixedCase ? "Fixing case in" : "Moving")} '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' to '{NewPath.Parts.Skip( skipedPathParts ).Concatenate( '/' )}'.";
+        public override string ToString( int skippedPathParts ) => $"{(FixedCase ? "Fixing case in" : "Moving")} '{Path.Parts.Skip( skippedPathParts ).Concatenate( '/' )}' to '{NewPath.Parts.Skip( skippedPathParts ).Concatenate( '/' )}'.";
     }
 
     List<LayoutAction>? CreateFixOrXifLayoutRoadMap( IActivityMonitor monitor, bool fix, bool emitNoActionMessage = true )
@@ -556,7 +556,7 @@ sealed partial class World
                     || !gitConfigPath.AsSpan( idxExpectedRepoName, repoName.Length ).Equals( repoName, StringComparison.OrdinalIgnoreCase ) )
                 {
                     monitor.Error( $"""
-                        Invalid parent folder name for repository '{repoName}'. The lats folder name of the path must end the repository name.
+                        Invalid parent folder name for repository '{repoName}'. The last folder name of the path must end the repository name.
                         Path: {gitConfigPath[..12] }
                         The current layout is not valid and must be fixed.
                         """ );

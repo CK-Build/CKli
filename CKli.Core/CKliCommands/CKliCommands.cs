@@ -12,7 +12,7 @@ namespace CKli;
 /// </summary>
 public static class CKliCommands
 {
-    static CommandNamespace _commands;
+    static readonly CommandNamespace _commands;
 
     static CKliCommands()
     {
@@ -89,7 +89,7 @@ public static class CKliCommands
         context.OnStartCommandHandling();
 
         // Honor the "ckli i" if specified.
-        // The command will be handled below but with the InteractiveSreen (the command may use it)
+        // The command will be handled below but with the InteractiveScreen (the command may use it)
         // and we will enter the interactive loop if this is the first command (History is empty and no
         // PreviousScreen exist) rather than returning from this method (FinalHandleInteractiveAsync does this).
         var interactiveScreen = context.Screen as InteractiveScreen;
@@ -225,7 +225,7 @@ public static class CKliCommands
                     {
                         // The command failed and the command line has not been closed: this indicates a bad argument/option value
                         // so we display the command help.
-                        // Before we must clear any remaining aruments otherwise we may display
+                        // Before we must clear any remaining arguments otherwise we may display
                         // a misleading remaining arguments message.
                         cmdLine.CloseAndForgetRemaingArguments();
                         context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );

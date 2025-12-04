@@ -33,6 +33,10 @@ public class VersionTagTests
                   .Message.ShouldBe( "object is no commit object" );
 
             dev1.Network.Push( origin1, ":" + t.CanonicalName );
+            // A deletion is fortunately idempotent.
+            Should.NotThrow( () => dev1.Network.Push( origin1, ":" + t.CanonicalName ) );
+
+            // This updates the remote tag.
             Should.NotThrow( () => dev1.Network.Push( origin1, t2.CanonicalName ) );
         }
         // Dev2 clones the repository.
