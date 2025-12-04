@@ -67,7 +67,7 @@ public sealed class PrimaryPluginContext
     public PluginConfiguration? GetConfigurationFor( Repo repo )
     {
         var e = repo._configuration.Element( _pluginInfo.GetXName() );
-        return e != null ? new PluginConfiguration( e ) : default;
+        return e != null ? new PluginConfiguration( e ) : null;
     }
 
     /// <summary>
