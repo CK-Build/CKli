@@ -16,8 +16,8 @@ public sealed class WorldDefinitionFile
     readonly XElement _root;
     readonly XElement _plugins;
     readonly LocalWorldName _world;
-    List<(NormalizedPath, Uri)>? _layout;
-    Dictionary<string, (XElement Config, bool IsDisabled)>? _pluginsConfiguration;
+    List<World.RepoLayout>? _layout;
+    Dictionary<XName, (XElement Config, bool IsDisabled)>? _pluginsConfiguration;
     PluginCompileMode? _compileMode;
     bool _allowEdit;
     bool _isDirty;
@@ -114,15 +114,15 @@ public sealed class WorldDefinitionFile
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <returns>The plugins configuration or null if errors have been detected.</returns>
-    public IReadOnlyDictionary<string,(XElement Config, bool IsDisabled)>? ReadPluginsConfiguration( IActivityMonitor monitor )
+    public IReadOnlyDictionary<XName,(XElement Config, bool IsDisabled)>? ReadPluginsConfiguration( IActivityMonitor monitor )
     {
-        return _pluginsConfiguration  ??= DoReadPluginsConfiguration( monitor );
+        return _pluginsConfiguration ??= DoReadPluginsConfiguration( monitor );
     }
 
-    Dictionary<string, (XElement Config, bool IsDisabled)>? DoReadPluginsConfiguration( IActivityMonitor monitor )
+    Dictionary<XName, (XElement Config, bool IsDisabled)>? DoReadPluginsConfiguration( IActivityMonitor monitor )
     {
         bool success = true;
-        var config = new Dictionary<string, (XElement Config, bool IsDisabled)>( StringComparer.OrdinalIgnoreCase );
+        var config = new Dictionary<XName, (XElement Config, bool IsDisabled)>();
         foreach( var e in _plugins.Elements() )
         {
             var name = e.Name.LocalName;
@@ -184,7 +184,7 @@ public sealed class WorldDefinitionFile
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <returns>The layout of the repositories or null if errors have been detected.</returns>
-    public IReadOnlyList<(NormalizedPath Path, Uri Uri)>? ReadLayout( IActivityMonitor monitor )
+    public IReadOnlyList<World.RepoLayout>? ReadLayout( IActivityMonitor monitor )
     {
         return _layout ??= GetRepositoryLayout( monitor, _root, _world );
     }
@@ -246,12 +246,17 @@ public sealed class WorldDefinitionFile
 
     internal void RemovePluginConfiguration( IActivityMonitor monitor, string shortPluginName )
     {
-        var config = Plugins.Elements().FirstOrDefault( e => e.Name.LocalName.Equals( shortPluginName, StringComparison.OrdinalIgnoreCase ) );
-        if( config != null )
+        // Take no risk, don't use the _pluginsConfiguration: analyze the xml (case insensitively) to find the configurations.
+        var filter = (XElement e) => e.Name.LocalName.Equals( shortPluginName, StringComparison.OrdinalIgnoreCase );
+        var allConfigs = _root.Descendants( _xRepository ).SelectMany( r => r.Elements().Where( filter ) )
+                              .Concat( Plugins.Elements().Where( filter ) )
+                              .ToList();
+
+        if( allConfigs.Count > 0 )
         {
             using( StartEdit() )
             {
-                config.Remove();
+                allConfigs.Remove();
                 _pluginsConfiguration = null;
             }
         }
@@ -265,7 +270,7 @@ public sealed class WorldDefinitionFile
         Throw.DebugAssert( folders.All( IsValidFolderName ) );
         Throw.DebugAssert( GitRepositoryKey.CheckAndNormalizeRepositoryUrl( uri ) == uri );
 
-        // Normalizing "Repository Proxy" url.
+        // Normalizing "Repository Proxy" url: The name of the Repo is used (the path.LastPart).
         string urlValue = NormalizeRepositoryProxyUrl( monitor, uri );
         var isEditingAbove = _allowEdit;
         using( isEditingAbove ? null : StartEdit() )
@@ -435,11 +440,11 @@ public sealed class WorldDefinitionFile
         return new WorldDefinitionFile( world, root, plugins );
     }
 
-    static List<(NormalizedPath Path, Uri Uri)>? GetRepositoryLayout( IActivityMonitor monitor,
-                                                                      XElement root,
-                                                                      LocalWorldName world )
+    static List<World.RepoLayout>? GetRepositoryLayout( IActivityMonitor monitor,
+                                                        XElement root,
+                                                        LocalWorldName world )
     {
-        var list = new List<(NormalizedPath Path, Uri Uri)>();
+        var list = new List<World.RepoLayout>();
         bool hasError = false;
 
         NormalizedPath worldRoot = world.WorldRoot;
@@ -448,7 +453,7 @@ public sealed class WorldDefinitionFile
         var uniqueCheck = new Dictionary<string,Uri>();
         var uniquePath = new HashSet<NormalizedPath>();
         var uniqueUrl = new HashSet<Uri>();
-        foreach( var (path, url) in list )
+        foreach( var (url, _, path) in list )
         {
             // These 2 checks guaranties that path <-> url is unique
             // and that repo name (the path.LastPart) is also unique.
@@ -497,7 +502,7 @@ public sealed class WorldDefinitionFile
                              XElement e,
                              LocalWorldName world,
                              in NormalizedPath p,
-                             List<(NormalizedPath, Uri)> list,
+                             List<World.RepoLayout> list,
                              ref bool hasError )
         {
             foreach( var c in e.Elements() )
@@ -590,7 +595,7 @@ public sealed class WorldDefinitionFile
                             }
                             else
                             {
-                                list.Add( (p.AppendPart( repoName ), url) );
+                                list.Add( new World.RepoLayout( url, c, p.AppendPart( repoName ) ) );
                             }
                         }
                     }

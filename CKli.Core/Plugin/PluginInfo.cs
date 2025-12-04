@@ -1,6 +1,7 @@
 using CSemVer;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Xml.Linq;
 
 namespace CKli.Core;
 
@@ -13,6 +14,7 @@ public sealed class PluginInfo
     readonly string _pluginName;
     readonly IReadOnlyList<IPluginTypeInfo> _pluginTypes;
     readonly string? _originalVersion;
+    readonly XName _xPluginName;
     readonly PluginStatus _status;
     InformationalVersion? _informationalVersion;
 
@@ -35,6 +37,7 @@ public sealed class PluginInfo
         _status = status;
         _originalVersion = informationalVersion;
         _pluginTypes = pluginTypes;
+        _xPluginName = XNamespace.None.GetName( pluginName );
     }
 
     /// <summary>
@@ -76,6 +79,7 @@ public sealed class PluginInfo
     /// <returns>The full plugin name.</returns>
     public override string ToString() => FullPluginName;
 
+    internal XName GetXName() => _xPluginName;
 }
 
 

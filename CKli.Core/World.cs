@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Xml.Linq;
 
 namespace CKli.Core;
 
@@ -72,7 +73,7 @@ public sealed partial class World
     // The WorldDefinitionFile maintains its layout list.
     // AddRepository, RemoveRepository and XifLayout are the only ones that can
     // update this layout.
-    readonly IReadOnlyList<(NormalizedPath Path, Uri Uri)> _layout;
+    readonly IReadOnlyList<RepoLayout> _layout;
 
     // This caches the Repo (and its GitRepository) by uri and path as string and case insensitively.
     // This enables to cache the Repo even with case mismatch (that FixLayout will fix).
@@ -84,7 +85,7 @@ public sealed partial class World
            ScreenType screenType,
            LocalWorldName name,
            WorldDefinitionFile definitionFile,
-           IReadOnlyList<(NormalizedPath Path, Uri Uri)> layout,
+           IReadOnlyList<RepoLayout> layout,
            PluginMachinery? pluginMachinery )
     {
         _stackRepository = stackRepository;
@@ -101,10 +102,10 @@ public sealed partial class World
     void FillCachedRepositories()
     {
         Throw.DebugAssert( _cachedRepositories.Count == 0 );
-        foreach( var (path, uri) in _layout )
+        foreach( var (url, _, path) in _layout )
         {
             _cachedRepositories.Add( path, null );
-            _cachedRepositories.Add( uri.ToString(), null );
+            _cachedRepositories.Add( url.ToString(), null );
         }
     }
 
@@ -208,7 +209,7 @@ public sealed partial class World
     /// <summary>
     /// Gets the expected layout of this world.
     /// </summary>
-    public IReadOnlyList<(NormalizedPath Path, Uri Uri)> Layout => _layout;
+    public IReadOnlyList<RepoLayout> Layout => _layout;
 
     /// <summary>
     /// Gets all events that can be raised by a World.
@@ -401,9 +402,9 @@ public sealed partial class World
     {
         for( index = 0; index < _layout.Count; ++index )
         {
-            var (path, uri) = _layout[index];
+            var (url, _, path) = _layout[index];
             if( IsBelowPathOrEqual( path, key )
-                || uri.ToString().Equals( key, StringComparison.OrdinalIgnoreCase ) )
+                || url.ToString().Equals( key, StringComparison.OrdinalIgnoreCase ) )
             {
                 return path;
             }
@@ -485,7 +486,7 @@ public sealed partial class World
             while( ckliRepoId == 0 );
             CreateOrUpdateCkliRepoTag( repository.Repository, _stackRepository, ckliRepoId );
         }
-        Repo? repo = new Repo( this, repository, index, ckliRepoId, _firstRepo );
+        Repo? repo = new Repo( this, repository, _layout[index].XElement, index, ckliRepoId, _firstRepo );
         _firstRepo = repo;
         _cachedRepositories[repository.WorkingFolder] = repo;
         _cachedRepositories[repository.OriginUrl.ToString()] = repo;

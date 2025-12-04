@@ -13,7 +13,7 @@ namespace CKli.Core;
 public sealed class PluginCollectorContext
 {
     readonly WorldName _worldName;
-    readonly IReadOnlyDictionary<string, (XElement Config, bool IsDisabled)> _pluginsConfiguration;
+    readonly IReadOnlyDictionary<XName, (XElement Config, bool IsDisabled)> _pluginsConfiguration;
     byte[]? _signature;
 
     /// <summary>
@@ -22,7 +22,7 @@ public sealed class PluginCollectorContext
     /// <param name="worldName">The world name.</param>
     /// <param name="pluginsConfiguration">The plugins configuration.</param>
     public PluginCollectorContext( WorldName worldName,
-                                   IReadOnlyDictionary<string, (XElement Config, bool IsDisabled)> pluginsConfiguration )
+                                   IReadOnlyDictionary<XName, (XElement Config, bool IsDisabled)> pluginsConfiguration )
     {
         _worldName = worldName;
         _pluginsConfiguration = pluginsConfiguration;
@@ -36,19 +36,19 @@ public sealed class PluginCollectorContext
     /// <summary>
     /// Gets the plugin configurations.
     /// </summary>
-    public IReadOnlyDictionary<string, (XElement Config, bool IsDisabled)> PluginsConfiguration => _pluginsConfiguration;
+    public IReadOnlyDictionary<XName, (XElement Config, bool IsDisabled)> PluginsConfiguration => _pluginsConfiguration;
 
     /// <summary>
     /// Gets the plugin configuration signature.
     /// </summary>
     public ReadOnlySpan<byte> Signature => new ReadOnlySpan<byte>( _signature ??= ComputeSignature( _pluginsConfiguration ) );
 
-    static byte[] ComputeSignature( IReadOnlyDictionary<string, (XElement Config, bool IsDisabled)> configs )
+    static byte[] ComputeSignature( IReadOnlyDictionary<XName, (XElement Config, bool IsDisabled)> configs )
     {
         using var hasher = IncrementalHash.CreateHash( HashAlgorithmName.SHA1 );
         foreach( var (name, isDisabled) in configs.Select( kv => (kv.Key,kv.Value.IsDisabled) ).OrderBy( kv => kv.Key ) )
         {
-            hasher.Append( name );
+            hasher.Append( name.LocalName );
             hasher.Append( isDisabled );
         }
         return hasher.GetHashAndReset();

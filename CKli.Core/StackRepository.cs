@@ -633,7 +633,7 @@ public sealed partial class StackRepository : IDisposable
         bool success = true;
         using( monitor.OpenInfo( $"Cloning {layout.Count} repositories in {stack.StackRoot}." ) )
         {
-            foreach( var (subPath, url) in layout )
+            foreach( var (url, _, subPath) in layout )
             {
                 using( var r = GitRepository.CloneWorkingFolder( monitor,
                                                                  new GitRepositoryKey( stack.SecretsStore, url, stack.IsPublic ),

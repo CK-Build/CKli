@@ -4,6 +4,7 @@ using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Security.Principal;
 using System.Text;
 using System.Xml.Linq;
@@ -44,9 +45,9 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
     protected override bool Initialize( IActivityMonitor monitor )
     {
         return !PrimaryPluginContext.Configuration.IsEmpty
-               || PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
+               || PrimaryPluginContext.ConfigurationEditor.EditConfiguration( monitor, ( monitor, c ) =>
                     {
-                        e.SetValue( "Initial Description..." );
+                        c.XElement.SetValue( "Initial Description..." );
                     } );
     }
 
@@ -55,30 +56,59 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
     public bool TestConfigEdit( IActivityMonitor monitor,
                                 [Description("The Description to update in the Xml element.")]
                                 string description,
+                                [Description("The target repository name to configure instead of the Plugin configuration.")]
+                                string? repoName = null,
                                 [Description("Try to remove the Plugin configuration element: Exception because we work on a detached clone.")]
-                                bool removePluginConfiguration,
+                                bool removePluginConfiguration = false,
                                 [Description("Rename the Plugin configuration element: ignored as we work on a clone and Nodes and Attributes are copied back.")]
-                                bool renamePluginConfiguration )
+                                bool renamePluginConfiguration = false )
     {
-        PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
+        if( repoName != null )
         {
-            e.SetValue( description );
-        } );
-        if( removePluginConfiguration )
-        {
-            return PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
-            {
-                e.Remove();
-            } );
-        }
-        if( renamePluginConfiguration )
-        {
-            return PrimaryPluginContext.ConfigurationEditor.Edit( monitor, ( monitor, e ) =>
-            {
-                e.Name = "SomeOtherName";
-            } );
-        }
+            var repoPath = World.Layout.FirstOrDefault( l => l.Path.LastPart == repoName ).Path;
+            var repo = !repoPath.IsEmptyPath ? World.GetDefinedRepo( monitor, repoPath ) : null;
+            if( repo == null ) return false;
 
+            PrimaryPluginContext.ConfigurationEditor.EditConfigurationFor( monitor, repo, ( monitor, c ) =>
+            {
+                c.XElement.SetValue( description );
+            } );
+            if( removePluginConfiguration )
+            {
+                return PrimaryPluginContext.ConfigurationEditor.EditConfigurationFor( monitor, repo, ( monitor, c ) =>
+                {
+                    c.XElement.Remove();
+                } );
+            }
+            if( renamePluginConfiguration )
+            {
+                return PrimaryPluginContext.ConfigurationEditor.EditConfigurationFor( monitor, repo, ( monitor, c ) =>
+                {
+                    c.XElement.Name = "SomeOtherName";
+                } );
+            }
+        }
+        else
+        {
+            PrimaryPluginContext.ConfigurationEditor.EditConfiguration( monitor, ( monitor, c ) =>
+            {
+                c.XElement.SetValue( description );
+            } );
+            if( removePluginConfiguration )
+            {
+                return PrimaryPluginContext.ConfigurationEditor.EditConfiguration( monitor, ( monitor, c ) =>
+                {
+                    c.XElement.Remove();
+                } );
+            }
+            if( renamePluginConfiguration )
+            {
+                return PrimaryPluginContext.ConfigurationEditor.EditConfiguration( monitor, ( monitor, c ) =>
+                {
+                    c.XElement.Name = "SomeOtherName";
+                } );
+            }
+        }
         return true;
     }
 

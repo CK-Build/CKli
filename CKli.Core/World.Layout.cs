@@ -5,11 +5,25 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace CKli.Core;
 
 sealed partial class World
 {
+    /// <summary>
+    /// Captures the <c>&lt;Repository Url="..." /&gt;</c> element.
+    /// </summary>
+    /// <param name="Url">The repository url.</param>
+    /// <param name="XElement">
+    /// The source configuration element from the definition file.
+    /// <para>
+    /// A <see cref="InvalidOperationException"/> is thrown by any modification to this element.
+    /// </para>
+    /// </param>
+    /// <param name="Path">The repository path (computed from the <c>&lt;Folder ... &gt;</c> elements).</param>
+    public readonly record struct RepoLayout( Uri Url, XElement XElement, NormalizedPath Path );
+
     /// <summary>
     /// Gets whether <see cref="AddRepository"/>, <see cref="RemoveRepository"/> or <see cref="XifLayout"/> can be called.
     /// </summary>
@@ -75,7 +89,7 @@ sealed partial class World
         }
 
         // The folder path must not be in an existing repository.
-        foreach( var (path, uri) in _layout )
+        foreach( var (uri, _, path) in _layout )
         {
             if( path.StartsWith( folderPath, strict: false ) )
             {
@@ -138,24 +152,24 @@ sealed partial class World
     public bool RemoveRepository( IActivityMonitor monitor, string nameOrUrl )
     {
         Throw.CheckState( CanChangeLayout );
-        foreach( var (path, uri) in _layout )
+        foreach( var (url, _, path) in _layout )
         {
             if( path.LastPart.Equals( nameOrUrl, StringComparison.OrdinalIgnoreCase )
-                || nameOrUrl.Equals( uri.ToString(), StringComparison.OrdinalIgnoreCase ) )
+                || nameOrUrl.Equals( url.ToString(), StringComparison.OrdinalIgnoreCase ) )
             {
                 if( !_name.Stack.Commit( monitor, $"Before removing repository '{nameOrUrl}' from world '{_name.FullName}'." ) )
                 {
                     return false;
                 }
-                using( monitor.OpenInfo( $"Removing '{path.LastPart}' ({uri}) from world '{_name.FullName}'." ) )
+                using( monitor.OpenInfo( $"Removing '{path.LastPart}' ({url}) from world '{_name.FullName}'." ) )
                 {
-                    if( !_definitionFile.RemoveRepository( monitor, uri, removeEmptyFolder: true )
+                    if( !_definitionFile.RemoveRepository( monitor, url, removeEmptyFolder: true )
                         || !FileHelper.DeleteFolder( monitor, path ) )
                     {
                         return false;
                     }
                 }
-                if( _name.Stack.Commit( monitor, $"Removed repository '{path.LastPart}' ({uri})." ) )
+                if( _name.Stack.Commit( monitor, $"Removed repository '{path.LastPart}' ({url})." ) )
                 {
                     _cachedRepositories.Clear();
                     FillCachedRepositories();
@@ -199,7 +213,7 @@ sealed partial class World
         {
             return false;
         }
-        ExecuteSuppr( monitor, this, deleteAliens, actions, potentiallyEmptyFolders );
+        ExecuteSuppress( monitor, this, deleteAliens, actions, potentiallyEmptyFolders );
 
         potentiallyEmptyFolders.Remove( _name.WorldRoot );
         if( potentiallyEmptyFolders.Count > 0 )
@@ -245,11 +259,11 @@ sealed partial class World
             return success;
         }
 
-        static void ExecuteSuppr( IActivityMonitor monitor,
-                                  World world,
-                                  bool deleteAliens,
-                                  List<LayoutAction> actions,
-                                  HashSet<NormalizedPath> potentiallyEmptyFolders )
+        static void ExecuteSuppress( IActivityMonitor monitor,
+                                     World world,
+                                     bool deleteAliens,
+                                     List<LayoutAction> actions,
+                                     HashSet<NormalizedPath> potentiallyEmptyFolders )
         {
             var toSuppr = actions.OfType<Suppress>().ToList();
             if( toSuppr.Count > 0 )
@@ -384,16 +398,16 @@ sealed partial class World
     }
 
     static List<LayoutAction> CreateFixOrXifLayoutRoadMap( Dictionary<Uri, NormalizedPath> physicalLayout,
-                                                           IReadOnlyList<(NormalizedPath Path, Uri Uri)> logicalLayout,
+                                                           IReadOnlyList<RepoLayout> logicalLayout,
                                                            bool fix )
     {
 
         var result = new List<LayoutAction>();
-        foreach( var (path, uri) in logicalLayout )
+        foreach( var (url, _, path) in logicalLayout )
         {
-            if( !physicalLayout.TryGetValue( uri, out var exist ) )
+            if( !physicalLayout.TryGetValue( url, out var exist ) )
             {
-                result.Add( fix ? new Clone( path, uri ) : new Suppress( path, uri ) );
+                result.Add( fix ? new Clone( path, url ) : new Suppress( path, url ) );
             }
             else
             {
@@ -405,9 +419,9 @@ sealed partial class World
                     {
                         (exist, to) = (to, exist.RemoveLastPart());
                     }
-                    result.Add( new Move( exist, uri, to, fixedCase ) );
+                    result.Add( new Move( exist, url, to, fixedCase ) );
                 }
-                physicalLayout.Remove( uri );
+                physicalLayout.Remove( url );
             }
         }
         foreach( var (uri, path) in physicalLayout )

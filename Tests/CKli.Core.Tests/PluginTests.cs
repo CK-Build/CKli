@@ -2,6 +2,7 @@ using CK.Core;
 using NUnit.Framework;
 using Shouldly;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
@@ -149,52 +150,114 @@ public class PluginTests
         // ckli plugin add CommandSample@version
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "add", $"CommandSample@{TestEnv.CKliPluginsCoreVersion}" )).ShouldBeTrue();
 
-        var definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
-        var config = definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
-        config.ShouldNotBeNull().Value.ShouldBe( "Initial Description..." );
-
-
-        using( TestHelper.Monitor.CollectTexts( out var logs ) )
-        {
-            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "New Description!" )).ShouldBeTrue();
-
-            definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
-            config = definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
-            config.ShouldNotBeNull().Value.ShouldBe( "New Description!" );
-        }
-
-        using( TestHelper.Monitor.CollectTexts( out var logs ) )
-        {
-            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "Will fail!", "--remove-plugin-configuration" ))
-                .ShouldBeFalse();
-
-            logs.ShouldContain( """
-                Plugin 'CommandSample' error while editing configuration:
-                <CommandSample>Will fail!</CommandSample>
-                """ );
-
-            definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
-            config = definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
-            config.ShouldNotBeNull().Value.ShouldBe( "New Description!", "Definition file is not saved on error." );
-        }
-
-        using( TestHelper.Monitor.CollectTexts( out var logs ) )
-        {
-            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "This will work but does nothing.", "--rename-plugin-configuration" ))
-                .ShouldBeTrue();
-
-            definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
-            config = definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
-            config.ShouldNotBeNull().Value.ShouldBe( "This will work but does nothing." );
-        }
+        await TestPluginConfigurationAsync( context );
+        await TestPluginConfigurationForRepoAsync( context, "OneRepo" );
 
         // ckli plugin remove CommandSample
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "remove", "CommandSample" )).ShouldBeTrue();
 
-        definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
-        config = definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
-        config.ShouldBeNull();
+        ReadConfigElement( context ).ShouldBeNull();
+        ReadRepoConfigElement( context, "OneRepo" ).ShouldBeNull();
+
+        static async Task TestPluginConfigurationAsync( CKliEnv context )
+        {
+            var config = ReadConfigElement( context );
+            config.ShouldNotBeNull().Value.ShouldBe( "Initial Description..." );
+
+            using( TestHelper.Monitor.CollectTexts( out var logs ) )
+            {
+                (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "New Description!" )).ShouldBeTrue();
+
+                config = ReadConfigElement( context );
+                config.ShouldNotBeNull().Value.ShouldBe( "New Description!" );
+            }
+
+            using( TestHelper.Monitor.CollectTexts( out var logs ) )
+            {
+                (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "Will fail!", "--remove-plugin-configuration" ))
+                    .ShouldBeFalse();
+
+                logs.ShouldContain( """
+                    Plugin 'CommandSample' error while editing configuration:
+                    <CommandSample>Will fail!</CommandSample>
+                    """ );
+
+                config = ReadConfigElement( context );
+                config.ShouldNotBeNull().Value.ShouldBe( "New Description!", "Definition file is not saved on error." );
+            }
+
+            using( TestHelper.Monitor.CollectTexts( out var logs ) )
+            {
+                (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "This will work but does nothing.", "--rename-plugin-configuration" ))
+                    .ShouldBeTrue();
+
+                config = ReadConfigElement( context );
+                config.ShouldNotBeNull().Value.ShouldBe( "This will work but does nothing." );
+            }
+        }
+
+        static async Task TestPluginConfigurationForRepoAsync( CKliEnv context, string repoName )
+        {
+            XElement? repoConfig = ReadRepoConfigElement( context, repoName );
+            repoConfig.ShouldBeNull();
+
+            using( TestHelper.Monitor.CollectTexts( out var logs ) )
+            {
+                (await CKliCommands.ExecAsync( TestHelper.Monitor,
+                                               context,
+                                               "test", "config", "edit", "For OneRepo!",
+                                               "--repo-name", repoName ))
+                    .ShouldBeTrue();
+
+                repoConfig = ReadRepoConfigElement( context, repoName );
+                repoConfig.ShouldNotBeNull().Value.ShouldBe( "For OneRepo!" );
+            }
+
+            using( TestHelper.Monitor.CollectTexts( out var logs ) )
+            {
+                (await CKliCommands.ExecAsync( TestHelper.Monitor,
+                                               context,
+                                               "test", "config", "edit", "Will fail!", "--remove-plugin-configuration",
+                                               "--repo-name", repoName ))
+                    .ShouldBeFalse();
+
+                logs.ShouldContain( """
+                    Plugin 'CommandSample' error while editing configuration for 'OneRepo':
+                    <CommandSample>Will fail!</CommandSample>
+                    """ );
+
+                repoConfig = ReadRepoConfigElement( context, repoName );
+                repoConfig.ShouldNotBeNull().Value.ShouldBe( "For OneRepo!", "Definition file is not saved on error." );
+            }
+
+            using( TestHelper.Monitor.CollectTexts( out var logs ) )
+            {
+                (await CKliCommands.ExecAsync( TestHelper.Monitor,
+                                               context,
+                                               "test", "config", "edit", "This will work but does nothing.", "--rename-plugin-configuration",
+                                               "--repo-name", repoName ))
+                    .ShouldBeTrue();
+
+                repoConfig = ReadRepoConfigElement( context, repoName );
+                repoConfig.ShouldNotBeNull().Value.ShouldBe( "This will work but does nothing." );
+            }
+        }
+
+        static XElement? ReadConfigElement( CKliEnv context )
+        {
+            var definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
+            return definitionFile.Element( "One" )?.Element( "Plugins" )?.Element( "CommandSample" );
+        }
+
+        static XElement? ReadRepoConfigElement( CKliEnv context, string repoName )
+        {
+            var definitionFile = XDocument.Load( context.CurrentStackPath.AppendPart( "One.xml" ) );
+            return definitionFile.Descendants( "Repository" )
+                                            .Single( e => e.Attribute( "Url" )!.Value.Contains( repoName ) )
+                                            .Element( "CommandSample" );
+        }
     }
+
 
     [Test]
     public async Task VSSolutionSample_issues_Async()

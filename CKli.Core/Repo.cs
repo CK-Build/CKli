@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Xml.Linq;
 
 namespace CKli.Core;
 
@@ -11,15 +12,18 @@ public sealed class Repo
     readonly World _world;
     // World.Dispose() disposes the Git repository.
     internal readonly GitRepository _git;
-    readonly int _index;
+    // For PrimaryPluginContext.GetConfigurationFor( Repo ).
+    internal readonly XElement _configuration;
     readonly ulong _ckliRepoId;
+    readonly int _index;
     internal readonly Repo? _nextRepo;
     GitRepository.SimpleStatusInfo _status;
 
-    internal Repo( World world, GitRepository git, int index, ulong ckliRepoId, Repo? nextRepo )
+    internal Repo( World world, GitRepository git, XElement configuration, int index, ulong ckliRepoId, Repo? nextRepo )
     {
         _world = world;
         _git = git;
+        _configuration = configuration;
         _index = index;
         _ckliRepoId = ckliRepoId;
         _nextRepo = nextRepo;

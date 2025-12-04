@@ -54,7 +54,7 @@ public sealed partial class World
         Throw.DebugAssert( "Or we'll not be here.", config != null );
 
         // No need to optimize this.
-        var missings = config.Select( kv => (ShortName: kv.Key, FullName: $"CKli.{kv.Key}.Plugin", Configuration: kv.Value.Config) )
+        var missings = config.Select( kv => (ShortName: kv.Key.LocalName, FullName: $"CKli.{kv.Key}.Plugin", Configuration: kv.Value.Config) )
                               .Where( e => !loaded.Any( p => p.FullPluginName == e.FullName ) )
                               .Select( e => new DisplayInfoPlugin( e.ShortName, e.FullName, PluginStatus.MissingImplementation, null, e.Configuration ) );
         infos = loaded.Select( p => new DisplayInfoPlugin( p.PluginName, p.FullPluginName, p.Status, p.InformationalVersion, config.GetValueOrDefault( p.PluginName ).Config ) )
