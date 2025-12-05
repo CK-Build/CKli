@@ -156,8 +156,8 @@ public abstract partial class Command
     public static bool IsValidCommandPath( string commandPath ) => ValidCommandPath().IsMatch( commandPath );
 
     /// <summary>
-    /// Used by code generator. This is implemented here to maintain the correspondance between the <see cref="IsValidCommandPath(string)"/>
-    /// defition and this rewriting.
+    /// Used by code generator. This is implemented here to maintain the correspondence between the <see cref="IsValidCommandPath(string)"/>
+    /// definition and this rewriting.
     /// </summary>
     /// <param name="b">The target string builder.</param>
     /// <param name="command">The command for which the command path must be written as an identifier.</param>
@@ -177,6 +177,6 @@ public abstract partial class Command
         return b;
     }
 
-    [GeneratedRegex( """^(?!-)\*?[a-z-]+\*?( (?!-)\*?[a-z-]+\*?)*$""", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture )]
+    [GeneratedRegex( """^(?!-)\*?[a-z][a-z0-9-]*\*?( (?!-)\*?[a-z][a-z0-9-]*\*?)*$""", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture )]
     private static partial Regex ValidCommandPath();
 }
