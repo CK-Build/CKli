@@ -66,7 +66,7 @@ public sealed class PluginConfiguration
                 {
                     Throw.DebugAssert( "Only Repo configuration can be new element.", _repo != null );
                     // Avoid polluting the definition file with empty plugin configurations.
-                    if( !e.IsEmpty )
+                    if( !e.IsEmpty || e.HasAttributes )
                     {
                         // This may be changed by the editor (corrects that).
                         e.Name = _context.PluginInfo.GetXName();
