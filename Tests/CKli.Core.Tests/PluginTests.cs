@@ -164,13 +164,10 @@ public class PluginTests
             var config = ReadConfigElement( context );
             config.ShouldNotBeNull().Value.ShouldBe( "Initial Description..." );
 
-            using( TestHelper.Monitor.CollectTexts( out var logs ) )
-            {
-                (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "New Description!" )).ShouldBeTrue();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "New Description!" )).ShouldBeTrue();
 
-                config = ReadConfigElement( context );
-                config.ShouldNotBeNull().Value.ShouldBe( "New Description!" );
-            }
+            config = ReadConfigElement( context );
+            config.ShouldNotBeNull().Value.ShouldBe( "New Description!" );
 
             using( TestHelper.Monitor.CollectTexts( out var logs ) )
             {
@@ -186,14 +183,11 @@ public class PluginTests
                 config.ShouldNotBeNull().Value.ShouldBe( "New Description!", "Definition file is not saved on error." );
             }
 
-            using( TestHelper.Monitor.CollectTexts( out var logs ) )
-            {
-                (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "This will work but does nothing.", "--rename-plugin-configuration" ))
-                    .ShouldBeTrue();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "config", "edit", "This will work but does nothing.", "--rename-plugin-configuration" ))
+                .ShouldBeTrue();
 
-                config = ReadConfigElement( context );
-                config.ShouldNotBeNull().Value.ShouldBe( "This will work but does nothing." );
-            }
+            config = ReadConfigElement( context );
+            config.ShouldNotBeNull().Value.ShouldBe( "This will work but does nothing." );
         }
 
         static async Task TestPluginConfigurationForRepoAsync( CKliEnv context, string repoName )
@@ -201,17 +195,14 @@ public class PluginTests
             XElement? repoConfig = ReadRepoConfigElement( context, repoName );
             repoConfig.ShouldBeNull();
 
-            using( TestHelper.Monitor.CollectTexts( out var logs ) )
-            {
-                (await CKliCommands.ExecAsync( TestHelper.Monitor,
-                                               context,
-                                               "test", "config", "edit", "For OneRepo!",
-                                               "--repo-name", repoName ))
-                    .ShouldBeTrue();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor,
+                                            context,
+                                            "test", "config", "edit", "For OneRepo!",
+                                            "--repo-name", repoName ))
+                .ShouldBeTrue();
 
-                repoConfig = ReadRepoConfigElement( context, repoName );
-                repoConfig.ShouldNotBeNull().Value.ShouldBe( "For OneRepo!" );
-            }
+            repoConfig = ReadRepoConfigElement( context, repoName );
+            repoConfig.ShouldNotBeNull().Value.ShouldBe( "For OneRepo!" );
 
             using( TestHelper.Monitor.CollectTexts( out var logs ) )
             {
@@ -230,17 +221,35 @@ public class PluginTests
                 repoConfig.ShouldNotBeNull().Value.ShouldBe( "For OneRepo!", "Definition file is not saved on error." );
             }
 
-            using( TestHelper.Monitor.CollectTexts( out var logs ) )
-            {
-                (await CKliCommands.ExecAsync( TestHelper.Monitor,
-                                               context,
-                                               "test", "config", "edit", "This will work but does nothing.", "--rename-plugin-configuration",
-                                               "--repo-name", repoName ))
+            (await CKliCommands.ExecAsync( TestHelper.Monitor,
+                                            context,
+                                            "test", "config", "edit", "This will work but does nothing.", "--rename-plugin-configuration",
+                                            "--repo-name", repoName ))
+                .ShouldBeTrue();
+
+            repoConfig = ReadRepoConfigElement( context, repoName );
+            repoConfig.ShouldNotBeNull().Value.ShouldBe( "This will work but does nothing." );
+
+            // Testing RemoveConfigurationFor( repo ).
+            (await CKliCommands.ExecAsync( TestHelper.Monitor,
+                                            context,
+                                            "test", "config", "edit", "Removed...", "--repo-configuration-remove",
+                                            "--repo-name", repoName ))
+                .ShouldBeTrue();
+
+            repoConfig = ReadRepoConfigElement( context, repoName );
+            repoConfig.ShouldBeNull();
+
+            // Adds the configuration back to be able to test Plugin remove (that removes the per Repo plugin configurations).
+            (await CKliCommands.ExecAsync( TestHelper.Monitor,
+                                context,
+                                "test", "config", "edit", "Will be removed by 'ckli plugin remove'.",
+                                "--repo-name", repoName ))
                     .ShouldBeTrue();
 
-                repoConfig = ReadRepoConfigElement( context, repoName );
-                repoConfig.ShouldNotBeNull().Value.ShouldBe( "This will work but does nothing." );
-            }
+            repoConfig = ReadRepoConfigElement( context, repoName );
+            repoConfig.ShouldNotBeNull().Value.ShouldBe( "Will be removed by 'ckli plugin remove'." );
+
         }
 
         static XElement? ReadConfigElement( CKliEnv context )

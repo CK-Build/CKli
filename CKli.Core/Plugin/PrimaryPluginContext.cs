@@ -99,4 +99,16 @@ public sealed class PrimaryPluginContext
         return result;
     }
 
+    /// <summary>
+    /// Clears and removes the configuration for the provided Repo.
+    /// </summary>
+    /// <param name="repo">The World's repo for which the per Repo plugin configuration must be removed.</param>
+    public void RemoveConfigurationFor( Repo repo )
+    {
+        if( HasConfigurationFor( repo ) )
+        {
+            GetConfigurationFor( repo ).ClearRepoConfiguration();
+        }
+    }
+
 }

@@ -38,6 +38,14 @@ public sealed class PluginConfiguration
     public bool IsEmptyConfiguration => _e.IsEmpty && !_e.HasAttributes;
 
     /// <summary>
+    /// Gets the Repo to which this config applies if this is a per Repo configuration.
+    /// <para>
+    /// This is null for the plugin configuration itself.
+    /// </para>
+    /// </summary>
+    public Repo? Repo => _repo;
+
+    /// <summary>
     /// Allows the plugin configuration to be changed.
     /// <para>
     /// This can fail and return false if an exception is thrown by <paramref name="editor"/>.
@@ -92,4 +100,13 @@ public sealed class PluginConfiguration
         return true;
     }
 
+    internal void ClearRepoConfiguration()
+    {
+        Throw.DebugAssert( _repo != null && !IsEmptyConfiguration );
+        using( _context.World.DefinitionFile.StartEdit() )
+        {
+            _e.RemoveAll();
+            _e.Remove();
+        }
+    }
 }

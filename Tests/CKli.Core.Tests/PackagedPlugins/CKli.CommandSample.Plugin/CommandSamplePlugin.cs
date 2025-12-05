@@ -61,7 +61,9 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
                                 [Description("Try to remove the Plugin configuration element: Exception because we work on a detached clone.")]
                                 bool removePluginConfiguration = false,
                                 [Description("Rename the Plugin configuration element: ignored as we work on a clone and Nodes and Attributes are copied back.")]
-                                bool renamePluginConfiguration = false )
+                                bool renamePluginConfiguration = false,
+                                [Description("Removed the Plugin Repo configuration element.")]
+                                bool repoConfigurationRemove = false )
     {
         if( repoName != null )
         {
@@ -86,6 +88,10 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
                 {
                     e.Name = "SomeOtherName";
                 } );
+            }
+            if( repoConfigurationRemove )
+            {
+                PrimaryPluginContext.RemoveConfigurationFor( repo );
             }
         }
         else
