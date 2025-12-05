@@ -1,4 +1,5 @@
 using CK.Core;
+using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 
@@ -18,9 +19,10 @@ sealed class CKliUpdate : Command
                 [
                     (["--prerelease"], "Consider prerelease versions (including CI builds)."),
                     (["--allow-downgrade"], """
-                    Allow package downgrade.
-                    Useful to come back to the last stable version when --prerelease has been used.
-                    """)
+                                            Allow package downgrade.
+                                            Useful to come back to the last stable version when --prerelease has been used.
+                                            """),
+                    (["--exp"], """!Experimental!""")
                 ] )
     {
     }
@@ -33,6 +35,7 @@ sealed class CKliUpdate : Command
     {
         bool prerelease = cmdLine.EatFlag( "--prerelease" );
         bool allowDowngrade = cmdLine.EatFlag( "--allow-downgrade" );
+        bool useDotnet = cmdLine.EatFlag( "--exp" );
         if( !cmdLine.Close( monitor ) )
         {
             return ValueTask.FromResult( false );
@@ -57,13 +60,42 @@ sealed class CKliUpdate : Command
         // See https://stackoverflow.com/questions/22558869/wait-for-process-to-end-in-windows-batch-file
         // I'd rather use a C# 10 file-based application...
         var pid = System.Environment.ProcessId;
-        var cmd = $@"Wait-Process -Id {pid} -Timeout 20 -ErrorAction SilentlyContinue; {updateCmd}";
-        Process.Start( new ProcessStartInfo
+
+        if( !useDotnet )
         {
-            FileName = "powershell.exe",
-            Arguments = $"-NoProfile -NoLogo -NonInteractive -ExecutionPolicy unrestricted -command {cmd}",
-            UseShellExecute = false
-        } );
+            var cmd = $@"Wait-Process -Id {pid} -Timeout 20 -ErrorAction SilentlyContinue; {updateCmd}";
+            Process.Start( new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoProfile -NoLogo -NonInteractive -ExecutionPolicy unrestricted -command {cmd}",
+                UseShellExecute = false
+            } );
+        }
+        else
+        {
+            var cmd = $$"""
+        'if(System.Diagnostics.Process.GetProcessById({{pid}}).WaitForExit(20000))
+        {System.Diagnostics.Process.Start( "dotnet", "{{updateCmd}}" ).WaitForExit();Console.WriteLine();}' | dotnet run -
+        """.ReplaceLineEndings( "" );
+
+            string fileName, arguments;
+            if( Environment.OSVersion.Platform == PlatformID.Unix )
+            {
+                fileName = "/bin/bash";
+                arguments = "-c " + cmd;
+            }
+            else
+            {
+                fileName = "cmd.exe";
+                arguments = "/c " + cmd;
+            }
+            Process.Start( new ProcessStartInfo
+            {
+                FileName = fileName,
+                Arguments = arguments,
+                UseShellExecute = false
+            } );
+        }
         return ValueTask.FromResult( true );
     }
 
