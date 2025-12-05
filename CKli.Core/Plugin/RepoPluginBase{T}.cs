@@ -31,10 +31,20 @@ public abstract class RepoPluginBase<T> : PluginBase
     }
 
     /// <summary>
+    /// Gets whether the <typeparamref name="T"/> for the provided Repo has already been created.
+    /// </summary>
+    /// <param name="r">The repository.</param>
+    /// <returns>
+    /// True if the info associated to the repository, false if the next
+    /// call to <see cref="Get(IActivityMonitor, Repo)"/> will create it.
+    /// </returns>
+    protected bool HasRepoInfoBeenCreated( Repo r ) => _infos[r.Index] != null;
+
+    /// <summary>
     /// Gets the associated information of a given <see cref="Repo"/>.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="r">The Repo from which a <typeparamref name="T"/> muts be obtained.</param>
+    /// <param name="r">The Repo from which a <typeparamref name="T"/> must be obtained.</param>
     /// <returns>The information.</returns>
     public T Get( IActivityMonitor monitor, Repo r )
     {
