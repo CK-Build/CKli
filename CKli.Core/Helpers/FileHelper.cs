@@ -112,14 +112,17 @@ public sealed class FileHelper
         if( !DeleteClonedFolderOnly( monitor, path, out bool isClonedFolder ) )
         {
             if( isClonedFolder ) return false;
-            foreach( var d in Directory.EnumerateDirectories( path ) )
+            if( Directory.Exists( path ) )
             {
-                if( !DeleteFolder( monitor, d ) )
+                foreach( var d in Directory.EnumerateDirectories( path ) )
                 {
-                    return false;
+                    if( !DeleteFolder( monitor, d ) )
+                    {
+                        return false;
+                    }
                 }
+                return DoDeleteFolder( monitor, path, recursive: true, LogLevel.Error );
             }
-            return DoDeleteFolder( monitor, path, recursive: true, LogLevel.Error );
         }
         return true;
     }
