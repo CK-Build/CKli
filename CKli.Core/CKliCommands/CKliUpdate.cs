@@ -16,7 +16,11 @@ sealed class CKliUpdate : Command
                 [],
                 [],
                 [
-                    (["--prerelease"], "Consider prerelease versions (including CI builds).")
+                    (["--prerelease"], "Consider prerelease versions (including CI builds)."),
+                    (["--allow-downgrade"], """
+                    Allow package downgrade.
+                    Useful to come back to the last stable version when --prerelease has been used.
+                    """)
                 ] )
     {
     }
@@ -28,19 +32,20 @@ sealed class CKliUpdate : Command
                                                                     CommandLineArguments cmdLine )
     {
         bool prerelease = cmdLine.EatFlag( "--prerelease" );
+        bool allowDowngrade = cmdLine.EatFlag( "--allow-downgrade" );
         if( !cmdLine.Close( monitor ) )
         {
             return ValueTask.FromResult( false );
         }
         if( context.Screen is InteractiveScreen )
         {
-            monitor.Warn( "Sorry, update command cannot be used in interactive mode." );
+            monitor.Error( "Update command cannot be used in interactive mode." );
             return ValueTask.FromResult( false );
         }
         var updateCmd = prerelease
                 ? "dotnet tool update CKli -g --prerelease --add-source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json"
-                : "dotnet tool update CKli -g --allow-downgrade";
-
+                : "dotnet tool update CKli -g";
+        if( allowDowngrade ) updateCmd += " --allow-downgrade";
         var info = CSemVer.InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() );
         monitor.Info( ScreenType.CKliScreenTag, $"""
             Currently installed '{info.Version}'. Will now execute after this CKli instance ends:
