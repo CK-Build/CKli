@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 
 namespace CKli.Core;
@@ -118,7 +119,7 @@ public sealed class FileHelper
                     return false;
                 }
             }
-            return DoDeleteFolder( monitor, path );
+            return DoDeleteFolder( monitor, path, recursive: true, LogLevel.Error );
         }
         return true;
     }
@@ -129,7 +130,7 @@ public sealed class FileHelper
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="path">The folder path to remove.</param>
     /// <param name="isClonedFolder">Outputs whether <paramref name="path"/> is a cloned folder, regardless of the returned result.</param>
-    /// <returns>True on success, false othewise.</returns>
+    /// <returns>True on success, false otherwise.</returns>
     public static bool DeleteClonedFolderOnly( IActivityMonitor monitor, string path, out bool isClonedFolder )
     {
         isClonedFolder = false;
@@ -144,26 +145,26 @@ public sealed class FileHelper
                     File.SetAttributes( gitObjectFile, FileAttributes.Normal );
                 }
             }
-            return DoDeleteFolder( monitor, path );
+            return DoDeleteFolder( monitor, path, recursive: true, LogLevel.Error );
         }
         return false;
     }
 
-    static bool DoDeleteFolder( IActivityMonitor monitor, string path )
+    static bool DoDeleteFolder( IActivityMonitor monitor, string path, bool recursive, LogLevel errorLogLevel )
     {
         int tryCount = 0;
         for(; ; )
         {
             try
             {
-                if( Directory.Exists( path ) ) Directory.Delete( path, true );
+                if( Directory.Exists( path ) ) Directory.Delete( path, recursive );
                 return true;
             }
             catch( Exception ex )
             {
                 if( ++tryCount > 5 )
                 {
-                    monitor.Error( $"While trying to delete folder '{path}'.", ex );
+                    monitor.Log( errorLogLevel, $"While trying to delete folder '{path}'.", ex );
                     return false;
                 }
                 Thread.Sleep( 100 );
@@ -171,4 +172,47 @@ public sealed class FileHelper
         }
     }
 
+    /// <summary>
+    /// Deletes any empty folder recursively in <paramref name="path"/>.
+    /// <para>
+    /// If an empty folder cannot be deleted, the error is logged and false is returned
+    /// but unless <paramref name="stopOnFirstError"/> is set, the process continues.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The root path to consider. May not exist: nothing is done.</param>
+    /// <param name="errorLogLevel">Log level to emit for non removable folders.</param>
+    /// <param name="stopOnFirstError">True to stop as soon as an empty folder cannot be deleted.</param>
+    /// <returns>True on success, false is an error occurred.</returns>
+    public static bool DeleteEmptyFoldersBelow( IActivityMonitor monitor,
+                                                string path,
+                                                LogLevel errorLogLevel = LogLevel.Error,
+                                                bool stopOnFirstError = false )
+    {
+        bool success = true;
+        if( Directory.Exists( path ) )
+        {
+            foreach( var e in Directory.EnumerateDirectories( path ) )
+            {
+                success &= DoDeleteEmptyFolders( monitor, e, errorLogLevel, stopOnFirstError );
+                if( !success && stopOnFirstError ) break;
+            }
+        }
+        return success;
+    }
+
+    static bool DoDeleteEmptyFolders( IActivityMonitor monitor, string path, LogLevel errorLogLevel, bool stopOnFirstError )
+    {
+        bool success = true;
+        foreach( var e in Directory.EnumerateDirectories( path ) )
+        {
+            success &= DoDeleteEmptyFolders( monitor, e, errorLogLevel, stopOnFirstError );
+            if( !success && stopOnFirstError ) break; 
+        }
+        if( !Directory.EnumerateFileSystemEntries( path ).Any() )
+        {
+            success &= DoDeleteFolder( monitor, path, recursive: false, errorLogLevel );
+        }
+        return success;
+    }
 }
