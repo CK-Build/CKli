@@ -1,30 +1,95 @@
+using CK.Core;
 using System;
 using System.Xml.Linq;
 
 namespace CKli.Core;
 
 /// <summary>
-/// Simple wrapper around a <see cref="XElement"/> that enables extension methods
-/// to be defined to help reading Plugin configuration.
+/// Wraps the <see cref="XElement"/> configuration.
 /// </summary>
-public readonly struct PluginConfiguration
+public sealed class PluginConfiguration
 {
+    readonly PrimaryPluginContext _context;
     readonly XElement _e;
+    readonly Repo? _repo;
 
-    internal PluginConfiguration( XElement e ) => _e = e;
+    internal PluginConfiguration( PrimaryPluginContext context, XElement e, Repo? repo )
+    {
+        _context = context;
+        _e = e;
+        _repo = repo;
+    }
 
     /// <summary>
     /// Gets the configuration element.
     /// <para>
     /// A <see cref="InvalidOperationException"/> is thrown by any modification to this element:
-    /// the <see cref="PluginConfigurationEditor"/> must be used.
+    /// <see cref="Edit"/> must be used.
     /// </para>
     /// </summary>
     public XElement XElement => _e;
 
     /// <summary>
-    /// Gets whether this configuration is empty (no child element nor text nodes or comments).
-    /// <see cref="XElement.HasAttributes"/> may be true.
+    /// Gets whether this configuration is empty (no attributes, no child element nor text nodes or comments).
+    /// <para>
+    /// This is not the same as the <see cref="XElement.IsEmpty"/> that can be true with a true <see cref="XElement.HasAttributes"/>.
+    /// </para>
     /// </summary>
-    public bool IsEmpty => _e.IsEmpty;
+    public bool IsEmptyConfiguration => _e.IsEmpty && !_e.HasAttributes;
+
+    /// <summary>
+    /// Allows the plugin configuration to be changed.
+    /// <para>
+    /// This can fail and return false if an exception is thrown by <paramref name="editor"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="editor">The mutation to apply.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public bool Edit( IActivityMonitor monitor, Action<IActivityMonitor, XElement> editor )
+    {
+        var e = _e.Document == null ? _e : new XElement( _e );
+        try
+        {
+            editor( monitor, e );
+            using( _context.World.DefinitionFile.StartEdit() )
+            {
+                if( e == _e )
+                {
+                    Throw.DebugAssert( "Only Repo configuration can be new element.", _repo != null );
+                    // Avoid polluting the definition file with empty plugin configurations.
+                    if( !e.IsEmpty )
+                    {
+                        // This may be changed by the editor (corrects that).
+                        e.Name = _context.PluginInfo.GetXName();
+                        _repo._configuration.Add( e );
+                    }
+                }
+                else
+                {
+                    _e.RemoveAll();
+                    if( _repo != null && !e.HasAttributes && e.IsEmpty )
+                    {
+                        // Avoid polluting the definition file with empty plugin configurations.
+                        _e.Remove();
+                    }
+                    else
+                    {
+                        _e.Add( e.Attributes() );
+                        _e.Add( e.Nodes() );
+                    }
+                }
+            }
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"""
+                Plugin '{_context.PluginInfo.PluginName}' error while editing configuration{(_repo != null ? $" for '{_repo.DisplayPath}'" : "")}:
+                {e}
+                """, ex );
+            return false;
+        }
+        return true;
+    }
+
 }

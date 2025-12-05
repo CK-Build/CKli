@@ -44,10 +44,10 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
 
     protected override bool Initialize( IActivityMonitor monitor )
     {
-        return !PrimaryPluginContext.Configuration.IsEmpty
-               || PrimaryPluginContext.ConfigurationEditor.EditConfiguration( monitor, ( monitor, c ) =>
+        return !PrimaryPluginContext.Configuration.IsEmptyConfiguration
+               || PrimaryPluginContext.Configuration.Edit( monitor, ( monitor, e ) =>
                     {
-                        c.XElement.SetValue( "Initial Description..." );
+                        e.SetValue( "Initial Description..." );
                     } );
     }
 
@@ -69,43 +69,43 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
             var repo = !repoPath.IsEmptyPath ? World.GetDefinedRepo( monitor, repoPath ) : null;
             if( repo == null ) return false;
 
-            PrimaryPluginContext.ConfigurationEditor.EditConfigurationFor( monitor, repo, ( monitor, c ) =>
+            PrimaryPluginContext.GetConfigurationFor( repo ).Edit( monitor, ( monitor, e ) =>
             {
-                c.XElement.SetValue( description );
+                e.SetValue( description );
             } );
             if( removePluginConfiguration )
             {
-                return PrimaryPluginContext.ConfigurationEditor.EditConfigurationFor( monitor, repo, ( monitor, c ) =>
+                return PrimaryPluginContext.GetConfigurationFor( repo ).Edit( monitor, ( monitor, e ) =>
                 {
-                    c.XElement.Remove();
+                    e.Remove();
                 } );
             }
             if( renamePluginConfiguration )
             {
-                return PrimaryPluginContext.ConfigurationEditor.EditConfigurationFor( monitor, repo, ( monitor, c ) =>
+                return PrimaryPluginContext.GetConfigurationFor( repo ).Edit( monitor, ( monitor, e ) =>
                 {
-                    c.XElement.Name = "SomeOtherName";
+                    e.Name = "SomeOtherName";
                 } );
             }
         }
         else
         {
-            PrimaryPluginContext.ConfigurationEditor.EditConfiguration( monitor, ( monitor, c ) =>
+            PrimaryPluginContext.Configuration.Edit( monitor, ( monitor, e ) =>
             {
-                c.XElement.SetValue( description );
+                e.SetValue( description );
             } );
             if( removePluginConfiguration )
             {
-                return PrimaryPluginContext.ConfigurationEditor.EditConfiguration( monitor, ( monitor, c ) =>
+                return PrimaryPluginContext.Configuration.Edit( monitor, ( monitor, e ) =>
                 {
-                    c.XElement.Remove();
+                    e.Remove();
                 } );
             }
             if( renamePluginConfiguration )
             {
-                return PrimaryPluginContext.ConfigurationEditor.EditConfiguration( monitor, ( monitor, c ) =>
+                return PrimaryPluginContext.Configuration.Edit( monitor, ( monitor, e ) =>
                 {
-                    c.XElement.Name = "SomeOtherName";
+                    e.Name = "SomeOtherName";
                 } );
             }
         }

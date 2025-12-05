@@ -6,13 +6,16 @@ namespace CKli.Core;
 
 /// <summary>
 /// Constructor parameter of a primary plugin.
+/// <para>
+/// Exposes the plugin configuration and the per Repo plugin configuration to its plugin.
+/// </para>
 /// </summary>
 public sealed class PrimaryPluginContext
 {
     readonly World _world;
     readonly PluginInfo _pluginInfo;
     readonly PluginConfiguration _configuration;
-    PluginConfigurationEditor? _configurationEditor;
+    Dictionary<Repo,PluginConfiguration>? _perRepoConfigurations;
 
     /// <summary>
     /// Constructor used by reflection based plugins.
@@ -23,7 +26,7 @@ public sealed class PrimaryPluginContext
     public PrimaryPluginContext( PluginInfo pluginInfo, XElement configuration, World world )
     {
         _pluginInfo = pluginInfo;
-        _configuration = new PluginConfiguration( configuration );
+        _configuration = new PluginConfiguration( this, configuration, null );
         _world = world;
     }
 
@@ -52,33 +55,48 @@ public sealed class PrimaryPluginContext
 
     /// <summary>
     /// Gets the plugin configuration.
-    /// This must not be altered otherwise an <see cref="InvalidOperationException"/> is thrown.
-    /// <para>
-    /// Use the <see cref="ConfigurationEditor"/> to edit this configuration or a per Repo configuration.
-    /// </para>
     /// </summary>
     public PluginConfiguration Configuration => _configuration;
 
     /// <summary>
-    /// Gets the non null plugin configuration for a given <see cref="Repo"/> if it exists.
+    /// Gets whether the plugin configuration for a given <see cref="Repo"/> exists.
+    /// <para>An empty configuration (when <see cref="PluginConfiguration.IsEmptyConfiguration"/> is true) doesn't exist.</para>
     /// </summary>
-    /// <param name="repo">The World's repo for which the per Repo plugin configuration must be obtained.</param>
-    /// <returns>The plugin configuration or null.</returns>
-    public PluginConfiguration? GetConfigurationFor( Repo repo )
+    /// <param name="repo">The World's repo for which the per Repo plugin configuration should exist.</param>
+    /// <returns>True if th plugin configuration exists, false otherwise.</returns>
+    public bool HasConfigurationFor( Repo repo )
     {
-        var e = repo._configuration.Element( _pluginInfo.GetXName() );
-        return e != null ? new PluginConfiguration( e ) : null;
+        return (_perRepoConfigurations != null
+                && _perRepoConfigurations.TryGetValue( repo, out var exists )
+                && !exists.IsEmptyConfiguration)
+               || repo._configuration.Element( _pluginInfo.GetXName() ) != null;
     }
 
     /// <summary>
-    /// Gets the editor that can be used to edit the plugin configuration and/or per Repo plugin configurations.
+    /// Gets the plugin configuration for a given <see cref="Repo"/> (creates an empty one if needed).
     /// </summary>
-    public PluginConfigurationEditor ConfigurationEditor
+    /// <param name="repo">The World's repo for which the per Repo plugin configuration must be obtained.</param>
+    /// <returns>The plugin configuration.</returns>
+    public PluginConfiguration GetConfigurationFor( Repo repo )
     {
-        get
+        PluginConfiguration? result;
+        if( _perRepoConfigurations != null )
         {
-            return _configurationEditor ??= new PluginConfigurationEditor( PluginInfo, World.DefinitionFile, Configuration.XElement );
+            if( _perRepoConfigurations.TryGetValue( repo, out result ) )
+            {
+                return result;
+            }
         }
+        else
+        {
+            _perRepoConfigurations = new Dictionary<Repo, PluginConfiguration>();
+        }
+        // e is either anchored (existing) or detached (new). Edit uses this.
+        var e = repo._configuration.Element( _pluginInfo.GetXName() )
+                ?? new XElement( _pluginInfo.GetXName() );
+        result = new PluginConfiguration( this, e, repo );
+        _perRepoConfigurations.Add( repo, result );
+        return result;
     }
 
 }
