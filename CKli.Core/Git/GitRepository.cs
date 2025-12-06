@@ -276,11 +276,12 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// Fetches 'origin' (or all remotes) branches and tags into this repository.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="withTags">Specify whether tags must be fetched from remote. When true, locally modified tags are lost.</param>
     /// <param name="originOnly">False to fetch all the remote branches. By default, branches from only 'origin' remote are considered.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool FetchBranches( IActivityMonitor monitor, bool originOnly = true )
+    public bool FetchBranches( IActivityMonitor monitor, bool withTags, bool originOnly = true )
     {
-        using( monitor.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{DisplayPath}'." ) )
+        using( monitor.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{DisplayPath}' with{(withTags ? "" : "out")} tags." ) )
         {
             try
             {
@@ -329,7 +330,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
             var b = DoGetBranch( monitor, _git, branchName, LogLevel.None, _displayPath );
             if( b == null )
             {
-                if( !FetchBranches( monitor, originOnly: true ) )
+                if( !FetchBranches( monitor, withTags: false, originOnly: true ) )
                 {
                     return false;
                 }

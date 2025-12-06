@@ -42,7 +42,7 @@ public sealed class FileHelper
     }
 
     /// <summary>
-    /// Moves/renames a directory. This handles casing correctly (even on case insenstive file systems).
+    /// Moves/renames a directory. This handles casing correctly (even on case insensitive file systems).
     /// <para>
     /// Retries up to 5 times and ultimately gives up with a logged error and returns false.
     /// </para>

@@ -110,9 +110,10 @@ public sealed class Repo
     /// Fetches 'origin' (or all remotes) branches and tags into this repository.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="withTags">Specify whether tags must be fetched from remote. When true, locally modified tags are lost.</param>
     /// <param name="originOnly">False to fetch all the remote branches. By default, branches from only 'origin' remote are considered.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool Fetch( IActivityMonitor monitor, bool originOnly = true ) => _git.FetchBranches( monitor, originOnly );
+    public bool Fetch( IActivityMonitor monitor, bool withTags, bool originOnly = true ) => _git.FetchBranches( monitor, withTags, originOnly );
 
     /// <summary>
     /// Pushes changes from the current branch to the origin.
@@ -120,10 +121,6 @@ public sealed class Repo
     /// <param name="monitor">The monitor to use.</param>
     /// <returns>True on success, false on error.</returns>
     public bool Push( IActivityMonitor monitor ) => _git.Push( monitor );
-
-    /// <inheritdoc cref="GitRepository.SetCurrentBranch(IActivityMonitor, string, bool)"/>
-    public bool SetCurrentBranch( IActivityMonitor monitor, string branchName, bool skipPullMerge = false )
-            => _git.SetCurrentBranch( monitor, branchName, skipPullMerge );
 
     /// <summary>
     /// Returns the <see cref="DisplayPath"/> (with its link to <see cref="WorkingFolder"/>) as a <see cref="ContentBox"/>

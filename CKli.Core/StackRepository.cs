@@ -524,7 +524,7 @@ public sealed partial class StackRepository : IDisposable
             // Before doing anything else, we read the definition file and extract the actual
             // world name with the right casing. If case differ, the git handle is disposed,
             // the folder name is fixed and a new git handle is acquired.
-            if( git.SetCurrentBranch( monitor, stackBranchName )
+            if( git.SetCurrentBranch( monitor, stackBranchName, skipPullMerge: true )
                 && GetActualStackName( monitor, git, stackNameFromUrl, out var actualStackName ) )
             {
                 if( actualStackName != stackNameFromUrl )
