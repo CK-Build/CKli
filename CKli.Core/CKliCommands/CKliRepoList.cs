@@ -51,7 +51,8 @@ sealed class CKliRepoList : Command
                          .OrderBy( g => g.Key )
                          .Select( g => new Collapsable(
                              screenType.Text( g.Key )
-                             .AddBelow( screenType.Unit.AddBelow( g.Select( r => r.ToRenderable( screenType, false, true, true ) ) )
+                             .AddBelow( screenType.Unit.AddBelow( g.OrderBy( r => r.Index )
+                                                                   .Select( r => r.ToRenderable( screenType, false, true, true ) ) )
                                                        .TableLayout() ) )
                          ) );
             }

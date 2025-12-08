@@ -78,25 +78,33 @@ sealed class CKliIssue : Command
                 }
                 if( fix )
                 {
+                    // Applies always the same ordering.
+                    var groupedIssues = issues.GroupBy( i => i.Repo ).OrderBy( g => g.Key?.Index ?? -1 );
                     if( autoFixCount > 0 )
                     {
                         using( monitor.OpenInfo( manualFixCount > 0
                                                     ? $"Trying to fix {autoFixCount} issues ({manualFixCount} issues must be fixed manually)."
                                                     : $"Trying to fix {autoFixCount} issues." ) )
                         {
-                            foreach( var i in issues )
+                            foreach( var g in groupedIssues.Where( g => g.Any() ) )
                             {
-                                try
+                                using( monitor.OpenInfo( $"Handling issues for '{g.Key?.DisplayPath ?? world.Name.FullName}'." ) )
                                 {
-                                    if( !i.ManualFix && !await i.ExecuteAsync( monitor, context, world ).ConfigureAwait( false ) )
+                                    foreach( var i in g )
                                     {
-                                        return false;
+                                        try
+                                        {
+                                            if( !i.ManualFix && !await i.ExecuteAsync( monitor, context, world ).ConfigureAwait( false ) )
+                                            {
+                                                return false;
+                                            }
+                                        }
+                                        catch( Exception ex )
+                                        {
+                                            monitor.Error( ex );
+                                            return false;
+                                        }
                                     }
-                                }
-                                catch( Exception ex )
-                                {
-                                    monitor.Error( ex );
-                                    return false;
                                 }
                             }
                         }
@@ -106,7 +114,7 @@ sealed class CKliIssue : Command
                 }
                 else
                 {
-                    foreach( var g in issues.GroupBy( i => i.Repo ) )
+                    foreach( var g in issues.GroupBy( i => i.Repo ).OrderBy( g => g.Key?.Index ?? -1 ) )
                     {
                         var link = g.Key == null
                                     ? context.Screen.ScreenType.Text( world.Name.FullName )
