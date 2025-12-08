@@ -57,7 +57,7 @@ public partial class TableLayout : IRenderable
 
         // Ensures that at least a non empty column exists and that at least one column
         // is free to grow (MaxW == 0, the last column is used as a fallback).
-        if( !hasColumns || !RemoveEmptyColumnsAndEnsureGrowable( cols ) )
+        if( !hasColumns || !EnsureNotEmptyAndGrowable( cols ) )
         {
             return rows;
         }
@@ -126,23 +126,18 @@ public partial class TableLayout : IRenderable
         }
     }
 
-    static bool RemoveEmptyColumnsAndEnsureGrowable( List<ColDef> cols )
+    static bool EnsureNotEmptyAndGrowable( List<ColDef> cols )
     {
-        bool found = false;
+        bool foundNonEmpty = false;
+        bool foundGrowable = false;
         for( int i = 0; i < cols.Count; i++ )
         {
             var c = cols[i];
-            if( c.IsEmpty )
-            {
-                cols.RemoveAt( i-- );
-            }
-            else 
-            {
-                found |= c.MaxW == 0;
-            }
+            foundNonEmpty |= !c.IsEmpty;
+            foundGrowable |= c.MaxW == 0;
         }
-        if( cols.Count == 0 ) return false;
-        if( !found ) cols[^1].ClearMaxWidth();
+        if( !foundNonEmpty ) return false;
+        if( !foundGrowable ) cols[^1].ClearMaxWidth();
         return true;
     }
 

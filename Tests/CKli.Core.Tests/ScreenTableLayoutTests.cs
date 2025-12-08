@@ -213,6 +213,23 @@ public class ScreenTableLayoutTests
                     """ );
     }
 
+    [Test]
+    public void empty_columns_handling()
+    {
+        var s = ScreenType.Default;
+
+        IRenderable Line( string t ) => s.Unit.AddRight( s.Text( t + "1" ), s.EmptyString, s.Text( t + "2" ), s.EmptyString, s.Text( t + "3" ) );
+
+        var lines = s.Unit.AddBelow( Line( "A" ), Line( "AAAAA" ) );
+        var table = lines.TableLayout();
+        var r = DebugRenderer.Render( table );
+        r.ShouldBe( """
+            A1    A2    A3    ⮐
+            AAAAA1AAAAA2AAAAA3⮐
+
+            """ );
+    }
+
 
     [Test]
     public void Repo_like()
