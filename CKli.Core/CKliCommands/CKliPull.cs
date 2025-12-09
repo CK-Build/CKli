@@ -9,7 +9,7 @@ sealed class CKliPull : Command
     public CKliPull()
         : base( null,
                 "pull",
-                "Resynchronizes the current Repo or World from the remotes.",
+                "Resynchronizes the current Repo or World from the remote 'origin'.",
                 [],
                 [],
                 [
@@ -46,9 +46,9 @@ sealed class CKliPull : Command
                             : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
                 if( repos == null ) return false;
                 bool success = true;
-                foreach( var r in repos )
+                foreach( var repo in repos )
                 {
-                    success &= r.Pull( monitor ).IsSuccess();
+                    success &= repo.Pull( monitor ).IsSuccess();
                 }
                 // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
                 return stack.Close( monitor );

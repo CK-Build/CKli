@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Xml.Linq;
 
 namespace CKli.Core;
 
@@ -215,75 +214,6 @@ public sealed partial class World
     /// Gets all events that can be raised by a World.
     /// </summary>
     public WorldEvents Events => _events;
-
-    /// <summary>
-    /// Calls <see cref="Repo.Pull(IActivityMonitor)"/> on all the repositories of this world.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="skipPull">Optional predicate to not pull some repos.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool Pull( IActivityMonitor monitor, Func<Repo,bool>? skipPull = null )
-    {
-        var all = GetAllDefinedRepo( monitor );
-        if( all == null ) return false;
-        bool success = true;
-        foreach( var r in all )
-        {
-            if( skipPull == null || skipPull( r ) )
-            {
-                success &= r.Pull( monitor ).IsSuccess();
-            }
-        }
-        return success;
-    }
-
-    /// <summary>
-    /// Calls <see cref="Repo.Fetch(IActivityMonitor, bool)"/> on all the repositories of this world.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="originOnly">False to fetch all the remote branches. By default, branches from only 'origin' remote are considered.</param>
-    /// <param name="skipFetch">Optional predicate to not fetch some repos.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool Fetch( IActivityMonitor monitor, bool originOnly = true, Func<Repo,bool>? skipFetch = null )
-    {
-        var all = GetAllDefinedRepo( monitor );
-        if( all == null ) return false;
-        bool success = true;
-        foreach( var g in all )
-        {
-            if( skipFetch == null || skipFetch( g ) )
-            {
-                success &= g.Fetch( monitor, originOnly );
-            }
-        }
-        return success;
-    }
-
-    /// <summary>
-    /// Calls <see cref="Repo.Push(IActivityMonitor)"/> on all the repositories of this world.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="stopOnFirstError">False to continue on errors.</param>
-    /// <param name="skipPush">Optional predicate to not push some repos.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool Push( IActivityMonitor monitor, bool stopOnFirstError = true, Func<Repo,bool>? skipPush = null )
-    {
-        var all = GetAllDefinedRepo( monitor );
-        if( all == null ) return false;
-        bool success = true;
-        foreach( var r in all )
-        {
-            if( skipPush == null || skipPush( r ) )
-            {
-                success &= r.Push( monitor );
-                if( stopOnFirstError && !success )
-                {
-                    break;
-                }
-            }
-        }
-        return success;
-    }
 
     /// <summary>
     /// Gets whether a full path or a origin url is defined in this <see cref="Layout"/>.

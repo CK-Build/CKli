@@ -249,7 +249,8 @@ public class StackRepositoryTests
             world.ShouldNotBeNull();
 
             // FixLayout kicks-in here.
-            world.Pull( TestHelper.Monitor ).ShouldBe( true );
+            // ckli pull
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "pull" )).ShouldBeTrue();
 
             File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Back thanks to the automatic FixLayout." );
 

@@ -105,16 +105,6 @@ public sealed class Repo
     public MergeResult Pull( IActivityMonitor monitor ) => _git.Pull( monitor,
                                                                       mergeFileFavor: LibGit2Sharp.MergeFileFavor.Normal,
                                                                       fastForwardStrategy: LibGit2Sharp.FastForwardStrategy.Default );
-
-    /// <summary>
-    /// Fetches 'origin' (or all remotes) branches and tags into this repository.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="withTags">Specify whether tags must be fetched from remote. When true, locally modified tags are lost.</param>
-    /// <param name="originOnly">False to fetch all the remote branches. By default, branches from only 'origin' remote are considered.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool Fetch( IActivityMonitor monitor, bool withTags, bool originOnly = true ) => _git.FetchBranches( monitor, withTags, originOnly );
-
     /// <summary>
     /// Pushes changes from the current branch to the origin.
     /// </summary>
