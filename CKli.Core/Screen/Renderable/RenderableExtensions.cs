@@ -89,34 +89,6 @@ public static class RenderableExtensions
                 : Core.TableLayout.Create( r, columns );
     }
 
-    ///// <summary>
-    ///// Applies padding, margin and/or <see cref="ContentAlign"/> to this renderable by
-    ///// creating a new <see cref="ContentBox"/> around this renderable.
-    ///// </summary>
-    ///// <param name="r">This renderable.</param>
-    ///// <param name="paddingTop">Optional top padding.</param>
-    ///// <param name="paddingLeft">Optional left padding.</param>
-    ///// <param name="paddingBottom">Optional bottom padding.</param>
-    ///// <param name="paddingRight">Optional right padding.</param>
-    ///// <param name="marginTop">Optional top margin.</param>
-    ///// <param name="marginLeft">Optional left margin.</param>
-    ///// <param name="marginBottom">Optional bottom margin.</param>
-    ///// <param name="marginRight">Optional right margin.</param>
-    ///// <param name="align">Optional content alignment.</param>
-    ///// <returns>A content box.</returns>
-    //public static ContentBox Box( this IRenderable r,
-    //                              int paddingTop = 0, int paddingLeft = 0, int paddingBottom = 0, int paddingRight = 0,
-    //                              int marginTop = 0, int marginLeft = 0, int marginBottom = 0, int marginRight = 0,
-    //                              ContentAlign align = ContentAlign.Unknwon )
-    //{
-    //    if( r is ContentBox b ) return b.AddPadding( paddingTop, paddingLeft, paddingBottom, paddingRight )
-    //                                    .AddMargin( marginTop, marginLeft, marginBottom, marginRight )
-    //                                    .WithAlign( align );
-    //    return new ContentBox( r, paddingTop, paddingLeft, paddingBottom, paddingRight,
-    //                              marginTop, marginLeft, marginBottom, marginRight,
-    //                              align );
-    //}
-
     /// <summary>
     /// Applies <see cref="TextStyle"/>, padding, margin and/or <see cref="ContentAlign"/> to this renderable by
     /// creating a new <see cref="ContentBox"/> around this renderable.
@@ -256,7 +228,7 @@ public static class RenderableExtensions
     {
         if( horizontalContent.Length == 0 ) return r;
         if( r is HorizontalContent h ) return h.Append( horizontalContent );
-        int flattenedLength = VerticalContent.ComputeActualContentLength( horizontalContent, out bool hasSpecial );
+        int flattenedLength = HorizontalContent.ComputeActualContentLength( horizontalContent, out bool hasSpecial );
         if( flattenedLength == 0 ) return r;
         var skipThis = r.Width == 0;
         if( skipThis ) --flattenedLength;
