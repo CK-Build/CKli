@@ -24,14 +24,16 @@ public static class CKliCommands
         Add( cmds, new CKliPull() );
         Add( cmds, new CKliFetch() );
         Add( cmds, new CKliPush() );
-        Add( cmds, new CKliUpdate() );
+
         cmds.Add( "layout", null );
         Add( cmds, new CKliLayoutFix() );
         Add( cmds, new CKliLayoutXif() );
+
         cmds.Add( "repo", null );
         Add( cmds, new CKliRepoList() );
         Add( cmds, new CKliRepoAdd() );
         Add( cmds, new CKliRepoRemove() );
+
         cmds.Add( "plugin", null );
         Add( cmds, new CKliPluginInfo() );
         Add( cmds, new CKliPluginCreate() );
@@ -39,6 +41,11 @@ public static class CKliCommands
         Add( cmds, new CKliPluginAdd() );
         Add( cmds, new CKliPluginEnable() );
         Add( cmds, new CKliPluginDisable() );
+
+        cmds.Add( "tag", null );
+        Add( cmds, new CKliTagList() );
+
+        Add( cmds, new CKliUpdate() );
 
         static void Add( Dictionary<string, Command?> commands, Command c ) => commands.Add( c.CommandPath, c );
 
