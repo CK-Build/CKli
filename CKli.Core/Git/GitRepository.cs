@@ -273,13 +273,13 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     public bool CanAmendCommit => (_git.Head.TrackingDetails.AheadBy ?? 1) > 0;
 
     /// <summary>
-    /// Fetches 'origin' (or all remotes) branches and tags into this repository.
+    /// Fetches 'origin' (or all remotes) branches and optionally tags into this repository.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="withTags">Specify whether tags must be fetched from remote. When true, locally modified tags are lost.</param>
     /// <param name="originOnly">False to fetch all the remote branches. By default, branches from only 'origin' remote are considered.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool FetchBranches( IActivityMonitor monitor, bool withTags, bool originOnly = true )
+    public bool FetchBranches( IActivityMonitor monitor, bool withTags, bool originOnly )
     {
         using( monitor.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{DisplayPath}' with{(withTags ? "" : "out")} tags." ) )
         {
@@ -295,7 +295,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
                     Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                     {
                         CredentialsProvider = ( url, user, types ) => creds,
-                        TagFetchMode = TagFetchMode.All
+                        TagFetchMode = withTags ? TagFetchMode.All : TagFetchMode.None
                     }, logMsg );
                 }
                 return true;
@@ -570,7 +570,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
             {
                 if( !amendPreviousCommit ) throw;
                 Throw.DebugAssert( "This check on merge commit is already done by LibGit2Sharp.", _git.Head.Tip.Parents.Count() == 1 );
-                monitor.Trace( "No actual changes. Reseting branch to parent commit." );
+                monitor.Trace( "No actual changes. Resetting branch to parent commit." );
                 _git.Reset( ResetMode.Hard, _git.Head.Tip.Parents.Single() );
                 Throw.DebugAssert( options.AmendPreviousCommit = true );
                 string sha = _git.Head.Tip.Sha;
@@ -885,7 +885,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     {
         if( !r.Commits.Any() )
         {
-            m.Info( $"Unitialized repository: automatically creating an initial commit." );
+            m.Info( $"Uninitialized repository: automatically creating an initial commit." );
             var date = DateTimeOffset.Now;
             Signature author = r.Config.BuildSignature( date );
             var committer = new Signature( "CKli", "none", date );
