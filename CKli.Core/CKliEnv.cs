@@ -54,6 +54,7 @@ public sealed class CKliEnv
         _secretsStore = secretsStore ?? CKliRootEnv.SecretsStore;
         _screen = screen ?? CKliRootEnv.Screen;
         _currentStackPath = StackRepository.FindGitStackPath( currentDirectory );
+        _startCommandHandlingLocalTime = DateTimeOffset.Now;
     }
 
     /// <summary>
