@@ -3,6 +3,7 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
@@ -306,6 +307,189 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
                 return false;
             }
         }
+    }
+
+    /// <summary>
+    /// Gets the remote <see cref="GitTagInfo"/> from the specified remote.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="tags">The remote <see cref="GitTagInfo"/> on success.</param>
+    /// <param name="remoteName">The remote name.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool GetRemoteTags( IActivityMonitor monitor, [NotNullWhen( true )] out GitTagInfo? tags, string remoteName = "origin" )
+    {
+        try
+        {
+            if( !_repositoryKey.GetReadCredentials( monitor, out var creds ) )
+            {
+                tags = null;
+                return false;
+            }
+
+            var remote = _git.Network.Remotes[remoteName];
+            if( remote == null )
+            {
+                monitor.Error( $"""
+                    Unable to get remote tags from '{remoteName}' as it doesn't exist.
+                    Defined remotes are: {_git.Network.Remotes.Select( r => r.Name ).Concatenate()}.
+                    """ );
+                tags = null;
+                return false;
+            }
+            var result = ImmutableArray.CreateBuilder<TagInfo>();
+            ImmutableArray<TagInfo>.Builder? invalidTags = null;
+            int fetchRequiredCount = 0;
+            var remoteRefs = _git.Network.ListReferences( remote );
+            foreach( var r in remoteRefs )
+            {
+                var sName = r.CanonicalName.AsSpan();
+                if( sName.StartsWith( "refs/tags/", StringComparison.Ordinal ) )
+                {
+                    if( sName.EndsWith( "^{}", StringComparison.Ordinal ) )
+                    {
+                        // We ignore the annotated tag reference.
+                        continue;
+                    }
+                    var dr = r.ResolveToDirectReference();
+                    if( dr.Target is TagAnnotation a )
+                    {
+                        if( a.Target is Commit t )
+                        {
+                            CollectTag( result, r.CanonicalName, t, a, ref fetchRequiredCount, ref invalidTags );
+                        }
+                        else
+                        {
+                            monitor.Trace( $"Ignoring annotated tag '{r.CanonicalName}' that does't target a commit." );
+                        }
+                    }
+                    else
+                    {
+                        var target = dr.Target;
+                        if( target is Commit t )
+                        {
+                            CollectTag( result, r.CanonicalName, t, null, ref fetchRequiredCount, ref invalidTags );
+                        }
+                        else if( target != null )
+                        {
+                            monitor.Trace( $"Ignoring lightweight tag '{r.CanonicalName}' that does't target a commit." );
+                        }
+                        else
+                        {
+                            // The target is not locally available. We cannot know if it's a
+                            // commit.
+                            CollectTag( result, r.CanonicalName, null, null, ref fetchRequiredCount, ref invalidTags );
+                        }
+                    }
+                }
+            }
+            result.Sort();
+            tags = new GitTagInfo( result, invalidTags, fetchRequiredCount );
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( "Error while getting remote tags. This requires a manual fix.", ex );
+            tags = null;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Gets the local <see cref="GitTagInfo"/>.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="tags">The local <see cref="GitTagInfo"/> on success.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool GetLocalTags( IActivityMonitor monitor, [NotNullWhen(true)]out GitTagInfo? tags )
+    {
+        try
+        {
+            var result = ImmutableArray.CreateBuilder<TagInfo>();
+            ImmutableArray<TagInfo>.Builder? invalidTags = null;
+            int fetchRequiredCount = 0;
+            foreach( var tag in _git.Tags )
+            {
+                if( tag.PeeledTarget is Commit t )
+                {
+                    CollectTag( result, tag.CanonicalName, t, tag.Annotation, ref fetchRequiredCount, ref invalidTags );
+                }
+                else
+                {
+                    monitor.Trace( $"Ignoring tag '{tag.CanonicalName}' that does't target a commit." );
+                }
+            }
+            Throw.DebugAssert( fetchRequiredCount == 0 );
+            result.Sort();
+            tags = new GitTagInfo( result, invalidTags, 0 );
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( "Error while listing tags. This requires a manual fix.", ex );
+            tags = null;
+            return false;
+        }
+    }
+
+    static void CollectTag( ImmutableArray<TagInfo>.Builder result,
+                            string canonicalName,
+                            Commit? commit,
+                            TagAnnotation? annotation,
+                            ref int fetchRequiredCount,
+                            ref ImmutableArray<TagInfo>.Builder? invalidTags )
+    {
+        var newOne = new TagInfo( canonicalName, commit, annotation );
+        if( !IsCKliValidTagName( canonicalName.AsSpan( 10 ) ) )
+        {
+            invalidTags ??= ImmutableArray.CreateBuilder<TagInfo>();
+            invalidTags.Add( newOne );
+        }
+        else
+        {
+            if( commit == null ) ++fetchRequiredCount;
+            result.Add( newOne );
+        }
+    }
+
+    /// <summary>
+    /// Checks that a tag name is valid for CKli: it must obviously be non empty and contains
+    /// only ascii characters and letters must be lowercase.
+    /// <para>
+    /// See <see cref="GitTagInfo.InvalidTags"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="tagName">The tag name to test.</param>
+    /// <returns>True if this is a valid tag name for CKli. False if this tag name must be ignored.</returns>
+    public static bool IsCKliValidTagName( ReadOnlySpan<char> tagName )
+    {
+        if( tagName.IsEmpty ) return false;
+        foreach( var c in tagName )
+        {
+            if( !char.IsAscii( c ) || char.IsAsciiLetter( c ) && !char.IsAsciiLetterLower( c ) )
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Gets the diff between local and remote tags.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="diff">The diff between local and remote tags on success.</param>
+    /// <param name="remoteName">The remote name.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool GetDiffTags( IActivityMonitor monitor, [NotNullWhen( true )] out GitTagInfo.Diff? diff, string remoteName = "origin" )
+    {
+        if( !GetLocalTags( monitor, out var localTags )
+            || !GetRemoteTags( monitor, out var remoteTags, remoteName ) )
+        {
+            diff = null;
+            return false;
+        }
+        diff = new GitTagInfo.Diff( localTags, remoteTags );
+        return true;
     }
 
     /// <summary>
