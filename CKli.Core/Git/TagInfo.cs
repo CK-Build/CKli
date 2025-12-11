@@ -1,16 +1,14 @@
 using CK.Core;
 using LibGit2Sharp;
 using System;
+using System.Collections.Generic;
 
 namespace CKli.Core;
 
 /// <summary>
-/// Captures a "refs/tags/name", its target commit (if it exists locally) and the message
+/// Captures a "refs/tags/name", its target commit (if it exists locally) and the <see cref="TagAnnotation"/>
 /// if this is an annotated tag (and not a lightweight one).
 /// </summary>
-/// <param name="CanonicalName"></param>
-/// <param name="Commit">The target commit. Null for a remote tag with a target that doesn't exist locally.</param>
-/// <param name="Message">The annotated message tag or null for a lightweight tag.</param>
 public sealed partial class TagInfo : IComparable<TagInfo>
 {
     readonly string _canonicalName;
@@ -30,7 +28,12 @@ public sealed partial class TagInfo : IComparable<TagInfo>
     public string CanonicalName => _canonicalName;
 
     /// <summary>
-    /// Gets the target commit. Null for a remote tag with a target that doesn't exist locally.
+    /// Gets the tag name without "refs/tags/" prefix.
+    /// </summary>
+    public ReadOnlySpan<char> ShortName => _canonicalName.AsSpan( 10 );
+
+    /// <summary>
+    /// Gets the target commit. Null for a remote tag with a target that doesn't exist locally (a fetch is required).
     /// </summary>
     public Commit? Commit => _commit;
 
@@ -58,14 +61,26 @@ public sealed partial class TagInfo : IComparable<TagInfo>
     internal IRenderable GetRenderableCommit( ScreenType s )
     {
         return s.Text( _commit != null
-                        ? $"{_commit.Id.ToString( 7 )} {Ellipsis( _commit.MessageShort, 15 )}"
+                        ? $"{_commit.Id.ToString( 8 )} {Ellipsis( _commit.MessageShort, 20 )}"
                         : "<<fetch required>>" );
 
-        static string Ellipsis( string s, int maxLen ) => s.Length > maxLen ? s.Substring( 0,maxLen)+ '…' : s;
+        static string Ellipsis( string s, int maxLen ) => s.Length > maxLen ? string.Concat( s.AsSpan( 0,maxLen), "…" ) : s;
     }
 
+    internal static IEnumerable<IRenderable> RenderTagNames( ScreenType s, IEnumerable<TagInfo> infos )
+    {
+        var sep = s.Text( ", ", TextStyle.Default );
+        int i = 0;
+        foreach( var tag in infos )
+        {
+            if( i++ > 0 ) yield return sep;
+            yield return tag.GetRenderableTagName( s );
+        }
+    }
+
+
     /// <summary>
-    /// Sort order is <see cref="CommitDateUtc"/> and then <see cref="CanonicalName"/>.
+    /// Sort order is <see cref="CommitDateUtc"/> (commit sha if dates are equal) and then <see cref="CanonicalName"/>.
     /// </summary>
     /// <param name="other">The other TagInfo.</param>
     /// <returns>Standard relative order value.</returns>
@@ -98,6 +113,6 @@ public sealed partial class TagInfo : IComparable<TagInfo>
                 : StringComparer.Ordinal.Compare( tC.Sha, oC.Sha );
     }
 
-    public override string ToString() => $"{_canonicalName.AsSpan(10)} {_commit?.ToString() ?? "<<fetch required>>"}";
+    public override string ToString() => $"{ShortName} {_commit?.ToString() ?? "<<fetch required>>"}";
 
 }

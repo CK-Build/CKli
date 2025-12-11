@@ -3,7 +3,6 @@ using CKli.Core;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using static CK.Core.ActivityMonitor;
 
 namespace CKli;
 
@@ -61,11 +60,11 @@ sealed class CKliTagList : Command
                     {
                         return false;
                     }
-                    var link = s.Text( repo.DisplayPath )
+                    var link = s.Text( repo.DisplayPath, effect: TextEffect.Bold | TextEffect.Invert )
                                     .HyperLink( new Uri( $"file://{repo.WorkingFolder}" ) );
-                    var header = link.Box( marginRight: 1 ).AddRight( s.Text( $"{tags.Tags.Length} local tags.", effect: TextEffect.Italic| TextEffect.Bold ) );
-                    var lines = s.Unit.AddBelow( tags.GroupedTags.Select( t => t.ToRenderable( s ) ) );
-                    context.Screen.Display( new Collapsable( header.AddBelow( lines.TableLayout() ) ) );
+                    var header = link.Box( marginRight: 1 )
+                                      .AddRight( s.Text( $"{tags.Tags.Length} local tags.", effect: TextEffect.Italic ) );
+                    context.Screen.Display( new Collapsable( header.AddBelow( tags.ToRenderable( s ) ) ) );
                 }
                 if( remote )
                 {
@@ -73,11 +72,10 @@ sealed class CKliTagList : Command
                     {
                         return false;
                     }
-                    var link = s.Text( repo.OriginUrl.ToString() )
+                    var link = s.Text( repo.OriginUrl.ToString(), effect: TextEffect.Bold | TextEffect.Invert )
                                     .HyperLink( repo.OriginUrl );
-                    var header = link.Box( marginRight: 1 ).AddRight( s.Text( $"{tags.Tags.Length} remote tags.", effect: TextEffect.Italic| TextEffect.Bold ) );
-                    var lines = s.Unit.AddBelow( tags.GroupedTags.Select( t => t.ToRenderable( s ) ) );
-                    context.Screen.Display( new Collapsable( header.AddBelow( lines.TableLayout() ) ) );
+                    var header = link.Box( marginRight: 1 ).AddRight( s.Text( $"{tags.Tags.Length} remote tags.", effect: TextEffect.Italic ) );
+                    context.Screen.Display( new Collapsable( header.AddBelow( tags.ToRenderable( s ) ) ) );
                 }
                 if( !local && !remote )
                 {
@@ -91,11 +89,9 @@ sealed class CKliTagList : Command
                     }
                     var diff = new GitTagInfo.Diff( localTags, remoteTags );
 
-                    var link = s.Text( repo.DisplayPath )
+                    var link = s.Text( repo.DisplayPath, effect: TextEffect.Bold | TextEffect.Invert )
                                     .HyperLink( new Uri( $"file://{repo.WorkingFolder}" ) );
-                    var header = link.Box( marginRight: 1 ).AddRight( s.Text( $"{localTags.Tags.Length} local tags / {remoteTags.Tags.Length} remote tags.", effect: TextEffect.Italic | TextEffect.Bold ) );
-                    var lines = s.Unit.AddBelow( diff.Entries.Select( t => t.ToRenderable( s ) ) );
-                    context.Screen.Display( new Collapsable( header.AddBelow( lines.TableLayout() ) ) );
+                    context.Screen.Display( new Collapsable( link.AddBelow( diff.ToRenderable( s ) ) ) );
 
                 }
             }

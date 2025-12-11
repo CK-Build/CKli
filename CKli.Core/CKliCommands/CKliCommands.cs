@@ -17,17 +17,16 @@ public static class CKliCommands
     static CKliCommands()
     {
         var cmds = new Dictionary<string, Command?>();
-        Add( cmds, new CKliLog() );
         Add( cmds, new CKliClone() );
-        Add( cmds, new CKliIssue() );
         Add( cmds, new CKliExec() );
-        Add( cmds, new CKliPull() );
         Add( cmds, new CKliFetch() );
-        Add( cmds, new CKliPush() );
+        Add( cmds, new CKliIssue() );
 
         cmds.Add( "layout", null );
         Add( cmds, new CKliLayoutFix() );
         Add( cmds, new CKliLayoutXif() );
+
+        Add( cmds, new CKliLog() );
 
         cmds.Add( "repo", null );
         Add( cmds, new CKliRepoList() );
@@ -35,15 +34,21 @@ public static class CKliCommands
         Add( cmds, new CKliRepoRemove() );
 
         cmds.Add( "plugin", null );
-        Add( cmds, new CKliPluginInfo() );
-        Add( cmds, new CKliPluginCreate() );
-        Add( cmds, new CKliPluginRemove() );
         Add( cmds, new CKliPluginAdd() );
-        Add( cmds, new CKliPluginEnable() );
+        Add( cmds, new CKliPluginCreate() );
         Add( cmds, new CKliPluginDisable() );
+        Add( cmds, new CKliPluginEnable() );
+        Add( cmds, new CKliPluginInfo() );
+        Add( cmds, new CKliPluginRemove() );
+
+        Add( cmds, new CKliPull() );
+        Add( cmds, new CKliPush() );
 
         cmds.Add( "tag", null );
+        Add( cmds, new CKliTagDelete() );
         Add( cmds, new CKliTagList() );
+        Add( cmds, new CKliTagPull() );
+        Add( cmds, new CKliTagPush() );
 
         Add( cmds, new CKliUpdate() );
 
@@ -234,7 +239,7 @@ public static class CKliCommands
                         // so we display the command help.
                         // Before we must clear any remaining arguments otherwise we may display
                         // a misleading remaining arguments message.
-                        cmdLine.CloseAndForgetRemaingArguments();
+                        cmdLine.CloseAndForgetRemainingArguments();
                         context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
                     }
                 }

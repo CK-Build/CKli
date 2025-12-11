@@ -27,16 +27,16 @@ public sealed partial class GitTagInfo
         RemoteOnly = 2,
 
         /// <summary>
-        /// Both tags exist but the <see cref="LocalRemoteTag.Local"/> isa an annotated
+        /// Both tags exist but the <see cref="LocalRemoteTag.Local"/> is an annotated
         /// one and the <see cref="LocalRemoteTag.Remote"/> is a lightweight tag.
         /// </summary>
-        LocalAnnotated = 4,
+        LocalAnnotatedDiffer = 4,
 
         /// <summary>
-        /// Both tags exist but the <see cref="LocalRemoteTag.Remote"/> isa an annotated
+        /// Both tags exist but the <see cref="LocalRemoteTag.Remote"/> is an annotated
         /// one and the <see cref="LocalRemoteTag.Local"/> is a lightweight tag.
         /// </summary>
-        RemoteAnnotated = 8,
+        RemoteAnnotatedDiffer = 8,
 
         /// <summary>
         /// Both tags exist and are annotated tags but their <see cref="TagAnnotation.Message"/> differ.
@@ -53,6 +53,12 @@ public sealed partial class GitTagInfo
         /// because the other one targets another commit. <see cref="LocalRemoteTag.Conflict"/> is necessarily not null
         /// and belongs to the "other side".
         /// </summary>
-        CommitConflict = 64
+        CommitConflict = 64,
+
+        /// <summary>
+        /// Covers the 4 <see cref="RemoteAnnotatedDiffer"/>, <see cref="LocalAnnotatedDiffer"/>, <see cref="AnnotationMessageDiffer"/>
+        /// and <see cref="AnnotationTaggerDiffer"/> bits.
+        /// </summary>
+        DifferMask = RemoteAnnotatedDiffer | LocalAnnotatedDiffer | AnnotationMessageDiffer | AnnotationTaggerDiffer
     }
 }

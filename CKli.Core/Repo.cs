@@ -81,12 +81,12 @@ public sealed class Repo
     /// <summary>
     /// Gets a unique identifier (randomly generated) for this Repo.
     /// <para>
-    /// This is stored in the git repository in the "CKli-Repo" annotated tag: this identifier is independent
+    /// This is stored in the git repository in the "ckli-repo" annotated tag: this identifier is independent
     /// of any names (origin url, name of the stack, etc.): it should be used as a the identifier of a Repo
     /// when data must be externally associated to it.
     /// </para>
     /// <para>
-    /// The "CKli-Repo" tag also contains the <see cref="StackRepository.OriginUrl"/> of the stack that contains
+    /// The "ckli-repo" tag also contains the <see cref="StackRepository.OriginUrl"/> of the stack that contains
     /// this Repo. The tag is updated if the Stack url changes (this is currently only for information). 
     /// </para>
     /// </summary>
@@ -105,12 +105,6 @@ public sealed class Repo
     public MergeResult Pull( IActivityMonitor monitor ) => _git.Pull( monitor,
                                                                       mergeFileFavor: LibGit2Sharp.MergeFileFavor.Normal,
                                                                       fastForwardStrategy: LibGit2Sharp.FastForwardStrategy.Default );
-    /// <summary>
-    /// Pushes changes from the current branch to the origin.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool Push( IActivityMonitor monitor ) => _git.Push( monitor );
 
     /// <summary>
     /// Returns the <see cref="DisplayPath"/> (with its link to <see cref="WorkingFolder"/>) as a <see cref="ContentBox"/>

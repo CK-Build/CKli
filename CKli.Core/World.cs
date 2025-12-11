@@ -414,7 +414,7 @@ public sealed partial class World
                 System.Security.Cryptography.RandomNumberGenerator.Fill( bytes );
             }
             while( ckliRepoId == 0 );
-            CreateOrUpdateCkliRepoTag( repository.Repository, _stackRepository, ckliRepoId );
+            CreateOrUpdateCKliRepoTag( repository.Repository, _stackRepository, ckliRepoId );
         }
         Repo? repo = new Repo( this, repository, _layout[index].XElement, index, ckliRepoId, _firstRepo );
         _firstRepo = repo;
@@ -425,10 +425,10 @@ public sealed partial class World
         static bool TryReadCKliRepoTag( IActivityMonitor monitor, GitRepository git, StackRepository stackRepository, out ulong ckliRepoId )
         {
             ckliRepoId = 0L;
-            var message = git.Repository.Tags["CKli-Repo"]?.Annotation?.Message;
+            var message = git.Repository.Tags["ckli-repo"]?.Annotation?.Message;
             if( message == null )
             {
-                monitor.Info( $"No 'CKli-Repo' tag found for '{git.DisplayPath}'. A new CKliRepoId will be created." );
+                monitor.Info( $"No 'ckli-repo' tag found for '{git.DisplayPath}'. A new 'ckli-repo' tag will be created." );
                 return false;
             }
             var s = message.AsSpan();
@@ -450,7 +450,7 @@ public sealed partial class World
                         It will be updated.
                         """;
             monitor.Warn( $"""
-                The 'CKli-Repo' tag in '{git.DisplayPath}' is:
+                The 'ckli-repo' tag in '{git.DisplayPath}' is:
                 {message}
 
                 {msg}
@@ -458,9 +458,9 @@ public sealed partial class World
             return false;
         }
 
-        static void CreateOrUpdateCkliRepoTag( Repository r, StackRepository stackRepository, ulong ckliRepoId )
+        static void CreateOrUpdateCKliRepoTag( Repository r, StackRepository stackRepository, ulong ckliRepoId )
         {
-            r.Tags.Add( "CKli-Repo", r.Head.Tip, stackRepository.Context.Committer, $"""
+            r.Tags.Add( "ckli-repo", r.Head.Tip, stackRepository.Context.Committer, $"""
                 Id: {ckliRepoId}
                 Stack: {stackRepository.OriginUrl}
 

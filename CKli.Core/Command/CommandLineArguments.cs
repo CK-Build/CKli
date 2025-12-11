@@ -219,6 +219,20 @@ public sealed class CommandLineArguments
     }
 
     /// <summary>
+    /// Extracts the any remaining arguments that may be flags or options: this should be called
+    /// after all <see cref="EatFlag"/>, <see cref="EatSingleOption"/> and <see cref="EatMultipleOption"/> have
+    /// been handled.
+    /// </summary>
+    /// <returns>The next argument.</returns>
+    public List<string> EatRemainingArgument()
+    {
+        CheckOpened();
+        var result = new List<string>( _args );
+        _args.Clear();
+        return result;
+    }
+
+    /// <summary>
     /// Extracts an option value.
     /// </summary>
     /// <param name="names">The option names.</param>
@@ -287,7 +301,7 @@ public sealed class CommandLineArguments
                                                                              .Concat( _foundCommand.Flags.SelectMany( f => f.Names ) ) );
             return _optionOrFlagNames.Contains( candidate );
         }
-        // We dont' know the command. Use the hyphen as a discriminator.
+        // We don't know the command. Use the hyphen as a discriminator.
         // This doesn't really matter: when the command is not found, arguments analysis is not done:
         // this is mainly for coherency (and to ease test: no command needed).
         return candidate[0] == '-';
@@ -352,7 +366,7 @@ public sealed class CommandLineArguments
     }
 
     /// <summary>
-    /// Closes this command line and returns a string that are the remaining arguments to use
+    /// Closes this command line and outputs a string that are the remaining arguments to use
     /// to call a <see cref="ProcessRunner.RunProcess(IActivityLineEmitter, string, string, string, Dictionary{string, string}?)"/>.
     /// <para>
     /// This cannot fail (the <paramref name="arguments"/> may be empty).
@@ -362,14 +376,14 @@ public sealed class CommandLineArguments
     public void CloseWithRemainingAsProcessStartArgs( out string arguments )
     {
         arguments = ArgumentHelper.EscapeAndConcatenateArgArrayForProcessStart( _args );
-        CloseAndForgetRemaingArguments();
+        CloseAndForgetRemainingArguments();
     }
 
     /// <summary>
     /// Called when a command failed without having closed the arguments.
     /// This displays the command help (without remaining arguments).
     /// </summary>
-    internal void CloseAndForgetRemaingArguments()
+    internal void CloseAndForgetRemainingArguments()
     {
         CheckOpened();
         _args.Clear();

@@ -61,7 +61,7 @@ sealed class CKliPush : Command
                 {
                     foreach( var r in repos )
                     {
-                        success &= r.Push( monitor );
+                        success &= r.GitRepository.Push( monitor, null );
                         if( !success && !continueOnError )
                         {
                             break;

@@ -57,20 +57,12 @@ public sealed partial class TagInfo
         {
             if( _tagCount == 1 ) return Head.ToRenderable( s );
             return s.Unit.AddRight( Head.GetRenderableCommit( s ).Box( marginRight: 1 ),
-                                    s.Unit.AddRight( beforeTags, _tagCount == 1 ? Head.GetRenderableTagName( s ) : RenderTagNames( s, Tags ) ).Box()
-                                    );
+                                    s.Unit.AddRight( beforeTags, _tagCount == 1
+                                                                    ? Head.GetRenderableTagName( s )
+                                                                    : TagInfo.RenderTagNames( s, Tags ) ).Box()
+                                  );
         }
 
-        internal static IEnumerable<IRenderable> RenderTagNames( ScreenType s, IEnumerable<TagInfo> infos )
-        {
-            var sep = s.Text( ", ", TextStyle.Default );
-            int i = 0;
-            foreach( var tag in infos )
-            {
-                if( i++ > 0 ) yield return sep;
-                yield return tag.GetRenderableTagName( s );
-            }
-        }
     }
 
     internal static ImmutableArray<Group> GetGroups( ImmutableArray<TagInfo> sortedTags, out int remoteOnly )

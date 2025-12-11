@@ -17,9 +17,10 @@ public sealed partial class GitTagInfo
         readonly IReadOnlyList<LocalRemoteTag> _tags;
 
         internal DiffEntry( IReadOnlyDictionary<string, TagInfo> localIndex,
-                        TagInfo.Group? gLocal,
-                        IReadOnlyDictionary<string, TagInfo> remoteIndex,
-                        TagInfo.Group? gRemote )
+                            TagInfo.Group? gLocal,
+                            IReadOnlyDictionary<string, TagInfo> remoteIndex,
+                            TagInfo.Group? gRemote,
+                            ref Diff.Stats stats )
         {
             Throw.DebugAssert( gLocal != null || gRemote != null );
             _group = gLocal ?? gRemote!;
@@ -28,14 +29,14 @@ public sealed partial class GitTagInfo
             {
                 Throw.DebugAssert( gRemote != null );
                 _group = gRemote;
-                _tags = SingleSide( gRemote, TagDiff.RemoteOnly, localIndex );
+                _tags = SingleSide( gRemote, TagDiff.RemoteOnly, localIndex, ref stats );
             }
             else
             {
                 _group = gLocal;
                 if( gRemote == null )
                 {
-                    _tags = SingleSide( gLocal, TagDiff.LocalOnly, remoteIndex );
+                    _tags = SingleSide( gLocal, TagDiff.LocalOnly, remoteIndex, ref stats );
                 }
                 else
                 {
@@ -48,14 +49,14 @@ public sealed partial class GitTagInfo
                     {
                         if( iR >= rTags.Length )
                         {
-                            tags.Add( new LocalRemoteTag( lTags[iL], TagDiff.LocalOnly, remoteIndex ) );
+                            tags.Add( new LocalRemoteTag( lTags[iL], TagDiff.LocalOnly, remoteIndex, ref stats ) );
                         }
                         else
                         {
                             int cmp = StringComparer.Ordinal.Compare( lTags[iL].CanonicalName, rTags[iR].CanonicalName );
                             while( cmp > 0 )
                             {
-                                tags.Add( new LocalRemoteTag( rTags[iR], TagDiff.RemoteOnly, localIndex ) );
+                                tags.Add( new LocalRemoteTag( rTags[iR], TagDiff.RemoteOnly, localIndex, ref stats ) );
                                 if( ++iR >= rTags.Length ) break;
                                 cmp = StringComparer.Ordinal.Compare( lTags[iL].CanonicalName, rTags[iR].CanonicalName );
                             }
@@ -82,41 +83,46 @@ public sealed partial class GitTagInfo
                                         }
                                         else
                                         {
-                                            d |= TagDiff.LocalAnnotated;
+                                            d |= TagDiff.LocalAnnotatedDiffer;
                                         }
                                     }
                                     else if( r.Annotation != null )
                                     {
-                                        d |= TagDiff.RemoteAnnotated;
+                                        d |= TagDiff.RemoteAnnotatedDiffer;
                                     }
                                     Throw.DebugAssert( "There is no TagDiff.CommitConflict: the tags target the same commit.",
                                                         localIndex[r.CanonicalName] == l && remoteIndex[l.CanonicalName] == r );
+                                    ++stats._commonCount;
+                                    if( d != TagDiff.None ) ++stats._differCount;
                                     tags.Add( new LocalRemoteTag( l, r, d ) );
                                     iR++;
                                 }
                                 else
                                 {
                                     Throw.DebugAssert( cmp < 0 );
-                                    tags.Add( new LocalRemoteTag( lTags[iL], TagDiff.LocalOnly, remoteIndex ) );
+                                    tags.Add( new LocalRemoteTag( lTags[iL], TagDiff.LocalOnly, remoteIndex, ref stats ) );
                                 }
                             }
                         }
                     }
                     while( iR < rTags.Length )
                     {
-                        tags.Add( new LocalRemoteTag( rTags[iR], TagDiff.RemoteOnly, localIndex ) );
+                        tags.Add( new LocalRemoteTag( rTags[iR], TagDiff.RemoteOnly, localIndex, ref stats ) );
                         iR++;
                     }
                     _tags = tags;
                 }
             }
 
-            static LocalRemoteTag[] SingleSide( TagInfo.Group g, TagDiff diff, IReadOnlyDictionary<string, TagInfo> oppositeIndex )
+            static LocalRemoteTag[] SingleSide( TagInfo.Group g,
+                                                TagDiff diff,
+                                                IReadOnlyDictionary<string, TagInfo> oppositeIndex,
+                                                ref Diff.Stats stats )
             {
                 var tags = new LocalRemoteTag[g.TagCount];
                 for( int i = 0; i < g.TagSpan.Length; ++i )
                 {
-                    tags[i] = new LocalRemoteTag( g.TagSpan[i], diff, oppositeIndex );
+                    tags[i] = new LocalRemoteTag( g.TagSpan[i], diff, oppositeIndex, ref stats );
                 }
                 return tags;
             }
@@ -131,11 +137,6 @@ public sealed partial class GitTagInfo
         /// Gets the local/remote tags and their <see cref="TagDiff"/> for this <see cref="Commit"/>.
         /// </summary>
         public IReadOnlyList<LocalRemoteTag> Tags => _tags;
-
-        internal IRenderable ToRenderable( ScreenType s )
-        {
-            return s.EmptyString;
-        }
 
         public override string ToString() => $"{Commit} - {_tags.Count} local/remote tags.";
     }

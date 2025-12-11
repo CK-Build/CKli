@@ -1,5 +1,6 @@
 using CK.Core;
 using LibGit2Sharp;
+using System;
 using System.Collections.Generic;
 
 namespace CKli.Core;
@@ -17,20 +18,36 @@ public sealed partial class GitTagInfo
         readonly TagInfo? _conflict;
         readonly TagDiff _diff;
 
-        internal LocalRemoteTag( TagInfo here, TagDiff d, IReadOnlyDictionary<string, TagInfo> oppositeIndex )
+        internal LocalRemoteTag( TagInfo here, TagDiff d, IReadOnlyDictionary<string, TagInfo> oppositeIndex, ref Diff.Stats stats )
         {
             Throw.DebugAssert( d is TagDiff.LocalOnly or TagDiff.RemoteOnly );
+
+            _diff = DetectCommitConflict( here, d, oppositeIndex, out _conflict );
+
             if( (d & TagDiff.LocalOnly) != 0 )
             {
+                // Don't consider conflict as a "local only" tag.
+                if( (_diff & TagDiff.CommitConflict) != 0 )
+                {
+                    ++stats._conflictCount;
+                }
+                else
+                {
+                    ++stats._localOnlyCount;
+                }
                 _local = here;
                 _remote = null;
             }
             else
             {
+                // Don't consider conflict as a "remote only" tag.
+                if( (_diff & TagDiff.CommitConflict) == 0 )
+                {
+                    ++stats._remoteOnlyCount;
+                }
                 _local = null;
                 _remote = here;
             }
-            _diff = DetectCommitConflict( here, d, oppositeIndex, out _conflict );
 
             static TagDiff DetectCommitConflict( TagInfo here,
                                                  TagDiff d,
@@ -77,6 +94,11 @@ public sealed partial class GitTagInfo
         public string CanonicalName => Info.CanonicalName;
 
         /// <summary>
+        /// Gets the tag name without "refs/tags/" prefix.
+        /// </summary>
+        public ReadOnlySpan<char> ShortName => Info.ShortName;
+
+        /// <summary>
         /// Gets the commit.
         /// </summary>
         public Commit Commit => Info.Commit!;
@@ -93,6 +115,23 @@ public sealed partial class GitTagInfo
         /// </para>
         /// </summary>
         public TagInfo? Conflict => _conflict;
+
+        /// <summary>
+        /// Gets either "unavailable" if the <see cref="Conflict"/> is not available (fetch-required)
+        /// or the shorten Sha otherwise.
+        /// <para>
+        /// Always null if there's not conflict.
+        /// </para>
+        /// </summary>
+        public string? ConflictCommitId
+        {
+            get
+            {
+                if( _conflict == null ) return null;
+                var c = _conflict.Commit;
+                return c == null ? "unavailable" : c.Id.Sha.Substring( 0, 7 );
+            }
+        }
 
         public override string ToString() => $"{CanonicalName} - Diff: {_diff}.";
     }

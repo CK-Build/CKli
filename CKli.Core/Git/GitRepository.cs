@@ -3,7 +3,6 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
@@ -14,7 +13,7 @@ namespace CKli.Core;
 /// <summary>
 /// Encapsulates LibGit2Sharp <see cref="Repository"/>.
 /// </summary>
-public sealed class GitRepository : IGitHeadInfo, IDisposable
+public sealed partial class GitRepository : IGitHeadInfo, IDisposable
 {
     static readonly StatusOptions _checkDirtyOptions = new StatusOptions() { IncludeIgnored = false };
     readonly GitRepositoryKey _repositoryKey;
@@ -127,7 +126,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     public readonly record struct SimpleStatusInfo( string CurrentBranchName, bool IsDirty, int? CommitAhead, int? CommitBehind )
     {
         /// <summary>
-        /// Gets whether this status is the <c>default</c>, unitialized value.
+        /// Gets whether this status is the <c>default</c>, uninitialized value.
         /// </summary>
         public bool IsDefault => CurrentBranchName == null;
 
@@ -249,7 +248,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
-    /// Ensures that a local branch exists. If a remote branch form the 'origin' remote is known locally
+    /// Ensures that a local branch exists. If a remote branch from the 'origin' remote is known locally
     /// it will be associated.
     /// <para>
     /// If the branch is created, it will point at the same commit as the current <see cref="Head"/>.
@@ -310,189 +309,6 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
-    /// Gets the remote <see cref="GitTagInfo"/> from the specified remote.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="tags">The remote <see cref="GitTagInfo"/> on success.</param>
-    /// <param name="remoteName">The remote name.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool GetRemoteTags( IActivityMonitor monitor, [NotNullWhen( true )] out GitTagInfo? tags, string remoteName = "origin" )
-    {
-        try
-        {
-            if( !_repositoryKey.GetReadCredentials( monitor, out var creds ) )
-            {
-                tags = null;
-                return false;
-            }
-
-            var remote = _git.Network.Remotes[remoteName];
-            if( remote == null )
-            {
-                monitor.Error( $"""
-                    Unable to get remote tags from '{remoteName}' as it doesn't exist.
-                    Defined remotes are: {_git.Network.Remotes.Select( r => r.Name ).Concatenate()}.
-                    """ );
-                tags = null;
-                return false;
-            }
-            var result = ImmutableArray.CreateBuilder<TagInfo>();
-            ImmutableArray<TagInfo>.Builder? invalidTags = null;
-            int fetchRequiredCount = 0;
-            var remoteRefs = _git.Network.ListReferences( remote );
-            foreach( var r in remoteRefs )
-            {
-                var sName = r.CanonicalName.AsSpan();
-                if( sName.StartsWith( "refs/tags/", StringComparison.Ordinal ) )
-                {
-                    if( sName.EndsWith( "^{}", StringComparison.Ordinal ) )
-                    {
-                        // We ignore the annotated tag reference.
-                        continue;
-                    }
-                    var dr = r.ResolveToDirectReference();
-                    if( dr.Target is TagAnnotation a )
-                    {
-                        if( a.Target is Commit t )
-                        {
-                            CollectTag( result, r.CanonicalName, t, a, ref fetchRequiredCount, ref invalidTags );
-                        }
-                        else
-                        {
-                            monitor.Trace( $"Ignoring annotated tag '{r.CanonicalName}' that does't target a commit." );
-                        }
-                    }
-                    else
-                    {
-                        var target = dr.Target;
-                        if( target is Commit t )
-                        {
-                            CollectTag( result, r.CanonicalName, t, null, ref fetchRequiredCount, ref invalidTags );
-                        }
-                        else if( target != null )
-                        {
-                            monitor.Trace( $"Ignoring lightweight tag '{r.CanonicalName}' that does't target a commit." );
-                        }
-                        else
-                        {
-                            // The target is not locally available. We cannot know if it's a
-                            // commit.
-                            CollectTag( result, r.CanonicalName, null, null, ref fetchRequiredCount, ref invalidTags );
-                        }
-                    }
-                }
-            }
-            result.Sort();
-            tags = new GitTagInfo( result, invalidTags, fetchRequiredCount );
-            return true;
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( "Error while getting remote tags. This requires a manual fix.", ex );
-            tags = null;
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Gets the local <see cref="GitTagInfo"/>.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="tags">The local <see cref="GitTagInfo"/> on success.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool GetLocalTags( IActivityMonitor monitor, [NotNullWhen(true)]out GitTagInfo? tags )
-    {
-        try
-        {
-            var result = ImmutableArray.CreateBuilder<TagInfo>();
-            ImmutableArray<TagInfo>.Builder? invalidTags = null;
-            int fetchRequiredCount = 0;
-            foreach( var tag in _git.Tags )
-            {
-                if( tag.PeeledTarget is Commit t )
-                {
-                    CollectTag( result, tag.CanonicalName, t, tag.Annotation, ref fetchRequiredCount, ref invalidTags );
-                }
-                else
-                {
-                    monitor.Trace( $"Ignoring tag '{tag.CanonicalName}' that does't target a commit." );
-                }
-            }
-            Throw.DebugAssert( fetchRequiredCount == 0 );
-            result.Sort();
-            tags = new GitTagInfo( result, invalidTags, 0 );
-            return true;
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( "Error while listing tags. This requires a manual fix.", ex );
-            tags = null;
-            return false;
-        }
-    }
-
-    static void CollectTag( ImmutableArray<TagInfo>.Builder result,
-                            string canonicalName,
-                            Commit? commit,
-                            TagAnnotation? annotation,
-                            ref int fetchRequiredCount,
-                            ref ImmutableArray<TagInfo>.Builder? invalidTags )
-    {
-        var newOne = new TagInfo( canonicalName, commit, annotation );
-        if( !IsCKliValidTagName( canonicalName.AsSpan( 10 ) ) )
-        {
-            invalidTags ??= ImmutableArray.CreateBuilder<TagInfo>();
-            invalidTags.Add( newOne );
-        }
-        else
-        {
-            if( commit == null ) ++fetchRequiredCount;
-            result.Add( newOne );
-        }
-    }
-
-    /// <summary>
-    /// Checks that a tag name is valid for CKli: it must obviously be non empty and contains
-    /// only ascii characters and letters must be lowercase.
-    /// <para>
-    /// See <see cref="GitTagInfo.InvalidTags"/>.
-    /// </para>
-    /// </summary>
-    /// <param name="tagName">The tag name to test.</param>
-    /// <returns>True if this is a valid tag name for CKli. False if this tag name must be ignored.</returns>
-    public static bool IsCKliValidTagName( ReadOnlySpan<char> tagName )
-    {
-        if( tagName.IsEmpty ) return false;
-        foreach( var c in tagName )
-        {
-            if( !char.IsAscii( c ) || char.IsAsciiLetter( c ) && !char.IsAsciiLetterLower( c ) )
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// Gets the diff between local and remote tags.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="diff">The diff between local and remote tags on success.</param>
-    /// <param name="remoteName">The remote name.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool GetDiffTags( IActivityMonitor monitor, [NotNullWhen( true )] out GitTagInfo.Diff? diff, string remoteName = "origin" )
-    {
-        if( !GetLocalTags( monitor, out var localTags )
-            || !GetRemoteTags( monitor, out var remoteTags, remoteName ) )
-        {
-            diff = null;
-            return false;
-        }
-        diff = new GitTagInfo.Diff( localTags, remoteTags );
-        return true;
-    }
-
-    /// <summary>
     /// Checks out the specified branch. 
     /// <list type="number">
     ///     <item>If the current branch name is <paramref name="branchName"/>, does nothing.</item>
@@ -534,8 +350,30 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
         }
     }
 
+    bool GetRemote( IActivityMonitor monitor,
+                string remoteName,
+                [NotNullWhen( true )] out Remote? remote,
+                out UsernamePasswordCredentials? creds )
+    {
+        if( !_repositoryKey.GetReadCredentials( monitor, out creds ) )
+        {
+            remote = null;
+            return false;
+        }
+        remote = _git.Network.Remotes[remoteName];
+        if( remote == null )
+        {
+            monitor.Error( $"""
+                    Unknown remote '{remoteName}'.
+                    Defined remotes are: '{_git.Network.Remotes.Select( r => r.Name ).Concatenate("', '")}'.
+                    """ );
+            return false;
+        }
+        return true;
+    }
+
     /// <summary>
-    /// Pull-Merge the current head from the remote. Any merge conflict is an error with <see cref="MergeFileFavor.Normal"/> and this is the
+    /// Fetch-Merge the current head from its tracked remote branch. Any merge conflict is an error with <see cref="MergeFileFavor.Normal"/> and this is the
     /// safest mode. Choosing one of other flavors will not trigger a conflict error.
     /// <para>
     /// If the current head has no associated tracking branch, nothing is done. 
@@ -831,27 +669,14 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
-    /// Gets whether <see cref="Push(IActivityMonitor)"/> can be called:
-    /// the current branch is tracked and is ahead of the remote branch.
-    /// </summary>
-    public bool CanPush => (_git.Head.TrackingDetails.AheadBy ?? 0) > 0;
-
-    /// <summary>
-    /// Pushes changes from the current branch to the origin.
+    /// Pushes changes from a branch to the remote "origin".
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="branchName">Local branch name. Null for the <see cref="CurrentBranchName"/>.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool Push( IActivityMonitor monitor ) => Push( monitor, CurrentBranchName );
-
-    /// <summary>
-    /// Pushes changes from a branch to the origin.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="branchName">Local branch name.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool Push( IActivityMonitor monitor, string branchName )
+    public bool Push( IActivityMonitor monitor, string? branchName )
     {
-        Throw.CheckNotNullArgument( branchName );
+        branchName ??= CurrentBranchName;
         using( monitor.OpenInfo( $"Pushing '{DisplayPath}' (branch '{branchName}') to origin." ) )
         {
             if( !_repositoryKey.GetWriteCredentials( monitor, out var creds ) ) return false;

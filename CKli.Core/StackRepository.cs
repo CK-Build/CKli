@@ -55,7 +55,7 @@ public sealed partial class StackRepository : IDisposable
 
     /// <summary>
     /// Internal access to the CKliEnv: this is only used to obtain the <see cref="CKliEnv.Committer"/> when
-    /// initializing "CKli-Repo" tag. CKliEnv must be parameter injected everywhere it is needed for better
+    /// initializing "ckli-repo" tag. CKliEnv must be parameter injected everywhere it is needed for better
     /// maintanability.
     /// </summary>
     internal CKliEnv Context => _context;
@@ -244,7 +244,7 @@ public sealed partial class StackRepository : IDisposable
     public bool PushChanges( IActivityMonitor monitor )
     {
         CommitResult result = _git.Commit( monitor, "Automatic pre-push commit." );
-        return result != CommitResult.Error && _git.Push( monitor );
+        return result != CommitResult.Error && _git.Push( monitor, null );
     }
 
     StackRepository( GitRepository git, in NormalizedPath stackRoot, CKliEnv context, string stackName )

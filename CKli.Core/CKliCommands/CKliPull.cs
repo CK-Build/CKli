@@ -4,16 +4,19 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
+// Fetch is the way to go along with manual merges.
+// See https://stackoverflow.com/questions/4318161/can-git-pull-all-update-all-my-local-branches
+// This is not easy to find a safe global pattern.
 sealed class CKliPull : Command
 {
     public CKliPull()
         : base( null,
                 "pull",
-                "Resynchronizes the current Repo or World from the remote 'origin'.",
+                """Fetch-Merge the Repo's current head from its tracked remote branch on remote "origin".""",
                 [],
                 [],
                 [
-                    (["--all"], "Pull all the Repos of the current World (even if current path is in a Repo)."),
+                    (["--all"], "Pulls all the Repos' current head of the current World (even if current path is in a Repo)."),
                     (["--skip-pull-stack"], "Don't pull the Stack repository itself.")
                 ] )
     {

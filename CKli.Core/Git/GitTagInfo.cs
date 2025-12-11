@@ -1,8 +1,11 @@
+using CK.Core;
 using LibGit2Sharp;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Security.Principal;
+using static CK.Core.ActivityMonitor;
 
 namespace CKli.Core;
 
@@ -65,5 +68,24 @@ public sealed partial class GitTagInfo
     public ImmutableArray<TagInfo.Group> GroupedTags => _groups.IsDefault
                                                             ? (_groups = TagInfo.GetGroups( _tags, out _fetchRequiredCount ))
                                                             : _groups;
+
+    internal IRenderable ToRenderable( ScreenType s )
+    {
+        var display = s.Unit;
+        if( _invalidTags.Length > 0 )
+        {
+            display.AddBelow( InvalidTagsToRenderable( s, "ignored" ) );
+        }
+        var lines = s.Unit.AddBelow( GroupedTags.Select( t => t.ToRenderable( s ) ) ).TableLayout();
+        display = display.AddBelow( lines );
+        return display;
+    }
+
+    internal IRenderable InvalidTagsToRenderable( ScreenType s, string kind )
+    {
+        Throw.DebugAssert( _invalidTags.Length > 0 );
+        return s.Text( $"‼ {_invalidTags.Length} {kind}:", foreColor: ConsoleColor.DarkYellow ).Box( marginRight: 1 )
+                        .AddRight( TagInfo.RenderTagNames( s, _invalidTags ) );
+    }
 
 }
