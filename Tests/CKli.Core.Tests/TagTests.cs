@@ -512,10 +512,10 @@ public partial class TagTests
                 │  I'm annotated too.⮐
                 │ <Local tagger>⮐
                 │  Tim (tim@mail.com)⮐
-                │  on 01/01/2000 00:00:00 +00:00⮐
+                │  on 2000-01-01 00:00:00Z⮐
                 │ <remote signature>⮐
                 │  Bob (bob@mail.com)⮐
-                │  on 11/12/2025 00:00:00 +00:00⮐
+                │  on 2025-12-11 00:00:00Z⮐
 
                 """ );
         }
