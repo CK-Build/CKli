@@ -25,133 +25,6 @@ internal static class AnsiCodes
     static bool _supportsProgressReporting = !RuntimeInformation.IsOSPlatform( OSPlatform.OSX );
 
     /// <summary>
-    /// Clears the screen.
-    /// </summary>
-    /// <returns>The Ansi string.</returns>
-    public static string EraseScreen( CursorRelativeSpan span = CursorRelativeSpan.Both ) => $"\u001b[{(int)span}J";
-
-    /// <summary>
-    /// Clears the current line.
-    /// </summary>
-    /// <returns>The Ansi string.</returns>
-    public static string EraseLine( CursorRelativeSpan span = CursorRelativeSpan.Both ) => $"\u001b[{(int)span}K";
-
-    /// <summary>
-    /// Moves the cursor at the given (1-based) position.
-    /// </summary>
-    /// <param name="line">The 1-based line.</param>
-    /// <param name="column">The 1-based column.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string MoveTo( int line, int column ) => $"\u001b[{line};{column}H";
-
-    /// <summary>
-    /// Moves the cursor up.
-    /// </summary>
-    /// <param name="lineCount">Number of lines.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string MoveUp( int lineCount = 1 ) => $"\u001b[{lineCount}A";
-
-    /// <summary>
-    /// Moves the cursor down.
-    /// </summary>
-    /// <param name="lineCount">Number of lines.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string MoveDown( int lineCount = 1 ) => $"\u001b[{lineCount}B";
-
-    /// <summary>
-    /// Moves the cursor forward.
-    /// </summary>
-    /// <param name="columnCount">Number of columns.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string MoveForward( int columnCount = 1 ) => $"\u001b[{columnCount}C";
-
-    /// <summary>
-    /// Moves the cursor backward.
-    /// </summary>
-    /// <param name="columnCount">Number of columns.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string MoveBackward( int columnCount = 1 ) => $"\u001b[{columnCount}D";
-
-    /// <summary>
-    /// Moves the cursor to beginning of the next line.
-    /// </summary>
-    /// <param name="lineCount">Number of lines.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string MoveToNextLine( int lineCount = 1 ) => $"\u001b[{lineCount}E";
-
-    /// <summary>
-    /// Moves the cursor to beginning of the previous line.
-    /// </summary>
-    /// <param name="lineCount">Number of lines.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string MoveToPrevLine( int lineCount = 1 ) => $"\u001b[{lineCount}F";
-
-    /// <summary>
-    /// Moves the cursor to the given 1-based column on the current line, or the rightmost column if <paramref name="column"/>
-    /// is greater than the width of the terminal.
-    /// </summary>
-    /// <param name="column">1-based column number.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string MoveToColumn( int column = 1 ) => $"\u001b[{column}G";
-
-    /// <summary>
-    /// Sets the foreground color.
-    /// </summary>
-    /// <param name="color">The color to set.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string SetForeColor( ConsoleColor color ) => $"\u001b[{(int)color.FromConsole()}m";
-
-    /// <summary>
-    /// Sets the background color.
-    /// </summary>
-    /// <param name="color">The color to set.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string SetBackColor( ConsoleColor color ) => $"\u001b[{10 + (int)color.FromConsole()}m";
-
-    /// <summary>
-    /// Sets the colors.
-    /// </summary>
-    /// <param name="color">The colors to set.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string SetColor( Color color ) => $"\u001b[{(int)color.ForeColor.FromConsole()},{10 + (int)color.BackColor.FromConsole()}m";
-
-    /// <summary>
-    /// Resets the colors to the default foreground and background colors. 
-    /// </summary>
-    /// <returns>The Ansi string.</returns>
-    public static string ResetColors() => "\u001b[39,49m";
-
-    /// <summary>
-    /// Sets or clears bold mode. 
-    /// </summary>
-    /// <returns>The Ansi string.</returns>
-    public static string SetBold( bool bold = true ) => bold ? "\u001b[1m" : "\u001b[22m";
-
-    /// <summary>
-    /// Sets or clears underlined mode. 
-    /// </summary>
-    /// <returns>The Ansi string.</returns>
-    public static string SetUnderline( bool underline = true ) => underline ? "\u001b[4m" : "\u001b[24m";
-
-    /// <summary>
-    /// Sets or clears strikethrough mode. 
-    /// </summary>
-    /// <returns>The Ansi string.</returns>
-    public static string SetStrikethrough( bool underline = true ) => underline ? "\u001b[9m" : "\u001b[29m";
-
-    /// <summary>
-    /// Sets or clears italic mode. 
-    /// </summary>
-    /// <returns>The Ansi string.</returns>
-    public static string SetItalic( bool underline = true ) => underline ? "\u001b[3m" : "\u001b[23m";
-
-    /// <summary>
-    /// Sets or clears blink mode. 
-    /// </summary>
-    /// <returns>The Ansi string.</returns>
-    public static string SetBlink( bool underline = true ) => underline ? "\u001b[3m" : "\u001b[23m";
-
-    /// <summary>
     /// Set progress state to a busy spinner (does nothing by returning an empty string if this
     /// is not supported on the current platform).
     /// </summary>
@@ -389,6 +262,29 @@ internal static class AnsiCodes
     {
         int saved = w.WrittenLength;
         if( !w.AppendCSI() || !w.Append( (char)('0' + span) ) || !w.Append( 'K' ) )
+        {
+            w.Truncate( saved );
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Clears the screen.
+    /// </summary>
+    /// <returns>The Ansi string.</returns>
+    public static string EraseScreen( CursorRelativeSpan span = CursorRelativeSpan.Both ) => $"\u001b[{(int)span}J";
+
+    /// <summary>
+    /// Erases the screen. The cursor remains where it is.
+    /// </summary>
+    /// <param name="w">The writer.</param>
+    /// <param name="span">Specifies which part of the screen must be erased.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public static bool EraseScreen( ref this FixedBufferWriter w, CursorRelativeSpan span = CursorRelativeSpan.Both )
+    {
+        int saved = w.WrittenLength;
+        if( !w.AppendCSI() || !w.Append( (char)('0' + span) ) || !w.Append( 'J' ) )
         {
             w.Truncate( saved );
             return false;

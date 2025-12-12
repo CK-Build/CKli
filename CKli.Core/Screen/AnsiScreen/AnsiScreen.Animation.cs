@@ -17,7 +17,6 @@ sealed partial class AnsiScreen
         readonly Timer _timer;
         readonly MultiColorString _workingString;
         readonly char[] _workingBuffer;
-        readonly int[] _linesLength;
         readonly object _lock;
 
         int _screenWidth;
@@ -35,7 +34,6 @@ sealed partial class AnsiScreen
             _workingBuffer = new char[ _maxWidth * 3 * _maxDynamicLineCount];
             _lock = new object();
             _workingString = new MultiColorString();
-            _linesLength = new int[ _maxDynamicLineCount ];
             _timer = new Timer( OnTimer, null, Timeout.Infinite, _timerPeriod );
             Show();
         }
@@ -104,20 +102,30 @@ sealed partial class AnsiScreen
 
                 bool widthChange = TrackScreenSizeChange();
                 var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
-                RestoreStartPosition( ref w );
-                _workingString.Append( ref w );
-                w.EraseLine( CursorRelativeSpan.After );
-                int newLineCount = 0;
-                _topLine?.Render( ref w, ref newLineCount, _width, widthChange, _linesLength );
-                int toRemove = _lastRenderedLineCount - newLineCount;
-                if( toRemove > 0 )
+                if( widthChange )
                 {
-                    w.MoveToRelativeLine( toRemove );
-                    EraseLastLines( ref w, toRemove );
+                    w.EraseScreen( CursorRelativeSpan.After );
                 }
+                _workingString.Append( ref w );
+                int newLineCount = 0;
+                _topLine?.Render( ref w, ref newLineCount, _width, widthChange );
+                if( !widthChange )
+                {
+                    int toRemove = _lastRenderedLineCount - newLineCount;
+                    if( toRemove > 0 )
+                    {
+                        w.MoveToRelativeLine( toRemove, resetColumn: true );
+                        while( --toRemove >= 0 )
+                        {
+                            w.EraseLine( CursorRelativeSpan.After );
+                            w.MoveToRelativeLine( -1 );
+                        }
+                    }
+                }
+                // Restores the starting position.
+                w.MoveToColumn( 1 );
+                w.MoveToRelativeLine( -newLineCount );
                 _lastRenderedLineCount = newLineCount;
-                //w.MoveToColumn( 1 );
-                //w.MoveToRelativeLine( -newLineCount );
 
                 _target.RawWrite( w.Text );
             }
@@ -125,49 +133,14 @@ sealed partial class AnsiScreen
 
         bool TrackScreenSizeChange()
         {
-            bool widthChange = false;
             _screenWidth = ConsoleScreen.GetWindowWidth();
             int width = Math.Min( _screenWidth, _maxWidth );
-            int delta = width - _width;
-            if( delta != 0 )
+            if( width != _width )
             {
-                widthChange = true;
-                if( delta < 0 )
-                {
-                    // The screen is smaller: some rendered lines have been wrapped.
-                    int newlastRenderedLineCount = _lastRenderedLineCount;
-                    for( int i = 0; i < _lastRenderedLineCount; ++i )
-                    {
-                        int len = _linesLength[i];
-                        while( len > width )
-                        {
-                            len -= width;
-                            newlastRenderedLineCount++;
-                        }
-                    }
-                    _lastRenderedLineCount = newlastRenderedLineCount;
-                }
                 _width = width;
+                return true;
             }
-
-            return widthChange;
-        }
-
-        void RestoreStartPosition( ref FixedBufferWriter w )
-        {
-            w.MoveToColumn( 1 );
-            w.MoveToRelativeLine( -_lastRenderedLineCount );
-        }
-
-        static void EraseLastLines( ref FixedBufferWriter w, int count )
-        {
-            Throw.DebugAssert( count > 0 );
-            w.MoveToColumn( 1 );
-            while( --count >= 0 )
-            {
-                w.EraseLine( CursorRelativeSpan.After );
-                w.MoveToRelativeLine( -1 );
-            }
+            return false;
         }
 
         public void Hide()
@@ -183,20 +156,7 @@ sealed partial class AnsiScreen
 
                     var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
                     w.Append( AnsiCodes.RemoveProgressIndicator() );
-
-                    if( _lastRenderedLineCount > 0 )
-                    {
-                        EraseLastLines( ref w, _lastRenderedLineCount );
-                        _lastRenderedLineCount = 0;
-                    }
-                    else
-                    {
-                        // We have not rendered lines: resets the cursor to
-                        // erase the MultiColorString.
-                        w.MoveToColumn( 1 );
-                    }
-                    // Erase the MultiColorString.
-                    w.EraseLine( CursorRelativeSpan.After );
+                    w.EraseScreen( CursorRelativeSpan.After );
                     w.AppendStyle( TextStyle.Default.Color, TextEffect.Regular );
                     w.ShowCursor( true );
 

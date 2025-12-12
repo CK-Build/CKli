@@ -81,7 +81,7 @@ sealed partial class AnsiScreen
                 return true;
             }
 
-            public void Render( ref FixedBufferWriter w, ref int depth, int width, bool refresh, int[] linesLength )
+            public void Render( ref FixedBufferWriter w, ref int depth, int width, bool refresh )
             {
                 // If we hit the depth limit or we can't write the next line, give up.
                 if( depth == _maxDynamicLineCount || !w.MoveToRelativeLine( 1, true ) )
@@ -92,21 +92,18 @@ sealed partial class AnsiScreen
                 var text = _text;
                 if( _lastRendered != text || refresh )
                 {
-                    linesLength[depth] = RenderLine( ref w, depth, width, text.AsSpan() );
+                    RenderLine( ref w, depth, width, text.AsSpan() );
                     _lastRendered = text;
                 }
                 ++depth;
                 var n = _next;
                 if( n != null )
                 {
-                    n.Render( ref w, ref depth, width, refresh, linesLength );
+                    n.Render( ref w, ref depth, width, refresh );
                 }
 
-                static int RenderLine( ref FixedBufferWriter w, int depth, int width, ReadOnlySpan<char> t )
+                static void RenderLine( ref FixedBufferWriter w, int depth, int width, ReadOnlySpan<char> t )
                 {
-                    // Don't bother tracking the actual line length. We don't inject control characters so
-                    // simply diff the length.
-                    int initialRemaining = w.RemainingLength;
                     t = t.Trim();
                     if( depth > 0 )
                     {
@@ -134,10 +131,8 @@ sealed partial class AnsiScreen
                             w.Append( '…' );
                         }
                     }
-                    var written = initialRemaining - w.RemainingLength;
                     // Always clear the end of line.
                     w.EraseLine( CursorRelativeSpan.After );
-                    return written;
                 }
             }
         }
