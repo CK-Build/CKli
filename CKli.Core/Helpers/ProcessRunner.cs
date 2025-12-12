@@ -22,7 +22,7 @@ public static class ProcessRunner
     public static readonly CKTrait StdOutTag = ActivityMonitor.Tags.Register( "StdOut" );
 
     /// <summary>
-    /// Starts and wait for the end of an external process, optionally handles a tiemout and
+    /// Starts and wait for the end of an external process, optionally handles a timeout and
     /// standard output and/or error capture. Always log the output and error as <see cref="LogLevel.Trace"/>
     /// and <see cref="StdOutTag"/> or <see cref="StdErrTag"/>.
     /// <para>
@@ -38,7 +38,7 @@ public static class ProcessRunner
     /// <param name="timeout">Optional timeout in milliseconds.</param>
     /// <param name="stdOut">Optional standard output collector.</param>
     /// <param name="stdErr">Optional standard error collector.</param>
-    /// <returns>The exit status code or null if timeout occured.</returns>
+    /// <returns>The exit status code or null if timeout occurred.</returns>
     public static int? RunProcess( IActivityLineEmitter logger,
                                    string fileName,
                                    string arguments,

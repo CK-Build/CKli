@@ -3,6 +3,7 @@ using CKli.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -99,6 +100,22 @@ public static class CKliCommands
     {
         monitor.Info( $"Executing '{cmdLine.InitialAsStringArguments}'." );
         context.OnStartCommandHandling();
+
+        if( cmdLine.HasInteractiveArgument )
+        {
+            for( int i = 0; i < 12; i++ )
+            {
+                monitor.OpenInfo(
+                    $"n°{i} GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG" );
+                Thread.Sleep( 500 );
+            }
+            for( int i = 0; i < 12; i++ )
+            {
+                monitor.CloseGroup();
+                Thread.Sleep( 500 );
+            }
+            return ValueTask.FromResult( true );
+        }
 
         // Honor the "ckli i" if specified.
         // The command will be handled below but with the InteractiveScreen (the command may use it)

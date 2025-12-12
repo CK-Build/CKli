@@ -24,7 +24,7 @@ sealed partial class AnsiScreen
             // Initializes our default colors.
             Span<char> b = stackalloc char[16];
             var w = new FixedBufferWriter( b );
-            w.AppendCSIStyle( _current.Color, _current.Effect );
+            w.AppendStyle( _current.Color, _current.Effect );
             writer( w.Text );
         }
 
@@ -43,7 +43,7 @@ sealed partial class AnsiScreen
 
         public ScreenType ScreenType => _screenType;
 
-        public void Write( ReadOnlySpan<char> text ) => Writer( text );
+        public void RawWrite( ReadOnlySpan<char> text ) => Writer( text );
 
         public void Write( ReadOnlySpan<char> text, TextStyle style )
         {
@@ -57,14 +57,13 @@ sealed partial class AnsiScreen
                 }
             }
             w( text );
-
         }
 
         static TextStyle WriteDiff( CoreTextWriter writer, TextStyle current, TextStyle style )
         {
             Span<char> styleBuffer = stackalloc char[64];
             var w = new FixedBufferWriter( styleBuffer );
-            w.AppendCSITextStyleDiff( current, style );
+            w.AppendTextStyleDiff( current, style );
             writer( w.Text );
             return style;
         }
@@ -74,9 +73,9 @@ sealed partial class AnsiScreen
             _current = TextStyle.Default;
             Span<char> b = stackalloc char[16];
             var w = new FixedBufferWriter( b );
-            w.AppendCSIStyle( _current.Color, _current.Effect );
+            w.AppendStyle( _current.Color, _current.Effect );
             if( newLine ) w.Append( '\n' );
-            Write( w.Text );
+            RawWrite( w.Text );
         }
     }
 

@@ -14,9 +14,8 @@ sealed partial class AnsiScreen
 
         protected internal override int UpdateScreenWidth()
         {
-            _screen._width = ConsoleScreen.GetWindowWidth();
             _screen._animation.Hide();
-            return _screen._width;
+            return _screen._animation.ScreenWidth;
         }
     }
 

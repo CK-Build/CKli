@@ -138,9 +138,9 @@ public sealed partial class InteractiveScreen : IScreen
     /// <inheritdoc />
     public void ScreenLog( LogLevel level, string text ) => _header.Logs.Add( _screen.ScreenType.CreateLog( level, text ) );
 
-    void IScreen.Close() => ((IScreen)_screen).Close();
+    void IScreen.Close() => _screen.Close();
 
-    void IScreen.OnLog( LogLevel level, string? text, bool isOpenGroup ) => ((IScreen)_screen).OnLog( level, text, isOpenGroup );
+    void IScreen.OnLog( LogLevel level, string? text, bool isOpenGroup ) => _screen.OnLog( level, text, isOpenGroup );
 
     InteractiveScreen? IScreen.TryCreateInteractive( IActivityMonitor monitor, CKliEnv context ) => throw new System.InvalidOperationException();
 

@@ -12,7 +12,6 @@ sealed partial class AnsiScreen : IScreen
     readonly uint? _originalConsoleMode;
     readonly Encoding _originalOutputEncoding;
     readonly Animation _animation;
-    int _width;
 
     public AnsiScreen( uint? originalConsoleMode )
     {
@@ -20,8 +19,7 @@ sealed partial class AnsiScreen : IScreen
         _originalOutputEncoding = Console.OutputEncoding;
         Console.OutputEncoding = Encoding.UTF8;
         _target = new RenderTarget( Console.Out.Write );
-        _width = ConsoleScreen.GetWindowWidth();
-        _animation = new Animation( _target, _width );
+        _animation = new Animation( _target );
     }
 
     public ScreenType ScreenType => _screenType;
@@ -29,14 +27,14 @@ sealed partial class AnsiScreen : IScreen
     public void Display( IRenderable renderable, bool newLine = true )
     {
         _animation.Hide();
-        if( renderable.Width > _width )
+        if( renderable.Width > _animation.ScreenWidth )
         {
-            renderable = renderable.SetWidth( _width, false );
+            renderable = renderable.SetWidth( _animation.ScreenWidth, false );
         }
         renderable.Render( _target, newLine );
     }
 
-    public int Width => _width;
+    public int Width => _animation.ScreenWidth;
 
     public void ScreenLog( LogLevel level, string message )
     {
@@ -44,12 +42,7 @@ sealed partial class AnsiScreen : IScreen
         _screenType.CreateLog( level, message ).Render( _target );
     }
 
-    public void OnLog( LogLevel level, string? text, bool isOpenGroup )
-    {
-        if( text == null ) _animation.CloseGroup();
-        else if( isOpenGroup ) _animation.OpenGroup( level, text );
-        else _animation.Line( level, text );
-    }
+    public void OnLog( LogLevel level, string? text, bool isOpenGroup ) => _animation.OnLog( text, isOpenGroup );
 
     void IScreen.Close()
     {

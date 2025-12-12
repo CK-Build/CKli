@@ -95,25 +95,6 @@ internal static class AnsiCodes
     public static string MoveToColumn( int column = 1 ) => $"\u001b[{column}G";
 
     /// <summary>
-    /// Show or hides the cursor.
-    /// </summary>
-    /// <param name="show">False to hide the cursor.</param>
-    /// <returns>The Ansi string.</returns>
-    public static string ShowCursor( bool show = true ) => show ? "\u001b[?25h" : "\u001b[?25l";
-
-    /// <summary>
-    /// Saves the cursor position. Can be restored by <see cref="RestoreCursorPosition"/>.
-    /// </summary>
-    /// <returns>The Ansi string.</returns>
-    public static string SaveCursorPosition() => "\x1b[s";
-
-    /// <summary>
-    /// Restores the cursor positionsaved by <see cref="SaveCursorPosition"/>.
-    /// </summary>
-    /// <returns>The Ansi string.</returns>
-    public static string RestoreCursorPosition() => "\x1b[u";
-
-    /// <summary>
     /// Sets the foreground color.
     /// </summary>
     /// <param name="color">The color to set.</param>
@@ -190,6 +171,14 @@ internal static class AnsiCodes
     public static bool AppendCSI( ref this FixedBufferWriter w ) => w.Append( '\u001b', '[' );
 
     /// <summary>
+    /// Show or hides the cursor.
+    /// </summary>
+    /// <param name="w">This buffer writer.</param>
+    /// <param name="show">False to hide the cursor.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public static bool ShowCursor( ref this FixedBufferWriter w, bool show = true ) => w.Append( show ? "\u001b[?25h" : "\u001b[?25l" );
+
+    /// <summary>
     /// Writes an hyperlink.
     /// </summary>
     /// <param name="w">This buffer writer.</param>
@@ -212,20 +201,82 @@ internal static class AnsiCodes
     }
 
     /// <summary>
+    /// Moves the cursor to the specified column.
+    /// </summary>
+    /// <param name="w">This buffer writer.</param>
+    /// <param name="columnCount">When 0 or negative, the cursor is moved to the first column (the 1 index).</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public static bool MoveToColumn( ref this FixedBufferWriter w, int columnCount )
+    {
+        return columnCount <= 1
+                ? w.Append( "\u001b[1G" )
+                : Append( ref w, columnCount );
+
+        static bool Append( ref FixedBufferWriter w, int columnCount )
+        {
+            int saved = w.WrittenLength;
+            if( w.AppendCSI()
+                && w.Append( columnCount )
+                && w.Append( 'G' ) )
+            {
+                return true;
+            }
+            w.Truncate( saved );
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Moves the cursor up or down from its current position.
+    /// </summary>
+    /// <param name="w">This buffer writer.</param>
+    /// <param name="deltaLine">Positive to move the cursor down, negative to move the cursor up. 0 is a no-op.</param>
+    /// <param name="resetColumn">
+    /// True to move the cursor at the start of the target line.
+    /// By default, the cursor stays on its current column.
+    /// </param>
+    /// <returns>True on success, false otherwise.</returns>
+    public static bool MoveToRelativeLine( ref this FixedBufferWriter w, int deltaLine, bool resetColumn = false )
+    {
+        return deltaLine == 1
+                ? w.Append( resetColumn ? "\u001b[1E" : "\u001b[1B" )
+                : deltaLine == -1
+                ? w.Append( resetColumn ? "\u001b[1F" : "\u001b[1A" )
+                : deltaLine > 0
+                ? Append( ref w, deltaLine, resetColumn ? 'E' : 'B' )
+                : deltaLine < 0
+                ? Append( ref w, -deltaLine, resetColumn ? 'F' : 'A' )
+                : true;
+
+        static bool Append( ref FixedBufferWriter w, int deltaLine, char move )
+        {
+            int saved = w.WrittenLength;
+            if( w.AppendCSI()
+                && w.Append( deltaLine )
+                && w.Append( move ) )
+            {
+                return true;
+            }
+            w.Truncate( saved );
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Writes the foreground and background colors and optionally a text effect.
     /// </summary>
     /// <param name="w">This writer.</param>
     /// <param name="c">The color.</param>
     /// <param name="effect">The effect to apply.</param>
     /// <returns>True on success, false otherwise.</returns>
-    public static bool AppendCSIStyle( ref this FixedBufferWriter w, Color c, TextEffect effect = TextEffect.Ignore )
+    public static bool AppendStyle( ref this FixedBufferWriter w, Color c, TextEffect effect = TextEffect.Ignore )
     {
         int saved = w.WrittenLength;
         if( w.AppendCSI()
             // Must come first: setting effect emits a 0 to reset the effect but
             // that also resets the colors.
             && (effect == TextEffect.Ignore
-                || (w.AppendEffectArguments( effect ) && w.Append( ';' ) ))
+                || (AppendEffectArguments( ref w, effect ) && w.Append( ';' ) ))
             && w.AppendColorArgument( c.ForeColor, false )
             && w.Append( ';' )
             && w.AppendColorArgument( c.BackColor, true )
@@ -235,51 +286,36 @@ internal static class AnsiCodes
         }
         w.Truncate( saved );
         return false;
-    }
 
-    public static bool AppendCSIMoveToColumn( ref this FixedBufferWriter w, int columnCount )
-    {
-        int saved = w.WrittenLength;
-        if( w.AppendCSI()
-            && w.Append( columnCount )
-            && w.Append( "G" ) )
+        static bool AppendEffectArguments( ref FixedBufferWriter w, TextEffect effect )
         {
-            return true;
+            int saved = w.WrittenLength;
+            if( w.AppendRegularTextArgument()
+                && (effect == TextEffect.Regular
+                    || (
+                         ((effect & TextEffect.Bold) == 0) || (w.Append( ';' ) && w.AppendBoldTextArgument( true ))
+                         && ((effect & TextEffect.Italic) == 0) || (w.Append( ';' ) && w.AppendItalicTextArgument( true ))
+                         && ((effect & TextEffect.Underline) == 0) || (w.Append( ';' ) && w.AppendUnderlineTextArgument( true ))
+                         && ((effect & TextEffect.Strikethrough) == 0) || (w.Append( ';' ) && w.AppendStrikeThroughTextArgument( true ))
+                         && ((effect & TextEffect.Blink) == 0) || (w.Append( ';' ) && w.AppendBlinkTextArgument( true ))
+                       )) )
+            {
+                return true;
+            }
+            w.Truncate( saved );
+            return false;
         }
-        w.Truncate( saved );
-        return false;
 
     }
 
     /// <summary>
-    /// Writes a <see cref="TextEffect"/> that must not be <see cref="TextEffect.Ignore"/> otherwise an <see cref="ArgumentException"/>
-    /// is thrown (if we accept ignore, the caller will not know if she must append a semicolon or not). 
+    /// Writes the optimized diff between <paramref name="current"/> and <paramref name="style"/>. 
     /// </summary>
     /// <param name="w">This writer.</param>
-    /// <param name="effect">The effect to apply.</param>
+    /// <param name="current">The current style to consider.</param>
+    /// <param name="style">The new style that must replace the current one.</param>
     /// <returns>True on success, false otherwise.</returns>
-    public static bool AppendEffectArguments( ref this FixedBufferWriter w, TextEffect effect )
-    {
-        Throw.CheckArgument( effect != TextEffect.Ignore );
-        int saved = w.WrittenLength;
-        if( w.AppendRegularTextArgument()
-            && (effect == TextEffect.Regular
-                || (
-                     ((effect & TextEffect.Bold) == 0) || (w.Append(';') && w.AppendBoldTextArgument( true ))
-                     && ((effect & TextEffect.Italic) == 0) || (w.Append( ';' ) && w.AppendItalicTextArgument( true ))
-                     && ((effect & TextEffect.Underline) == 0) || (w.Append( ';' ) && w.AppendUnderlineTextArgument( true ))
-                     && ((effect & TextEffect.Strikethrough) == 0) || (w.Append( ';' ) && w.AppendStrikeThroughTextArgument( true ))
-                     && ((effect & TextEffect.Blink) == 0) || (w.Append( ';' ) && w.AppendBlinkTextArgument( true ))
-                   )) )
-        {
-            return true;
-        }
-        w.Truncate( saved );
-        return false;
-    }
-
-
-    public static bool AppendCSITextStyleDiff( ref this FixedBufferWriter w, TextStyle current, TextStyle style )
+    public static bool AppendTextStyleDiff( ref this FixedBufferWriter w, TextStyle current, TextStyle style )
     {
         int saved = w.WrittenLength;
         if( !w.AppendCSI() ) return false;
@@ -349,7 +385,7 @@ internal static class AnsiCodes
     /// <param name="w">The writer.</param>
     /// <param name="span">Specifies which part of the line must be erased.</param>
     /// <returns>True on success, false otherwise.</returns>
-    public static bool AppendCSIEraseLine( ref this FixedBufferWriter w, CursorRelativeSpan span = CursorRelativeSpan.Both )
+    public static bool EraseLine( ref this FixedBufferWriter w, CursorRelativeSpan span = CursorRelativeSpan.Both )
     {
         int saved = w.WrittenLength;
         if( !w.AppendCSI() || !w.Append( (char)('0' + span) ) || !w.Append( 'K' ) )
@@ -360,24 +396,7 @@ internal static class AnsiCodes
         return true;
     }
 
-    /// <summary>
-    /// Erases the current line and set the cursor on the first column (n°1 - this is one based).
-    /// </summary>
-    /// <param name="w">The writer.</param>
-    /// <returns>True on success, false otherwise.</returns>
-    public static bool AppendCSIEraseLineAndMoveToFirstColumn( ref this FixedBufferWriter w )
-    {
-        Throw.DebugAssert( (int)CursorRelativeSpan.Both == 2 );
-        int saved = w.WrittenLength;
-        if( !w.AppendCSI() || !w.Append( '2', 'K' ) || !w.AppendCSI() || !w.Append( '1', 'G' ) )
-        {
-            w.Truncate( saved );
-            return false;
-        }
-        return true;
-    }
-
-    public static bool AppendColorArgument( ref this FixedBufferWriter w, ConsoleColor c, bool background )
+    static bool AppendColorArgument( ref this FixedBufferWriter w, ConsoleColor c, bool background )
     {
         AnsiColor aC = c.FromConsole();
         var (h, l) = Math.DivRem( (int)aC, 10 );
@@ -392,17 +411,17 @@ internal static class AnsiCodes
         return w.Append( (char)('0' + h), (char)('0' + l) );
     }
 
-    public static bool AppendRegularTextArgument( ref this FixedBufferWriter w ) => w.Append( '0' );
+    static bool AppendRegularTextArgument( ref this FixedBufferWriter w ) => w.Append( '0' );
 
-    public static bool AppendBoldTextArgument( ref this FixedBufferWriter w, bool active ) => active ? w.Append( '1' ) : w.Append( '2', '2' );
+    static bool AppendBoldTextArgument( ref this FixedBufferWriter w, bool active ) => active ? w.Append( '1' ) : w.Append( '2', '2' );
 
-    public static bool AppendUnderlineTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '4' );
+    static bool AppendUnderlineTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '4' );
 
-    public static bool AppendStrikeThroughTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '9' );
+    static bool AppendStrikeThroughTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '9' );
 
-    public static bool AppendItalicTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '3' );
+    static bool AppendItalicTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '3' );
 
-    public static bool AppendBlinkTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '5' );
+    static bool AppendBlinkTextArgument( ref this FixedBufferWriter w, bool active ) => AppendStdDecoration( ref w, active, '5' );
 
     static bool AppendStdDecoration( ref FixedBufferWriter w, bool active, char d ) => active ? w.Append( d ) : w.Append( '2', d );
 }

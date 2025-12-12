@@ -32,7 +32,7 @@ public ref struct FixedBufferWriter
     public readonly int WrittenLength => _buffer.Length - _head.Length;
 
     /// <summary>
-    /// Gets the remaing available space.
+    /// Gets the remaining available space.
     /// </summary>
     public readonly int RemainingLength => _head.Length;
 
@@ -68,7 +68,7 @@ public ref struct FixedBufferWriter
     }
 
     /// <summary>
-    /// Appends a <see cref="ISpanFormattable"/>.
+    /// Appends a <see cref="ISpanFormattable"/> in <see cref="System.Globalization.CultureInfo.InvariantCulture"/>.
     /// </summary>
     /// <param name="formattable">The formattable.</param>
     /// <returns>True on success, false if the formattable requires more than <see cref="RemainingLength"/>.</returns>

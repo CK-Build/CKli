@@ -110,7 +110,7 @@ public sealed class CommandLineArguments
 
         static string? StartsWithPath( ref Span<string> args )
         {
-            if( args.Length > 0 && args[0] == "-p" || args[0] == "--path" )
+            if( args.Length > 0 && (args[0] == "-p" || args[0] == "--path") )
             {
                 args = args.Slice( 1 );
                 return args.Length == 0 ? "" : args[0];
@@ -120,7 +120,7 @@ public sealed class CommandLineArguments
 
         static bool StartsWithInteractive( ref Span<string> args )
         {
-            if( args.Length > 0 && args[0] == "i" || args[0] == "interactive" )
+            if( args.Length > 0 && (args[0] == "i" || args[0] == "interactive") )
             {
                 args = args.Slice( 1 );
                 return true;
