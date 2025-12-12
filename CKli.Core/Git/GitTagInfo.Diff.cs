@@ -145,7 +145,11 @@ public sealed partial class GitTagInfo
                     while( cmp > 0 )
                     {
                         b.Add( new DiffEntry( localIndex, null, remoteIndex, eR.Current, ref _stats ) );
-                        if( (hasR && (hasR = eR.MoveNext())) is false ) break;
+                        if( (hasR && (hasR = eR.MoveNext())) is false )
+                        {
+                            b.Add( new DiffEntry( localIndex, eL.Current, remoteIndex, null, ref _stats ) );
+                            break;
+                        }
                         cmp = eL.Current.CompareTo( eR.Current );
                     }
                     if( hasR )
@@ -282,12 +286,12 @@ public sealed partial class GitTagInfo
                                           .Append( "│  " ).Append( lr.Local.Annotation.Tagger.Name )
                                                           .Append( " (" ).Append( lr.Local.Annotation.Tagger.Email ).Append( ')' )
                                                           .AppendLine()
-                                          .Append( "│  on " ).Append( lr.Local.Annotation.Tagger.When ).AppendLine()
+                                          .Append( "│  on " ).Append( lr.Local.Annotation.Tagger.When.UtcDateTime.ToString( "u" ) ).AppendLine()
                                           .Append( "│ <remote signature>" ).AppendLine()
                                           .Append( "│  " ).Append( lr.Remote.Annotation.Tagger.Name )
                                                           .Append( " (" ).Append( lr.Remote.Annotation.Tagger.Email ).Append( ')' )
                                                           .AppendLine()
-                                          .Append( "│  on " ).Append( lr.Remote.Annotation.Tagger.When ).AppendLine()
+                                          .Append( "│  on " ).Append( lr.Remote.Annotation.Tagger.When.UtcDateTime.ToString( "u" ) ).AppendLine()
                                           .AppendLine();
                             }
                         }

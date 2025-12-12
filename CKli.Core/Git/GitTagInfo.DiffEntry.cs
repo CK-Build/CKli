@@ -57,7 +57,11 @@ public sealed partial class GitTagInfo
                             while( cmp > 0 )
                             {
                                 tags.Add( new LocalRemoteTag( rTags[iR], TagDiff.RemoteOnly, localIndex, ref stats ) );
-                                if( ++iR >= rTags.Length ) break;
+                                if( ++iR >= rTags.Length )
+                                {
+                                    tags.Add( new LocalRemoteTag( lTags[iL], TagDiff.LocalOnly, remoteIndex, ref stats ) );
+                                    break;
+                                }
                                 cmp = StringComparer.Ordinal.Compare( lTags[iL].CanonicalName, rTags[iR].CanonicalName );
                             }
                             if( iR < rTags.Length )
