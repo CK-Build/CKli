@@ -7,6 +7,14 @@ namespace CKli.Core;
 
 sealed partial class AnsiScreen
 {
+    /// <summary>
+    /// This has been designed to be lock-free when handling logs.
+    /// The lock is used only from the Timer and in Show or Hide.
+    /// This relies on the single linked-list of DynamicLine.
+    /// Maximum number of lines management is subtle (_maxDynamicLineCount = 10)
+    /// and the code doesn't blindly update the screen...
+    /// Please don't change the code unless you truly understand the pattern.
+    /// </summary>
     sealed partial class Animation : IDisposable
     {
         const int _timerPeriod = 250;
@@ -22,6 +30,7 @@ sealed partial class AnsiScreen
         int _screenWidth;
         int _width;
         DynamicLine? _topLine;
+        DynamicLine? _lastRenderedTopLine;
         int _lastRenderedLineCount;
         bool _visible;
 
@@ -100,16 +109,27 @@ sealed partial class AnsiScreen
             {
                 if( !_visible ) return;
 
-                bool widthChange = TrackScreenSizeChange();
+                bool refresh = TrackScreenSizeChange();
                 var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
-                if( widthChange )
+                if( refresh )
                 {
                     w.EraseScreen( CursorRelativeSpan.After );
                 }
-                _workingString.Append( ref w );
                 int newLineCount = 0;
-                _topLine?.Render( ref w, ref newLineCount, _width, widthChange );
-                if( !widthChange )
+                DynamicLine? newTopLine = _lastRenderedTopLine;
+                // Capture the topLine.
+                var topLine = _topLine;
+                if( topLine != null )
+                {
+                    int skipTopLines = Math.Max( topLine.GetDepth() - _maxDynamicLineCount, 0 );
+                    topLine.Render( ref w, ref newLineCount, _width, ref refresh, skipTopLines, ref newTopLine, _workingString );
+                    newLineCount -= skipTopLines;
+                }
+                else
+                {
+                    _workingString.Append( ref w );
+                }
+                if( !refresh )
                 {
                     int toRemove = _lastRenderedLineCount - newLineCount;
                     if( toRemove > 0 )
@@ -122,10 +142,12 @@ sealed partial class AnsiScreen
                         }
                     }
                 }
+                _lastRenderedLineCount = newLineCount;
+                _lastRenderedTopLine = newTopLine;
+
                 // Restores the starting position.
                 w.MoveToColumn( 1 );
                 w.MoveToRelativeLine( -newLineCount );
-                _lastRenderedLineCount = newLineCount;
 
                 _target.RawWrite( w.Text );
             }

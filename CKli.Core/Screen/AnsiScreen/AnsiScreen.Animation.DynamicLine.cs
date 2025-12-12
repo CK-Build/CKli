@@ -8,6 +8,9 @@ sealed partial class AnsiScreen
 {
     sealed partial class Animation
     {
+        /// <summary>
+        /// Pure single linked list: this is the key for lock-free log collection.
+        /// </summary>
         sealed class DynamicLine
         {
             DynamicLine? _next;
@@ -81,26 +84,63 @@ sealed partial class AnsiScreen
                 return true;
             }
 
-            public void Render( ref FixedBufferWriter w, ref int depth, int width, bool refresh )
+            public int GetDepth()
             {
-                // If we hit the depth limit or we can't write the next line, give up.
-                if( depth == _maxDynamicLineCount || !w.MoveToRelativeLine( 1, true ) )
-                {
-                    return;
-                }
-                // If text has not changed, we have nothing to do.
-                var text = _text;
-                if( _lastRendered != text || refresh )
-                {
-                    RenderLine( ref w, depth, width, text.AsSpan() );
-                    _lastRendered = text;
-                }
-                ++depth;
+                int d = 1;
                 var n = _next;
-                if( n != null )
+                while( n != null )
                 {
-                    n.Render( ref w, ref depth, width, refresh );
+                    d++;
+                    n = n._next;
                 }
+                return d;
+            }
+
+            public void Render( ref FixedBufferWriter w, ref int depth, int width, ref bool refresh, int skipTopLines, ref DynamicLine? topLine, MultiColorString workingString )
+            {
+                int depthInRange = depth - skipTopLines;
+                if( depthInRange >= 0 )
+                {
+                    // Are we the starting line?
+                    if( depthInRange == 0 )
+                    {
+                        // If yes, then we must:
+                        // - Check that we are the last one and if not: refresh!
+                        // - Display the MultiColorString.
+                        if( topLine != this )
+                        {
+                            // We are the new top line. If another were here, then we clear the screen
+                            // and switch to refresh mode (if not already).
+                            if( topLine != null && !refresh )
+                            {
+                                w.EraseScreen( CursorRelativeSpan.After );
+                                refresh = true;
+                            }
+                            topLine = this;
+                        }
+                        workingString.Append( ref w );
+                    }
+                    else if( depthInRange == _maxDynamicLineCount )
+                    {
+                        // If we hit the depth limit, give up.
+                        return;
+                    }
+                    // If we can't write the next line, give up.
+                    if( !w.MoveToRelativeLine( 1, true ) )
+                    {
+                        return;
+                    }
+                    // If text has not changed, we have nothing to do (unless refresh is true).
+                    var text = _text;
+                    if( _lastRendered != text || refresh )
+                    {
+                        RenderLine( ref w, depth, width, text.AsSpan() );
+                        _lastRendered = text;
+                    }
+                }
+                // Whether we are in range or not, call the next.
+                ++depth;
+                _next?.Render( ref w, ref depth, width, ref refresh, skipTopLines, ref topLine, workingString );
 
                 static void RenderLine( ref FixedBufferWriter w, int depth, int width, ReadOnlySpan<char> t )
                 {
