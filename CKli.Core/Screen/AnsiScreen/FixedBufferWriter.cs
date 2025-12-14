@@ -42,6 +42,11 @@ public ref struct FixedBufferWriter
     public readonly ReadOnlySpan<char> Text => _buffer.Slice( 0, WrittenLength );
 
     /// <summary>
+    /// Clears this buffer.
+    /// </summary>
+    public void ResetBuffer() => _head = _buffer;
+
+    /// <summary>
     /// Truncates the current text.
     /// </summary>
     /// <param name="length">Must be between 0 and <see cref="WrittenLength"/> or an <see cref="ArgumentException"/> is thrown.</param>

@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Threading;
 
@@ -27,6 +28,9 @@ sealed partial class AnsiScreen
         readonly char[] _workingBuffer;
         readonly object _lock;
 
+        VerticalContent? _header;
+        VerticalContent? _lastRenderedHeader;
+        int _lastHeaderHeight;
         int _screenWidth;
         int _width;
         DynamicLine? _topLine;
@@ -51,6 +55,20 @@ sealed partial class AnsiScreen
         {
             Hide();
             _timer.Dispose();
+        }
+
+        public void AddHeader( IRenderable h )
+        {
+            if( h.Height == 0 ) return;
+            if( _header == null )
+            {
+                var header = new VerticalContent( _screenType );
+                _header = header.Append( [h] );
+            }
+            else
+            {
+                _header = _header.Append( [h] );
+            }
         }
 
         public void OnLog( string? text, bool isOpenGroup )
@@ -109,11 +127,24 @@ sealed partial class AnsiScreen
             {
                 if( !_visible ) return;
 
+                // Capture the current header.
+                var header = _header;
+
                 bool refresh = TrackScreenSizeChange();
+                bool headerChanged = _lastRenderedHeader != header;
+                bool headerRedrawn = false;
                 var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
-                if( refresh )
+                if( refresh || headerChanged )
                 {
-                    w.EraseScreen( CursorRelativeSpan.After );
+                    headerRedrawn = HandleHeaderChange( ref w, header, ref refresh, headerChanged );
+                }
+                if( !headerRedrawn )
+                {
+                    w.MoveToRelativeLine( _lastHeaderHeight );
+                    if( refresh )
+                    {
+                        w.EraseScreen( CursorRelativeSpan.After );
+                    }
                 }
                 int newLineCount = 0;
                 DynamicLine? newTopLine = _lastRenderedTopLine;
@@ -147,10 +178,43 @@ sealed partial class AnsiScreen
 
                 // Restores the starting position.
                 w.MoveToColumn( 1 );
-                w.MoveToRelativeLine( -newLineCount );
+                w.MoveToRelativeLine( -(newLineCount + _lastHeaderHeight) );
 
                 _target.RawWrite( w.Text );
             }
+        }
+
+        bool HandleHeaderChange( ref FixedBufferWriter w, VerticalContent? header, ref bool refresh, bool headerChanged )
+        {
+            if( header != null )
+            {
+                var resized = header.SetWidth( _width, false );
+                // It's hard to really say but it seems that this optimization weakens
+                // the size changed detection (since this relies on the same height and
+                // avoids a brutal clear of the screen from the top position)...
+                //
+                //if( !headerChanged && _lastHeaderHeight == resized.Height )
+                //{
+                //    // No actual change in the header. We can simply skip the header lines
+                //    // and let the dynamic part do its job.
+                //    return false;
+                //}
+                // Header must be redrawn.
+                _target.BeginUpdate();
+                w.EraseScreen( CursorRelativeSpan.After );
+                _target.RawWrite( w.Text );
+                w.ResetBuffer();
+                resized.Render( _target );
+                _target.EndUpdate();
+                _lastHeaderHeight = resized.Height;
+                // We have cleared the screen:
+                refresh = true;
+                _lastRenderedHeader = header;
+                return true;
+            }
+            // We currently never transition from a header to no header (no ClearHeader).
+            Throw.DebugAssert( _lastRenderedHeader == null );
+            return false;
         }
 
         bool TrackScreenSizeChange()
@@ -178,6 +242,7 @@ sealed partial class AnsiScreen
 
                     var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
                     w.Append( AnsiCodes.RemoveProgressIndicator() );
+                    w.MoveToRelativeLine( _lastHeaderHeight );
                     w.EraseScreen( CursorRelativeSpan.After );
                     w.AppendStyle( TextStyle.Default.Color, TextEffect.Regular );
                     w.ShowCursor( true );

@@ -126,7 +126,9 @@ sealed partial class AnsiScreen
                         return;
                     }
                     // If we can't write the next line, give up.
-                    if( !w.MoveToRelativeLine( 1, true ) )
+                    // Don't use w.MoveToRelativeLine( 1, true ) here: this doesn't trigger
+                    // the scroll of the viewport. Using '\n' does.
+                    if( !w.Append( '\n' ) )
                     {
                         return;
                     }

@@ -101,6 +101,30 @@ public static class CKliCommands
         monitor.Info( $"Executing '{cmdLine.InitialAsStringArguments}'." );
         context.OnStartCommandHandling();
 
+        if( cmdLine.HasInteractiveArgument )
+        {
+            for( int i = 0; i < 14; i++ )
+            {
+                monitor.OpenInfo(
+                    $"n°{i} GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG" );
+                Thread.Sleep( 500 );
+                if( Random.Shared.Next( 3 ) == 1 )
+                {
+                    monitor.Warn( $"open n°{i} - wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww" );
+                }
+            }
+            for( int i = 0; i < 12; i++ )
+            {
+                monitor.CloseGroup();
+                Thread.Sleep( 500 );
+                if( Random.Shared.Next( 3 ) == 1 )
+                {
+                    monitor.Warn( $"close n°{i} - wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww" );
+                }
+            }
+            return ValueTask.FromResult( true );
+        }
+
         // Honor the "ckli i" if specified.
         // The command will be handled below but with the InteractiveScreen (the command may use it)
         // and we will enter the interactive loop if this is the first command (History is empty and no

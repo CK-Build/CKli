@@ -1,7 +1,9 @@
 using CK.Core;
 using System;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace CKli.Core;
 
@@ -74,13 +76,15 @@ public sealed class VerticalContent : IRenderable
     /// </summary>
     public ImmutableArray<IRenderable> Cells => _cells;
 
-    /// <inheritdoc />
-    public IRenderable SetWidth( int width, bool allowWider )
+    /// <inheritdoc cref="IRenderable.SetWidth(int, bool)" />
+    public VerticalContent SetWidth( int width, bool allowWider )
     {
         if( width < _minWidth ) width = _minWidth;
         if( width == _width ) return this;
-        return ApplyTransform( r => r.SetWidth( width, allowWider ) );
+        return Unsafe.As<VerticalContent>( ApplyTransform( r => r.SetWidth( width, allowWider ) ) );
     }
+
+    IRenderable IRenderable.SetWidth( int width, bool allowWider ) => SetWidth( width, allowWider );
 
     /// <summary>
     /// Applies a transform function to all <see cref="Cells"/>.
