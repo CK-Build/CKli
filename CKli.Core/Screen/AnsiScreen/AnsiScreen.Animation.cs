@@ -71,6 +71,17 @@ sealed partial class AnsiScreen
             }
         }
 
+        /// <summary>
+        /// Clears the current header and returns it.
+        /// </summary>
+        /// <returns>The current header.</returns>
+        public VerticalContent? ClearHeader()
+        {
+            var h = _header;
+            _header = null;
+            return h;
+        }
+
         public void OnLog( string? text, bool isOpenGroup )
         {
             if( text == null )
@@ -116,7 +127,8 @@ sealed partial class AnsiScreen
                     w.AppendStyle( TextStyle.Default.Color, TextEffect.Regular );
                     w.ShowCursor( false );
                     _target.RawWrite( w.Text );
-                    _timer.Change( 0, _timerPeriod );
+                    _timer.Change( _timerPeriod, _timerPeriod );
+                    Draw();
                 }
             }
         }
@@ -126,61 +138,69 @@ sealed partial class AnsiScreen
             lock( _lock )
             {
                 if( !_visible ) return;
+                Draw();
+            }
+        }
 
-                // Capture the current header.
-                var header = _header;
+        void Draw()
+        {
+            bool refresh = TrackScreenSizeChange();
+            var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
 
-                bool refresh = TrackScreenSizeChange();
-                bool headerChanged = _lastRenderedHeader != header;
-                bool headerRedrawn = false;
-                var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
-                if( refresh || headerChanged )
+            HandleHeader( ref w, ref refresh, _header );
+
+            int newLineCount = 0;
+            DynamicLine? newTopLine = _lastRenderedTopLine;
+            // Capture the topLine.
+            var topLine = _topLine;
+            if( topLine != null )
+            {
+                int skipTopLines = Math.Max( topLine.GetDepth() - _maxDynamicLineCount, 0 );
+                topLine.Render( ref w, ref newLineCount, _width, ref refresh, skipTopLines, ref newTopLine, _workingString );
+                newLineCount -= skipTopLines;
+            }
+            else
+            {
+                _workingString.Append( ref w );
+            }
+            if( !refresh )
+            {
+                int toRemove = _lastRenderedLineCount - newLineCount;
+                if( toRemove > 0 )
                 {
-                    headerRedrawn = HandleHeaderChange( ref w, header, ref refresh, headerChanged );
-                }
-                if( !headerRedrawn )
-                {
-                    w.MoveToRelativeLine( _lastHeaderHeight );
-                    if( refresh )
+                    w.MoveToRelativeLine( toRemove, resetColumn: true );
+                    while( --toRemove >= 0 )
                     {
-                        w.EraseScreen( CursorRelativeSpan.After );
+                        w.EraseLine( CursorRelativeSpan.After );
+                        w.MoveToRelativeLine( -1 );
                     }
                 }
-                int newLineCount = 0;
-                DynamicLine? newTopLine = _lastRenderedTopLine;
-                // Capture the topLine.
-                var topLine = _topLine;
-                if( topLine != null )
-                {
-                    int skipTopLines = Math.Max( topLine.GetDepth() - _maxDynamicLineCount, 0 );
-                    topLine.Render( ref w, ref newLineCount, _width, ref refresh, skipTopLines, ref newTopLine, _workingString );
-                    newLineCount -= skipTopLines;
-                }
-                else
-                {
-                    _workingString.Append( ref w );
-                }
-                if( !refresh )
-                {
-                    int toRemove = _lastRenderedLineCount - newLineCount;
-                    if( toRemove > 0 )
-                    {
-                        w.MoveToRelativeLine( toRemove, resetColumn: true );
-                        while( --toRemove >= 0 )
-                        {
-                            w.EraseLine( CursorRelativeSpan.After );
-                            w.MoveToRelativeLine( -1 );
-                        }
-                    }
-                }
-                _lastRenderedLineCount = newLineCount;
-                _lastRenderedTopLine = newTopLine;
+            }
+            _lastRenderedLineCount = newLineCount;
+            _lastRenderedTopLine = newTopLine;
 
-                // Restores the starting position.
-                w.MoveToColumn( 1 );
-                w.MoveToRelativeLine( -(newLineCount + _lastHeaderHeight) );
+            // Restores the starting position.
+            w.MoveToColumn( 1 );
+            w.MoveToRelativeLine( -(newLineCount + _lastHeaderHeight) );
 
-                _target.RawWrite( w.Text );
+            _target.RawWrite( w.Text );
+        }
+
+        void HandleHeader( ref FixedBufferWriter w, ref bool refresh, VerticalContent? header )
+        {
+            bool headerChanged = _lastRenderedHeader != header;
+            bool headerRedrawn = false;
+            if( refresh || headerChanged )
+            {
+                headerRedrawn = HandleHeaderChange( ref w, header, ref refresh, headerChanged );
+            }
+            if( !headerRedrawn )
+            {
+                w.MoveToRelativeLine( _lastHeaderHeight );
+                if( refresh )
+                {
+                    w.EraseScreen( CursorRelativeSpan.After );
+                }
             }
         }
 
@@ -212,8 +232,17 @@ sealed partial class AnsiScreen
                 _lastRenderedHeader = header;
                 return true;
             }
-            // We currently never transition from a header to no header (no ClearHeader).
-            Throw.DebugAssert( _lastRenderedHeader == null );
+            // No current header.
+            if( headerChanged )
+            {
+                // We had one before. Let's clear the screen here and consider
+                // that we have redrawn the header.
+                _lastHeaderHeight = 0;
+                _lastRenderedHeader = null;
+                w.EraseScreen( CursorRelativeSpan.After );
+                refresh = true;
+                return true;
+            }
             return false;
         }
 
@@ -238,12 +267,11 @@ sealed partial class AnsiScreen
                     _visible = false;
                     _timer.Change( Timeout.Infinite, _timerPeriod );
 
-                    TrackScreenSizeChange();
+                    bool refresh = TrackScreenSizeChange();
 
                     var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
+                    HandleHeader( ref w, ref refresh, _header );
                     w.Append( AnsiCodes.RemoveProgressIndicator() );
-                    w.MoveToRelativeLine( _lastHeaderHeight );
-                    w.EraseScreen( CursorRelativeSpan.After );
                     w.AppendStyle( TextStyle.Default.Color, TextEffect.Regular );
                     w.ShowCursor( true );
 

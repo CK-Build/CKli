@@ -36,10 +36,7 @@ sealed partial class AnsiScreen : IScreen
 
     public int Width => _animation.ScreenWidth;
 
-    public void ScreenLog( LogLevel level, string message )
-    {
-        _animation.AddHeader( _screenType.CreateLog( level, message ) );
-    }
+    public void ScreenLog( LogLevel level, string message ) => _animation.AddHeader( _screenType.CreateLog( level, message ) );
 
     public void OnLog( LogLevel level, string? text, bool isOpenGroup ) => _animation.OnLog( text, isOpenGroup );
 

@@ -136,7 +136,7 @@ public sealed partial class InteractiveScreen : IScreen
     public void Display( IRenderable renderable, bool newLine = true ) => _body.Content.Add( (renderable, newLine) );
 
     /// <inheritdoc />
-    public void ScreenLog( LogLevel level, string text ) => _header.Logs.Add( _screen.ScreenType.CreateLog( level, text ) );
+    public void ScreenLog( LogLevel level, string text ) => _screen.ScreenLog( level, text );
 
     void IScreen.Close() => _screen.Close();
 
@@ -150,8 +150,10 @@ public sealed partial class InteractiveScreen : IScreen
         _history.Add( initial );
         for(; ; )
         {
+            _driver.HideAnimation( out int screenWidth, out VerticalContent? logs );
+            _header.Logs = logs;
             var newScreen = _nextScreenBuilder( _screen.ScreenType, _header, _body, _footer )
-                                .SetWidth( _driver.UpdateScreenWidth(), allowWider: false );
+                                .SetWidth( screenWidth, allowWider: false );
             if( newScreen != _previousScreen )
             {
                 newScreen.Render( _target, newLine: false );

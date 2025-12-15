@@ -20,7 +20,7 @@ public sealed partial class InteractiveScreen
 
         public InteractiveScreen InteractiveScreen => _screen;
 
-        internal protected abstract int UpdateScreenWidth();
+        internal protected abstract void HideAnimation( out int screenWidth, out VerticalContent? logs );
 
         public virtual Task<CommandLineArguments?> PromptAsync( IActivityMonitor monitor )
         {

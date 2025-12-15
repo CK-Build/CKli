@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Text;
 
-namespace CKli.Core.Tests;
+namespace CKli.Core;
 
 /// <summary>
 /// A string renderer that renders text styles diff (colors and effect in [brackets]) and end of line ⮐.
@@ -37,7 +37,7 @@ public sealed class DebugRenderer : IRenderTarget
 
     ScreenType IRenderTarget.ScreenType => ScreenType.Default;
 
-    void IRenderTarget.BeginUpdate() {}
+    void IRenderTarget.BeginUpdate() { }
 
     void IRenderTarget.EndUpdate() { }
 

@@ -3,18 +3,17 @@ using System.Collections.Generic;
 namespace CKli.Core;
 
 /// <summary>
-/// An interactive body is a simple list of <see cref="Logs"/> that are <see cref="IRenderable"/> with
+/// An interactive body is the <see cref="Logs"/> collected by the animations with
 /// optional <see cref="Header"/> and <see cref="Footer"/>.
 /// </summary>
 public sealed class InteractiveHeader
 {
     IRenderable? _header;
-    readonly List<IRenderable> _logs;
+    VerticalContent? _logs;
     IRenderable? _footer;
 
     internal InteractiveHeader()
     {
-        _logs = new List<IRenderable>();
     }
 
     /// <summary>
@@ -27,9 +26,13 @@ public sealed class InteractiveHeader
     }
 
     /// <summary>
-    /// Gets the logs= entries.
+    /// Gets or sets the logs entries.
     /// </summary>
-    public List<IRenderable> Logs => _logs;
+    public VerticalContent? Logs
+    {
+        get => _logs;
+        set => _logs = value;
+    }
 
     /// <summary>
     /// Gets or sets the optional footer.
@@ -43,7 +46,7 @@ public sealed class InteractiveHeader
     internal void Clear()
     {
         _header = null;
-        _logs.Clear();
+        _logs = null;
         _footer = null;
     }
 }

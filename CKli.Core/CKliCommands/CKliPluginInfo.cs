@@ -35,6 +35,7 @@ sealed class CKliPluginInfo : Command
             if( !Enum.TryParse<PluginCompileMode>( sCompileMode, ignoreCase: true, out var mode ) )
             {
                 monitor.Error( $"Invalid '--compile-mode'. Must be None, Debug or Release." );
+                return ValueTask.FromResult( false );
             }
             compileMode = mode;
         }
