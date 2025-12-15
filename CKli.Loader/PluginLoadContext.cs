@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -21,6 +22,49 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
     readonly string _runFolder;
     IPluginFactory? _pluginFactory;
     bool _disposed;
+
+    static Dictionary<string, Assembly>? _assemblies;
+
+    /// <summary>
+    /// Depending on the host, the <see cref="AssemblyLoadContext.Default"/> may not be the load context
+    /// into which the application assemblies are loaded. For instance, NUnit3TestAdapter v6.0.0 loads 
+    /// the assemblies in a dedicated context (wasn't the case in v5.2.1).
+    /// <para>
+    /// Fortunately, <see cref="AssemblyLoadContext.All"/> exposes all the contexts so we can consider
+    /// another "Default" context when needed.
+    /// </para>
+    /// <para>
+    /// This must obviously be called before the first call to <see cref="Load(IActivityMonitor, NormalizedPath, PluginCollectorContext, out bool, out WeakReference?)"/>.
+    /// If not called, only the <see cref="AssemblyLoadContext.Default"/> is considered.
+    /// </para>
+    /// </summary>
+    /// <param name="supplementary">Optional supplementary context to consider.</param>
+    public static void Initialize( AssemblyLoadContext? supplementary = null )
+    {
+        Throw.CheckState( "Must be called only once.", _assemblies == null );
+        _assemblies = new Dictionary<string, Assembly>( 100 );
+        // With NUnit contexts, there are assemblies that are in both contexts...
+        // It appears that the "right" one must be the one of the NUnit context,
+        // the one loaded in the default context is "hidden".
+        // So we fill the final index with this in mind (but this is ad-hoc and may
+        // require adaptation in the future).
+        if( supplementary != null )
+        {
+            foreach( var a in supplementary.Assemblies )
+            {
+                if( a.FullName != null ) _assemblies.Add( a.FullName, a );
+            }
+        }
+        foreach( var a in Default.Assemblies )
+        {
+            if( a.FullName != null ) _assemblies.TryAdd( a.FullName, a );
+        }
+    }
+
+    /// <summary>
+    /// Gets whether <see cref="Initialize(AssemblyLoadContext?)"/> has been called.
+    /// </summary>
+    public static bool IsInitialized => _assemblies != null;
 
     PluginLoadContext( WorldName worldName, string runFolder )
         : base( worldName.FullName, isCollectible: true )
@@ -43,6 +87,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
                                         out bool recoverableError,
                                         out WeakReference? loader )
     {
+        if( _assemblies == null ) Initialize();
         recoverableError = false;
         if( !File.Exists( dllPath ) )
         {
@@ -67,7 +112,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
         catch( Exception ex )
         {
             // An exception here indicates that a call to the plugins fails, typically
-            // with a missing methond exception. By deleting the CKli.CompiledPlugins.cs generated file,
+            // with a missing method exception. By deleting the CKli.CompiledPlugins.cs generated file,
             // reflection may do the job. And if it still fails, CKLi switches to "Working without plugins"
             // mode that allows plugin commands to be executed, typically to upgrade a packaged plugin.
             recoverableError = true;
@@ -92,8 +137,8 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
 
     protected override Assembly? Load( AssemblyName assemblyName )
     {
-        var a = Default.Assemblies.FirstOrDefault( x => x.FullName == assemblyName.FullName );
-        if( a == null )
+        Throw.DebugAssert( _assemblies != null );
+        if( !_assemblies.TryGetValue( assemblyName.FullName, out var a ) )
         {
             var p = $"{_runFolder}/{assemblyName.Name}.dll";
             if( !File.Exists( p ) )

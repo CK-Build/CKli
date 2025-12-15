@@ -8,6 +8,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.Loader;
 using System.Text;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
@@ -39,9 +40,12 @@ static partial class TestEnv
     static void Initialize()
     {
         CKliRootEnv.Initialize( "Test", screen: new StringScreen() );
-        World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
         InitializeRemotes();
         InitializeNuGetSource();
+        // Single so that this throws if naming change.
+        var nunitLoadContext = AssemblyLoadContext.All.Single( c => c.GetType().Name == "TestAssemblyLoadContext" );
+        CKli.Loader.PluginLoadContext.Initialize( nunitLoadContext );
+        World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
     }
 
     static void InitializeNuGetSource()
@@ -115,12 +119,9 @@ static partial class TestEnv
 
         static bool LastWriteTimeChanged( DateTime zipTime )
         {
-            if( Directory.GetLastWriteTimeUtc( _remotesPath ) != zipTime )
-            {
-                return true;
-            }
             foreach( var sub in Directory.EnumerateDirectories( _remotesPath ) )
             {
+                if( sub.AsSpan().EndsWith( "bare" ) ) continue;
                 if( Directory.GetLastWriteTimeUtc( sub ) != zipTime )
                 {
                     return true;
@@ -131,9 +132,9 @@ static partial class TestEnv
 
         static void SetLastWriteTime( DateTime zipTime )
         {
-            Directory.SetLastWriteTimeUtc( _remotesPath, zipTime );
             foreach( var sub in Directory.EnumerateDirectories( _remotesPath ) )
             {
+                if( sub.AsSpan().EndsWith( "bare" ) ) continue;
                 Directory.SetLastWriteTimeUtc( sub, zipTime );
             }
         }

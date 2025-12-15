@@ -20,9 +20,9 @@
   <!--</BasicDefinitions>-->
 
   <!--<ReproducibleBuilds>:Ehttps://github.com/dotnet/reproducible-builds. SourceLink is automatically managed by this package.-->
-  <Sdk Name="DotNet.ReproducibleBuilds.Isolated" Version="1.2.25" />
+  <Sdk Name="DotNet.ReproducibleBuilds.Isolated" Version="1.2.39" />
   <ItemGroup>
-    <PackageReference Include="DotNet.ReproducibleBuilds" Version="1.2.25" PrivateAssets="All" />
+    <PackageReference Include="DotNet.ReproducibleBuilds" Version="1.2.39" PrivateAssets="All" />
   </ItemGroup>
   <PropertyGroup>
     <!-- InformationalVersion is either the Zero version or provided by the CodeCakeBuilder when in CI build). -->
