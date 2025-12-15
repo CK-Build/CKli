@@ -785,7 +785,7 @@ public sealed partial class PluginMachinery
     const string DefaultDirectoryBuildPropsPattern = """
                 <Project>
                   <PropertyGroup>
-                    <TargetFramework>net8.0</TargetFramework>
+                    <TargetFramework>net10.0</TargetFramework>
                     <ArtifactsPath>$(MSBuildThisFileDirectory)../$Local/{0}</ArtifactsPath>
                     <ArtifactsPivots>run</ArtifactsPivots>
                     <Nullable>enable</Nullable>
