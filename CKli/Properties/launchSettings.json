@@ -2,7 +2,7 @@
   "profiles": {
     "C:\\Dev3 (cmd)": {
       "environmentVariables": {
-        "PATH": "C:\\Dev\\CKli\\CKli\\bin\\Debug\\net8.0;%PATH%"
+        "PATH": "C:\\Dev\\CKli\\CKli\\bin\\Debug\\net10.0;%PATH%"
       },
       "commandName": "Executable",
       "executablePath": "cmd",
@@ -10,7 +10,7 @@
     },
     "C:\\Dev3 (ps)": {
       "environmentVariables": {
-        "PATH": "C:\\Dev\\CKli\\CKli\\bin\\Debug\\net8.0;%PATH%"
+        "PATH": "C:\\Dev\\CKli\\CKli\\bin\\Debug\\net10.0;%PATH%"
       },
       "commandName": "Executable",
       "executablePath": "powershell",

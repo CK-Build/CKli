@@ -67,7 +67,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
         catch( Exception ex )
         {
             // An exception here indicates that a call to the plugins fails, typically
-            // with a missing methond exception. By deleting the CKli.CompiledPlugins.cs generated file,
+            // with a missing method exception. By deleting the CKli.CompiledPlugins.cs generated file,
             // reflection may do the job. And if it still fails, CKLi switches to "Working without plugins"
             // mode that allows plugin commands to be executed, typically to upgrade a packaged plugin.
             recoverableError = true;
