@@ -26,12 +26,13 @@ sealed partial class AnsiScreen : IScreen
 
     public void Display( IRenderable renderable, bool newLine = true )
     {
-        _animation.Hide();
+        _animation.Hide( true );
         if( renderable.Width > _animation.ScreenWidth )
         {
             renderable = renderable.SetWidth( _animation.ScreenWidth, false );
         }
         renderable.Render( _target, newLine );
+        _animation.Show();
     }
 
     public int Width => _animation.ScreenWidth;

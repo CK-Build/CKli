@@ -8,6 +8,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -542,7 +543,7 @@ public sealed partial class PluginMachinery
         // When plugins change, the 4 possible reasons are:
         // - SetPluginCompileMode: This doesn't change anything (at least should not).
         //                         There should be no reason to reload the plugin instances except that the "ckli plugin --compile-mode"
-        //                         displays the plugin infos atfer the mode change.
+        //                         displays the plugin infos after the mode change.
         //                         => reloadPlugins is true.
         //
         // - CreatePlugin: The new plugin does nothing (it doesn't touch its empty configuration element)
@@ -555,7 +556,7 @@ public sealed partial class PluginMachinery
         //                 A plugin that loses an optional dependency MAY change something in its Xml configuration:
         //                 ==> reloadPlugins is true.
         //
-        // - AddOrSetPluginPackage: Obvisously, a Plugin may initialize its configuration.
+        // - AddOrSetPluginPackage: Obviously, a Plugin may initialize its configuration.
         //                          ==> reloadPlugins is true.
         // 
         // Note that both CreatePlugin, RemovePlugin and AddOrSetPluginPackage are "transacted" (by a pre commit and

@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Threading;
 
@@ -50,7 +51,7 @@ sealed partial class AnsiScreen
 
         public void Dispose()
         {
-            Hide();
+            Hide( false );
             _timer.Dispose();
         }
 
@@ -112,7 +113,7 @@ sealed partial class AnsiScreen
             Show();
         }
 
-        void Show()
+        public void Show()
         {
             lock( _lock )
             {
@@ -146,6 +147,9 @@ sealed partial class AnsiScreen
 
             HandleHeader( ref w, ref refresh, _header );
 
+            _workingString.Append( ref w );
+            w.Append( '\n' );
+
             int newLineCount = 0;
             DynamicLine? newTopLine = _lastRenderedTopLine;
             // Capture the topLine.
@@ -153,12 +157,8 @@ sealed partial class AnsiScreen
             if( topLine != null )
             {
                 int skipTopLines = Math.Max( topLine.GetDepth() - _maxDynamicLineCount, 0 );
-                topLine.Render( ref w, ref newLineCount, _width, ref refresh, skipTopLines, ref newTopLine, _workingString );
+                topLine.Render( ref w, ref newLineCount, _width, ref refresh, skipTopLines, ref newTopLine );
                 newLineCount -= skipTopLines;
-            }
-            else
-            {
-                _workingString.Append( ref w );
             }
             if( !refresh )
             {
@@ -178,7 +178,7 @@ sealed partial class AnsiScreen
 
             // Restores the starting position.
             w.MoveToColumn( 1 );
-            w.MoveToRelativeLine( -(newLineCount + _lastHeaderHeight) );
+            w.MoveToRelativeLine( -(1 + _lastHeaderHeight + newLineCount) );
 
             _target.RawWrite( w.Text );
         }
@@ -255,7 +255,7 @@ sealed partial class AnsiScreen
             return false;
         }
 
-        public void Hide()
+        public void Hide( bool forDisplay )
         {
             lock( _lock )
             {
@@ -267,12 +267,28 @@ sealed partial class AnsiScreen
                     bool refresh = TrackScreenSizeChange();
 
                     var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
-                    HandleHeader( ref w, ref refresh, _header );
+                    if( forDisplay )
+                    {
+                        w.EraseScreen( CursorRelativeSpan.After );
+                    }
+                    else
+                    {
+                        HandleHeader( ref w, ref refresh, _header );
+                        // If the header has not refresh (cleared the screen), we have
+                        // 1 (the MultiColorString) + _lastRenderedLineCount lines to clear.
+                        if( !refresh )
+                        {
+                            w.EraseScreen( CursorRelativeSpan.After );
+                        }
+                    }
                     w.Append( AnsiCodes.RemoveProgressIndicator() );
                     w.AppendStyle( TextStyle.Default.Color, TextEffect.Regular );
                     w.ShowCursor( true );
-
                     _target.RawWrite( w.Text );
+                    _lastHeaderHeight = 0;
+                    _lastRenderedHeader = null;
+                    _lastRenderedLineCount = 0;
+                    _lastRenderedTopLine = null;
                 }
             }
         }

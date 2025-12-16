@@ -43,7 +43,7 @@ public static partial class CKliRootEnv
         Throw.CheckState( "Initialize can be called only once.", _appLocalDataPath.IsEmptyPath );
         _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create ),
                                           instanceName == null ? "CKli" : $"CKli-{instanceName}" );
-        // To handle logs, we firts must determine if we are in a Stack. If this is the case, then the Logs/ folder
+        // To handle logs, we first must determine if we are in a Stack. If this is the case, then the Logs/ folder
         // will be .[Public|PrivateStack]/Logs, else the log will be in _appLocalDataPath/Out-of-Stack-Logs/.
         _currentDirectory = Environment.CurrentDirectory;
         _currentStackPath = StackRepository.FindGitStackPath( _currentDirectory );
@@ -176,8 +176,8 @@ public static partial class CKliRootEnv
         var defaultOutput = GrandOutput.Default;
         if( defaultOutput != null )
         {
-            // Before disposing, posts the supression of the current log file if it
-            // must be suppressed and prevently removes the handler.
+            // Before disposing, posts the suppression of the current log file if it
+            // must be suppressed and preventely removes the handler.
             var logCloser = new TextLogFileCloser( ShouldDeleteCurrentLogFile( arguments ), deactivateHandler: true );
             defaultOutput.Sink.Submit( logCloser );
             await logCloser.Completion.ConfigureAwait( false );
@@ -209,8 +209,7 @@ public static partial class CKliRootEnv
         {
             // We fire & forget here because we can (and avoid an async context): this uses the capability
             // of the Text sink handler to forget the current file: the file won't appear at all on the
-            // file system. If a "ckli log" is emitted, the previous one will be found. (Moreover CKliLog
-            // command cleanup any successful "ckli log" file result.)
+            // file system. If a "ckli log" is emitted, the previous one will be found.
             bool suppressFile = ShouldDeleteCurrentLogFile( arguments );
             _shouldDeletePureCKliLogFile = null;
             defaultOutput.Sink.Submit( new TextLogFileCloser( suppressFile, deactivateHandler: false ) );

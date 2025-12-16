@@ -95,7 +95,7 @@ sealed partial class AnsiScreen
                 return d;
             }
 
-            public void Render( ref FixedBufferWriter w, ref int depth, int width, ref bool refresh, int skipTopLines, ref DynamicLine? topLine, MultiColorString workingString )
+            public void Render( ref FixedBufferWriter w, ref int depth, int width, ref bool refresh, int skipTopLines, ref DynamicLine? topLine )
             {
                 int depthInRange = depth - skipTopLines;
                 if( depthInRange >= 0 )
@@ -103,9 +103,7 @@ sealed partial class AnsiScreen
                     // Are we the starting line?
                     if( depthInRange == 0 )
                     {
-                        // If yes, then we must:
-                        // - Check that we are the last one and if not: refresh!
-                        // - Display the MultiColorString.
+                        // If yes, then we must check that we are the same as the last one and if not: refresh!
                         if( topLine != this )
                         {
                             // We are the new top line. If another were here, then we clear the screen
@@ -117,18 +115,10 @@ sealed partial class AnsiScreen
                             }
                             topLine = this;
                         }
-                        workingString.Append( ref w );
                     }
                     else if( depthInRange == _maxDynamicLineCount )
                     {
                         // If we hit the depth limit, give up.
-                        return;
-                    }
-                    // If we can't write the next line, give up.
-                    // Don't use w.MoveToRelativeLine( 1, true ) here: this doesn't trigger
-                    // the scroll of the viewport. Using '\n' does.
-                    if( !w.Append( '\n' ) )
-                    {
                         return;
                     }
                     // If text has not changed, we have nothing to do (unless refresh is true).
@@ -138,10 +128,14 @@ sealed partial class AnsiScreen
                         RenderLine( ref w, depth, width, text.AsSpan() );
                         _lastRendered = text;
                     }
+                    else
+                    {
+                        w.Append( '\n' );
+                    }
                 }
                 // Whether we are in range or not, call the next.
                 ++depth;
-                _next?.Render( ref w, ref depth, width, ref refresh, skipTopLines, ref topLine, workingString );
+                _next?.Render( ref w, ref depth, width, ref refresh, skipTopLines, ref topLine );
 
                 static void RenderLine( ref FixedBufferWriter w, int depth, int width, ReadOnlySpan<char> t )
                 {
@@ -154,26 +148,18 @@ sealed partial class AnsiScreen
                     w.Append( '>', ' ' );
                     // Why do we need to substract 1 here (at least on Windows Terminal)?
                     int maxLen = Math.Min( width - 2 - depth - 1, w.RemainingLength );
+                    int idx = t.IndexOfAny( '\r', '\n' );
+                    if( idx >= 0 ) t = t.Slice( 0, idx ).TrimEnd();
                     if( t.Length < maxLen )
                     {
                         w.Append( t );
                     }
                     else
                     {
-                        int idx = t.IndexOfAny( '\r', '\n' );
-                        if( idx > 0 && idx < maxLen )
-                        {
-                            var head = t.Slice( 0, idx ).TrimEnd();
-                            w.Append( head );
-                        }
-                        else
-                        {
-                            w.Append( t.Slice( 0, maxLen - 1 ) );
-                            w.Append( '…' );
-                        }
+                        w.Append( t.Slice( 0, maxLen - 1 ) );
+                        w.Append( '…' );
                     }
-                    // Always clear the end of line.
-                    w.EraseLine( CursorRelativeSpan.After );
+                    w.Append( '\n' );
                 }
             }
         }
