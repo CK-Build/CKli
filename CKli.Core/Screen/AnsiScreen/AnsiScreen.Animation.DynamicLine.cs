@@ -1,6 +1,5 @@
 using CK.Core;
 using System;
-using System.Text;
 
 namespace CKli.Core;
 

@@ -1,11 +1,8 @@
 using CK.Core;
-using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Security.Principal;
-using static CK.Core.ActivityMonitor;
 
 namespace CKli.Core;
 

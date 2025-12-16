@@ -2,7 +2,6 @@ using CK.Core;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace CKli.Core;
 

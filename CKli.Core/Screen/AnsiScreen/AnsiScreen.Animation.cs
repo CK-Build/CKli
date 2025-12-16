@@ -1,7 +1,4 @@
-using CK.Core;
 using System;
-using System.Reflection.PortableExecutable;
-using System.Text;
 using System.Threading;
 
 namespace CKli.Core;

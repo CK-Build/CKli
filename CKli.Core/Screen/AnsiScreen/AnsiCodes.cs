@@ -1,4 +1,3 @@
-using CK.Core;
 using System;
 using System.Runtime.InteropServices;
 

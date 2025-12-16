@@ -1,14 +1,10 @@
 using CK.Core;
 using LibGit2Sharp;
-using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Linq;
 using System.Text;
-using static CKli.Core.GitTagInfo;
 
 namespace CKli.Core;
 
