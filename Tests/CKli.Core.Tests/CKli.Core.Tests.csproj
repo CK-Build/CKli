@@ -28,5 +28,8 @@
   <ItemGroup>
     <Compile Remove="Remotes\**;PackagedPlugins\**" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Remotes\bare\" />
+  </ItemGroup>
 
 </Project>

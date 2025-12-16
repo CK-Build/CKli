@@ -1,5 +1,6 @@
 using CK.Core;
 using CSemVer;
+using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;
 using System;
@@ -26,7 +27,7 @@ static partial class TestEnv
 
     static SVersion? _cKliPluginsCoreVersion;
     static XDocument? _packagedDirectoryPackagesProps;
-    static Dictionary<string, RemotesCollection>? _readOnlyRemotes;
+    static Dictionary<string, RemotesCollection>? _remoteRepositories;
 
     [OneTimeSetUp]
     public static void SetupEnv() => TestHelper.OnlyOnce( Initialize );
@@ -103,41 +104,19 @@ static partial class TestEnv
 
         var zipPath = _remotesPath.AppendPart( "Remotes.zip" );
         var zipTime = File.GetLastWriteTimeUtc( zipPath );
-        if( !Directory.EnumerateDirectories( _remotesPath ).Any()
-            || LastWriteTimeChanged( zipTime ) )
+        if( !File.Exists( remoteIndexPath ) 
+            || File.GetLastWriteTimeUtc( remoteIndexPath ) != zipTime )
         {
             using( TestHelper.Monitor.OpenInfo( $"Last write time of 'Remotes/' differ from 'Remotes/Remotes.zip'. Restoring remotes from zip." ) )
             {
                 RestoreRemotesZipAndCreateBareRepositories( remoteIndexPath, zipPath, zipTime );
             }
         }
-        _readOnlyRemotes = File.ReadAllLines( remoteIndexPath )
+        _remoteRepositories = File.ReadAllLines( remoteIndexPath )
                                .Select( l => l.Split( '/' ) )
                                .GroupBy( names => names[0], names => names[1] )
-                               .Select( g => new RemotesCollection( g.Key, g.ToArray() ) ).
-                               ToDictionary( r => r.Name ); 
-
-        static bool LastWriteTimeChanged( DateTime zipTime )
-        {
-            foreach( var sub in Directory.EnumerateDirectories( _remotesPath ) )
-            {
-                if( sub.AsSpan().EndsWith( "bare" ) ) continue;
-                if( Directory.GetLastWriteTimeUtc( sub ) != zipTime )
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        static void SetLastWriteTime( DateTime zipTime )
-        {
-            foreach( var sub in Directory.EnumerateDirectories( _remotesPath ) )
-            {
-                if( sub.AsSpan().EndsWith( "bare" ) ) continue;
-                Directory.SetLastWriteTimeUtc( sub, zipTime );
-            }
-        }
+                               .Select( g => new RemotesCollection( g.Key, g.ToArray() ) )
+                               .ToDictionary( r => r.Name ); 
 
         static void RestoreRemotesZipAndCreateBareRepositories( NormalizedPath remoteIndexPath, NormalizedPath zipPath, DateTime zipTime )
         {
@@ -173,10 +152,9 @@ static partial class TestEnv
             // Extracts Remotes.zip content.
             // Disallow overwriting: .gitignore file and README.md must not be in the Zip archive.
             ZipFile.ExtractToDirectory( zipPath, _remotesPath, overwriteFiles: false );
-            SetLastWriteTime( zipTime );
             // Fills the bare/ with the .zip of the bare repositories and creates the Remotes.txt
             // index file.
-            var remotesContent = new StringBuilder();
+            var remotesIndex = new StringBuilder();
             Directory.CreateDirectory( _barePath );
             foreach( var stack in Directory.EnumerateDirectories( _remotesPath ) )
             {
@@ -190,20 +168,15 @@ static partial class TestEnv
                         var dst = Path.Combine( bareStack, Path.GetFileName( repository ), ".git" );
                         var target = new DirectoryInfo( dst );
                         FileUtil.CopyDirectory( src, target );
-                        var exitCode = ProcessRunner.RunProcess( TestHelper.Monitor.ParallelLogger,
-                                                                 "git",
-                                                                 "config core.bare true",
-                                                                 dst );
-                        if( exitCode != 0 )
-                        {
-                            Throw.CKException( $"Failed to configure bare repository '{dst}'." );
-                        }
-                        remotesContent.AppendLine( $"{stackName}/{Path.GetFileName( repository )}" );
+                        using var r = new Repository( dst );
+                        r.Config.Set( "core.bare", true );
+                        remotesIndex.AppendLine( $"{stackName}/{Path.GetFileName( repository )}" );
                     }
                     ZipFile.CreateFromDirectory( bareStack, bareStack + ".zip" );
                 }
             }
-            File.WriteAllText( remoteIndexPath, remotesContent.ToString() );
+            File.WriteAllText( remoteIndexPath, remotesIndex.ToString() );
+            File.SetLastWriteTimeUtc( remoteIndexPath, zipTime );
         }
     }
 
@@ -214,8 +187,8 @@ static partial class TestEnv
     /// <returns>The active remotes collection.</returns>
     public static RemotesCollection OpenRemotes( string name )
     {
-        Throw.DebugAssert( _readOnlyRemotes != null );
-        var r = _readOnlyRemotes[name];
+        Throw.DebugAssert( _remoteRepositories != null );
+        var r = _remoteRepositories[name];
         // Deletes the current repository that may have been modified
         // and extracts a brand new bare git repository.
         var path = _barePath.AppendPart( r.Name );

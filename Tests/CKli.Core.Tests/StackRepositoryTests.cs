@@ -296,24 +296,30 @@ public class StackRepositoryTests
     {
         var context = TestEnv.EnsureCleanFolder();
         var display = (StringScreen)context.Screen;
+        var remotes = TestEnv.OpenRemotes( "CKt" );
 
-        // ckli clone https://github.com/CK-Build/ck-bUILD-stack
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", "https://github.com/CK-Build/ck-bUILD-stack" )).ShouldBeTrue();
+        var stackUrl = remotes.StackUri.ToString();
+        stackUrl.ShouldStartWith( "file:///" );
+        stackUrl = stackUrl.Substring( 8 ).ToLowerInvariant();
+        Assume.That( Directory.Exists( stackUrl ), "This test can only run on case insensitive file system." );
 
-        Directory.EnumerateDirectories( context.CurrentDirectory )
+        // ckli clone ...ckt-stack
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", "file:///" + stackUrl )).ShouldBeTrue();
+
+        var folders = Directory.EnumerateDirectories( context.CurrentDirectory )
             .Select( path => Path.GetFileName( path ) )
-            .ShouldContain( "CK-Build", "The folder name has been fixed." );
+            .ToList();
+        folders.ShouldContain( "CKt", "The folder name has been fixed." );
+        folders.ShouldNotContain( "ckt", "The folder name has been fixed." );
 
-        // cd CK-Build
-        context = context.ChangeDirectory( "CK-Build" );
+        // cd CKt
+        context = context.ChangeDirectory( "CKt" );
 
         display.Clear();
         // ckli repo list
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo", "list" )).ShouldBeTrue();
         display.ToString().ShouldBe( """
-            ··CSemVer-Net···master·↑0↓0·https://github.com/CK-Build/CSemVer-Net·
-            ··SGV-Net·······master·↑0↓0·https://github.com/CK-Build/SGV-Net·····
-            ··Cake/CodeCake·master·↑0↓0·https://github.com/CK-Build/CodeCake····
+            ··CK-Core-Projects/CKt-Core·master·↑0↓0·file:///c:/dev/ckli/tests/ckli.core.tests/remotes/bare/ckt/CKt-Core·
             ❰✓❱
 
             """.Replace( '·', ' ' ) );
