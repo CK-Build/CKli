@@ -145,12 +145,17 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
             var p = $"{_runFolder}/{assemblyName.Name}.dll";
             if( !File.Exists( p ) )
             {
-                Throw.CKException( $"""
+                ActivityMonitor.StaticLogger.Info( $"""
                     Unable to find '{assemblyName.Name}.dll' in '{_runFolder}'.
                     Please check that 'CKli.Plugins.csproj' has <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>.
+                    Trying to load in the default context.
                     """ );
+                a = Assembly.Load( assemblyName );
             }
-            a = LoadFromAssemblyPath( p );
+            else
+            {
+                a = LoadFromAssemblyPath( p );
+            }
         }
         return a;
     }
