@@ -52,12 +52,14 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
         {
             foreach( var a in supplementary.Assemblies )
             {
-                if( a.FullName != null ) _assemblies.Add( a.FullName, a );
+                var n = a.GetName().Name;
+                if( n != null ) _assemblies.Add( n, a );
             }
         }
         foreach( var a in Default.Assemblies )
         {
-            if( a.FullName != null ) _assemblies.TryAdd( a.FullName, a );
+            var n = a.GetName().Name;
+            if( n != null ) _assemblies.TryAdd( n, a );
         }
     }
 
@@ -138,7 +140,8 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
     protected override Assembly? Load( AssemblyName assemblyName )
     {
         Throw.DebugAssert( _assemblies != null );
-        if( !_assemblies.TryGetValue( assemblyName.FullName, out var a ) )
+        Throw.CheckArgument( assemblyName.Name != null );
+        if( !_assemblies.TryGetValue( assemblyName.Name, out var a ) )
         {
             var p = $"{_runFolder}/{assemblyName.Name}.dll";
             if( !File.Exists( p ) )
