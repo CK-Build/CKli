@@ -109,8 +109,8 @@ public class StackRepositoryTests
         error.ShouldBeFalse();
         var cktCoreRepo = world.GetDefinedRepo( TestHelper.Monitor, inCKt.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core" ) )
                                .ShouldNotBeNull();
-        ulong cktCoreRepoId = cktCoreRepo.CKliRepoId;
-        cktCoreRepoId.ShouldNotBe( 0UL );
+        var cktCoreRepoId = cktCoreRepo.CKliRepoId;
+        cktCoreRepoId.IsValid.ShouldBeTrue();
         stack.Dispose();
 
         var inCKtProject = context.ChangeDirectory( "CKt/CK-Core-Projects" );

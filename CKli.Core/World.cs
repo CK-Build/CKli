@@ -4,7 +4,6 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 
 namespace CKli.Core;
 
@@ -216,6 +215,22 @@ public sealed partial class World
     public WorldEvents Events => _events;
 
     /// <summary>
+    /// Finds a Repo among the already loaded ones by it <see cref="Repo.CKliRepoId"/>.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    public Repo? FindByCKliRepoId( RandomId id )
+    {
+        var r = _firstRepo;
+        while( r != null )
+        {
+            if( r.CKliRepoId == id ) return r;
+            r = r._nextRepo;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Gets whether a full path or a origin url is defined in this <see cref="Layout"/>.
     /// The lookup is case insensitive.
     /// </summary>
@@ -406,25 +421,26 @@ public sealed partial class World
 
     Repo CreateRepo( IActivityMonitor monitor, int index, GitRepository repository )
     {
-        if( !TryReadCKliRepoTag( monitor, repository, _stackRepository, out var ckliRepoId) )
+        if( !TryReadCKliRepoTag( monitor, repository, _stackRepository, out var repoId ) )
         {
-            Span<byte> bytes = MemoryMarshal.AsBytes( new Span<ulong>( ref ckliRepoId ) );
-            do
+            if( !repoId.IsValid )
             {
-                System.Security.Cryptography.RandomNumberGenerator.Fill( bytes );
+                repoId = RandomId.CreateRandom();
             }
-            while( ckliRepoId == 0 );
-            CreateOrUpdateCKliRepoTag( repository.Repository, _stackRepository, ckliRepoId );
+            CreateOrUpdateCKliRepoTag( repository.Repository, _stackRepository, repoId );
         }
-        Repo? repo = new Repo( this, repository, _layout[index].XElement, index, ckliRepoId, _firstRepo );
+        Repo? repo = new Repo( this, repository, _layout[index].XElement, index, repoId, _firstRepo );
         _firstRepo = repo;
         _cachedRepositories[repository.WorkingFolder] = repo;
         _cachedRepositories[repository.OriginUrl.ToString()] = repo;
         return repo;
 
-        static bool TryReadCKliRepoTag( IActivityMonitor monitor, GitRepository git, StackRepository stackRepository, out ulong ckliRepoId )
+        static bool TryReadCKliRepoTag( IActivityMonitor monitor,
+                                        GitRepository git,
+                                        StackRepository stackRepository,
+                                        out RandomId repoId )
         {
-            ckliRepoId = 0L;
+            repoId = default;
             var message = git.Repository.Tags["ckli-repo"]?.Annotation?.Message;
             if( message == null )
             {
@@ -433,8 +449,8 @@ public sealed partial class World
             }
             var s = message.AsSpan();
             if( s.TryMatch( "Id: " )
-                && s.TryMatchInteger( out ckliRepoId )
-                && ckliRepoId != 0UL
+                && RandomId.TryMatch( ref s, out repoId )
+                && repoId.IsValid
                 && s.SkipWhiteSpaces()
                 && s.TryMatch( "Stack: " )
                 && s.TryMatch( stackRepository.OriginUrl.ToString() )
@@ -443,7 +459,7 @@ public sealed partial class World
             {
                 return true;
             }
-            var msg = ckliRepoId == 0UL
+            var msg = !repoId.IsValid
                         ? "The message cannot be parsed. A new CKliRepoId will be created."
                         : $"""
                         The message contains a Stack that is not '{stackRepository.OriginUrl}'.
@@ -456,12 +472,13 @@ public sealed partial class World
                 {msg}
                 """ );
             return false;
+
         }
 
-        static void CreateOrUpdateCKliRepoTag( Repository r, StackRepository stackRepository, ulong ckliRepoId )
+        static void CreateOrUpdateCKliRepoTag( Repository r, StackRepository stackRepository, RandomId repoId )
         {
             r.Tags.Add( "ckli-repo", r.Head.Tip, stackRepository.Context.Committer, $"""
-                Id: {ckliRepoId}
+                Id: {repoId}
                 Stack: {stackRepository.OriginUrl}
 
                 """,

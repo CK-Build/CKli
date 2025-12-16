@@ -23,13 +23,10 @@
        content: their .csproj are ignored by the build system.
   -->
   <ItemGroup>
-    <Content Include="$(Content);Remotes\**;Cloned\**;PackagedPlugins\**" />
+    <None Include="$(Content);Remotes\**;Cloned\**;PackagedPlugins\**" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Remove="Remotes\**;PackagedPlugins\**" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Remotes\bare\" />
+    <Compile Remove="Remotes\**;Cloned\**;PackagedPlugins\**" />
   </ItemGroup>
 
 </Project>

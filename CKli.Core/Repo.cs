@@ -14,18 +14,18 @@ public sealed class Repo
     internal readonly GitRepository _git;
     // For PrimaryPluginContext.GetConfigurationFor( Repo ).
     internal readonly XElement _configuration;
-    readonly ulong _ckliRepoId;
     readonly int _index;
+    readonly RandomId _repoId;
     internal readonly Repo? _nextRepo;
     GitRepository.SimpleStatusInfo _status;
 
-    internal Repo( World world, GitRepository git, XElement configuration, int index, ulong ckliRepoId, Repo? nextRepo )
+    internal Repo( World world, GitRepository git, XElement configuration, int index, RandomId repoId, Repo? nextRepo )
     {
         _world = world;
         _git = git;
         _configuration = configuration;
         _index = index;
-        _ckliRepoId = ckliRepoId;
+        _repoId = repoId;
         _nextRepo = nextRepo;
     }
 
@@ -90,7 +90,7 @@ public sealed class Repo
     /// this Repo. The tag is updated if the Stack url changes (this is currently only for information). 
     /// </para>
     /// </summary>
-    public ulong CKliRepoId => _ckliRepoId;
+    public RandomId CKliRepoId => _repoId;
 
     /// <summary>
     /// Pull-Merge the current head from the remote using the default fast-forward strategy
