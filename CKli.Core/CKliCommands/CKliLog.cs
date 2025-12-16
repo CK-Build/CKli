@@ -13,8 +13,6 @@ namespace CKli.Core;
 /// </summary>
 sealed class CKliLog : Command
 {
-    const string _successfulLogMarker = "SUCCESSFUL-LOG-EXECUTION";
-    static ReadOnlySpan<byte> _successfulLogMarkerBytes => "SUCCESSFUL-LOG-EXECUTION"u8;
     static string? _fileOpenerPath;
 
     internal CKliLog()
@@ -38,15 +36,17 @@ sealed class CKliLog : Command
         }
         Throw.DebugAssert( LogFile.RootLogPath != null && LogFile.RootLogPath[^1] == Path.DirectorySeparatorChar );
 
-        bool success = RemoveStupidLogFile( monitor, out string textFolder, out string? firstLogFilePath );
+        bool success = true;
         try
         {
+            var textFolder = LogFile.RootLogPath + "Text/";
             if( folder )
             {
                 success &= OpenLogFolder( monitor, textFolder );
             }
             else
             {
+                var firstLogFilePath = Directory.EnumerateFiles( textFolder, "*.log" ).OrderDescending().FirstOrDefault();
                 if( firstLogFilePath != null )
                 {
                     success &= OpenLogFile( monitor, firstLogFilePath );
@@ -62,64 +62,7 @@ sealed class CKliLog : Command
             monitor.Error( "While opening logs.", ex );
             success = false;
         }
-        if( success )
-        {
-            monitor.UnfilteredLog( LogLevel.Info | LogLevel.IsFiltered, null, _successfulLogMarker, null );
-        }
         return ValueTask.FromResult( success );
-    }
-
-    internal static bool RemoveStupidLogFile( IActivityMonitor monitor )
-    {
-        return RemoveStupidLogFile( monitor, out _, out _ );
-    }
-
-    static bool RemoveStupidLogFile( IActivityMonitor monitor, out string textFolder, out string? firstLogFilePath )
-    {
-        textFolder = LogFile.RootLogPath + "Text/";
-        firstLogFilePath = null;
-        byte[] filterBuffer = ArrayPool<byte>.Shared.Rent( 8192 );
-        bool success = true;
-        try
-        {
-            foreach( var f in Directory.EnumerateFiles( textFolder, "*.log" ).OrderDescending() )
-            {
-                if( HasSuccessfulCKliLogMarker( monitor, f, filterBuffer ) )
-                {
-                    success &= FileHelper.DeleteFile( monitor, f );
-                }
-                else
-                {
-                    firstLogFilePath = f;
-                    break;
-                }
-            }
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( $"While discovering logs in '{textFolder}'.", ex );
-            success = false;
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return( filterBuffer );
-        }
-        return success;
-    }
-
-    static bool HasSuccessfulCKliLogMarker( IActivityMonitor monitor, string path, byte[] buffer )
-    {
-        try
-        {
-            using Microsoft.Win32.SafeHandles.SafeFileHandle handle = File.OpenHandle( path, FileMode.Open, FileAccess.Read, FileShare.Read, FileOptions.SequentialScan );
-            int count = RandomAccess.Read( handle, buffer, 0 );
-            return buffer.AsSpan( 0, count ).IndexOf( _successfulLogMarkerBytes ) > 0;
-        }
-        catch( Exception ex ) 
-        {
-            monitor.Error( $"While filtering out '{_successfulLogMarker}' log file '{path}'.", ex );
-            return false;
-        }
     }
 
     static bool OpenLogFolder( IActivityMonitor monitor, string folder )
