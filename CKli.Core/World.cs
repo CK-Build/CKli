@@ -449,28 +449,34 @@ public sealed partial class World
                 return false;
             }
             var s = message.AsSpan();
+            bool sameStack = false;
+            bool repoIdTrulyParsed = false;
             if( s.TryMatch( "Id: " )
                 && RandomId.TryMatch( ref s, out repoId )
                 && repoId.IsValid
-                && s.SkipWhiteSpaces()
+                && (repoIdTrulyParsed = s.TrySkipWhiteSpaces( 1 ))
                 && s.TryMatch( "Stack: " )
-                && s.TryMatch( stackRepository.OriginUrl.ToString() )
+                && (sameStack = s.TryMatch( stackRepository.OriginUrl.ToString() ))
                 && s.SkipWhiteSpaces()
                 && s.Length == 0 )
             {
                 return true;
             }
-            var msg = !repoId.IsValid
-                        ? "The message cannot be parsed. A new CKliRepoId will be created."
-                        : $"""
-                        The message contains a Stack that is not '{stackRepository.OriginUrl}'.
-                        It will be updated.
-                        """;
+            if( !repoIdTrulyParsed ) repoId = default;
+
+            string msg = repoId.IsValid
+                        ? "Unable to parse Id. A new CKliRepoId will be created."
+                        : "Found a valid CKliRepoId.";
+            if( !sameStack ) msg += $"""
+
+                    Unable to find current Stack that is '{stackRepository.OriginUrl}'.
+                    """;
             monitor.Warn( $"""
                 The 'ckli-repo' tag in '{git.DisplayPath}' is:
                 {message}
 
                 {msg}
+                The tag will be updated.
                 """ );
             return false;
 
