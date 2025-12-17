@@ -206,7 +206,10 @@ public static class CKliCommands
         }
     }
 
-    static async ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine, StackRepository? initialStack )
+    static async ValueTask<bool> ExecuteAsync( IActivityMonitor monitor,
+                                               CKliEnv context,
+                                               CommandLineArguments cmdLine,
+                                               StackRepository? initialStack )
     {
         Throw.DebugAssert( cmdLine.FoundCommand != null );
         var result = await DoExecuteAsync( monitor, context, cmdLine ).ConfigureAwait( false );

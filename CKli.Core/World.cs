@@ -10,7 +10,8 @@ namespace CKli.Core;
 /// <summary>
 /// The World handles the <see cref="Repo"/> that are defined in its <see cref="Layout"/>.
 /// <para>
-/// The only way to obtain a World is to use the StackRepository.
+/// The only way to obtain a World is to use the StackRepository. A World has a "short" life time (just like
+/// its <see cref="StackRepository"/>): it is bound to a command execution (even in interactive mode).
 /// </para>
 /// </summary>
 public sealed partial class World

@@ -130,9 +130,9 @@ public sealed partial class StackRepository : IDisposable
 
     /// <summary>
     /// Gets all the worlds that this stack contains starting with the <see cref="DefaultWorldName"/>
-    /// and lexigraphically sorted.
+    /// and lexicographically sorted.
     /// <para>
-    /// Worlds are defined by the xml World definition files "StackName[@LTSName].xml" in this stack reposiory <see cref="StackWorkingFolder"/>.
+    /// Worlds are defined by the xml World definition files "StackName[@LTSName].xml" in this stack repository <see cref="StackWorkingFolder"/>.
     /// </para>
     /// </summary>
     public ImmutableArray<LocalWorldName> WorldNames
@@ -276,7 +276,7 @@ public sealed partial class StackRepository : IDisposable
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">The basic command context.</param>
-    /// <param name="error">True on errror, false on success.</param>
+    /// <param name="error">True on error, false on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
     /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branches in a stack repository.</param>
     /// <returns>The resulting stack repository if found and opened successfully. May be null if not found.</returns>
@@ -580,7 +580,7 @@ public sealed partial class StackRepository : IDisposable
                     Logs/
                     .vs/
                     .idea/
-
+                    !.gitignore
                     """ );
             }
         }

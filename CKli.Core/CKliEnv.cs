@@ -7,9 +7,11 @@ namespace CKli.Core;
 /// <summary>
 /// The immutable command context reflects the <see cref="CKliRootEnv"/>: <see cref="CKliRootEnv.DefaultCKliEnv"/>
 /// should almost always be used unless the default context needs to be overridden. This is the case in tests: 
-/// <see cref="ChangeDirectory(NormalizedPath)"/> is used to change the <see cref="CurrentDirectory"/> (and potentially the <see cref="CurrentStackPath"/>).
+/// <see cref="ChangeDirectory(NormalizedPath)"/> is used to change the <see cref="CurrentDirectory"/> (and potentially
+/// the <see cref="CurrentStackPath"/>).
 /// <para>
-/// This object is not really immutable: <see cref="StartCommandHandlingLocalTime"/> and <see cref="StartCommandHandlingUtc"/> are internally updated:
+/// This object is not really immutable: <see cref="StartCommandHandlingLocalTime"/> and <see cref="StartCommandHandlingUtc"/>
+/// are internally updated:
 /// command handlers use this to rely on a shared time for the currently executed command and <see cref="Committer"/> uses it. 
 /// </para>
 /// </summary>
