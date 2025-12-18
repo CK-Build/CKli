@@ -64,6 +64,7 @@ sealed class CKliUpdate : Command
                 ? "dotnet tool update CKli -g --prerelease --add-source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json"
                 : "dotnet tool update CKli -g";
         if( allowDowngrade ) updateCmd += " --allow-downgrade";
+        updateCmd += " --no-http-cache";
         monitor.Info( ScreenType.CKliScreenTag, $"""
             Currently installed '{info.Version}'. Will now execute after this CKli instance ends:
             {updateCmd}
