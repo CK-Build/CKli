@@ -41,6 +41,12 @@ sealed partial class AnsiScreen : IScreen
 
     public void OnLog( LogLevel level, string? text, bool isOpenGroup ) => _animation.OnLog( text, isOpenGroup );
 
+    void IScreen.OnCommandExecuted( bool success, CommandLineArguments cmdLine )
+    {
+        _animation.Hide( true );
+        ScreenExtensions.DisplayCommandSuccessOrFailure( this, success, cmdLine );
+    }
+
     void IScreen.Close()
     {
         _animation.Dispose();

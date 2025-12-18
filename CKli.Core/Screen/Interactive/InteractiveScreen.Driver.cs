@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 
@@ -20,9 +21,11 @@ public sealed partial class InteractiveScreen
 
         public InteractiveScreen InteractiveScreen => _screen;
 
-        internal protected abstract void HideAnimation( out int screenWidth, out VerticalContent? logs );
+        internal protected abstract void OnCommandExecuted( bool success, CommandLineArguments cmdLine );
 
-        public virtual Task<CommandLineArguments?> PromptAsync( IActivityMonitor monitor )
+        internal protected abstract void GetLogs( out int screenWidth, out VerticalContent? logs );
+
+        public virtual Task<CommandLineArguments?> PromptAsync( IActivityMonitor monitor, List<CommandLineArguments> history )
         {
             var line = Console.ReadLine();
             return Task.FromResult( CreateCommandLineArguments( line ) );
@@ -46,6 +49,7 @@ public sealed partial class InteractiveScreen
             return new CommandLineArguments( line );
         }
 
+        internal protected abstract Task<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmd, List<CommandLineArguments> history );
     }
 
 }

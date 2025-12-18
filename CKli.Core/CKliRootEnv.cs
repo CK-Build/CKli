@@ -177,8 +177,8 @@ public static partial class CKliRootEnv
         if( defaultOutput != null )
         {
             // Before disposing, posts the suppression of the current log file if it
-            // must be suppressed and preventely removes the handler.
-            var logCloser = new TextLogFileCloser( ShouldDeleteCurrentLogFile( arguments ), deactivateHandler: true );
+            // must be suppressed and removes the Text handler to avoid "closing GrandOutput" useless log.
+            var logCloser = new TextLogFileCloser( ShouldDeleteCurrentLogFile( arguments ), deactivateTextHandler: true );
             defaultOutput.Sink.Submit( logCloser );
             await logCloser.Completion.ConfigureAwait( false );
             await defaultOutput.DisposeAsync().ConfigureAwait( false );
@@ -202,7 +202,7 @@ public static partial class CKliRootEnv
 
     internal static void OnAnyOtherCommandAndSuccess() => _shouldDeletePureCKliLogFile = false;
 
-    internal static void OnInteractiveCommandExecuted( IActivityMonitor monitor, CommandLineArguments arguments )
+    internal static void OnInteractiveCommandExecuted( CommandLineArguments arguments )
     {
         var defaultOutput = GrandOutput.Default;
         if( defaultOutput != null )
@@ -212,7 +212,7 @@ public static partial class CKliRootEnv
             // file system. If a "ckli log" is emitted, the previous one will be found.
             bool suppressFile = ShouldDeleteCurrentLogFile( arguments );
             _shouldDeletePureCKliLogFile = null;
-            defaultOutput.Sink.Submit( new TextLogFileCloser( suppressFile, deactivateHandler: false ) );
+            defaultOutput.Sink.Submit( new TextLogFileCloser( suppressFile, deactivateTextHandler: false ) );
         }
     }
 

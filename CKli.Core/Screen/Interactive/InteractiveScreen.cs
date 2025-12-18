@@ -144,13 +144,20 @@ public sealed partial class InteractiveScreen : IScreen
 
     InteractiveScreen? IScreen.TryCreateInteractive( IActivityMonitor monitor, CKliEnv context ) => throw new System.InvalidOperationException();
 
-    internal async Task<bool> RunInteractiveAsync( IActivityMonitor monitor, CommandLineArguments initial )
+    void IScreen.OnCommandExecuted( bool success, CommandLineArguments cmdLine )
+    {
+        _driver.OnCommandExecuted( success, cmdLine );
+    }
+
+    internal async Task<bool> RunInteractiveAsync( IActivityMonitor monitor, CommandLineArguments initial, bool success )
     {
         Throw.DebugAssert( _history.Count == 0 );
         _history.Add( initial );
         for(; ; )
         {
-            _driver.HideAnimation( out int screenWidth, out VerticalContent? logs );
+            // Question: success is the result of the previous command here.
+            //           How should we render it?
+            _driver.GetLogs( out int screenWidth, out VerticalContent? logs );
             _header.Logs = logs;
             var newScreen = _nextScreenBuilder( _screen.ScreenType, _header, _body, _footer )
                                 .SetWidth( screenWidth, allowWider: false );
@@ -162,10 +169,10 @@ public sealed partial class InteractiveScreen : IScreen
             _header.Clear();
             _body.Clear();
             _footer.Clear();
-            CommandLineArguments? cmd = await _driver.PromptAsync( monitor ).ConfigureAwait( false );
+            CommandLineArguments? cmd = await _driver.PromptAsync( monitor, _history ).ConfigureAwait( false );
             if( cmd == null ) break;
             _history.Add( cmd );
-            await CKliCommands.HandleCommandAsync( monitor, _context, cmd ).ConfigureAwait( false );
+            success = await _driver.HandleCommandAsync( monitor, _context, cmd, _history ).ConfigureAwait( false );
         }
         return true;
     }

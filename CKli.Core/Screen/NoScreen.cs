@@ -23,6 +23,11 @@ public sealed class NoScreen : IScreen
 
     void IScreen.Close() { }
 
+    void IScreen.OnCommandExecuted( bool success, CommandLineArguments cmdLine )
+    {
+        ScreenExtensions.DisplayCommandSuccessOrFailure( this, success, cmdLine );
+    }
+
     InteractiveScreen? IScreen.TryCreateInteractive( IActivityMonitor monitor, CKliEnv context )
     {
         monitor.Warn( $"Screen type '{nameof( NoScreen )}' doesn't support interactive mode." );

@@ -129,7 +129,7 @@ public static class CKliCommands
                                         cmdLine,
                                         (interactiveScreen != null ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
                                         (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
-            return FinalHandleInteractiveAsync( monitor, context, cmdLine, null, true );
+            return FinalizeCommandExecutionAsync( monitor, context, cmdLine, null, true );
         }
         // If it's a CKli command, we can now execute it.
         if( cmdLine.FoundCommand != null )
@@ -155,7 +155,7 @@ public static class CKliCommands
                                         cmdLine,
                                         (interactiveScreen != null ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
                                         (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
-            return FinalHandleInteractiveAsync( monitor, context, cmdLine, null, false );
+            return FinalizeCommandExecutionAsync( monitor, context, cmdLine, null, false );
         }
 
         // We are in a World, we have an opened Stack: handles World.Commands.
@@ -188,14 +188,14 @@ public static class CKliCommands
                                                 cmdLine,
                                                 (context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
                                                 (context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
-                    return await FinalHandleInteractiveAsync( monitor, context, cmdLine, stack, cmdLine.HasHelp ).ConfigureAwait( false );
+                    return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, stack, cmdLine.HasHelp ).ConfigureAwait( false );
                 }
                 // We have a plugin command (and no --help).
                 Throw.DebugAssert( "This cannot be a CKli command: we'd have located it initially.", cmdLine.FoundCommand.PluginTypeInfo != null );
                 if( cmdLine.FoundCommand.IsDisabled )
                 {
                     monitor.Error( $"Command '{cmdLine.FoundCommand.CommandPath}' exists but its type '{cmdLine.FoundCommand.PluginTypeInfo.TypeName}' is disabled in plugin '{cmdLine.FoundCommand.PluginTypeInfo.Plugin.FullPluginName}'." );
-                    return await FinalHandleInteractiveAsync( monitor, context, cmdLine, stack, false ).ConfigureAwait( false );
+                    return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, stack, false ).ConfigureAwait( false );
                 }
                 return await ExecuteAsync( monitor, context, cmdLine, stack ).ConfigureAwait( false );
             }
@@ -213,7 +213,7 @@ public static class CKliCommands
     {
         Throw.DebugAssert( cmdLine.FoundCommand != null );
         var result = await DoExecuteAsync( monitor, context, cmdLine ).ConfigureAwait( false );
-        return await FinalHandleInteractiveAsync( monitor, context, cmdLine, initialStack, result ).ConfigureAwait( false );
+        return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, initialStack, result ).ConfigureAwait( false );
 
         static async Task<bool> DoExecuteAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
         {
@@ -271,14 +271,6 @@ public static class CKliCommands
                 }
                 success = false;
             }
-            if( success )
-            {
-                context.Screen.Display( t => t.Text( "❰✓❱", ConsoleColor.Black, ConsoleColor.DarkGreen ) );
-            }
-            else
-            {
-                context.Screen.Display( t => t.Text( "❌ Failed", ConsoleColor.Black, ConsoleColor.Red ) );
-            }
             // Not very elegant trick to cleanup 'ckli log' log files.
             if( success && cmdLine.FoundCommand is CKliLog )
             {
@@ -292,15 +284,15 @@ public static class CKliCommands
         }
     }
 
-    static ValueTask<bool> FinalHandleInteractiveAsync( IActivityMonitor monitor,
-                                                        CKliEnv context,
-                                                        CommandLineArguments cmdLine,
-                                                        StackRepository? initialStack,
-                                                        bool initialResult )
+    static ValueTask<bool> FinalizeCommandExecutionAsync( IActivityMonitor monitor,
+                                                          CKliEnv context,
+                                                          CommandLineArguments cmdLine,
+                                                          StackRepository? initialStack,
+                                                          bool success )
     {
         if( initialStack != null )
         {
-            if( initialResult )
+            if( success )
             {
                 initialStack.Close( monitor );
             }
@@ -309,18 +301,19 @@ public static class CKliCommands
                 initialStack.Dispose();
             }
         }
+        context.Screen.OnCommandExecuted( success, cmdLine );
         if( context.Screen is InteractiveScreen interactive )
         {
             // Always handle the current log file: this avoids saving the
             // log file for "ckli log" or help display.
-            CKliRootEnv.OnInteractiveCommandExecuted( monitor, cmdLine );
+            CKliRootEnv.OnInteractiveCommandExecuted( cmdLine );
             // If we are initiating the interactive mode, enter its loop:
             // this will return with the "exit" command.
             if( interactive.PreviousScreen == null )
             {
-                return new ValueTask<bool>( interactive.RunInteractiveAsync( monitor, cmdLine ) );
+                return new ValueTask<bool>( interactive.RunInteractiveAsync( monitor, cmdLine, success ) );
             }
         }
-        return ValueTask.FromResult( initialResult );
+        return ValueTask.FromResult( success );
     }
 }

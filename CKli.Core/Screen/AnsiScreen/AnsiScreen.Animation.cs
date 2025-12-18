@@ -28,7 +28,7 @@ sealed partial class AnsiScreen
         readonly Timer _timer;
         readonly MultiColorString _workingString;
         readonly char[] _workingBuffer;
-        readonly object _lock;
+        readonly Lock _lock;
 
         List<IRenderable>? _logs;
         VerticalContent? _finalLogs;
@@ -38,6 +38,7 @@ sealed partial class AnsiScreen
         DynamicLine? _lastRenderedTopLine;
         int _lastRenderedLineCount;
         bool _visible;
+        bool _finalHidden;
 
         public int ScreenWidth => _screenWidth;
 
@@ -46,7 +47,7 @@ sealed partial class AnsiScreen
             _target = target;
             // Big enough buffer.
             _workingBuffer = new char[ _maxWidth * 3 * _maxDynamicLineCount];
-            _lock = new object();
+            _lock = new Lock();
             _workingString = new MultiColorString();
             _timer = new Timer( OnTimer, null, Timeout.Infinite, _timerPeriod );
             Show();
@@ -113,7 +114,7 @@ sealed partial class AnsiScreen
         {
             lock( _lock )
             {
-                if( !_visible )
+                if( !_visible && !_finalHidden )
                 {
                     _visible = true;
                     _screenWidth = ConsoleScreen.GetWindowWidth();
@@ -208,15 +209,21 @@ sealed partial class AnsiScreen
                     _target.RawWrite( w.Text );
                     _lastRenderedLineCount = 0;
                     _lastRenderedTopLine = null;
-                    if( final && _logs != null )
+                    if( final )
                     {
-                        _finalLogs = new VerticalContent( _screenType, _logs.Select( l => l.SetWidth( _screenWidth, false ) ).ToImmutableArray() );
-                        _finalLogs.Render( _target );
+                        if( _logs != null && _logs.Count > 0 )
+                        {
+                            _finalLogs = new VerticalContent( _screenType, _logs.Select( l => l.SetWidth( _screenWidth, false ) ).ToImmutableArray() );
+                            _finalLogs.Render( _target );
+                            _logs.Clear();
+                        }
+                        _finalHidden = true;
                     }
                 }
             }
         }
 
+        public void Resurrect() => _finalHidden = false;
     }
 
 

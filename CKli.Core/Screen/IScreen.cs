@@ -1,4 +1,5 @@
 using CK.Core;
+using System;
 
 namespace CKli.Core;
 
@@ -42,12 +43,15 @@ public interface IScreen
     /// <param name="text">The message.</param>
     void ScreenLog( LogLevel level, string text );
 
+
     /// <summary>
     /// All screens returns an empty string except <see cref="StringScreen"/> that returns
     /// the screen content.
     /// </summary>
     /// <returns>A non null string.</returns>
     string ToString();
+
+    internal void OnCommandExecuted( bool success, CommandLineArguments cmdLine );
 
     internal void OnLog( LogLevel level, string? text, bool isOpenGroup );
 

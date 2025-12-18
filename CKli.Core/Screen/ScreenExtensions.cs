@@ -164,7 +164,6 @@ public static class ScreenExtensions
 
     }
 
-
     internal static void DisplayPluginInfo( this IScreen screen, string headerText, List<World.DisplayInfoPlugin>? infos )
     {
         var s = screen.ScreenType;
@@ -196,5 +195,27 @@ public static class ScreenExtensions
         }
         screen.Display( display );
     }
+
+    /// <summary>
+    /// Called after a command execution. Default implementation does nothing on help
+    /// and displays a green "❰✓❱" on success and a red "❌ Failed" on error.
+    /// </summary>
+    /// <param name="success">Whether the command succeeded or not.</param>
+    /// <param name="cmdLine">The command line (with its <see cref="CommandLineArguments.FoundCommand"/>).</param>
+    internal static void DisplayCommandSuccessOrFailure( IScreen screen, bool success, CommandLineArguments cmdLine )
+    {
+        if( !cmdLine.HasHelp )
+        {
+            if( success )
+            {
+                screen.Display( screen.ScreenType.Text( "❰✓❱", ConsoleColor.Black, ConsoleColor.DarkGreen ) );
+            }
+            else
+            {
+                screen.Display( screen.ScreenType.Text( "❌ Failed", ConsoleColor.Black, ConsoleColor.Red ) );
+            }
+        }
+    }
 }
+
 

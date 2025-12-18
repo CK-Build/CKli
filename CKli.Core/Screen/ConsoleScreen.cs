@@ -64,6 +64,11 @@ sealed class ConsoleScreen : IScreen
     {
     }
 
+    void IScreen.OnCommandExecuted( bool success, CommandLineArguments cmdLine )
+    {
+        ScreenExtensions.DisplayCommandSuccessOrFailure( this, success, cmdLine );
+    }
+
     void IScreen.Close() { }
 
     public InteractiveScreen? TryCreateInteractive( IActivityMonitor monitor, CKliEnv context )

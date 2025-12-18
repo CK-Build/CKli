@@ -10,8 +10,8 @@ public static partial class CKliRootEnv
     /// Closes the current "Text/" log file.
     /// </summary>
     /// <param name="forgetCurrentFile">True to forget the current logs.</param>
-    /// <param name="deactivateHandler">True to remove the handler. Used at application exit to avoid "Stopping GrandOutput" useless logs.</param>
-    sealed class TextLogFileCloser( bool forgetCurrentFile, bool deactivateHandler ) : GrandOutputHandlersAction
+    /// <param name="deactivateTextHandler">True to remove the Text handler. Used at application exit to avoid "Stopping GrandOutput" useless logs.</param>
+    sealed class TextLogFileCloser( bool forgetCurrentFile, bool deactivateTextHandler ) : GrandOutputHandlersAction
     {
         protected override async ValueTask RunAsync( IActivityMonitor monitor, DispatcherSink.HandlerList handlers )
         {
@@ -20,7 +20,7 @@ public static partial class CKliRootEnv
                 if( h is CK.Monitoring.Handlers.TextFile t && t.KeyPath == "Text" )
                 {
                     t.CloseCurrentFile( forgetCurrentFile );
-                    if( deactivateHandler ) await handlers.RemoveAsync( monitor, h ).ConfigureAwait( false );
+                    if( deactivateTextHandler ) await handlers.RemoveAsync( monitor, h ).ConfigureAwait( false );
                     break;
                 }
             }
