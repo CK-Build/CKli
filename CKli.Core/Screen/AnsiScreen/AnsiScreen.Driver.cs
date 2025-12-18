@@ -14,8 +14,8 @@ sealed partial class AnsiScreen
 
         protected internal override void HideAnimation( out int screenWidth, out VerticalContent? logs )
         {
-            logs = _screen._animation.ClearHeader();
-            _screen._animation.Hide( false );
+            logs = _screen._animation.ClearLogs();
+            _screen._animation.Hide( true );
             screenWidth = _screen._animation.ScreenWidth;
         }
     }

@@ -14,18 +14,21 @@ public sealed class ScreenType
     TextBlock? _emptyString;
     IRenderable? _errorHead;
     IRenderable? _warningHead;
+    IRenderable? _infoHead;
     readonly bool _canBeInteractive;
     readonly bool _hasAnsiLink;
 
-    IRenderable ErrorHead => _errorHead ??= Text( "Error:" )
-                                            .Box( paddingLeft: 1,
-                                                  paddingRight: 1,
-                                                  style: new TextStyle( new Color( ConsoleColor.Black, ConsoleColor.DarkRed ), TextEffect.Bold ) );
+    IRenderable ErrorHead => _errorHead ??= Text( "E" )
+                                            .Box( paddingLeft: 1, paddingRight: 1, marginRight: 1,
+                                                  style: new TextStyle( new Color( ConsoleColor.Red, ConsoleColor.Black ), TextEffect.Invert ) );
 
-    IRenderable WarningHead => _warningHead ??= Text( "Warning:" )
-                                                .Box( paddingLeft: 1,
-                                                      paddingRight: 1,
-                                                      style: new TextStyle( new Color( ConsoleColor.Yellow, ConsoleColor.Black ), TextEffect.Bold ) );
+    IRenderable WarningHead => _warningHead ??= Text( "W" )
+                                                .Box( paddingLeft: 1, paddingRight: 1, marginRight: 1,
+                                                      style: new TextStyle( new Color( ConsoleColor.DarkYellow, ConsoleColor.Black ), TextEffect.Invert ) );
+
+    IRenderable InfoHead => _infoHead ??= Text( "i" )
+                                                .Box( paddingLeft: 1, paddingRight: 1, marginRight: 1,
+                                                      style: new TextStyle( new Color( ConsoleColor.DarkGreen, ConsoleColor.Black ), TextEffect.Invert ) );
 
     /// <summary>
     /// Gets a passive, basic screen type. Applies to <see cref="StringScreen"/> and <see cref="NoScreen"/>.
@@ -122,14 +125,14 @@ public sealed class ScreenType
     /// <returns>The renderable.</returns>
     public IRenderable CreateLog( LogLevel level, string message )
     {
-        if( level >= LogLevel.Warn )
+        var head = level switch
         {
-            var h = level == LogLevel.Warn ? WarningHead : ErrorHead;
-            return h.AddRight( Text( message, TextStyle.Default ) );
-        }
-        return Text( message, TextStyle.Default );
+            > LogLevel.Warn => ErrorHead,
+            LogLevel.Warn => WarningHead,
+            _ => InfoHead
+        };
+        return head.AddRight( Text( message, TextStyle.Default ) );
     }
-
 
     sealed class RenderableUnit : IRenderable
     {

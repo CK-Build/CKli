@@ -1,6 +1,10 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
+using static System.Reflection.Metadata.BlobBuilder;
 
 namespace CKli.Core;
 
@@ -26,9 +30,8 @@ sealed partial class AnsiScreen
         readonly char[] _workingBuffer;
         readonly object _lock;
 
-        VerticalContent? _header;
-        VerticalContent? _lastRenderedHeader;
-        int _lastHeaderHeight;
+        List<IRenderable>? _logs;
+        VerticalContent? _finalLogs;
         int _screenWidth;
         int _width;
         DynamicLine? _topLine;
@@ -51,32 +54,25 @@ sealed partial class AnsiScreen
 
         public void Dispose()
         {
-            Hide( false );
+            Hide( true );
             _timer.Dispose();
         }
 
-        public void AddHeader( IRenderable h )
+        public void AddLog( IRenderable h )
         {
             if( h.Height == 0 ) return;
-            if( _header == null )
-            {
-                var header = new VerticalContent( _screenType );
-                _header = header.Append( [h] );
-            }
-            else
-            {
-                _header = _header.Append( [h] );
-            }
+            _logs ??= new List<IRenderable>();
+            _logs.Add( h );
         }
 
         /// <summary>
-        /// Clears the current header and returns it.
+        /// Clears the current logs and returns them.
         /// </summary>
-        /// <returns>The current header.</returns>
-        public VerticalContent? ClearHeader()
+        /// <returns>The current logs.</returns>
+        public VerticalContent? ClearLogs()
         {
-            var h = _header;
-            _header = null;
+            var h = _finalLogs;
+            _finalLogs = null;
             return h;
         }
 
@@ -142,10 +138,8 @@ sealed partial class AnsiScreen
 
         void Draw()
         {
-            bool refresh = TrackScreenSizeChange();
+            bool refresh = TrackScreenWidthChange();
             var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
-
-            HandleHeader( ref w, ref refresh, _header );
 
             _workingString.Append( ref w );
             w.Append( '\n' );
@@ -178,72 +172,12 @@ sealed partial class AnsiScreen
 
             // Restores the starting position.
             w.MoveToColumn( 1 );
-            w.MoveToRelativeLine( -(1 + _lastHeaderHeight + newLineCount) );
+            w.MoveToRelativeLine( -(1 + newLineCount) );
 
             _target.RawWrite( w.Text );
         }
 
-        void HandleHeader( ref FixedBufferWriter w, ref bool refresh, VerticalContent? header )
-        {
-            bool headerChanged = _lastRenderedHeader != header;
-            bool headerRedrawn = false;
-            if( refresh || headerChanged )
-            {
-                headerRedrawn = HandleHeaderChange( ref w, header, ref refresh, headerChanged );
-            }
-            if( !headerRedrawn )
-            {
-                w.MoveToRelativeLine( _lastHeaderHeight );
-                if( refresh )
-                {
-                    w.EraseScreen( CursorRelativeSpan.After );
-                }
-            }
-        }
-
-        bool HandleHeaderChange( ref FixedBufferWriter w, VerticalContent? header, ref bool refresh, bool headerChanged )
-        {
-            if( header != null )
-            {
-                var resized = header.SetWidth( _width, false );
-                // It's hard to really say but it seems that this optimization weakens
-                // the size changed detection (since this relies on the same height and
-                // avoids a brutal clear of the screen from the top position)...
-                //
-                //if( !headerChanged && _lastHeaderHeight == resized.Height )
-                //{
-                //    // No actual change in the header. We can simply skip the header lines
-                //    // and let the dynamic part do its job.
-                //    return false;
-                //}
-                // Header must be redrawn.
-                _target.BeginUpdate();
-                w.EraseScreen( CursorRelativeSpan.After );
-                _target.RawWrite( w.Text );
-                w.ResetBuffer();
-                resized.Render( _target );
-                _target.EndUpdate();
-                _lastHeaderHeight = resized.Height;
-                // We have cleared the screen:
-                refresh = true;
-                _lastRenderedHeader = header;
-                return true;
-            }
-            // No current header.
-            if( headerChanged )
-            {
-                // We had one before. Let's clear the screen here and consider
-                // that we have redrawn the header.
-                _lastHeaderHeight = 0;
-                _lastRenderedHeader = null;
-                w.EraseScreen( CursorRelativeSpan.After );
-                refresh = true;
-                return true;
-            }
-            return false;
-        }
-
-        bool TrackScreenSizeChange()
+        bool TrackScreenWidthChange()
         {
             _screenWidth = ConsoleScreen.GetWindowWidth();
             int width = Math.Min( _screenWidth, _maxWidth );
@@ -255,7 +189,7 @@ sealed partial class AnsiScreen
             return false;
         }
 
-        public void Hide( bool forDisplay )
+        public void Hide( bool final )
         {
             lock( _lock )
             {
@@ -264,31 +198,21 @@ sealed partial class AnsiScreen
                     _visible = false;
                     _timer.Change( Timeout.Infinite, _timerPeriod );
 
-                    bool refresh = TrackScreenSizeChange();
+                    bool refresh = TrackScreenWidthChange();
 
                     var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
-                    if( forDisplay )
-                    {
-                        w.EraseScreen( CursorRelativeSpan.After );
-                    }
-                    else
-                    {
-                        HandleHeader( ref w, ref refresh, _header );
-                        // If the header has not refresh (cleared the screen), we have
-                        // 1 (the MultiColorString) + _lastRenderedLineCount lines to clear.
-                        if( !refresh )
-                        {
-                            w.EraseScreen( CursorRelativeSpan.After );
-                        }
-                    }
+                    w.EraseScreen( CursorRelativeSpan.After );
                     w.Append( AnsiCodes.RemoveProgressIndicator() );
                     w.AppendStyle( TextStyle.Default.Color, TextEffect.Regular );
                     w.ShowCursor( true );
                     _target.RawWrite( w.Text );
-                    _lastHeaderHeight = 0;
-                    _lastRenderedHeader = null;
                     _lastRenderedLineCount = 0;
                     _lastRenderedTopLine = null;
+                    if( final && _logs != null )
+                    {
+                        _finalLogs = new VerticalContent( _screenType, _logs.Select( l => l.SetWidth( _screenWidth, false ) ).ToImmutableArray() );
+                        _finalLogs.Render( _target );
+                    }
                 }
             }
         }

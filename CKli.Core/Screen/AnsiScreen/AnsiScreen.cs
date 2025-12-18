@@ -26,7 +26,7 @@ sealed partial class AnsiScreen : IScreen
 
     public void Display( IRenderable renderable, bool newLine = true )
     {
-        _animation.Hide( true );
+        _animation.Hide( false );
         if( renderable.Width > _animation.ScreenWidth )
         {
             renderable = renderable.SetWidth( _animation.ScreenWidth, false );
@@ -37,7 +37,7 @@ sealed partial class AnsiScreen : IScreen
 
     public int Width => _animation.ScreenWidth;
 
-    public void ScreenLog( LogLevel level, string message ) => _animation.AddHeader( _screenType.CreateLog( level, message ) );
+    public void ScreenLog( LogLevel level, string message ) => _animation.AddLog( _screenType.CreateLog( level, message ) );
 
     public void OnLog( LogLevel level, string? text, bool isOpenGroup ) => _animation.OnLog( text, isOpenGroup );
 

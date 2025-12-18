@@ -153,6 +153,8 @@ sealed partial class AnsiScreen
                     if( t.Length < maxLen )
                     {
                         w.Append( t );
+                        // Clears line remainder (previous longer line).
+                        w.EraseLine( CursorRelativeSpan.After );
                     }
                     else
                     {

@@ -33,9 +33,11 @@ sealed class ConsoleScreen : IScreen
     {
         try
         {
-            return Console.IsOutputRedirected || Console.BufferWidth == 0 || Console.BufferWidth > IScreen.MaxScreenWidth
+            if( Console.IsOutputRedirected ) return IScreen.MaxScreenWidth;
+            int w = Console.BufferWidth;
+            return w == 0 || w > IScreen.MaxScreenWidth
                         ? IScreen.MaxScreenWidth
-                        : Console.BufferWidth;
+                        : w;
         }
         catch
         {
