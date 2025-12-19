@@ -164,4 +164,9 @@ public sealed class Repo
         }
     }
 
+    /// <summary>
+    /// Overridden to return the <see cref="DisplayPath"/>.
+    /// </summary>
+    /// <returns>This display path.</returns>
+    public override string ToString() => _git.DisplayPath;
 }

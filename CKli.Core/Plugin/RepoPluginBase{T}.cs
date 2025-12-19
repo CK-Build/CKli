@@ -51,8 +51,11 @@ public abstract class RepoPluginBase<T> : PluginBase
         var info = _infos[r.Index];
         if( info == null )
         {
-            info = Create( monitor, r );
-            _infos[r.Index] = info;
+            using( monitor.OpenTrace( $"Creating '{typeof(T).Name}' for '{r.DisplayPath}'." ) )
+            {
+                info = Create( monitor, r );
+                _infos[r.Index] = info;
+            }
         }
         return info;
     }
