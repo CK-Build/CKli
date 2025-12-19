@@ -184,10 +184,11 @@ public static class CKliCommands
                     // needed (based on the helpPath). If this second TryFindForExecution call
                     // returned an help path, it should be the same or a better help path than
                     // the one from only the CKli commands: use it.
+                    // If a world help path has been found, don't display the Global options & flags helps.
                     context.Screen.DisplayHelp( world.Commands.GetForHelp( context.Screen.ScreenType, worldHelpPath ?? helpPath, _commands ),
                                                 cmdLine,
-                                                (context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
-                                                (context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
+                                                (worldHelpPath != null || context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
+                                                (worldHelpPath != null || context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
                     return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, stack, cmdLine.HasHelp ).ConfigureAwait( false );
                 }
                 // We have a plugin command (and no --help).
@@ -197,6 +198,9 @@ public static class CKliCommands
                     monitor.Error( $"Command '{cmdLine.FoundCommand.CommandPath}' exists but its type '{cmdLine.FoundCommand.PluginTypeInfo.TypeName}' is disabled in plugin '{cmdLine.FoundCommand.PluginTypeInfo.Plugin.FullPluginName}'." );
                     return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, stack, false ).ConfigureAwait( false );
                 }
+                // We are executing a World's plugin command. We use the World as an internal vehicle for
+                // the executing command exposed by the PrimaryPluginContext.
+                world.SetExecutingCommand( cmdLine.FoundCommand );
                 return await ExecuteAsync( monitor, context, cmdLine, stack ).ConfigureAwait( false );
             }
             finally

@@ -31,10 +31,10 @@ sealed class CKliFetch : Command
         bool withTags = cmdLine.EatFlag( "--with-tags" );
         bool fromAllRemotes = cmdLine.EatFlag( "--from-all-remotes" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Fetch( monitor, context, all, withTags, fromAllRemotes ) );
+                                     && Fetch( monitor, this, context, all, withTags, fromAllRemotes ) );
     }
 
-    static bool Fetch( IActivityMonitor monitor, CKliEnv context, bool all, bool withTags, bool fromAllRemotes )
+    static bool Fetch( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool withTags, bool fromAllRemotes )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -46,6 +46,7 @@ sealed class CKliFetch : Command
         }
         try
         {
+            world.SetExecutingCommand( command );
             var repos = all
                         ? world.GetAllDefinedRepo( monitor )
                         : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );

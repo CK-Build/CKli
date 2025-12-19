@@ -4,9 +4,17 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliPluginRemove : Command
+/// <summary>
+/// Removes a plugin.
+/// This reloads the plugins (and depending on the <see cref="WorldDefinitionFile.CompileMode"/> recompiles them).
+/// <para>
+/// This command is public: primary plugin constructors and their <see cref="PluginBase.Initialize(IActivityMonitor)"/> method
+/// can observe a non null <see cref="PrimaryPluginContext.Command"/> during the reload steps.
+/// </para>
+/// </summary>
+public sealed class CKliPluginRemove : Command
 {
-    public CKliPluginRemove()
+    internal CKliPluginRemove()
         : base( null,
                 "plugin remove",
                 "Fully removes a plugin from the current World. It must not have dependent plugins otherwise this fails.",
@@ -25,7 +33,7 @@ sealed class CKliPluginRemove : Command
         string pluginName = cmdLine.EatArgument();
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && CKliPluginCreate.CreateOrRemovePlugin( monitor, context, pluginName, allowLTS, create: false ) );
+                                     && CKliPluginCreate.CreateOrRemovePlugin( monitor, this, context, pluginName, allowLTS, create: false ) );
     }
 
 }

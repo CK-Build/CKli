@@ -24,10 +24,10 @@ sealed class CKliRepoList : Command
     {
         bool byBranch = cmdLine.EatFlag( "--by-branch", "-b" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && DisplayRepos( monitor, context, byBranch ) );
+                                     && DisplayRepos( monitor, this, context, byBranch ) );
     }
 
-    static bool DisplayRepos( IActivityMonitor monitor, CKliEnv context, bool byBranch )
+    static bool DisplayRepos( IActivityMonitor monitor, Command command, CKliEnv context, bool byBranch )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -39,6 +39,7 @@ sealed class CKliRepoList : Command
         }
         try
         {
+            world.SetExecutingCommand( command );
             var repos = world.GetAllDefinedRepo( monitor );
             if( repos == null ) return false;
 

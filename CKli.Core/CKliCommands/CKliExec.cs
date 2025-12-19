@@ -36,10 +36,10 @@ sealed class CKliExec : Command
         bool continueOnError = cmdLine.EatFlag( "--ckli-continue-on-error" );
         bool all = cmdLine.EatFlag( "--ckli-all" );
         cmdLine.CloseWithRemainingAsProcessStartArgs( out var arguments );
-        return ValueTask.FromResult( DoRun( monitor, context, all, continueOnError, processName, arguments ) );
+        return ValueTask.FromResult( DoRun( monitor, this, context, all, continueOnError, processName, arguments ) );
     }
 
-    static bool DoRun( IActivityMonitor monitor, CKliEnv context, bool all, bool continueOnError, string processName, string arguments )
+    static bool DoRun( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool continueOnError, string processName, string arguments )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -47,6 +47,7 @@ sealed class CKliExec : Command
         }
         try
         {
+            world.SetExecutingCommand( command );
             IReadOnlyList<Repo>? repos = all
                                           ? world.GetAllDefinedRepo( monitor )
                                           : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );

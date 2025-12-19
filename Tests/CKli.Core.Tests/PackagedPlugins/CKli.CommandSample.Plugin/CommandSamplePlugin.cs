@@ -28,7 +28,7 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
     }
 
     [CommandPath( "test echo" )]
-    [Description( "Echoes the message, optionnaly in upper case." )]
+    [Description( "Echoes the message, optionally in upper case." )]
     public bool Echo( IActivityMonitor monitor,
                       CKliEnv context,
                       [Description("The message to write.")]
@@ -65,6 +65,7 @@ public sealed class CommandSamplePlugin : PrimaryPluginBase
                                 [Description("Removed the Plugin Repo configuration element.")]
                                 bool repoConfigurationRemove = false )
     {
+        Throw.CheckState( PrimaryPluginContext.Command.CommandPath == "test config edit" );
         if( repoName != null )
         {
             var repoPath = World.Layout.FirstOrDefault( l => l.Path.LastPart == repoName ).Path;

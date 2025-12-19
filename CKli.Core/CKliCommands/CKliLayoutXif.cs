@@ -6,7 +6,7 @@ namespace CKli;
 
 sealed class CKliLayoutXif : Command
 {
-    public CKliLayoutXif()
+    internal CKliLayoutXif()
         : base( null,
                 "layout xif",
                 """
@@ -22,10 +22,10 @@ sealed class CKliLayoutXif : Command
                                                                     CommandLineArguments cmdLine )
     {
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && LayoutXif( monitor, context ) );
+                                     && LayoutXif( monitor, this, context ) );
     }
 
-    static bool LayoutXif( IActivityMonitor monitor, CKliEnv context )
+    static bool LayoutXif( IActivityMonitor monitor, Command command, CKliEnv context )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -33,6 +33,7 @@ sealed class CKliLayoutXif : Command
         }
         try
         {
+            world.SetExecutingCommand( command );
             // XifLayout handles the WorldDefinition file save and commit.
             return world.XifLayout( monitor );
         }

@@ -7,9 +7,12 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliIssue : Command
+/// <summary>
+/// Raises the <see cref="WorldEvents.Issue"/> event.
+/// </summary>
+public sealed class CKliIssue : Command
 {
-    public CKliIssue()
+    internal CKliIssue()
         : base( null,
                 "issue",
                 "Asks plugins to detect any possible issues.",
@@ -32,10 +35,10 @@ sealed class CKliIssue : Command
         {
             return ValueTask.FromResult( false );
         }
-        return IssueAsync( monitor, context, all, fix );
+        return IssueAsync( monitor, this, context, all, fix );
     }
 
-    static async ValueTask<bool> IssueAsync( IActivityMonitor monitor, CKliEnv context, bool all, bool fix )
+    static async ValueTask<bool> IssueAsync( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool fix )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -43,6 +46,7 @@ sealed class CKliIssue : Command
         }
         try
         {
+            world.SetExecutingCommand( command );
             var issues = new List<World.Issue>();
             if( all )
             {

@@ -4,9 +4,11 @@ using System.Xml.Linq;
 namespace CKli.Core;
 
 /// <summary>
-/// Constructor parameter of a primary plugin.
+/// Constructor parameter of a primary plugin that is kept and exposed as <see cref="PrimaryPluginBase.PrimaryPluginContext"/>
+/// and <see cref="PrimaryRepoPlugin{T}.PrimaryPluginContext"/>.
 /// <para>
-/// Exposes the plugin configuration and the per Repo plugin configuration to its plugin.
+/// This exposes the plugin configuration and per Repo plugin configuration to its plugin, the <see cref="World"/> and
+/// the executing <see cref="Command"/>.
 /// </para>
 /// </summary>
 public sealed class PrimaryPluginContext
@@ -46,6 +48,14 @@ public sealed class PrimaryPluginContext
     /// Gets the world.
     /// </summary>
     public World World => _world;
+
+    /// <summary>
+    /// Gets the command being executed.
+    /// <para>
+    /// Caution: this is null during plugin initialization. 
+    /// </para>
+    /// </summary>
+    public Command? Command => _world.ExecutingCommand;
 
     /// <summary>
     /// Gets the plugin info.

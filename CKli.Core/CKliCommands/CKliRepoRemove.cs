@@ -25,10 +25,11 @@ sealed class CKliRepoRemove : Command
         string nameOrUrl = cmdLine.EatArgument();
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && RepoRemove( monitor, context, nameOrUrl, allowLTS ) );
+                                     && RepoRemove( monitor, this, context, nameOrUrl, allowLTS ) );
     }
 
     static bool RepoRemove( IActivityMonitor monitor,
+                            Command command,
                             CKliEnv context,
                             string nameOrUrl,
                             bool allowLTS = false )
@@ -39,6 +40,7 @@ sealed class CKliRepoRemove : Command
         }
         try
         {
+            world.SetExecutingCommand( command );
             if( !allowLTS && !world.Name.IsDefaultWorld )
             {
                 return CKliRepoAdd.RequiresAllowLTS( monitor, world.Name );

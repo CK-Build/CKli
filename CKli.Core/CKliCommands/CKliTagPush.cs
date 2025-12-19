@@ -23,6 +23,6 @@ sealed class CKliTagPush : Command
                                                                     CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
-        return ValueTask.FromResult( CKliTagPull.PullOrPushTags( monitor, context, cmdLine, pull: false ) );
+        return ValueTask.FromResult( CKliTagPull.PullOrPushTags( monitor, this, context, cmdLine, pull: false ) );
     }
 }

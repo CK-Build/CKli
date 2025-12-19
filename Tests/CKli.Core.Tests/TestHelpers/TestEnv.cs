@@ -280,7 +280,7 @@ static partial class TestEnv
         var v = version != null ? SVersion.Parse( version ) : _cKliPluginsCoreVersion;
 
         var path = _packagedPluginsPath.AppendPart( projectName );
-        var args = $"""pack -tl:off --no-dependencies -o "{_nugetSourcePath}" -c {TestHelper.BuildConfiguration} /p:IsPackable=true;Version={v}""";
+        var args = $"""pack -tl:off --no-dependencies -o "{_nugetSourcePath}" -c {TestHelper.BuildConfiguration} /p:IsPackable=true /p:Version={v}""";
         using var _ = TestHelper.Monitor.OpenInfo( $"""
             Ensure plugin package '{projectName}':
             dotnet {args}

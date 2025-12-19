@@ -31,10 +31,11 @@ sealed class CKliRepoAdd : Command
         }
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && RepositoryAdd( monitor, context, uri, allowLTS ) );
+                                     && RepositoryAdd( monitor, this, context, uri, allowLTS ) );
     }
 
     static bool RepositoryAdd( IActivityMonitor monitor,
+                               Command command,
                                CKliEnv context,
                                Uri repositoryUrl,
                                bool allowLTS )
@@ -45,6 +46,7 @@ sealed class CKliRepoAdd : Command
         }
         try
         {
+            world.SetExecutingCommand( command );
             if( !allowLTS && !world.Name.IsDefaultWorld )
             {
                 return RequiresAllowLTS( monitor, world.Name );

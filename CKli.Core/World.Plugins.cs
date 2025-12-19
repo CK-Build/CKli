@@ -8,7 +8,6 @@ namespace CKli.Core;
 
 public sealed partial class World
 {
-
     internal CommandNamespace Commands
     {
         get
@@ -16,6 +15,13 @@ public sealed partial class World
             Throw.DebugAssert( _plugins != null );
             return _plugins.Commands;
         }
+    }
+
+    internal Command? ExecutingCommand => _executingCommand;
+
+    internal void SetExecutingCommand( Command command )
+    {
+        _executingCommand = command;
     }
 
     internal bool SetPluginCompileMode( IActivityMonitor monitor, PluginCompileMode mode )

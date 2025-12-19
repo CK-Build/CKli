@@ -4,9 +4,17 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliPluginAdd : Command
+/// <summary>
+/// Adds or updates a plugin. This reloads the plugins (and depending on the <see cref="WorldDefinitionFile.CompileMode"/>
+/// recompiles them).
+/// <para>
+/// This command is public: primary plugin constructors and their <see cref="PluginBase.Initialize(IActivityMonitor)"/> method
+/// can observe a non null <see cref="PrimaryPluginContext.Command"/> during the reload steps.
+/// </para>
+/// </summary>
+public sealed class CKliPluginAdd : Command
 {
-    public CKliPluginAdd()
+    internal CKliPluginAdd()
         : base( null,
                 "plugin add",
                 "Adds a new plugin (or sets the version of an existing one) in the current World's plugins.",
@@ -30,10 +38,11 @@ sealed class CKliPluginAdd : Command
         }
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && PluginAdd( monitor, context, package, allowLTS ) );
+                                     && PluginAdd( monitor, this, context, package, allowLTS ) );
     }
 
     static bool PluginAdd( IActivityMonitor monitor,
+                           Command command,
                            CKliEnv context,
                            PackageInstance package,
                            bool allowLTS )
@@ -48,6 +57,7 @@ sealed class CKliPluginAdd : Command
             {
                 return CKliRepoAdd.RequiresAllowLTS( monitor, world.Name );
             }
+            world.SetExecutingCommand( command );
             // AddOrSetPluginPackage handles the WorldDefinition file save and commit.
             return world.AddOrSetPluginPackage( monitor, package.PackageId, package.Version );
         }

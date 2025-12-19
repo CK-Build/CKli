@@ -25,13 +25,14 @@ sealed class CKliTagPull : Command
                                                                     CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
-        return ValueTask.FromResult( PullOrPushTags( monitor, context, cmdLine, pull: true ) );
+        return ValueTask.FromResult( PullOrPushTags( monitor, this, context, cmdLine, pull: true ) );
     }
 
     internal static bool PullOrPushTags( IActivityMonitor monitor,
-                                          CKliEnv context,
-                                          CommandLineArguments cmdLine,
-                                          bool pull )
+                                         Command command,
+                                         CKliEnv context,
+                                         CommandLineArguments cmdLine,
+                                         bool pull )
     {
         IEnumerable<string> tagNames = cmdLine.EatRemainingArgument();
         var invalidNames = tagNames.Where( n => !GitRepository.IsCKliValidTagName( n ) );
@@ -61,6 +62,7 @@ sealed class CKliTagPull : Command
         var s = context.Screen.ScreenType;
         try
         {
+            world.SetExecutingCommand( command );
             var repo = world.GetDefinedRepo( monitor, context.CurrentDirectory );
             if( repo == null ) return false;
             return pull

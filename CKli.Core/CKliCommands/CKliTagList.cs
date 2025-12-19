@@ -31,10 +31,15 @@ sealed class CKliTagList : Command
         bool remote = cmdLine.EatFlag( "--remote" );
         bool local = cmdLine.EatFlag( "--local" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && ListTags( monitor, context, all, local, remote ) );
+                                     && ListTags( monitor, this, context, all, local, remote ) );
     }
 
-    static bool ListTags( IActivityMonitor monitor, CKliEnv context, bool all, bool local, bool remote )
+    static bool ListTags( IActivityMonitor monitor,
+                          Command command,
+                          CKliEnv context,
+                          bool all,
+                          bool local,
+                          bool remote )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -47,6 +52,7 @@ sealed class CKliTagList : Command
         var s = context.Screen.ScreenType;
         try
         {
+            world.SetExecutingCommand( command );
             var repos = all
                         ? world.GetAllDefinedRepo( monitor )
                         : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );

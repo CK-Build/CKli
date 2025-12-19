@@ -5,12 +5,15 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliPluginInfo : Command
+/// <summary>
+/// Raises the <see cref="WorldEvents.PluginInfo"/> event.
+/// </summary>
+public sealed class CKliPluginInfo : Command
 {
-    public CKliPluginInfo()
+    internal CKliPluginInfo()
         : base( null,
                 "plugin info",
-                "Handles CKli plugins compilation mode and provides informations.",
+                "Handles CKli plugins compilation mode and provides information.",
                 arguments: [],
                 options: [(["--compile-mode"],
                             """
@@ -40,12 +43,13 @@ sealed class CKliPluginInfo : Command
             compileMode = mode;
         }
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Plugin( monitor, context, compileMode ) );
+                                     && PluginInfo( monitor, this, context, compileMode ) );
     }
 
-    static bool Plugin( IActivityMonitor monitor,
-                        CKliEnv context,
-                        PluginCompileMode? compileMode )
+    static bool PluginInfo( IActivityMonitor monitor,
+                            Command command,
+                            CKliEnv context,
+                            PluginCompileMode? compileMode )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -53,6 +57,7 @@ sealed class CKliPluginInfo : Command
         }
         try
         {
+            world.SetExecutingCommand( command );
             if( compileMode.HasValue
                 && compileMode.Value != world.DefinitionFile.CompileMode
                 && !world.SetPluginCompileMode( monitor, compileMode.Value ) )

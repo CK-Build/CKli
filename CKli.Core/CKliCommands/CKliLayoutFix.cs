@@ -4,9 +4,12 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliLayoutFix : Command
+/// <summary>
+/// Fixes the world layout (if it needs to) and raises the <see cref="WorldEvents.FixedLayout"/>.
+/// </summary>
+public sealed class CKliLayoutFix : Command
 {
-    public CKliLayoutFix()
+    internal CKliLayoutFix()
         : base( null,
                 "layout fix",
                 "Fixes the the folders and repositories layout of the current world (including casing differences).",
@@ -24,10 +27,11 @@ sealed class CKliLayoutFix : Command
     {
         bool deleteAliens = cmdLine.EatFlag( "--delete-aliens" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && LayoutFix( monitor, context, deleteAliens ) );
+                                     && LayoutFix( monitor, this, context, deleteAliens ) );
     }
 
     static bool LayoutFix( IActivityMonitor monitor,
+                           Command command,
                            CKliEnv context,
                            bool deleteAliens = false )
     {
@@ -37,6 +41,7 @@ sealed class CKliLayoutFix : Command
         }
         try
         {
+            world.SetExecutingCommand( command );
             // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
             return world.FixLayout( monitor, deleteAliens, out _ ) && stack.Close( monitor );
         }

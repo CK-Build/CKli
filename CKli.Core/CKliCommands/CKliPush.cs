@@ -28,10 +28,11 @@ sealed class CKliPush : Command
         bool stackOnly = cmdLine.EatFlag( "--stack-only" );
         bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Push( monitor, context, all, stackOnly, continueOnError ) );
+                                     && Push( monitor, this, context, all, stackOnly, continueOnError ) );
     }
 
     static bool Push( IActivityMonitor monitor,
+                      Command command,
                       CKliEnv context,
                       bool all = false,
                       bool stackOnly = false,
@@ -47,6 +48,7 @@ sealed class CKliPush : Command
         }
         try
         {
+            world.SetExecutingCommand( command );
             bool success = true;
             if( !stackOnly )
             {

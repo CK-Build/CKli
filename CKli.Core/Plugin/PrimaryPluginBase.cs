@@ -1,8 +1,8 @@
 namespace CKli.Core;
 
 /// <summary>
-/// Base class for primary plugins: these plugins are always instantiated and have access to the
-/// Xml configuration element through the <see cref="PrimaryPluginContext"/>.
+/// Base class for primary plugins: these plugins are always instantiated and have access to their
+/// configurations, the <see cref="World"/> and the executing <see cref="Command"/> through the <see cref="PrimaryPluginContext"/>.
 /// </summary>
 public abstract class PrimaryPluginBase : PluginBase
 {

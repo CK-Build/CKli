@@ -42,11 +42,13 @@ sealed class CKliTagDelete : Command
             return ValueTask.FromResult( false );
         }
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && DeleteTags( monitor, context, tagNames, multiRepo, remoteOnly, withRemote ) );
+                                     && DeleteTags( monitor, this, context, tagNames, multiRepo, remoteOnly, withRemote ) );
     }
 
     static bool DeleteTags( IActivityMonitor monitor,
-                            CKliEnv context, List<string> tagNames,
+                            Command command,
+                            CKliEnv context,
+                            List<string> tagNames,
                             bool multiRepo,
                             bool remoteOnly,
                             bool withRemote )
@@ -62,6 +64,7 @@ sealed class CKliTagDelete : Command
         var s = context.Screen.ScreenType;
         try
         {
+            world.SetExecutingCommand( command );
             var repos = world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
             if( repos == null ) return false;
             if( repos.Count > 1 && !multiRepo )

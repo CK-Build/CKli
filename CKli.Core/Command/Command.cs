@@ -23,7 +23,7 @@ namespace CKli.Core;
 ///         Optional named value that map to optional string method parameters (parameter must have a null default)
 ///         or an optional array of strings (parameter must have a null default).
 ///         <para>
-///         When the method parameter is an array of strings, multiple occurences of the option names can appear on the command line.
+///         When the method parameter is an array of strings, multiple occurrences of the option names can appear on the command line.
 ///         </para>
 ///     </description>
 /// </item>
@@ -123,7 +123,7 @@ public abstract partial class Command
     public virtual InteractiveMode InteractiveMode => InteractiveMode.Both;
 
     /// <summary>
-    /// Returns "[CKli] commad path".
+    /// Returns "[CKli] command path".
     /// This applies to intrinsic CKli commands and is overridden by command implemented by plugin.
     /// </summary>
     /// <returns>A readable string.</returns>

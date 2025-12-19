@@ -68,6 +68,7 @@ public sealed partial class World
     readonly WorldEvents _events;
     readonly PluginMachinery? _pluginMachinery;
     PluginCollection? _plugins;
+    Command? _executingCommand;
 
     // The WorldDefinitionFile maintains its layout list.
     // AddRepository, RemoveRepository and XifLayout are the only ones that can
