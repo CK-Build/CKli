@@ -11,7 +11,8 @@ public abstract class PluginCommand : Command
     readonly string _methodName;
     readonly MethodAsyncReturn _returnType;
     internal object? _instance;
-    readonly bool _hasCKliEnvParameter;
+    readonly int _idxCKliEnvParameter;
+    readonly int _idxCmdLineParameter;
 
     /// <summary>
     /// Initializes a new <see cref="PluginCommand"/>.
@@ -19,7 +20,13 @@ public abstract class PluginCommand : Command
     /// <param name="typeInfo">The type info.</param>
     /// <param name="commandPath">The command path.</param>
     /// <param name="description">The command description.</param>
-    /// <param name="hasCKliEnvParameter">True if the second parameter is the <see cref="CKliEnv"/>.</param>
+    /// <param name="idxCKliEnvParameter">
+    /// The <see cref="CKliEnv"/> parameter index or -1. Can only be -1, 1 (or 2 if <paramref name="idxCKliEnvParameter"/> is 1).
+    /// </param>
+    /// <param name="idxCmdLineParameter">
+    /// The <see cref="CommandLineArguments"/> parameter index or -1. Can only be -1, 1 or 2.
+    /// Can be 2 only if <paramref name="idxCKliEnvParameter"/> is 1.
+    /// </param>
     /// <param name="arguments">The command arguments.</param>
     /// <param name="options">The command options.</param>
     /// <param name="flags">The command flags.</param>
@@ -28,7 +35,8 @@ public abstract class PluginCommand : Command
     protected PluginCommand( IPluginTypeInfo typeInfo,
                              string commandPath,
                              string description,
-                             bool hasCKliEnvParameter,
+                             int idxCKliEnvParameter,
+                             int idxCmdLineParameter,
                              ImmutableArray<(string Name, string Description)> arguments,
                              ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
                              ImmutableArray<(ImmutableArray<string> Names, string Description)> flags,
@@ -38,7 +46,8 @@ public abstract class PluginCommand : Command
     {
         _methodName = methodName;
         _returnType = returnType;
-        _hasCKliEnvParameter = hasCKliEnvParameter;
+        _idxCKliEnvParameter = idxCKliEnvParameter;
+        _idxCmdLineParameter = idxCmdLineParameter;
     }
 
     /// <summary>
@@ -57,10 +66,17 @@ public abstract class PluginCommand : Command
     public MethodAsyncReturn ReturnType => _returnType;
 
     /// <summary>
-    /// Gets whether the second parameter of <see cref="MethodName"/> is the <see cref="CKliEnv"/>
-    /// (the first parameter is always the <see cref="IActivityMonitor"/>).
+    /// Gets the parameter index of <see cref="CKliEnv"/> in <see cref="MethodName"/> parameters.
+    /// This can be -1 (no context), 1 or 2 (the first parameter is always the <see cref="IActivityMonitor"/>).
     /// </summary>
-    public bool HasCKliEnvParameter => _hasCKliEnvParameter;
+    public int IdxCKliEnvParameter => _idxCKliEnvParameter;
+
+    /// <summary>
+    /// Gets the parameter index of <see cref="CommandLineArguments"/> in <see cref="MethodName"/> parameters.
+    /// This can be -1 (for a regular command method signature), 1 or 2 (the first parameter is always the <see cref="IActivityMonitor"/>).
+    /// When the CommandLineArguments is used, no other parameter except <see cref="CKliEnv"/> exist. 
+    /// </summary>
+    public int IdxCmdLineParameter => _idxCmdLineParameter;
 
     /// <summary>
     /// Gets the instance that implements the command.

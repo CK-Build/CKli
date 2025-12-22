@@ -13,14 +13,24 @@ sealed class ReflectionPluginCommand : PluginCommand
     public ReflectionPluginCommand( IPluginTypeInfo typeInfo,
                                     string commandPath,
                                     string description,
-                                    bool hasCKliEnvParameter,
+                                    int idxCKliEnvParameter,
+                                    int idxCmdLineParameter,
                                     ImmutableArray<(string Name, string Description)> arguments,
                                     ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
                                     ImmutableArray<(ImmutableArray<string> Names, string Description)> flags,
                                     MethodInfo method,
                                     int parameterCount,
                                     MethodAsyncReturn returnType )
-        : base( typeInfo, commandPath, description, hasCKliEnvParameter, arguments, options, flags, method.Name, returnType )
+        : base( typeInfo,
+                commandPath,
+                description,
+                idxCKliEnvParameter,
+                idxCmdLineParameter,
+                arguments,
+                options,
+                flags,
+                method.Name,
+                returnType )
     {
         _method = method;
         _parameterCount = parameterCount;
@@ -30,27 +40,40 @@ sealed class ReflectionPluginCommand : PluginCommand
     {
         var args = new object?[_parameterCount];
         args[0] = monitor;
-        int iParam = 1;
-        if( HasCKliEnvParameter )
+        if( IdxCmdLineParameter > 0 )
         {
-            args[iParam++] = context;
+            Throw.DebugAssert( IdxCmdLineParameter != IdxCKliEnvParameter );
+            args[IdxCmdLineParameter] = cmdLine;
+            if( IdxCKliEnvParameter > 0 )
+            {
+                args[IdxCKliEnvParameter] = context;
+            }
         }
-        for( int i = 0; i < Arguments.Length; i++ )
+        else
         {
-            args[iParam++] = cmdLine.EatArgument();
+            Throw.DebugAssert( IdxCmdLineParameter == -1 && IdxCKliEnvParameter is -1 or 0 or 1 );
+            int iParam = 1;
+            if( IdxCKliEnvParameter == 1 )
+            {
+                args[iParam++] = context;
+            }
+            for( int i = 0; i < Arguments.Length; i++ )
+            {
+                args[iParam++] = cmdLine.EatArgument();
+            }
+            for( int i = 0; i < Options.Length; i++ )
+            {
+                var o = Options[i];
+                args[iParam++] = o.Multiple
+                                                ? cmdLine.EatMultipleOption( o.Names )
+                                                : cmdLine.EatSingleOption( o.Names );
+            }
+            for( int i = 0; i < Flags.Length; i++ )
+            {
+                args[iParam++] = cmdLine.EatFlag( Flags[i].Names );
+            }
+            if( !cmdLine.Close( monitor ) ) return ValueTask.FromResult( false );
         }
-        for( int i = 0; i < Options.Length; i++ )
-        {
-            var o = Options[i];
-            args[iParam++] = o.Multiple
-                                            ? cmdLine.EatMultipleOption( o.Names )
-                                            : cmdLine.EatSingleOption( o.Names );
-        }
-        for( int i = 0; i < Flags.Length; i++ )
-        {
-            args[iParam++] = cmdLine.EatFlag( Flags[i].Names );
-        }
-        if( !cmdLine.Close( monitor ) ) return ValueTask.FromResult( false );
         switch( ReturnType )
         {
             case MethodAsyncReturn.None:

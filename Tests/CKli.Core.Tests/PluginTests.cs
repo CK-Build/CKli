@@ -84,7 +84,7 @@ public class PluginTests
     }
 
     [Test]
-    public async Task CommandSample_package_echo_Async()
+    public async Task CommandSample_package_echo_and_CmdLine_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.OpenRemotes( "One" );
@@ -99,6 +99,7 @@ public class PluginTests
         // ckli plugin add CommandSample@version
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "add", $"CommandSample@{TestEnv.CKliPluginsCoreVersion}" )).ShouldBeTrue();
 
+        // Echo test (compiled)
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "echo", "hello n°1" )).ShouldBeTrue();
@@ -114,9 +115,38 @@ public class PluginTests
             logs.ShouldContain( "get-world-name: one" );
         }
 
+        // CommandLineArguments or no argument tests (compiled)
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "no-argument-at-all" )).ShouldBeTrue();
+            logs.ShouldContain( $"CommandWithNoArgument!!!" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "cklienv-only" )).ShouldBeTrue();
+            logs.ShouldContain( $"CommandWithCKliEnvOnly!!!" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line" )).ShouldBeTrue();
+            logs.ShouldContain( "CommandWithCommandLineArgumentsOnly!!!" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line-env" )).ShouldBeTrue();
+            logs.ShouldContain( "CommandWithCommandLineArgumentsAndCKliEnv!!!" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-env-line" )).ShouldBeTrue();
+            logs.ShouldContain( "CommandWithCKliEnvAndCommandLineArguments!!!" );
+
+            // Forgetting to close the CommandLineArguments is an error.
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line", "--forget-close" )).ShouldBeFalse();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line-env", "--forget-close" )).ShouldBeFalse();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-env-line", "--forget-close" )).ShouldBeFalse();
+            // Too much (unexpected) arguments is also an error.
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line", "--some" )).ShouldBeFalse();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line-env", "more" )).ShouldBeFalse();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-env-line", "-args a" )).ShouldBeFalse();
+        }
+
         // ckli plugin info --compile-mode none
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "info", "--compile-mode", "none" )).ShouldBeTrue();
 
+        // Echo test (via reflection)
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "echo", "hello n°1" )).ShouldBeTrue();
@@ -130,6 +160,34 @@ public class PluginTests
 
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "get-world-name", "-l" )).ShouldBeTrue();
             logs.ShouldContain( "get-world-name: one" );
+
+            // Forgetting to close the CommandLineArguments is an error.
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line", "--forget-close" )).ShouldBeFalse();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line-env", "--forget-close" )).ShouldBeFalse();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-env-line", "--forget-close" )).ShouldBeFalse();
+            // Too much (unexpected) arguments is also an error.
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line", "--some" )).ShouldBeFalse();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line-env", "more" )).ShouldBeFalse();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-env-line", "-args a" )).ShouldBeFalse();
+        }
+
+        // CommandLineArguments or no argument tests (via reflection)
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "no-argument-at-all" )).ShouldBeTrue();
+            logs.ShouldContain( $"CommandWithNoArgument!!!" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "cklienv-only" )).ShouldBeTrue();
+            logs.ShouldContain( $"CommandWithCKliEnvOnly!!!" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line" )).ShouldBeTrue();
+            logs.ShouldContain( "CommandWithCommandLineArgumentsOnly!!!" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-line-env" )).ShouldBeTrue();
+            logs.ShouldContain( "CommandWithCommandLineArgumentsAndCKliEnv!!!" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-env-line" )).ShouldBeTrue();
+            logs.ShouldContain( "CommandWithCKliEnvAndCommandLineArguments!!!" );
         }
 
     }

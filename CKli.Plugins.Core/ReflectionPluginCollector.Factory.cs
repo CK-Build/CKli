@@ -235,17 +235,21 @@ sealed partial class ReflectionPluginCollector
             b.Append( "sealed class Cmd_" );
             Command.WriteCommandPathAsIdentifier( b, c ).Append( " : PluginCommand" ).AppendLine()
                 .Append( '{' ).AppendLine();
+            // Constructor signature.
             int offset = 4;
             b.Append( ' ', offset ).Append( "internal Cmd_" );
             Command.WriteCommandPathAsIdentifier( b, c ).Append( "( IPluginTypeInfo typeInfo )" ).AppendLine();
+
+            // Constructor base(...) call.
             offset += 4;
             b.Append( ' ', offset ).Append( ": base( typeInfo," ).AppendLine();
             offset += 8;
             AppendSourceString( b.Append( ' ', offset ), c.CommandPath ).Append( ',' ).AppendLine();
             AppendSourceString( b.Append( ' ', offset ), c.Description ).Append( ',' ).AppendLine();
-            b.Append( ' ', offset ).Append( c.HasCKliEnvParameter ? "true," : "false," ).AppendLine();
+            b.Append( ' ', offset ).Append( c.IdxCKliEnvParameter ).Append( ',' ).AppendLine();
+            b.Append( ' ', offset ).Append( c.IdxCmdLineParameter ).Append( ',' ).AppendLine();
 
-            // Arguments
+            // Arguments (empty for CommandLineArguments call but we use the same generation code).
             b.Append( ' ', offset ).Append( "arguments: [" ).AppendLine();
             offset += 4;
             foreach( var a in c.Arguments )
@@ -255,11 +259,11 @@ sealed partial class ReflectionPluginCollector
             }
             offset -= 4;
             b.Append( ' ', offset ).Append( "]," ).AppendLine();
-            // Options
+            // Options (empty for CommandLineArguments call but we use the same generation code).
             b.Append( ' ', offset ).Append( "options: [" ).AppendLine();
             DumpOptions( b, offset + 4, c.Options );
             b.Append( ' ', offset ).Append( "]," ).AppendLine();
-            // Flags
+            // Flags (empty for CommandLineArguments call but we use the same generation code).
             b.Append( ' ', offset ).Append( "flags: [" ).AppendLine();
             DumpFlags( b, offset + 4, c.Flags );
             b.Append( ' ', offset ).Append( "]," ).AppendLine();
@@ -270,40 +274,13 @@ sealed partial class ReflectionPluginCollector
                                    .AppendLine();
             b.Append( ' ', offset ).Append( '{' ).AppendLine();
             offset += 4;
-
-            for( int i = 0; i < c.Arguments.Length; i++ )
+            if( c.IdxCmdLineParameter != -1 )
             {
-                b.Append( ' ', offset ).Append( "var a" ).Append( i ).Append( " = cmdLine.EatArgument();" ).AppendLine();
+                GenerateCallWithCommandLine( b, c, offset );
             }
-            for( int i = 0; i < c.Options.Length; i++ )
+            else
             {
-                b.Append( ' ', offset ).Append( "var o" ).Append( i ).Append( " = cmdLine.Eat" )
-                                       .Append( c.Options[i].Multiple ? "Multiple" : "Single" )
-                                       .Append( "Option( Options[" ).Append( i ).Append( "].Names );" ).AppendLine();
-            }
-            for( int i = 0; i < c.Flags.Length; i++ )
-            {
-                b.Append( ' ', offset ).Append( "var f" ).Append( i ).Append( " = cmdLine.EatFlag( Flags[" ).Append( i ).Append( "].Names );" ).AppendLine();
-            }
-            b.Append( ' ', offset ).Append( "if( !cmdLine.Close( monitor ) ) return ValueTask.FromResult( false );" ).AppendLine();
-
-            b.Append( ' ', offset ).Append( "return " );
-            switch( c.ReturnType )
-            {
-                case MethodAsyncReturn.None:
-                    b.Append( "ValueTask.FromResult( " );
-                    GenerateCall( b, offset + 35, c );
-                    b.Append( " );" );
-                    break;
-                case MethodAsyncReturn.ValueTask:
-                    GenerateCall( b, offset + 10, c );
-                    break;
-                default:
-                    Throw.DebugAssert( c.ReturnType == MethodAsyncReturn.Task );
-                    b.Append( "new ValueTask<bool>( " );
-                    GenerateCall( b, offset + 35, c );
-                    b.Append( " );" );
-                    break;
+                GenerateCallWithArguments( b, c, offset );
             }
             offset -= 4;
             b.AppendLine().Append( ' ', offset ).Append( '}' ).AppendLine();
@@ -338,29 +315,110 @@ sealed partial class ReflectionPluginCollector
                 }
             }
 
-            static void GenerateCall( StringBuilder b, int offset, PluginCommand c )
+            static void GenerateCallWithCommandLine( StringBuilder b, PluginCommand c, int offset )
             {
-                b.Append( "((" ).Append( c.PluginTypeInfo.TypeName ).Append( ")Instance)." ).Append( c.MethodName ).Append( '(' ).AppendLine();
-                b.Append( ' ', offset ).Append( "monitor" );
-                if( c.HasCKliEnvParameter )
+                b.Append( ' ', offset ).Append( "return " );
+                switch( c.ReturnType )
                 {
-                    b.Append( ", context" );
+                    case MethodAsyncReturn.None:
+                        b.Append( "ValueTask.FromResult( " );
+                        GenerateCommandLineCall( b, c );
+                        b.Append( " );" );
+                        break;
+                    case MethodAsyncReturn.ValueTask:
+                        GenerateCommandLineCall( b, c );
+                        break;
+                    default:
+                        Throw.DebugAssert( c.ReturnType == MethodAsyncReturn.Task );
+                        b.Append( "new ValueTask<bool>( " );
+                        GenerateCommandLineCall( b, c );
+                        b.Append( " );" );
+                        break;
                 }
+
+                static void GenerateCommandLineCall( StringBuilder b, PluginCommand c )
+                {
+                    b.Append( "((" ).Append( c.PluginTypeInfo.TypeName ).Append( ")Instance)." ).Append( c.MethodName )
+                     .Append( "( monitor, " );
+
+                    if( c.IdxCKliEnvParameter == 1 )
+                    {
+                        Throw.DebugAssert( c.IdxCmdLineParameter == 2 );
+                        b.Append( "context, cmdLine" );
+                    }
+                    else
+                    {
+                        b.Append( "cmdLine" );
+                        if( c.IdxCKliEnvParameter == 2 )
+                        {
+                            b.Append( ", context" );
+                        }
+                    }
+                    b.Append( " )" );
+                }
+            }
+
+            static void GenerateCallWithArguments( StringBuilder b, PluginCommand c, int offset )
+            {
                 for( int i = 0; i < c.Arguments.Length; i++ )
                 {
-                    b.Append( ", a" ).Append( i );
+                    b.Append( ' ', offset ).Append( "var a" ).Append( i ).Append( " = cmdLine.EatArgument();" ).AppendLine();
                 }
                 for( int i = 0; i < c.Options.Length; i++ )
                 {
-                    b.Append( ", o" ).Append( i );
+                    b.Append( ' ', offset ).Append( "var o" ).Append( i ).Append( " = cmdLine.Eat" )
+                                           .Append( c.Options[i].Multiple ? "Multiple" : "Single" )
+                                           .Append( "Option( Options[" ).Append( i ).Append( "].Names );" ).AppendLine();
                 }
                 for( int i = 0; i < c.Flags.Length; i++ )
                 {
-                    b.Append( ", f" ).Append( i );
+                    b.Append( ' ', offset ).Append( "var f" ).Append( i ).Append( " = cmdLine.EatFlag( Flags[" ).Append( i ).Append( "].Names );" ).AppendLine();
                 }
-                b.Append( " )" );
-            }
+                b.Append( ' ', offset ).Append( "if( !cmdLine.Close( monitor ) ) return ValueTask.FromResult( false );" ).AppendLine();
+                b.Append( ' ', offset ).Append( "return " );
+                switch( c.ReturnType )
+                {
+                    case MethodAsyncReturn.None:
+                        b.Append( "ValueTask.FromResult( " );
+                        GenerateCall( b, offset + 35, c );
+                        b.Append( " );" );
+                        break;
+                    case MethodAsyncReturn.ValueTask:
+                        GenerateCall( b, offset + 10, c );
+                        break;
+                    default:
+                        Throw.DebugAssert( c.ReturnType == MethodAsyncReturn.Task );
+                        b.Append( "new ValueTask<bool>( " );
+                        GenerateCall( b, offset + 35, c );
+                        b.Append( " );" );
+                        break;
+                }
 
+                static void GenerateCall( StringBuilder b, int offset, PluginCommand c )
+                {
+                    b.Append( "((" ).Append( c.PluginTypeInfo.TypeName ).Append( ")Instance)." ).Append( c.MethodName ).Append( '(' ).AppendLine();
+                    b.Append( ' ', offset ).Append( "monitor" );
+                    if( c.IdxCKliEnvParameter != -1 )
+                    {
+                        Throw.DebugAssert( c.IdxCKliEnvParameter == 1 );
+                        b.Append( ", context" );
+                    }
+                    for( int i = 0; i < c.Arguments.Length; i++ )
+                    {
+                        b.Append( ", a" ).Append( i );
+                    }
+                    for( int i = 0; i < c.Options.Length; i++ )
+                    {
+                        b.Append( ", o" ).Append( i );
+                    }
+                    for( int i = 0; i < c.Flags.Length; i++ )
+                    {
+                        b.Append( ", f" ).Append( i );
+                    }
+                    b.Append( " )" );
+                }
+
+            }
         }
 
         static StringBuilder AppendSourceString( StringBuilder b, string s )

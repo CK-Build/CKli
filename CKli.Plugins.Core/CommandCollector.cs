@@ -63,19 +63,51 @@ sealed partial class CommandCollector
                 Throw.CKException( $"Invalid command method '{typeInfo.TypeName}.{method.Name}': a command method must return a boolean, a ValueTask<bool> or a Task<bool>." );
             }
         }
+        int idxCKliEnvParameter = -1;
+        int idxCmdLineParameter = -1;
+        int iP = 1;
+        while( iP < parameters.Length && iP < 3 )
+        {
+            var pType = parameters[iP].ParameterType;
+            if( pType == typeof( CKliEnv ) )
+            {
+                if( idxCKliEnvParameter >= 0 )
+                {
+                    Throw.CKException( $"Duplicate CKliEnv {parameters[iP].Name}' in command method '{typeInfo.TypeName}.{method.Name}'." );
+                }
+                idxCKliEnvParameter = iP++;
+            }
+            else if( pType == typeof( CommandLineArguments ) )
+            {
+                if( idxCmdLineParameter >= 0 )
+                {
+                    Throw.CKException( $"Duplicate CommandLineArguments {parameters[iP].Name}' in command method '{typeInfo.TypeName}.{method.Name}'." );
+                }
+                idxCmdLineParameter = iP++;
+            }
+            else
+            {
+                break;
+            }
+        }
+        if( idxCmdLineParameter != -1 && iP < parameters.Length )
+        {
+            Throw.CKException( $"""
+                Invalid command signature for method '{typeInfo.TypeName}.{method.Name}'.
+                When CommandLineArguments is used, the only other possible parameter is the CKliEnv context.  
+                """ );
+        }
+#if DEBUG
+        if( idxCmdLineParameter != -1 )
+        {
+            Throw.DebugAssert( idxCmdLineParameter is 1 or 2 );
+            Throw.DebugAssert( idxCKliEnvParameter != idxCmdLineParameter );
+        }
+#endif
+
         var arguments = ImmutableArray.CreateBuilder<(string Name, string Description)>();
         var options = ImmutableArray.CreateBuilder<(ImmutableArray<string> Names, string Description, bool Multiple)>();
         var flags = ImmutableArray.CreateBuilder<(ImmutableArray<string> Names, string Description)>();
-        bool hasCKliEnvParameter = false;
-        int iP = 1;
-        if( parameters.Length > 1 )
-        {
-            if( parameters[1].ParameterType == typeof( CKliEnv ) )
-            {
-                hasCKliEnvParameter = true;
-                iP = 2;
-            }
-        }
         // Arguments: Eats strings until they become optional,
         // or until an array of strings is found,
         // or a boolean is found.
@@ -118,7 +150,7 @@ sealed partial class CommandCollector
                 break;
             }
         }
-        // Flags: Eats booleans.
+        // Flags: Eats Booleans.
         for( ;  iP < parameters.Length; iP++ )
         {
             var p = parameters[iP];
@@ -131,7 +163,8 @@ sealed partial class CommandCollector
         var cmd = new ReflectionPluginCommand( typeInfo,
                                                commandPath,
                                                description,
-                                               hasCKliEnvParameter,
+                                               idxCKliEnvParameter,
+                                               idxCmdLineParameter,
                                                arguments.DrainToImmutable(),
                                                options.DrainToImmutable(),
                                                flags.DrainToImmutable(),
