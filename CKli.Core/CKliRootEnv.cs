@@ -330,7 +330,12 @@ public static partial class CKliRootEnv
     public static Mutex AcquireAppMutex( IActivityMonitor? monitor )
     {
         CheckInitialized();
-        var mutex = new Mutex( true, _appLocalDataPath, out var acquired );
+        // On Linux, named mutexes are implemented using named semaphores.
+        // Their names cannot contain slashes and must start with a leading slash (or it is implementation-defined).
+        // .NET handles the leading slash if it's missing, but it doesn't handle internal slashes.
+        // See: https://man7.org/linux/man-pages/man7/sem_overview.7.html
+        var mutexName = "Global\\" + _appLocalDataPath.ToString().Replace( Path.DirectorySeparatorChar, '_' ).Replace( ':', '_' );
+        var mutex = new Mutex( true, mutexName, out var acquired );
         if( !acquired )
         {
             var msg = $"Waiting for the '{_appLocalDataPath}' mutex to be released.";
