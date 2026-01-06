@@ -27,10 +27,11 @@ static partial class TestEnv
 
         public Uri GetUriFor( string repositoryName )
         {
-            var safe = _repositoryNames.Contains( repositoryName )
-                            ? $"file:///{_barePath}/{_name}/{repositoryName}"
-                            : $"file:///Missing '{repositoryName}' repository in '{_name}' remotes";
-            return new Uri( safe, UriKind.Absolute );
+            if( _repositoryNames.Contains( repositoryName ) )
+            {
+                return new Uri( _barePath.AppendPart( _name ).AppendPart( repositoryName ) );
+            }
+            return new Uri( "file:///Missing '" + repositoryName + "' repository in '" + _name + "' remotes" );
         }
 
         public override string ToString() => $"{_name} - {_repositoryNames.Length} repositories";

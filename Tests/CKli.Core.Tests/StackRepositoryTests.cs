@@ -1,3 +1,4 @@
+using System;
 using CK.Core;
 using NUnit.Framework;
 using Shouldly;
@@ -298,13 +299,12 @@ public class StackRepositoryTests
         var display = (StringScreen)context.Screen;
         var remotes = TestEnv.OpenRemotes( "CKt" );
 
-        var stackUrl = remotes.StackUri.ToString();
-        stackUrl.ShouldStartWith( "file:///" );
-        stackUrl = stackUrl.Substring( 8 ).ToLowerInvariant();
+        var stackUrl = remotes.StackUri.LocalPath;
+        stackUrl = stackUrl.ToLowerInvariant();
         Assume.That( Directory.Exists( stackUrl ), "This test can only run on case insensitive file system." );
 
         // ckli clone ...ckt-stack
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", "file:///" + stackUrl )).ShouldBeTrue();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", new Uri( stackUrl ) )).ShouldBeTrue();
 
         var folders = Directory.EnumerateDirectories( context.CurrentDirectory )
             .Select( path => Path.GetFileName( path ) )
