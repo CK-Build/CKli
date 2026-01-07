@@ -78,6 +78,7 @@ public sealed partial class World
     // This caches the Repo (and its GitRepository) by uri and path as string and case insensitively.
     // This enables to cache the Repo even with case mismatch (that FixLayout will fix).
     readonly Dictionary<string, Repo?> _cachedRepositories;
+    readonly Dictionary<RandomId, Repo> _ckliRepoIndex;
     Repo[]? _allRepositories;
     Repo? _firstRepo;
 
@@ -95,6 +96,7 @@ public sealed partial class World
         _layout = layout;
         _pluginMachinery = pluginMachinery;
         _cachedRepositories = new Dictionary<string, Repo?>( layout.Count, StringComparer.OrdinalIgnoreCase );
+        _ckliRepoIndex = new Dictionary<RandomId, Repo>( layout.Count );
         FillCachedRepositories();
         _events = new WorldEvents();
     }
@@ -217,20 +219,11 @@ public sealed partial class World
     public WorldEvents Events => _events;
 
     /// <summary>
-    /// Finds a Repo among the already loaded ones by it <see cref="Repo.CKliRepoId"/>.
+    /// Finds a Repo among the already loaded ones by its <see cref="Repo.CKliRepoId"/>.
     /// </summary>
-    /// <param name="id"></param>
-    /// <returns></returns>
-    public Repo? FindByCKliRepoId( RandomId id )
-    {
-        var r = _firstRepo;
-        while( r != null )
-        {
-            if( r.CKliRepoId == id ) return r;
-            r = r._nextRepo;
-        }
-        return null;
-    }
+    /// <param name="id">The repository identifier.</param>
+    /// <returns>The Repo or null.</returns>
+    public Repo? FindByCKliRepoId( RandomId id ) => _ckliRepoIndex.GetValueOrDefault( id );
 
     /// <summary>
     /// Gets whether a full path or a origin url is defined in this <see cref="Layout"/>.
@@ -319,6 +312,12 @@ public sealed partial class World
         }
         return result;
     }
+
+    /// <summary>
+    /// Gets whether all the <see cref="Repo"/> are loaded: <see cref="GetAllDefinedRepo(IActivityMonitor)"/>
+    /// has been called at least once.
+    /// </summary>
+    public bool IsAllRepoLoaded => _allRepositories != null;
 
     /// <summary>
     /// Tries to load all the <see cref="Repo"/> in the <see cref="Layout"/>.
@@ -435,6 +434,7 @@ public sealed partial class World
         _firstRepo = repo;
         _cachedRepositories[repository.WorkingFolder] = repo;
         _cachedRepositories[repository.OriginUrl.ToString()] = repo;
+        _ckliRepoIndex.Add( repoId, repo );
         return repo;
 
         static bool TryReadCKliRepoTag( IActivityMonitor monitor,

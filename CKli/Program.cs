@@ -10,7 +10,7 @@ var arguments = new CommandLineArguments( args );
 
 if( arguments.HasCKliDebugFlag )
 {
-    if( !Debugger.IsAttached ) Debugger.Launch();
+    Debugger.Launch();
 }
 
 // Sets the Environment.CurrentDirectory before CKliRootEnv.Initialize().

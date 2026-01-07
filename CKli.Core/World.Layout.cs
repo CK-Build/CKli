@@ -134,6 +134,7 @@ sealed partial class World
         if( _name.Stack.Commit( monitor, $"Added repository '{folderPath.LastPart}'." ) )
         {
             _cachedRepositories.Clear();
+            _ckliRepoIndex.Clear();
             FillCachedRepositories();
             return true;
         }
@@ -172,6 +173,7 @@ sealed partial class World
                 if( _name.Stack.Commit( monitor, $"Removed repository '{path.LastPart}' ({url})." ) )
                 {
                     _cachedRepositories.Clear();
+                    _ckliRepoIndex.Clear();
                     FillCachedRepositories();
                     return true;
                 }
