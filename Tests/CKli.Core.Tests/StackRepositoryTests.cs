@@ -318,8 +318,10 @@ public class StackRepositoryTests
         display.Clear();
         // ckli repo list
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo", "list" )).ShouldBeTrue();
-        display.ToString().ShouldBe( """
-            ··CK-Core-Projects/CKt-Core·master·↑0↓0·file:///c:/dev/ckli/tests/ckli.core.tests/remotes/bare/ckt/CKt-Core·
+        // The repo URL uses the lowercased stack path (from the clone URL) + the repo name.
+        var expectedRepoUrl = new Uri( Path.GetDirectoryName( stackUrl )! + "/CKt-Core" );
+        display.ToString().ShouldBe( $"""
+            ··CK-Core-Projects/CKt-Core·master·↑0↓0·{expectedRepoUrl}·
             ❰✓❱
 
             """.Replace( '·', ' ' ) );
