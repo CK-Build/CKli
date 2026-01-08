@@ -55,6 +55,7 @@ sealed class CKliExec : Command
             {
                 return false;
             }
+            bool success = true;
             foreach( var repo in repos )
             {
                 using( monitor.OpenTrace( $"Executing '{processName} {arguments}' in '{repo.DisplayPath}'." ) )
@@ -62,16 +63,12 @@ sealed class CKliExec : Command
                     var exitCode = ProcessRunner.RunProcess( monitor.ParallelLogger, processName, arguments, repo.WorkingFolder, null );
                     if( exitCode != 0 )
                     {
-                        var msg = $"'{processName}' failed in Repo '{repo.DisplayPath}' with exit code {exitCode}. Use 'ckli log' to see the logs.";
-                        if( continueOnError )
+                        monitor.Error( $"'{processName}' failed in Repo '{repo.DisplayPath}' with exit code {exitCode}. Use 'ckli log' to see the logs." );
+                        if( !continueOnError )
                         {
-                            monitor.Warn( msg );
-                        }
-                        else
-                        {
-                            monitor.Error( msg );
                             return false;
                         }
+                        success = false;
                     }
                     else
                     {
@@ -80,7 +77,7 @@ sealed class CKliExec : Command
                 }
             }
             // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
-            return stack.Close( monitor );
+            return stack.Close( monitor ) && success;
         }
         finally
         {
