@@ -387,6 +387,7 @@ public sealed partial class World
         {
             var repository = GitRepository.Open( monitor,
                                                  _stackRepository.SecretsStore,
+                                                 _stackRepository.Context.Committer,
                                                  p,
                                                  p.RemoveFirstPart( _name.WorldRoot.Parts.Count ),
                                                  _stackRepository.IsPublic );
@@ -407,6 +408,7 @@ public sealed partial class World
                 {
                     var repository = GitRepository.Open( monitor,
                                                          _stackRepository.SecretsStore,
+                                                         _stackRepository.Context.Committer,
                                                          p,
                                                          p.RemoveFirstPart( _name.WorldRoot.Parts.Count ),
                                                          _stackRepository.IsPublic );
@@ -428,7 +430,7 @@ public sealed partial class World
             {
                 repoId = RandomId.CreateRandom();
             }
-            CreateOrUpdateCKliRepoTag( repository.Repository, _stackRepository, repoId );
+            CreateOrUpdateCKliRepoTag( repository, _stackRepository, repoId );
         }
         Repo? repo = new Repo( this, repository, _layout[index].XElement, index, repoId, _firstRepo );
         _firstRepo = repo;
@@ -483,9 +485,10 @@ public sealed partial class World
 
         }
 
-        static void CreateOrUpdateCKliRepoTag( Repository r, StackRepository stackRepository, RandomId repoId )
+        static void CreateOrUpdateCKliRepoTag( GitRepository repo, StackRepository stackRepository, RandomId repoId )
         {
-            r.Tags.Add( "ckli-repo", r.Head.Tip, stackRepository.Context.Committer, $"""
+            var r = repo.Repository;
+            r.Tags.Add( "ckli-repo", r.Head.Tip, repo.Committer, $"""
                 Id: {repoId}
                 Stack: {stackRepository.OriginUrl}
 

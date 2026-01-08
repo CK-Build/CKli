@@ -196,7 +196,7 @@ public sealed partial class GitTagInfo
             }
             if( _remote.InvalidTags.Length > 0 )
             {
-                display = display.AddBelow( _local.InvalidTagsToRenderable( s, "remote ignored tags" ) );
+                display = display.AddBelow( _remote.InvalidTagsToRenderable( s, "remote ignored tags" ) );
             }
             if( _stats._conflictCount > 0 )
             {

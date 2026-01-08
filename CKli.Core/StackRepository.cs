@@ -55,8 +55,8 @@ public sealed partial class StackRepository : IDisposable
 
     /// <summary>
     /// Internal access to the CKliEnv: this is only used to obtain the <see cref="CKliEnv.Committer"/> when
-    /// initializing "ckli-repo" tag. CKliEnv must be parameter injected everywhere it is needed for better
-    /// maintanability.
+    /// initializing new repositories. CKliEnv must be parameter injected everywhere it is needed for better
+    /// maintainability.
     /// </summary>
     internal CKliEnv Context => _context;
 
@@ -294,6 +294,7 @@ public sealed partial class StackRepository : IDisposable
         var isPublic = gitPath.LastPart == PublicStackName;
         var git = GitRepository.Open( monitor,
                                       context.SecretsStore,
+                                      context.Committer,
                                       gitPath,
                                       gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ),
                                       isPublic );
@@ -315,7 +316,7 @@ public sealed partial class StackRepository : IDisposable
                     monitor.Error( $"Stack folder '{stackRoot.LastPart}' must be '{stackNameFromUrl}' or '{DuplicatePrefix}{stackNameFromUrl}' (case insensitive) since repository Url is '{git.OriginUrl}'." );
                     error = true;
                 }
-                if( !error && git.SetCurrentBranch( monitor, stackBranchName, skipPullStack ) )
+                if( !error && git.Checkout( monitor, stackBranchName, skipPullStack ) )
                 {
                     return new StackRepository( git, stackRoot, context, stackNameFromUrl );
                 }
@@ -517,6 +518,7 @@ public sealed partial class StackRepository : IDisposable
         var stackGitKey = new GitRepositoryKey( context.SecretsStore, url, isPublic );
         var git = GitRepository.Clone( monitor,
                                        stackGitKey,
+                                       context.Committer,
                                        gitPath,
                                        gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ) );
         if( git != null )
@@ -524,7 +526,7 @@ public sealed partial class StackRepository : IDisposable
             // Before doing anything else, we read the definition file and extract the actual
             // world name with the right casing. If case differ, the git handle is disposed,
             // the folder name is fixed and a new git handle is acquired.
-            if( git.SetCurrentBranch( monitor, stackBranchName, skipPullMerge: true )
+            if( git.Checkout( monitor, stackBranchName, skipFetchMerge: true )
                 && GetActualStackName( monitor, git, stackNameFromUrl, out var actualStackName ) )
             {
                 if( actualStackName != stackNameFromUrl )

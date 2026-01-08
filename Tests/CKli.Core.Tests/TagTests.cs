@@ -215,12 +215,14 @@ public partial class TagTests
         var timPath = context.CurrentDirectory.AppendPart( "Tim" );
         using var tim = GitRepository.Clone( TestHelper.Monitor,
                                              new GitRepositoryKey( context.SecretsStore, remoteUrl, true ),
+                                             context.Committer,
                                              timPath,
                                              timPath.LastPart ).ShouldNotBeNull();
 
         var bobPath = context.CurrentDirectory.AppendPart( "Bob" );
         using var bob = GitRepository.Clone( TestHelper.Monitor,
                                              new GitRepositoryKey( context.SecretsStore, remoteUrl, true ),
+                                             context.Committer,
                                              bobPath,
                                              bobPath.LastPart ).ShouldNotBeNull();
 
@@ -347,8 +349,8 @@ public partial class TagTests
         Should.NotThrow( () => tim.PullTags( TestHelper.Monitor, ["t1-lightweight"] ).ShouldBeTrue() );
 
         // Tim & Bob create the same "v4" tag but on 2 different commits.
-        tim.SetCurrentBranch( TestHelper.Monitor, "branch1" ).ShouldBeTrue();
-        bob.SetCurrentBranch( TestHelper.Monitor, "branch2" ).ShouldBeTrue();
+        tim.Checkout( TestHelper.Monitor, "branch1" ).ShouldBeTrue();
+        bob.Checkout( TestHelper.Monitor, "branch2" ).ShouldBeTrue();
         tim.Repository.ApplyTag( "v4" );
         bob.Repository.ApplyTag( "v4" );
         // As long as these tags remain local, everything is fine.

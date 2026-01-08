@@ -20,8 +20,10 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     readonly Repository _git;
     readonly NormalizedPath _displayPath;
     readonly NormalizedPath _workingFolder;
+    Signature _committer;
 
     GitRepository( GitRepositoryKey repositoryKey,
+                   Signature committer,
                    Repository libRepository,
                    in NormalizedPath fullPath,
                    in NormalizedPath displayPath )
@@ -30,6 +32,7 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
         Throw.CheckNotNullArgument( libRepository );
 
         _repositoryKey = repositoryKey;
+        _committer = committer;
         _git = libRepository;
         _workingFolder = fullPath;
         _displayPath = displayPath;
@@ -76,6 +79,19 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// Gets the git provider kind.
     /// </summary>
     public KnownGitProvider KnownGitProvider => _repositoryKey.KnownGitProvider;
+
+    /// <summary>
+    /// Gets or sets the signature to use when modifying this repository.
+    /// </summary>
+    public Signature Committer
+    {
+        get => _committer;
+        set
+        {
+            Throw.CheckNotNullArgument( value );
+            _committer = value;
+        }
+    }
 
     /// <summary>
     /// Gets the head information.
@@ -253,7 +269,7 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// <para>
     /// If the branch is created, it will point at the same commit as the current <see cref="Head"/>.
     /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
-    /// Use <see cref="SetCurrentBranch(IActivityMonitor, string, bool)"/> to make sure that the potential remote 'origin' branch
+    /// Use <see cref="Checkout(IActivityMonitor, string, bool)"/> to make sure that the potential remote 'origin' branch
     /// is fetched if it exists.
     /// </para>
     /// </summary>
@@ -314,14 +330,14 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     ///     <item>If the current branch name is <paramref name="branchName"/>, does nothing.</item>
     ///     <item>Otherwise, the working folder must be clean (<see cref="CheckCleanCommit(IActivityMonitor)"/>).</item>
     ///     <item>If the local branch doesn't exist yet, all branches from 'origin' are fetched, a tracking local branch is created if the remote branch exists and it is checked out.</item>
-    ///     <item>If the local branch already exists, it is checked out and pulled-merge from the remote unless <paramref name="skipPullMerge"/> is true.</item>
+    ///     <item>If the local branch already exists, it is checked out and pulled-merge from the remote unless <paramref name="skipFetchMerge"/> is true.</item>
     /// </list>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="branchName">The branch name.</param>
-    /// <param name="skipPullMerge">True to not pull-merge the branch if it exists locally.</param>
+    /// <param name="skipFetchMerge">True to not fetch-merge the branch if it exists locally.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool SetCurrentBranch( IActivityMonitor monitor, string branchName, bool skipPullMerge = false )
+    public bool Checkout( IActivityMonitor monitor, string branchName, bool skipFetchMerge = false )
     {
         if( CurrentBranchName == branchName ) return true;
         try
@@ -337,11 +353,11 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
                 b = DoEnsureBranch( monitor, _git, branchName, LogLevel.Warn, _displayPath, out bool localCreated );
                 // Either the branch has been created from its remote fetched branch, or it has been created
                 // as a local branch (as there's no remote branch): in both cases, we can skip the pull.
-                skipPullMerge = true;
+                skipFetchMerge = true;
             }
             monitor.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
             Commands.Checkout( _git, b );
-            return skipPullMerge || Pull( monitor, MergeFileFavor.Normal ).IsSuccess();
+            return skipFetchMerge || FetchMerge( monitor, MergeFileFavor.Normal ).IsSuccess();
         }
         catch( Exception ex )
         {
@@ -351,9 +367,9 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     }
 
     bool GetRemote( IActivityMonitor monitor,
-                string remoteName,
-                [NotNullWhen( true )] out Remote? remote,
-                out UsernamePasswordCredentials? creds )
+                    string remoteName,
+                    [NotNullWhen( true )] out Remote? remote,
+                    out UsernamePasswordCredentials? creds )
     {
         if( !_repositoryKey.GetReadCredentials( monitor, out creds ) )
         {
@@ -373,8 +389,15 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
-    /// Fetch-Merge the current head from its tracked remote branch. Any merge conflict is an error with <see cref="MergeFileFavor.Normal"/> and this is the
-    /// safest mode. Choosing one of other flavors will not trigger a conflict error.
+    /// Fetch-Merges (pulls) the current head from its tracked remote branch.
+    /// Any merge conflict is an error with <see cref="MergeFileFavor.Normal"/> and this is the safest mode.
+    /// Choosing one of other flavors will not trigger a conflict error.
+    /// <para>
+    /// Tags that point to the remote branch will be retrieved and will replace locally defined tags if they point
+    /// to the same object. If a local tag points to a different object, this will be an error.
+    /// To prevent this, <see cref="GetDiffTags(IActivityMonitor, out GitTagInfo.Diff?, string)"/> can be used
+    /// to handle conflicting tags before calling this method.
+    /// </para>
     /// <para>
     /// If the current head has no associated tracking branch, nothing is done. 
     /// </para>
@@ -383,9 +406,9 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// <param name="mergeFileFavor">How merge must be done.</param>
     /// <param name="fastForwardStrategy">The fast forward strategy to apply.</param>
     /// <returns>A MergeResult: both <see cref="MergeResult.Error"/> and <see cref="MergeResult.ErrorConflicts"/> are failures.</returns>
-    public MergeResult Pull( IActivityMonitor monitor,
-                             MergeFileFavor mergeFileFavor = MergeFileFavor.Normal,
-                             FastForwardStrategy fastForwardStrategy = FastForwardStrategy.Default )
+    public MergeResult FetchMerge( IActivityMonitor monitor,
+                                  MergeFileFavor mergeFileFavor = MergeFileFavor.Normal,
+                                  FastForwardStrategy fastForwardStrategy = FastForwardStrategy.Default )
     {
         if( _git.Head.TrackedBranch == null )
         {
@@ -395,14 +418,15 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
 
         if( !_repositoryKey.GetReadCredentials( monitor, out var creds ) ) return MergeResult.Error;
 
-        var merger = _git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
         try
         {
-            var result = Commands.Pull( _git, merger, new PullOptions
+            var result = Commands.Pull( _git, _committer, new PullOptions
             {
                 FetchOptions = new FetchOptions
                 {
-                    TagFetchMode = TagFetchMode.All,
+                    // We don't want ALL the tags (GIT_REMOTE_DOWNLOAD_TAGS_ALL), only the
+                    // tags that point to objects retrieved during this fetch (GIT_REMOTE_DOWNLOAD_TAGS_AUTO).
+                    TagFetchMode = TagFetchMode.Auto,
                     CredentialsProvider = (url, user, types) => creds
                 },
                 MergeOptions = new MergeOptions
@@ -484,7 +508,7 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
                 monitor.CloseGroup( "Working folder is up-to-date." );
                 return CommitResult.NoChanges;
             }
-            return DoCommit( monitor, commitMessage, DateTimeOffset.Now, false );
+            return DoCommit( monitor, commitMessage, _committer.When, false );
         }
     }
 
@@ -581,10 +605,9 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
             // Let AllowEmptyCommit even when amending: this avoids creating an empty commit.
             // If we are not amending, this is an error and we let the EmptyCommitException pops.
             var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
-            var committer = new Signature( "CKli", "none", date );
             try
             {
-                Commit commit = _git.Commit( commitMessage, author ?? committer, committer, options );
+                Commit commit = _git.Commit( commitMessage, author ?? _committer, _committer, options );
                 monitor.CloseGroup( "Committed changes." );
                 return amendPreviousCommit ? CommitResult.Amended : CommitResult.Commited;
             }
@@ -596,7 +619,7 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
                 _git.Reset( ResetMode.Hard, _git.Head.Tip.Parents.Single() );
                 Throw.DebugAssert( options.AmendPreviousCommit = true );
                 string sha = _git.Head.Tip.Sha;
-                _git.Commit( commitMessage, author, committer, options );
+                _git.Commit( commitMessage, author ?? _committer, _committer, options );
                 return sha == _git.Head.Tip.Sha ? CommitResult.NoChanges : CommitResult.Amended;
             }
         }
@@ -743,6 +766,7 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="committer">The signature to use when modifying the repository.</param>
     /// <param name="git">The Git key.</param>
     /// <param name="workingFolder">The local working folder.</param>
     /// <param name="displayPath">
@@ -752,17 +776,19 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// <returns>The GitRepository object or null on error.</returns>
     public static GitRepository? Clone( IActivityMonitor monitor,
                                         GitRepositoryKey git,
+                                        Signature committer,
                                         NormalizedPath workingFolder,
                                         NormalizedPath displayPath )
     {
         var r = CloneWorkingFolder( monitor, git, workingFolder );
-        return r == null ? null : new GitRepository( git, r, workingFolder, displayPath );
+        return r == null ? null : new GitRepository( git, committer, r, workingFolder, displayPath );
     }
 
     /// <summary>
     /// Opens a working folder. The <paramref name="workingFolder"/> must exist otherwise an error is logged.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="committer">The signature to use when modifying the repository.</param>
     /// <param name="secretsStore">The key store to use.</param>
     /// <param name="workingFolder">The local working folder.</param>
     /// <param name="displayPath">
@@ -773,6 +799,7 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// <returns>The SimpleGitRepository object or null on error.</returns>
     public static GitRepository? Open( IActivityMonitor monitor,
                                        ISecretsStore secretsStore,
+                                       Signature committer,
                                        NormalizedPath workingFolder,
                                        NormalizedPath displayPath,
                                        bool isPublic )
@@ -781,7 +808,7 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
         if( r == null ) return null;
 
         var gitKey = new GitRepositoryKey( secretsStore, r.Value.OriginUrl, isPublic );
-        return new GitRepository( gitKey, r.Value.Repository, workingFolder, displayPath );
+        return new GitRepository( gitKey, committer, r.Value.Repository, workingFolder, displayPath );
     }
 
     /// <summary>

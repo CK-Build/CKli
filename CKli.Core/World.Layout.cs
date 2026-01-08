@@ -1,4 +1,5 @@
 using CK.Core;
+using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -211,7 +212,7 @@ sealed partial class World
             monitor.Error( "Error while fixing layout. This must be manually fixed." );
             return false;
         }
-        if( !ExecuteClones( monitor, this, actions, out newClones ) )
+        if( !ExecuteClones( monitor, this, _stackRepository.Context.Committer, actions, out newClones ) )
         {
             return false;
         }
@@ -236,6 +237,7 @@ sealed partial class World
 
         static bool ExecuteClones( IActivityMonitor monitor,
                                    World world,
+                                   Signature committer,
                                    List<LayoutAction> actions,
                                    [NotNullWhen( true )] out List<Repo>? newClones )
         {
@@ -246,7 +248,7 @@ sealed partial class World
                 Throw.DebugAssert( "Since we must Clone, the cached repository is missing.", world._cachedRepositories[c.Uri.ToString()] == null );
                 Throw.DebugAssert( "Since we must Clone, the cached repository is missing.", world._cachedRepositories[c.Path] == null );
                 var gitKey = new GitRepositoryKey( world._stackRepository.SecretsStore, c.Uri, world._stackRepository.IsPublic );
-                var cloned = GitRepository.Clone( monitor, gitKey, c.Path, c.Path.RemoveFirstPart( world.Name.WorldRoot.Parts.Count ) );
+                var cloned = GitRepository.Clone( monitor, gitKey, committer, c.Path, c.Path.RemoveFirstPart( world.Name.WorldRoot.Parts.Count ) );
                 if( cloned == null )
                 {
                     success = false;

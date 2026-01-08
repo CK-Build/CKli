@@ -3,7 +3,7 @@ using CK.Core;
 namespace CKli.Core;
 
 /// <summary>
-/// Result of a <see cref="GitRepository.Pull(IActivityMonitor, LibGit2Sharp.MergeFileFavor, LibGit2Sharp.FastForwardStrategy)"/>.
+/// Result of a <see cref="GitRepository.FetchMerge(IActivityMonitor, LibGit2Sharp.MergeFileFavor, LibGit2Sharp.FastForwardStrategy)"/>.
 /// </summary>
 public enum MergeResult
 {
