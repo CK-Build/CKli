@@ -54,7 +54,7 @@ sealed partial class CommandCollector
             {
                 retType = MethodAsyncReturn.ValueTask;
             }
-            else if( returnedType != typeof( Task<bool> ) )
+            else if( returnedType == typeof( Task<bool> ) )
             {
                 retType = MethodAsyncReturn.Task;
             }
