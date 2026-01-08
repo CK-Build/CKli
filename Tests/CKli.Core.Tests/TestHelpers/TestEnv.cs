@@ -66,7 +66,9 @@ static partial class TestEnv
         };
         var corePath = CopyMostRecentPackageToNuGetSource( "CKli.Core" );
         var pluginsPath = CopyMostRecentPackageToNuGetSource( "CKli.Plugins.Core" );
-        
+        NuGetHelper.ClearGlobalCache( TestHelper.Monitor, "CKli.Core", null );
+        NuGetHelper.ClearGlobalCache( TestHelper.Monitor, "CKli.Plugins.Core", null );
+
         foreach( var nuget in Directory.EnumerateFiles( _nugetSourcePath ) )
         {
             var p = new NormalizedPath( nuget );
@@ -104,7 +106,7 @@ static partial class TestEnv
 
         var zipPath = _remotesPath.AppendPart( "Remotes.zip" );
         var zipTime = File.GetLastWriteTimeUtc( zipPath );
-        if( !File.Exists( remoteIndexPath ) 
+        if( !File.Exists( remoteIndexPath )
             || File.GetLastWriteTimeUtc( remoteIndexPath ) != zipTime )
         {
             using( TestHelper.Monitor.OpenInfo( $"Last write time of 'Remotes/' differ from 'Remotes/Remotes.zip'. Restoring remotes from zip." ) )
@@ -116,7 +118,7 @@ static partial class TestEnv
                                .Select( l => l.Split( '/' ) )
                                .GroupBy( names => names[0], names => names[1] )
                                .Select( g => new RemotesCollection( g.Key, g.ToArray() ) )
-                               .ToDictionary( r => r.Name ); 
+                               .ToDictionary( r => r.Name );
 
         static void RestoreRemotesZipAndCreateBareRepositories( NormalizedPath remoteIndexPath, NormalizedPath zipPath, DateTime zipTime )
         {
@@ -280,7 +282,7 @@ static partial class TestEnv
         var v = version != null ? SVersion.Parse( version ) : _cKliPluginsCoreVersion;
 
         var path = _packagedPluginsPath.AppendPart( projectName );
-        var args = $"""pack -tl:off --no-dependencies -o "{_nugetSourcePath}" -c {TestHelper.BuildConfiguration} /p:IsPackable=true /p:Version={v}""";
+        var args = $"""pack -tl:off --no-dependencies -o "{_nugetSourcePath}" -c {TestHelper.BuildConfiguration} /p:IsPackable=true /p:Version={v} /p:RestoreAdditionalSources="{_nugetSourcePath}" """;
         using var _ = TestHelper.Monitor.OpenInfo( $"""
             Ensure plugin package '{projectName}':
             dotnet {args}

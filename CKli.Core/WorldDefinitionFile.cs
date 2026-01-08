@@ -558,7 +558,7 @@ public sealed class WorldDefinitionFile
                                     var candidate = world.Stack.LocalProxyRepositoriesPath.AppendPart( aUrl.Value );
                                     if( Directory.Exists( candidate ) )
                                     {
-                                        url = new Uri( "file:///" + candidate, UriKind.Absolute );
+                                        url = new Uri( candidate );
                                         monitor.Trace( $"Automatic Repository Proxy mapping of Url=\"{aUrl.Value}\" to '{url}'." );
                                     }
                                 }

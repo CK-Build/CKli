@@ -347,11 +347,11 @@ public class PluginTests
         display.Clear();
         // ckli issue
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue" )).ShouldBeTrue();
-        display.ToString().ShouldBe( """
+        display.ToString().Replace('\\','/').ShouldBe( """
             > EmptySolution (1)
             │ > ✋ Empty solution file.
             │ │ Ignoring 2 projects:
-            │ │ CodeCakeBuilder\CodeCakeBuilder.csproj, SomeJsApp\SomeJsApp.esproj
+            │ │ CodeCakeBuilder/CodeCakeBuilder.csproj, SomeJsApp/SomeJsApp.esproj
             > MissingSolution (1)
             │ > ✋ No solution found. Expecting 'MissingSolution.sln' (or '.slnx').
             > MultipleSolutions (1)
@@ -380,15 +380,15 @@ public class PluginTests
         context = context.ChangeDirectory( ".." );
         display.Clear();
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue" )).ShouldBeTrue();
-        display.ToString().ShouldBe( """
+        display.ToString().Replace('\\','/').ShouldBe( """
             > EmptySolution (1)
             │ > ✋ Empty solution file.
             │ │ Ignoring 2 projects:
-            │ │ CodeCakeBuilder\CodeCakeBuilder.csproj, SomeJsApp\SomeJsApp.esproj
+            │ │ CodeCakeBuilder/CodeCakeBuilder.csproj, SomeJsApp/SomeJsApp.esproj
             > MissingSolution (1)
             │ > ✋ No solution found. Expecting 'MissingSolution.sln' (or '.slnx').
             ❰✓❱
-            
+
             """ );
 
     }
