@@ -91,19 +91,7 @@ sealed class CKliPull : Command
             {
                 foreach( var repo in repos )
                 {
-                    var r = repo.GitRepository.Repository;
-                    foreach( var b in r.Branches )
-                    {
-                        var tracked = b.TrackedBranch;
-                        if( tracked != null
-                            && tracked.CanonicalName.StartsWith( "refs/remotes/", StringComparison.OrdinalIgnoreCase )
-                            && (fromAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.OrdinalIgnoreCase )) )
-                        {
-                            var refB = b;
-                            success &= repo.GitRepository.MergeTrackedBranch( monitor, ref refB );
-                            if( !success && !continueOnError ) break;
-                        }
-                    }
+                    success &= repo.GitRepository.MergeTrackedBranches( monitor, continueOnError, fromAllRemotes );
                 }
             }
         }

@@ -368,7 +368,11 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
                 monitor.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
                 Commands.Checkout( _git, b );
             }
-            return skipFetchMerge || FetchMerge( monitor ).IsSuccess();
+            if( skipFetchMerge || _git.Head.TrackedBranch == null )
+            {
+                return true;
+            }
+            return skipFetchMerge || FetchMergeHead( monitor );
         }
         catch( Exception ex )
         {
@@ -376,6 +380,75 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
             return false;
         }
     }
+
+    /// <summary>
+    /// Fetch-Merges (pulls) the current head from its tracked remote branch.
+    /// Any merge conflict is an error with <see cref="MergeFileFavor.Normal"/> and this is the safest mode.
+    /// Choosing one of other flavors will not trigger a conflict error.
+    /// <para>
+    /// Tags that point to the remote branch will be retrieved and will replace locally defined tags if they point
+    /// to the same object. If a local tag points to a different object, this will be an error.
+    /// To prevent this, <see cref="GetDiffTags(IActivityMonitor, out GitTagInfo.Diff?, string)"/> can be used
+    /// to handle conflicting tags before calling this method.
+    /// </para>
+    /// <para>
+    /// If the current head has no associated tracking branch, nothing is done. 
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="mergeFileFavor">How merge must be done.</param>
+    /// <param name="fastForwardStrategy">The fast forward strategy to apply.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool FetchMergeHead( IActivityMonitor monitor,
+                                MergeFileFavor mergeFileFavor = MergeFileFavor.Normal,
+                                FastForwardStrategy fastForwardStrategy = FastForwardStrategy.Default )
+    {
+        if( _git.Head.TrackedBranch == null )
+        {
+            monitor.Warn( $"There is no tracking branch for the '{DisplayPath}/{CurrentBranchName}' branch. Skip pulling from the remote." );
+            return true;
+        }
+
+        if( !_repositoryKey.GetReadCredentials( monitor, out var creds ) )
+        {
+            return false;
+        }
+
+        try
+        {
+            var result = Commands.Pull( _git, _committer, new PullOptions
+            {
+                FetchOptions = new FetchOptions
+                {
+                    // We don't want ALL the tags (GIT_REMOTE_DOWNLOAD_TAGS_ALL), only the
+                    // tags that point to objects retrieved during this fetch (GIT_REMOTE_DOWNLOAD_TAGS_AUTO).
+                    TagFetchMode = TagFetchMode.Auto,
+                    CredentialsProvider = ( url, user, types ) => creds
+                },
+                MergeOptions = new MergeOptions
+                {
+                    MergeFileFavor = mergeFileFavor,
+                    CommitOnSuccess = true,
+                    FailOnConflict = true,
+                    FastForwardStrategy = fastForwardStrategy,
+                    SkipReuc = true
+                }
+            } );
+            if( result.Status == MergeStatus.Conflicts )
+            {
+                monitor.Error( $"Unable to pumm '{DisplayPath}/{CurrentBranchName}'. Merge conflicts must be manually fixed." );
+                return false;
+            }
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While pulling from '{DisplayPath}/{CurrentBranchName}'.", ex );
+            return false;
+        }
+    }
+
+
 
     bool GetRemote( IActivityMonitor monitor,
                     string remoteName,
@@ -400,6 +473,31 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
+    /// Calls <see cref="MergeTrackedBranch(IActivityMonitor, ref Branch)"/> for each existing branch.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="continueOnError">True to continue on error.</param>
+    /// <param name="fromAllRemotes">True to consider all remotes, not only 'origin'.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public bool MergeTrackedBranches( IActivityMonitor monitor, bool continueOnError = false, bool fromAllRemotes = false )
+    {
+        bool success = true;
+        foreach( var b in _git.Branches )
+        {
+            var tracked = b.TrackedBranch;
+            if( tracked != null
+                && tracked.CanonicalName.StartsWith( "refs/remotes/", StringComparison.OrdinalIgnoreCase )
+                && (fromAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.OrdinalIgnoreCase )) )
+            {
+                var refB = b;
+                success &= MergeTrackedBranch( monitor, ref refB );
+                if( !success && !continueOnError ) break;
+            }
+        }
+        return success;
+    }
+
+    /// <summary>
     /// Merges the <see cref="Branch.TrackedBranch"/> into its tracking <paramref name="branch"/>.
     /// The branch's <see cref="Branch.IsTracking"/> must be true otherwise an <see cref="ArgumentException"/> is thrown.
     /// </summary>
@@ -413,6 +511,12 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
         if( branch.Tip.Sha == tracked.Tip.Sha )
         {
             return true;
+        }
+
+        bool isHead = branch.IsCurrentRepositoryHead;
+        if( isHead && !CheckCleanCommit( monitor ) )
+        {
+            return false;
         }
         Exception? exception = null;
         try
@@ -428,6 +532,10 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
                                                           prettifyMessage: true );
                 branch = _git.Branches.Add( branch.CanonicalName, c, allowOverwrite: true );
                 monitor.Trace( $"Branch '{tracked.FriendlyName}' has been merged into '{branch.FriendlyName}' in '{DisplayPath}'." );
+                if( isHead )
+                {
+                    Commands.Checkout( _git, branch );
+                }
                 return true;
             }
         }
@@ -437,76 +545,6 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
         }
         monitor.Error( $"Failed merging '{tracked.FriendlyName}' into '{branch.FriendlyName}' in '{DisplayPath}'.", exception );
         return false;
-    }
-
-    /// <summary>
-    /// Fetch-Merges (pulls) the current head from its tracked remote branch.
-    /// Any merge conflict is an error with <see cref="MergeFileFavor.Normal"/> and this is the safest mode.
-    /// Choosing one of other flavors will not trigger a conflict error.
-    /// <para>
-    /// Tags that point to the remote branch will be retrieved and will replace locally defined tags if they point
-    /// to the same object. If a local tag points to a different object, this will be an error.
-    /// To prevent this, <see cref="GetDiffTags(IActivityMonitor, out GitTagInfo.Diff?, string)"/> can be used
-    /// to handle conflicting tags before calling this method.
-    /// </para>
-    /// <para>
-    /// If the current head has no associated tracking branch, nothing is done. 
-    /// </para>
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="mergeFileFavor">How merge must be done.</param>
-    /// <param name="fastForwardStrategy">The fast forward strategy to apply.</param>
-    /// <returns>A MergeResult: both <see cref="MergeResult.Error"/> and <see cref="MergeResult.ErrorConflicts"/> are failures.</returns>
-    public MergeResult FetchMerge( IActivityMonitor monitor,
-                                  MergeFileFavor mergeFileFavor = MergeFileFavor.Normal,
-                                  FastForwardStrategy fastForwardStrategy = FastForwardStrategy.Default )
-    {
-        if( _git.Head.TrackedBranch == null )
-        {
-            monitor.Warn( $"There is no tracking branch for the '{DisplayPath}/{CurrentBranchName}' branch. Skip pulling from the remote." );
-            return MergeResult.UpToDate;
-        }
-
-        if( !_repositoryKey.GetReadCredentials( monitor, out var creds ) ) return MergeResult.Error;
-
-        try
-        {
-            var result = Commands.Pull( _git, _committer, new PullOptions
-            {
-                FetchOptions = new FetchOptions
-                {
-                    // We don't want ALL the tags (GIT_REMOTE_DOWNLOAD_TAGS_ALL), only the
-                    // tags that point to objects retrieved during this fetch (GIT_REMOTE_DOWNLOAD_TAGS_AUTO).
-                    TagFetchMode = TagFetchMode.Auto,
-                    CredentialsProvider = (url, user, types) => creds
-                },
-                MergeOptions = new MergeOptions
-                {
-                    MergeFileFavor = mergeFileFavor,
-                    CommitOnSuccess = true,
-                    FailOnConflict = true,
-                    FastForwardStrategy = fastForwardStrategy,
-                    SkipReuc = true
-                }
-            } );
-            if( result.Status == MergeStatus.Conflicts )
-            {
-                monitor.Error( "Merge conflicts occurred. Unable to merge changes from the remote." );
-                return MergeResult.ErrorConflicts;
-            }
-            return result.Status switch
-            {
-                MergeStatus.FastForward => MergeResult.FastForward,
-                MergeStatus.NonFastForward => MergeResult.NonFastForward,
-                MergeStatus.UpToDate => MergeResult.UpToDate,
-                _ => Throw.NotSupportedException<MergeResult>()
-            };
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( $"While pulling from '{DisplayPath}/{CurrentBranchName}'.", ex );
-            return MergeResult.Error;
-        }
     }
 
     /// <summary>
