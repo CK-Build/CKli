@@ -11,7 +11,23 @@ environment:
   CODECAKEBUILDER_SECRET_KEY:
     secure: 8VAzdXgUQaJyFoU3WLf2iPFV/8zPDm9qV4TfOpx8/rg=
 test: false
-install: []
+
+# Install .NET 10 SDK (not pre-installed on Visual Studio 2022 image which only has up to .NET 9)
+# Uses Microsoft's official dotnet-install.ps1 script
+# Documentation: https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-install-script
+# Script source: https://dot.net/v1/dotnet-install.ps1
+# Pre-installed software on AppVeyor images: https://www.appveyor.com/docs/windows-images-software/
+install:
+  - ps: |
+      Write-Host "Installing .NET 10 SDK..."
+      Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -UseBasicParsing -OutFile "$env:TEMP\dotnet-install.ps1"
+      # -Channel 10.0: Install latest SDK from the .NET 10 channel (auto-updates to latest 10.0.x)
+      # -InstallDir: Use existing dotnet installation directory
+      # -Architecture x64: Install 64-bit SDK
+      & "$env:TEMP\dotnet-install.ps1" -Channel 10.0 -InstallDir "$env:ProgramFiles\dotnet" -Architecture x64
+      Write-Host "Installed SDKs:"
+      dotnet --list-sdks
+
 build_script:
   - dotnet run --project CodeCakeBuilder -nointeraction
 on_finish:
