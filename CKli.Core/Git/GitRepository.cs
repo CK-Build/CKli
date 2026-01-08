@@ -267,7 +267,7 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// Ensures that a local branch exists. If a remote branch from the 'origin' remote is known locally
     /// it will be associated.
     /// <para>
-    /// If the branch is created, it will point at the same commit as the current <see cref="Head"/>.
+    /// If the branch is created without a remote, it will point at the same commit as the current <see cref="Head"/>.
     /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
     /// Use <see cref="Checkout(IActivityMonitor, string, bool)"/> to make sure that the potential remote 'origin' branch
     /// is fetched if it exists.
@@ -325,39 +325,50 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
-    /// Checks out the specified branch. 
+    /// Checks out the specified branch, creating it if it doesn't exist and by default fetch-merge from the remote if
+    /// it's a tracking branch.
     /// <list type="number">
-    ///     <item>If the current branch name is <paramref name="branchName"/>, does nothing.</item>
+    ///     <item>
+    ///     If the current branch name is <paramref name="branchName"/>, it is fetch-merged from the remote (unless <paramref name="skipFetchMerge"/>
+    ///     is true or it is not a tracking branch).
+    ///     </item>
     ///     <item>Otherwise, the working folder must be clean (<see cref="CheckCleanCommit(IActivityMonitor)"/>).</item>
-    ///     <item>If the local branch doesn't exist yet, all branches from 'origin' are fetched, a tracking local branch is created if the remote branch exists and it is checked out.</item>
-    ///     <item>If the local branch already exists, it is checked out and pulled-merge from the remote unless <paramref name="skipFetchMerge"/> is true.</item>
+    ///     <item>
+    ///     If the local branch already exists, it is checked out and fetch-merged from the remote (unless <paramref name="skipFetchMerge"/>
+    ///     is true or it is not a tracking branch).</item>
+    ///     <item>
+    ///     Else (the local branch doesn't exist), all branches from 'origin' are fetched, a local branch is created
+    ///     (an tracks its remote branch if it exists) and it is checked out.
+    ///     </item>
     /// </list>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="branchName">The branch name.</param>
-    /// <param name="skipFetchMerge">True to not fetch-merge the branch if it exists locally.</param>
+    /// <param name="skipFetchMerge">True to NOT fetch-merge the head once checked out.</param>
     /// <returns>True on success, false on error.</returns>
     public bool Checkout( IActivityMonitor monitor, string branchName, bool skipFetchMerge = false )
     {
-        if( CurrentBranchName == branchName ) return true;
         try
         {
-            if( !CheckCleanCommit( monitor ) ) return false;
-            var b = DoGetBranch( monitor, _git, branchName, LogLevel.None, _displayPath );
-            if( b == null )
+            if( CurrentBranchName != branchName )
             {
-                if( !FetchBranches( monitor, withTags: false, originOnly: true ) )
+                if( !CheckCleanCommit( monitor ) ) return false;
+                var b = DoGetBranch( monitor, _git, branchName, LogLevel.None, _displayPath );
+                if( b == null )
                 {
-                    return false;
+                    if( !FetchBranches( monitor, withTags: false, originOnly: true ) )
+                    {
+                        return false;
+                    }
+                    b = DoEnsureBranch( monitor, _git, branchName, LogLevel.Warn, _displayPath, out bool localCreated );
+                    // Either the branch has been created from its remote fetched branch, or it has been created
+                    // as a local branch (as there's no remote branch): in both cases, we can skip the pull.
+                    skipFetchMerge = true;
                 }
-                b = DoEnsureBranch( monitor, _git, branchName, LogLevel.Warn, _displayPath, out bool localCreated );
-                // Either the branch has been created from its remote fetched branch, or it has been created
-                // as a local branch (as there's no remote branch): in both cases, we can skip the pull.
-                skipFetchMerge = true;
+                monitor.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
+                Commands.Checkout( _git, b );
             }
-            monitor.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
-            Commands.Checkout( _git, b );
-            return skipFetchMerge || FetchMerge( monitor, MergeFileFavor.Normal ).IsSuccess();
+            return skipFetchMerge || FetchMerge( monitor ).IsSuccess();
         }
         catch( Exception ex )
         {
@@ -386,6 +397,46 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
             return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// Merges the <see cref="Branch.TrackedBranch"/> into its tracking <paramref name="branch"/>.
+    /// The branch's <see cref="Branch.IsTracking"/> must be true otherwise an <see cref="ArgumentException"/> is thrown.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="branch">The local branch. This is updated to the new Branch instance on success.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool MergeTrackedBranch( IActivityMonitor monitor, ref Branch branch )
+    {
+        Throw.CheckArgument( branch.TrackedBranch != null );
+        var tracked = branch.TrackedBranch;
+        if( branch.Tip.Sha == tracked.Tip.Sha )
+        {
+            return true;
+        }
+        Exception? exception = null;
+        try
+        {
+            var result = _git.ObjectDatabase.MergeCommits( branch.Tip, tracked.Tip, new MergeTreeOptions() { SkipReuc = true, FailOnConflict = true } );
+            if( result.Tree != null )
+            {
+                var c = _git.ObjectDatabase.CreateCommit( _committer,
+                                                          _committer,
+                                                          $"Merge branch '{tracked.FriendlyName}'.",
+                                                          result.Tree,
+                                                          [branch.Tip, tracked.Tip],
+                                                          prettifyMessage: true );
+                branch = _git.Branches.Add( branch.CanonicalName, c, allowOverwrite: true );
+                monitor.Trace( $"Branch '{tracked.FriendlyName}' has been merged into '{branch.FriendlyName}' in '{DisplayPath}'." );
+                return true;
+            }
+        }
+        catch( Exception ex )
+        {
+            exception = ex;
+        }
+        monitor.Error( $"Failed merging '{tracked.FriendlyName}' into '{branch.FriendlyName}' in '{DisplayPath}'.", exception );
+        return false;
     }
 
     /// <summary>

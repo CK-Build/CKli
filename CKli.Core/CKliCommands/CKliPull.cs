@@ -1,19 +1,19 @@
 using CK.Core;
 using CKli.Core;
+using LibGit2Sharp;
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace CKli;
 
-// Fetch is the way to go (along with manual merges).
-// See https://stackoverflow.com/questions/4318161/can-git-pull-all-update-all-my-local-branches
-// This is not easy to find a safe global pattern.
 sealed class CKliPull : Command
 {
     internal CKliPull()
         : base( null,
                 "pull",
                 """
-                Fetch-Merge the Repo's current head from its tracked remote branch on remote "origin".
+                Pulls the Stack repository and all Repo's local branches that track a remote branch.
                 Note that tags that point to the remote branches will be retrieved and will replace locally defined tags if they point
                 to the same object. If a local tag points to a different object, this will be an error.
                 To prevent this, use 'ckli tag list' to detect conflicts.
@@ -21,9 +21,10 @@ sealed class CKliPull : Command
                 [],
                 [],
                 [
-                    (["--all"], "Pulls all the Repos' current head of the current World (even if current path is in a Repo)."),
-                    (["--skip-pull-stack"], "Don't pull the Stack repository itself.")
-                ] )
+                    (["--all"], "Consider all the Repos' of the current World (even if current path is in a Repo)."),
+                    (["--from-all-remotes"], "Consider all available remotes, not only 'origin'."),
+                    (["--continue-on-error"], "Continues even on error. By default the first error stops the operation."),
+             ] )
     {
     }
 
@@ -32,18 +33,19 @@ sealed class CKliPull : Command
                                                                     CommandLineArguments cmdLine )
     {
         bool all = cmdLine.EatFlag( "--all" );
-        bool skipPullStack = cmdLine.EatFlag( "--skip-pull-stack" );
+        bool fromAllRemotes = cmdLine.EatFlag( "--fromAllRemotes" );
+        bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Pull( monitor, this, context, all, skipPullStack ) );
+                                     && Pull( monitor, this, context, all, fromAllRemotes, continueOnError ) );
 
 
-        static bool Pull( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool skipPullStack )
+        static bool Pull( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool fromAllRemotes, bool continueOnError )
         {
             if( !StackRepository.OpenWorldFromPath( monitor,
                                                     context,
                                                     out var stack,
                                                     out var world,
-                                                    skipPullStack ) )
+                                                    skipPullStack: false ) )
             {
                 return false;
             }
@@ -54,13 +56,11 @@ sealed class CKliPull : Command
                             ? world.GetAllDefinedRepo( monitor )
                             : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
                 if( repos == null ) return false;
-                bool success = true;
-                foreach( var repo in repos )
-                {
-                    success &= repo.GitRepository.FetchMerge( monitor ).IsSuccess();
-                }
-                // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
-                return stack.Close( monitor );
+
+                bool withTags = true;
+                bool success = DoPull( monitor, fromAllRemotes, continueOnError, repos, withTags );
+                // Save a dirty World's DefinitionFile ony if no unhandled exception is thrown.
+                return stack.Close( monitor ) && success;
             }
             finally
             {
@@ -68,5 +68,46 @@ sealed class CKliPull : Command
                 stack.Dispose();
             }
         }
+    }
+
+    internal static bool DoPull( IActivityMonitor monitor,
+                                 bool fromAllRemotes,
+                                 bool continueOnError,
+                                 IReadOnlyList<Repo> repos,
+                                 bool withTags )
+    {
+        bool success = true;
+        using( monitor.OpenInfo( $"Fetching remote branches {(withTags ? "and tags " : "")}for {repos.Count} repositories." ) )
+        {
+            foreach( var repo in repos )
+            {
+                success &= repo.GitRepository.FetchBranches( monitor, withTags, !fromAllRemotes );
+                if( !success && !continueOnError ) break;
+            }
+        }
+        if( success || continueOnError )
+        {
+            using( monitor.OpenInfo( $"Merging remote branches into existing local ones for {repos.Count} repositories." ) )
+            {
+                foreach( var repo in repos )
+                {
+                    var r = repo.GitRepository.Repository;
+                    foreach( var b in r.Branches )
+                    {
+                        var tracked = b.TrackedBranch;
+                        if( tracked != null
+                            && tracked.CanonicalName.StartsWith( "refs/remotes/", StringComparison.OrdinalIgnoreCase )
+                            && (fromAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.OrdinalIgnoreCase )) )
+                        {
+                            var refB = b;
+                            success &= repo.GitRepository.MergeTrackedBranch( monitor, ref refB );
+                            if( !success && !continueOnError ) break;
+                        }
+                    }
+                }
+            }
+        }
+
+        return success;
     }
 }

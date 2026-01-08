@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -9,13 +10,17 @@ sealed class CKliPush : Command
     public CKliPush()
         : base( null,
                 "push",
-                "Pushes the current Repo or all the current World's Repos current branches to their remotes.",
+                """
+                Pushes the Stack repository and all Repo's local branches that track a remote branch.
+                A pull is done before: it must be successful for the actual push to be done.
+                """,
                 [],
                 [],
                 [
-                    (["--all"], "Push all the Repos of the current World (even if current path is in a Repo)."),
-                    (["--stack-only"], "Only push the Stack repository, not the current Repo nor the Repos of the current World."),
-                    (["--continue-on-error"], "Push all the Repos even on error. By default the first error stops the push."),
+                    (["--stack-only"], "Only push the Stack repository, not the Repos."),
+                    (["--all"], "Consider all the Repos' of the current World (even if current path is in a Repo)."),
+                    (["--to-all-remotes"], "Consider all available remotes, not only 'origin'."),
+                    (["--continue-on-error"], "Continues even on error. By default the first error stops the operation."),
                 ] )
     {
     }
@@ -24,19 +29,21 @@ sealed class CKliPush : Command
                                                                     CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
-        bool all = cmdLine.EatFlag( "--all" );
         bool stackOnly = cmdLine.EatFlag( "--stack-only" );
+        bool all = cmdLine.EatFlag( "--all" );
+        bool toAllRemotes = cmdLine.EatFlag( "--to-all-remotes" );
         bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Push( monitor, this, context, all, stackOnly, continueOnError ) );
+                                     && Push( monitor, this, context, stackOnly, all, toAllRemotes, continueOnError ) );
     }
 
     static bool Push( IActivityMonitor monitor,
                       Command command,
                       CKliEnv context,
-                      bool all = false,
-                      bool stackOnly = false,
-                      bool continueOnError = false )
+                      bool stackOnly,
+                      bool all,
+                      bool toAllRemotes,
+                      bool continueOnError )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -49,9 +56,12 @@ sealed class CKliPush : Command
         try
         {
             world.SetExecutingCommand( command );
-            bool success = true;
-            if( !stackOnly )
+            // The Stack has been opened with pull. If this succeeded, we push
+            // it immediately.
+            bool success = stack.PushChanges( monitor );
+            if( !stackOnly && (success || continueOnError) )
             {
+                // If we must handle the Repos, we first pull them.
                 var repos = all
                      ? world.GetAllDefinedRepo( monitor )
                      : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
@@ -61,22 +71,36 @@ sealed class CKliPush : Command
                 }
                 else
                 {
-                    foreach( var r in repos )
+                    // Even if we "continue on error", if pull fails, we don't push.
+                    if( CKliPull.DoPull( monitor, toAllRemotes, continueOnError, repos, withTags: false ) )
                     {
-                        success &= r.GitRepository.Push( monitor, null );
-                        if( !success && !continueOnError )
+                        foreach( var repo in repos )
                         {
-                            break;
+                            var r = repo.GitRepository.Repository;
+                            foreach( var b in r.Branches )
+                            {
+                                var tracked = b.TrackedBranch;
+                                if( tracked != null
+                                    && tracked.CanonicalName.StartsWith( "refs/remotes/", StringComparison.OrdinalIgnoreCase )
+                                    && (toAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.OrdinalIgnoreCase )) )
+                                {
+                                    try
+                                    {
+                                        r.Network.Push( b );
+                                    }
+                                    catch( Exception ex )
+                                    {
+                                        monitor.Error( $"While pushing '{repo.DisplayPath}/{b.FriendlyName}'.", ex );
+                                        success = false;
+                                    }
+                                    if( !success && !continueOnError ) break;
+                                }
+                            }
                         }
                     }
                 }
             }
-            if( success || continueOnError )
-            {
-                success &= stack.PushChanges( monitor );
-            }
-            // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
-            return stack.Close( monitor );
+            return stack.Close( monitor ) && success;
         }
         finally
         {

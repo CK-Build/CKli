@@ -10,7 +10,7 @@ sealed class CKliFetch : Command
         : base( null,
                 "fetch",
                 """
-                Fetches all tracked branches (and optionally tags) of the current Repo or all the Repos of the current World.
+                Fetches all branches (and optionally tags) from the remote(s).
                 When --with-tags is specified, locally modified tags are lost.
                 """,
                 [],
@@ -56,12 +56,11 @@ sealed class CKliFetch : Command
             {
                 success &= repo.GitRepository.FetchBranches( monitor, withTags, originOnly: !fromAllRemotes );
             }
-            // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
-            return stack.Close( monitor );
+            return stack.Close( monitor ) && success;
         }
         finally
         {
-            // On error, don't save a dirty World's DefinitionFile.
+            // On unhandled exception, don't save a dirty World's DefinitionFile.
             stack.Dispose();
         }
     }

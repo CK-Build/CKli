@@ -84,32 +84,47 @@ of the last log file.
 The `Log/` folder is `%LocalAppData%/CKli/Out-of-Stack-Logs/` when CKli doesn't start is a Stack folder, otherwise
 each Stack keeps its own logs in their `.PublicStack/Logs` (or `.PrivateStack/Logs`). 
 
-### `pull -all --skip-pull-stack`
-Resynchronizes the current Repo or World from the remotes.
+### `pull -all --from-all-remotes --continue-on-error`
 
-When the current directory is in a Repo, only the current repository is pulled
-unless `--all` is specified.
+Pulls (fetch-merge) the Stack repository and all current Repos' local branches that track a remote branch.
+Note that tags that point to the remote branches will be retrieved and will replace locally defined tags if they point
+to the same object. If a local tag points to a different object, this will be an error.
+To prevent this, use `ckli tag list` to detect conflicts.
 
-When `--skip-pull-stack` is specified, the Stack repository is not updated.
-
-### `fetch -all --from-all-remotes`
-Fetches all branches of the current Repo or all the Repos of the current World.
-
-When the current directory is in a Repo, only the current repository's branches are
-fetched unless `--all` is specified.
+By default, the current directory selects the Repos unless `--all` is specified.
 
 `--from-all-remotes` fetches from all remotes instead of the 'origin' remote.
 
-### `push -all --stack-only --continue-on-error`
-Pushes the current Repo or all the current World's Repos current branches to their remotes.
+Any merge conflict is an error. Unless `--continue-on-error` is specified, the first error stops the operation.
+
+A pull is implicitly executed first by `ckli push`. 
+
+### `fetch -all --with-tags --from-all-remotes`
+Fetches all branches (and optionally tags) of the current Repos.
+
+By default, the current directory selects the Repos unless `--all` is specified.
+
+When `--with-tags` is specified, remote tags will replace locally defined tags if they point
+to the same object. If a local tag points to a different object, this will be an error.
+Use `ckli tag list` to detect conflicts.
+
+`--from-all-remotes` fetches from all remotes instead of the 'origin' remote.
+
+### `push --stack-only -all --to-all-remotes --continue-on-error`
+Pushes the Stack repository and all Repo's local branches that track a remote branch.
+A pull is done before: it must be successful for the actual push to be done.
+
+Tags are not pushed: tags are pushed when artifacts are published and this is the job
+of dedicated plugins.
+
+When `--stack-only` is specified, only the Stack repository is pushed. Repos are ignored.
+
+By default, the current directory selects the Repos unless `--all` is specified.
+
+`--to-all-remotes` considers all remotes instead of only the 'origin' remote.
+
 Any conflict is an error, unless `--continue-on-error` is specified, the first error stops
 the push.
-
-When the current directory is in a Repo, only the current Repo's current branch is
-pushed unless `--all` is specified.
-
-When `--stack-only` is specified, only the Stack repository is pushed. Current Repo and
-World is ignored.
 
 ### `repo add <url> --allow-lts`
 Adds a new repository to the current world.
@@ -118,7 +133,7 @@ If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified b
 it is weird to add a new Repo to a Long Term Support World.
 
 This clones the repository in the current directory, updates the World's definition file in
-the Stack repsoitory and creates a commit. To publish this addition, a `push` (typically
+the Stack repository and creates a commit. To publish this addition, a `push` (typically
 with `--stack-only`) must be executed.
 
 ### `repo remove <name or url> --allow-lts`
