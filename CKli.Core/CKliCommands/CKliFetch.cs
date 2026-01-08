@@ -10,8 +10,8 @@ sealed class CKliFetch : Command
         : base( null,
                 "fetch",
                 """
-                Fetches all tracked branches and tags of the current Repo or all the Repos of the current World.
-                When --without-tags is not specified, locally modified tags are lost.
+                Fetches all tracked branches (and optionally tags) of the current Repo or all the Repos of the current World.
+                When --with-tags is specified, locally modified tags are lost.
                 """,
                 [],
                 [],

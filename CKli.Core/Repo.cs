@@ -93,20 +93,6 @@ public sealed class Repo
     public RandomId CKliRepoId => _repoId;
 
     /// <summary>
-    /// Pull-Merge the current head from the remote using the default fast-forward strategy
-    /// (see <see href="https://git-scm.com/docs/git-merge#Documentation/git-merge.txt-mergeff"/>).
-    /// Any merge conflict is an error.
-    /// <para>
-    /// If the current head has no associated tracking branch, nothing is done. 
-    /// </para>
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <returns>A MergeResult: both <see cref="MergeResult.Error"/> and <see cref="MergeResult.ErrorConflicts"/> are failures.</returns>
-    public MergeResult Pull( IActivityMonitor monitor ) => _git.Pull( monitor,
-                                                                      mergeFileFavor: LibGit2Sharp.MergeFileFavor.Normal,
-                                                                      fastForwardStrategy: LibGit2Sharp.FastForwardStrategy.Default );
-
-    /// <summary>
     /// Returns the <see cref="DisplayPath"/> (with its link to <see cref="WorkingFolder"/>) as a <see cref="ContentBox"/>
     /// or a <see cref="HorizontalContent"/> with it and:
     /// <list type="number">

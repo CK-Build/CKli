@@ -12,7 +12,12 @@ sealed class CKliPull : Command
     internal CKliPull()
         : base( null,
                 "pull",
-                """Fetch-Merge the Repo's current head from its tracked remote branch on remote "origin".""",
+                """
+                Fetch-Merge the Repo's current head from its tracked remote branch on remote "origin".
+                Note that tags that point to the remote branches will be retrieved and will replace locally defined tags if they point
+                to the same object. If a local tag points to a different object, this will be an error.
+                To prevent this, use 'ckli tag list' to detect conflicts.
+                """,
                 [],
                 [],
                 [
@@ -52,7 +57,7 @@ sealed class CKliPull : Command
                 bool success = true;
                 foreach( var repo in repos )
                 {
-                    success &= repo.Pull( monitor ).IsSuccess();
+                    success &= repo.GitRepository.FetchMerge( monitor ).IsSuccess();
                 }
                 // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
                 return stack.Close( monitor );
