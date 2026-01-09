@@ -72,6 +72,9 @@ sealed class CKliPush : Command
                 else
                 {
                     // Even if we "continue on error", if pull fails, we don't push.
+                    // Instead of working branch per branch, we pull (fetch-merge) all branches
+                    // first and then push them (CKliPull.DoPull fetches all remote branches and then
+                    // merges them).
                     if( CKliPull.DoPull( monitor, toAllRemotes, continueOnError, repos, withTags: false ) )
                     {
                         foreach( var repo in repos )
@@ -81,18 +84,10 @@ sealed class CKliPush : Command
                             {
                                 var tracked = b.TrackedBranch;
                                 if( tracked != null
-                                    && tracked.CanonicalName.StartsWith( "refs/remotes/", StringComparison.OrdinalIgnoreCase )
-                                    && (toAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.OrdinalIgnoreCase )) )
+                                    && tracked.CanonicalName.StartsWith( "refs/remotes/", StringComparison.Ordinal )
+                                    && (toAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.Ordinal )) )
                                 {
-                                    try
-                                    {
-                                        r.Network.Push( b );
-                                    }
-                                    catch( Exception ex )
-                                    {
-                                        monitor.Error( $"While pushing '{repo.DisplayPath}/{b.FriendlyName}'.", ex );
-                                        success = false;
-                                    }
+                                    success &= repo.GitRepository.PushBranch( monitor, b, autoCreateRemoteBranch: false );
                                     if( !success && !continueOnError ) break;
                                 }
                             }

@@ -244,7 +244,7 @@ public sealed partial class StackRepository : IDisposable
     public bool PushChanges( IActivityMonitor monitor )
     {
         CommitResult result = _git.Commit( monitor, "Automatic pre-push commit." );
-        return result != CommitResult.Error && _git.Push( monitor, null );
+        return result != CommitResult.Error && _git.PushBranch( monitor, _git.Repository.Head, autoCreateRemoteBranch: false );
     }
 
     StackRepository( GitRepository git, in NormalizedPath stackRoot, CKliEnv context, string stackName )
@@ -316,7 +316,7 @@ public sealed partial class StackRepository : IDisposable
                     monitor.Error( $"Stack folder '{stackRoot.LastPart}' must be '{stackNameFromUrl}' or '{DuplicatePrefix}{stackNameFromUrl}' (case insensitive) since repository Url is '{git.OriginUrl}'." );
                     error = true;
                 }
-                if( !error && git.Checkout( monitor, stackBranchName, skipPullStack ) )
+                if( !error && git.FullCheckout( monitor, stackBranchName, skipPullStack ) )
                 {
                     return new StackRepository( git, stackRoot, context, stackNameFromUrl );
                 }
@@ -526,7 +526,7 @@ public sealed partial class StackRepository : IDisposable
             // Before doing anything else, we read the definition file and extract the actual
             // world name with the right casing. If case differ, the git handle is disposed,
             // the folder name is fixed and a new git handle is acquired.
-            if( git.Checkout( monitor, stackBranchName, skipFetchMerge: true )
+            if( git.FullCheckout( monitor, stackBranchName, skipFetchMerge: true )
                 && GetActualStackName( monitor, git, stackNameFromUrl, out var actualStackName ) )
             {
                 if( actualStackName != stackNameFromUrl )

@@ -172,36 +172,23 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// <summary>
     /// Checks that the current head is a clean commit (working directory is clean and no staging files exists).
     /// </summary>
-    /// <param name="m">The monitor to use.</param>
+    /// <param name="monitor">The monitor to use.</param>
     /// <returns>True if the current head is clean, false otherwise.</returns>
-    public bool CheckCleanCommit( IActivityMonitor m )
+    public bool CheckCleanCommit( IActivityMonitor monitor )
     {
         if( _git.RetrieveStatus( _checkDirtyOptions ).IsDirty )
         {
-            m.Error( $"Repository '{DisplayPath}' has uncommitted changes ({CurrentBranchName})." );
+            monitor.Error( $"Repository '{DisplayPath}' has uncommitted changes ({CurrentBranchName})." );
             return false;
         }
         return true;
     }
 
     /// <summary>
-    /// Gets the sha of the given branch tip or null if the branch doesn't exist.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="branchName">The branch name. Must not be null or white space.</param>
-    /// <returns>The Sha or null.</returns>
-    public string? GetBranchSha( IActivityMonitor monitor, string branchName )
-    {
-        Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
-        var b = DoGetBranch( monitor, _git, branchName, LogLevel.Warn, _displayPath );
-        return b?.Tip.Sha;
-    }
-
-    /// <summary>
     /// Gets the LibGitRepository's <see cref="Branch"/> of the given branch or null if the branch
     /// doesn't exist locally and in the "origin" remote.
     /// <para>
-    /// If the remote "origin" exists, it is created locally.
+    /// If the remote "origin" exists, it is created locally and tracks the origin remote branch.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -267,10 +254,9 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// Ensures that a local branch exists. If a remote branch from the 'origin' remote is known locally
     /// it will be associated.
     /// <para>
-    /// If the branch is created without a remote, it will point at the same commit as the current <see cref="Head"/>.
+    /// If the branch is created without a remote, it will point at the current <see cref="Head"/>'s commit.
     /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
-    /// Use <see cref="Checkout(IActivityMonitor, string, bool)"/> to make sure that the potential remote 'origin' branch
-    /// is fetched if it exists.
+    /// Use <see cref="Checkout(IActivityMonitor, Branch)"/> to switch the head onto the branch.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -295,7 +281,7 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// <param name="withTags">Specify whether tags must be fetched from remote. When true, locally modified tags are lost.</param>
     /// <param name="originOnly">False to fetch all the remote branches. By default, branches from only 'origin' remote are considered.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool FetchBranches( IActivityMonitor monitor, bool withTags, bool originOnly )
+    public bool FetchRemoteBranches( IActivityMonitor monitor, bool withTags, bool originOnly )
     {
         using( monitor.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{DisplayPath}' with{(withTags ? "" : "out")} tags." ) )
         {
@@ -325,6 +311,162 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
+    /// Fetches a branch from its remote if possible.
+    /// <list type="bullet">
+    ///     <item>
+    ///     If the branch doesn't exist yet, a local branch bound to its 'origin' remote is created.
+    ///     If the remote branch doesn't exist, the output <paramref name="branch"/> is null and this is not an error:
+    ///     if you want the local branch to exist, call <see cref="EnsureBranch(IActivityMonitor, string, LogLevel)"/>
+    ///     before.
+    ///     </item>
+    ///     <item>
+    ///     If the local branch exists but is not tracked, the 'origin' remote is looked up for this branch and if it
+    ///     exists on the remote, the output <paramref name="branch"/> is updated with the tracked branch.
+    ///     </item>
+    ///     <item>
+    ///     If the branch exists and is already tracked (whatever the remote is), the output <paramref name="branch"/>
+    ///     is updated with the tracked branch.
+    ///     </item>
+    /// </list>
+    /// This doesn't create a local branch if the branch doesn't already exist locally or in the 'origin' remote.
+    /// The output <paramref name="branch"/> is updated (may be set to null if the tracked branch disappeared from the remote).
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="branchName">The human friendly branch name.</param>
+    /// <param name="withTags">True to fetch the tags that point to any fetched object. False to not retrieve any remote tag.</param>
+    /// <param name="branch">On success, contains an up-to-date branch instance.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool FetchRemoteBranch( IActivityMonitor monitor, string branchName, bool withTags, out Branch? branch )
+    {
+        branch = GetBranch( monitor, branchName, LogLevel.None );
+        if( branch == null )
+        {
+            // The branch doesn't exist locally (as a local branch or as a known "origin/" branch).
+            // We try to fetch the remote branch from 'origin' and then use GetBranch to create it
+            // if it has been found on the 'origin' remote.
+            if( !FetchFromOrigin( monitor, branchName, withTags ) )
+            {
+                branch = null;
+                return false;
+            }
+            branch = GetBranch( monitor, branchName, LogLevel.None );
+            return true;
+        }
+        else
+        {
+            var tracked = branch.TrackedBranch;
+            if( tracked == null )
+            {
+                // The branch exists locally but is not bound to a tracked branch.
+                // Same as above, we try to fetch the 'origin' one.
+                if( !FetchFromOrigin( monitor, branchName, withTags ) )
+                {
+                    // On error, we let the local branch instance be returned.
+                    return false;
+                }
+                // We bind the branch if the remote 'origin' has been found. 
+                tracked = _git.Branches[$"refs/remotes/origin/{branchName}"];
+                if( tracked != null )
+                {
+                    branch = _git.Branches.Update( branch, u => u.TrackedBranch = tracked.CanonicalName );
+                }
+                return true;
+            }
+            else if( tracked.Reference.IsRemoteTrackingBranch )
+            {
+                // The branch is a "refs/remotes/" branch.
+                if( !DoFetch( monitor, this, tracked.RemoteName, branch.CanonicalName, tracked.CanonicalName, withTags ) )
+                {
+                    return false;
+                }
+                // We rebind the tracked branch: if it doesn't exist anymore on the the remote,
+                // this clears the association.
+                tracked = _git.Branches[tracked.CanonicalName];
+                branch = _git.Branches.Update( branch, u => u.TrackedBranch = tracked?.CanonicalName );
+                return true;
+            }
+            else
+            {
+                // The branch tracks a non remote branch: we cannot "fetch" anything.
+                return true;
+            }
+        }
+
+        bool FetchFromOrigin( IActivityMonitor monitor, string branchName, bool withTags )
+        {
+            return DoFetch( monitor,
+                            this,
+                            "origin",
+                            src: $"refs/heads/{branchName}",
+                            dst: $"refs/remotes/origin/{branchName}",
+                            withTags );
+        }
+
+        static bool DoFetch( IActivityMonitor monitor,
+                             GitRepository r,
+                             string remoteName,
+                             string src,
+                             string dst,
+                             bool withTags )
+        {
+            var refSpec = $"+{src}:{dst}";
+            try
+            {
+                if( !r._repositoryKey.GetReadCredentials( monitor, out var creds ) ) return false;
+                Commands.Fetch( r._git, remoteName, [refSpec], new FetchOptions()
+                {
+                    CredentialsProvider = ( url, user, types ) => creds,
+                    TagFetchMode = withTags ? TagFetchMode.Auto : TagFetchMode.None
+                }, null );
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"Error while fetching '{refSpec}'.", ex );
+                return false;
+            }
+            return true;
+        }
+
+    }
+
+    /// <summary>
+    /// Checks out the specified local branch.
+    /// If the current head has the same <see cref="Reference.CanonicalName"/>, nothing is done.
+    /// Otherwise, the working folder must be clean (<see cref="CheckCleanCommit(IActivityMonitor)"/>)
+    /// and the branch is checked out.
+    /// <para>
+    /// If the <paramref name="localBranch"/> is a remote branch this throws an <see cref="ArgumentException"/>:
+    /// we should never check out a remote branch, only a local branch (that may track a remote one).
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="localBranch">The local branch to check out.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool Checkout( IActivityMonitor monitor, Branch localBranch )
+    {
+        Throw.CheckArgument( !localBranch.Reference.IsRemoteTrackingBranch );
+
+        if( _git.Head.CanonicalName == localBranch.CanonicalName )
+        {
+            return true;
+        }
+        if( !CheckCleanCommit( monitor ) )
+        {
+            return false;
+        }
+        try
+        {
+            Commands.Checkout( _git, localBranch );
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"Checking out '{DisplayPath}/{localBranch.FriendlyName}' failed.", ex );
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Checks out the specified branch, creating it if it doesn't exist and by default fetch-merge from the remote if
     /// it's a tracking branch.
     /// <list type="number">
@@ -346,7 +488,7 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// <param name="branchName">The branch name.</param>
     /// <param name="skipFetchMerge">True to NOT fetch-merge the head once checked out.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool Checkout( IActivityMonitor monitor, string branchName, bool skipFetchMerge = false )
+    public bool FullCheckout( IActivityMonitor monitor, string branchName, bool skipFetchMerge = false )
     {
         try
         {
@@ -356,7 +498,7 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
                 var b = DoGetBranch( monitor, _git, branchName, LogLevel.None, _displayPath );
                 if( b == null )
                 {
-                    if( !FetchBranches( monitor, withTags: false, originOnly: true ) )
+                    if( !FetchRemoteBranches( monitor, withTags: false, originOnly: true ) )
                     {
                         return false;
                     }
@@ -473,7 +615,8 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
-    /// Calls <see cref="MergeTrackedBranch(IActivityMonitor, ref Branch)"/> for each existing branch.
+    /// Calls <see cref="MergeTrackedBranch(IActivityMonitor, ref Branch)"/> for each existing branch that has a remote tracked branch
+    /// on 'origin' (or on any remote if <paramref name="fromAllRemotes"/> is true).
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="continueOnError">True to continue on error.</param>
@@ -486,8 +629,8 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
         {
             var tracked = b.TrackedBranch;
             if( tracked != null
-                && tracked.CanonicalName.StartsWith( "refs/remotes/", StringComparison.OrdinalIgnoreCase )
-                && (fromAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.OrdinalIgnoreCase )) )
+                && tracked.CanonicalName.StartsWith( "refs/remotes/", StringComparison.Ordinal )
+                && (fromAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.Ordinal )) )
             {
                 var refB = b;
                 success &= MergeTrackedBranch( monitor, ref refB );
@@ -500,6 +643,9 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     /// <summary>
     /// Merges the <see cref="Branch.TrackedBranch"/> into its tracking <paramref name="branch"/>.
     /// The branch's <see cref="Branch.IsTracking"/> must be true otherwise an <see cref="ArgumentException"/> is thrown.
+    /// <para>
+    /// This method can handle local tracked branch even if it is mainly used with remote branches.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="branch">The local branch. This is updated to the new Branch instance on success.</param>
@@ -518,6 +664,8 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
         {
             return false;
         }
+        var localName = branch.FriendlyName;
+        var trackedName = tracked.FriendlyName;
         Exception? exception = null;
         try
         {
@@ -526,15 +674,21 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
             {
                 var c = _git.ObjectDatabase.CreateCommit( _committer,
                                                           _committer,
-                                                          $"Merge branch '{tracked.FriendlyName}'.",
+                                                          $"Merge branch '{trackedName}'.",
                                                           result.Tree,
                                                           [branch.Tip, tracked.Tip],
                                                           prettifyMessage: true );
-                branch = _git.Branches.Add( branch.CanonicalName, c, allowOverwrite: true );
-                monitor.Trace( $"Branch '{tracked.FriendlyName}' has been merged into '{branch.FriendlyName}' in '{DisplayPath}'." );
                 if( isHead )
                 {
-                    Commands.Checkout( _git, branch );
+                    // Before updating the branch, we need to detach the head.
+                    // We do this as a no-op for the file system: the Tree is the same.
+                    Commands.Checkout( _git, branch.Tip );
+                }
+                branch = _git.Branches.Add( localName, c, allowOverwrite: true );
+                monitor.Trace( $"Branch '{trackedName}' has been merged into '{localName}' in '{DisplayPath}'." );
+                if( isHead )
+                {
+                    branch = Commands.Checkout( _git, branch );
                 }
                 return true;
             }
@@ -543,8 +697,96 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
         {
             exception = ex;
         }
-        monitor.Error( $"Failed merging '{tracked.FriendlyName}' into '{branch.FriendlyName}' in '{DisplayPath}'.", exception );
+        monitor.Error( $"Failed merging '{trackedName}' into '{localName}' in '{DisplayPath}'.", exception );
         return false;
+    }
+
+    /// <summary>
+    /// Pushes the local's <see cref="Branch.TrackedBranch"/> to its remote.
+    /// <para>
+    /// if the <see cref="Branch.TrackedBranch"/> exists, its <see cref="Branch.RemoteName"/> must not be null
+    /// otherwise it is an error.
+    /// </para>
+    /// <para>
+    /// If the <paramref name="localBranch"/> is a remote branch this throws a <see cref="ArgumentException"/>.
+    /// </para>
+    /// <para>
+    /// A branch should always been fetched and merged before being pushed.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="localBranch">The local branch to push.</param>
+    /// <param name="autoCreateRemoteBranch">
+    /// True create the 'origin' remote branch if the branch has no tracked branch.
+    /// </param>
+    /// <returns>True on success, false on error.</returns>
+    public bool PushBranch( IActivityMonitor monitor, Branch localBranch, bool autoCreateRemoteBranch )
+    {
+        Throw.CheckArgument( !localBranch.Reference.IsRemoteTrackingBranch );
+
+        var branchName = localBranch.FriendlyName;
+        using( monitor.OpenInfo( $"Pushing branch '{DisplayPath}/{branchName}'." ) )
+        {
+            if( !_repositoryKey.GetWriteCredentials( monitor, out var creds ) )
+            {
+                return false;
+            }
+            var tracked = localBranch.TrackedBranch;
+            if( tracked == null )
+            {
+                if( !autoCreateRemoteBranch )
+                {
+                    monitor.Error( $"Branch '{branchName}' has no tracked branch." );
+                    return false;
+                }
+                monitor.Warn( $"Branch '{branchName}' has no tracked branch. Creating branch 'origin/{branchName}'." );
+                localBranch = _git.Branches.Update( localBranch, u => { u.Remote = "origin"; u.UpstreamBranch = localBranch.CanonicalName; } );
+            }
+            else if( tracked.RemoteName == null )
+            {
+                monitor.Error( $"Branch '{branchName}' tracks branch '{tracked.CanonicalName}' that is not a remote branch." );
+                return false;
+            }
+            int? aheadBy = localBranch.TrackingDetails.AheadBy;
+            if( aheadBy.HasValue && aheadBy.Value == 0 )
+            {
+                monitor.CloseGroup( "Tracked branch is on the same commit. Push skipped." );
+                return true;
+            }
+            try
+            {
+                // Take no risk: consider that the error callback can be called concurrently
+                // and that there may be more than one error.
+                ConcurrentBag<string> errors = new ConcurrentBag<string>();
+                var options = new PushOptions()
+                {
+                    CredentialsProvider = ( url, user, types ) => creds,
+                    OnPushStatusError = ( e ) =>
+                    {
+                        errors.Add( $"""
+                            Error while pushing ref '{e.Reference}':
+                            {e.Message}
+                            """ );
+                    }
+                };
+                _git.Network.Push( localBranch, options );
+                if( !errors.IsEmpty )
+                {
+                    monitor.Error( $"""
+                While pushing '{DisplayPath}/{localBranch.FriendlyName}':
+                {errors.Concatenate( Environment.NewLine )}
+                """ );
+                    monitor.CloseGroup( $"{errors.Count} errors." );
+                    return false;
+                }
+                return true;
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"While pushing '{DisplayPath}/{localBranch.FriendlyName}'.", ex );
+                return false;
+            }
+        }
     }
 
     /// <summary>
@@ -777,73 +1019,6 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
         {
             monitor.Error( ex );
             return false;
-        }
-    }
-
-    /// <summary>
-    /// Pushes changes from a branch to the remote "origin".
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="branchName">Local branch name. Null for the <see cref="CurrentBranchName"/>.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool Push( IActivityMonitor monitor, string? branchName )
-    {
-        branchName ??= CurrentBranchName;
-        using( monitor.OpenInfo( $"Pushing '{DisplayPath}' (branch '{branchName}') to origin." ) )
-        {
-            if( !_repositoryKey.GetWriteCredentials( monitor, out var creds ) ) return false;
-            try
-            {
-                var b = _git.Branches[branchName];
-                if( b == null )
-                {
-                    monitor.Error( $"Unable to find branch '{branchName}' in '{DisplayPath}'." );
-                    return false;
-                }
-                bool created = false;
-                if( !b.IsTracking )
-                {
-                    monitor.Warn( $"Branch '{branchName}' does not exist on the remote. Creating the remote branch on 'origin'." );
-                    _git.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
-                    created = true;
-                }
-                if( created || (b.TrackingDetails.AheadBy ?? 1) > 0 )
-                {
-                    // Take no risk: consider that the error callback can be called concurrently
-                    // and that there may be more than one error.
-                    ConcurrentBag<string> errors = new ConcurrentBag<string>();
-                    var options = new PushOptions()
-                    {
-                        CredentialsProvider = ( url, user, types ) => creds,
-                        OnPushStatusError = ( e ) =>
-                        {
-                            errors.Add( $"""
-                                Error while pushing ref '{e.Reference}':
-                                {e.Message}
-                                """ );
-                        }
-                    };
-                    _git.Network.Push( b, options );
-                    if( !errors.IsEmpty )
-                    {
-                        foreach( var error in errors )
-                        {
-                            monitor.Error( error );
-                        }
-                        monitor.CloseGroup( $"{errors.Count} errors." );
-                    }
-                }
-                else
-                {
-                    monitor.CloseGroup( "Remote branch is on the same commit. Push skipped." );
-                }
-                return true;
-            }
-            catch( Exception ex )
-            {
-                monitor.Error( ex );
-                return false;
-            }
         }
     }
 

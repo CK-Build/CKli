@@ -54,7 +54,7 @@ sealed class CKliFetch : Command
             bool success = true;
             foreach( var repo in repos )
             {
-                success &= repo.GitRepository.FetchBranches( monitor, withTags, originOnly: !fromAllRemotes );
+                success &= repo.GitRepository.FetchRemoteBranches( monitor, withTags, originOnly: !fromAllRemotes );
             }
             return stack.Close( monitor ) && success;
         }

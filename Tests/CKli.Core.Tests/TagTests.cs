@@ -12,7 +12,7 @@ using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
 
-[TestFixture]
+    [TestFixture]
 public partial class TagTests
 {
     [Test]
@@ -290,7 +290,7 @@ public partial class TagTests
         }
 
         // Tim "ckli fetch". It now sees the 2 tags pushed by Bob but t1 tags are "RemoteOnly".
-        tim.FetchBranches( TestHelper.Monitor, withTags: false, originOnly: true ).ShouldBeTrue();
+        tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false, originOnly: true ).ShouldBeTrue();
         tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
         diff.FetchRequired.ShouldBeFalse();
         diff.UnavailableRemoteTags.ShouldBeEmpty();
@@ -349,8 +349,8 @@ public partial class TagTests
         Should.NotThrow( () => tim.PullTags( TestHelper.Monitor, ["t1-lightweight"] ).ShouldBeTrue() );
 
         // Tim & Bob create the same "v4" tag but on 2 different commits.
-        tim.Checkout( TestHelper.Monitor, "branch1" ).ShouldBeTrue();
-        bob.Checkout( TestHelper.Monitor, "branch2" ).ShouldBeTrue();
+        tim.FullCheckout( TestHelper.Monitor, "branch1" ).ShouldBeTrue();
+        bob.FullCheckout( TestHelper.Monitor, "branch2" ).ShouldBeTrue();
         tim.Repository.ApplyTag( "v4" );
         bob.Repository.ApplyTag( "v4" );
         // As long as these tags remain local, everything is fine.
@@ -419,7 +419,7 @@ public partial class TagTests
         // follow the "v4" tag that is a "new" one.
         // ... No change. But we know that is v4 tag is problematic.
         //
-        tim.FetchBranches( TestHelper.Monitor, withTags: false, originOnly: true ).ShouldBeTrue();
+        tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false, originOnly: true ).ShouldBeTrue();
         {
             tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
             RedactCommitId( DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) ) ).ShouldBe( """
