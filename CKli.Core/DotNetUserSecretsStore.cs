@@ -76,7 +76,14 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
             {
                 if( File.Exists( _secretFilePath ) )
                 {
-                    _document = JsonDocument.Parse( File.ReadAllBytes( _secretFilePath ),
+                    var bytes = File.ReadAllBytes( _secretFilePath );
+                    // Skips the BOM.
+                    int start = 0;
+                    if( bytes.Length > 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF )
+                    {
+                        start = 3;
+                    }
+                    _document = JsonDocument.Parse( new System.Buffers.ReadOnlySequence<byte>( bytes, start, bytes.Length - start ),
                                                     new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip } );
                 }
             }

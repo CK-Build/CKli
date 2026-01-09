@@ -49,7 +49,7 @@ public sealed partial class TagInfo : IComparable<TagInfo>
 
     internal IRenderable ToRenderable( ScreenType s )
     {
-        Throw.DebugAssert( _canonicalName.StartsWith( "refs/tags/" ) && "refs/tags/".Length == 10 );
+        Throw.DebugAssert( _canonicalName.StartsWith( "refs/tags/", StringComparison.Ordinal ) && "refs/tags/".Length == 10 );
         return s.Unit.AddRight( GetRenderableCommit( s ).Box( marginRight: 1 ), GetRenderableTagName( s ).Box() );
     }
 
