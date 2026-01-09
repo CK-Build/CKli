@@ -23,7 +23,7 @@ public sealed class CKliPluginInfo : Command
                             - None: Plugins are not compiled (uses reflection).
                             """,
                             Multiple: false)],
-                flags: [] )
+                flags: [(["--force", "-f"], "Forces plugin recompilation even if the compile mode hasn't changed.")] )
     {
     }
 
@@ -32,6 +32,7 @@ public sealed class CKliPluginInfo : Command
                                                                     CommandLineArguments cmdLine )
     {
         string? sCompileMode = cmdLine.EatSingleOption( "--compile-mode" );
+        bool force = cmdLine.EatFlag( "--force", "-f" );
         PluginCompileMode? compileMode = default;
         if( sCompileMode != null )
         {
@@ -43,13 +44,14 @@ public sealed class CKliPluginInfo : Command
             compileMode = mode;
         }
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && PluginInfo( monitor, this, context, compileMode ) );
+                                     && PluginInfo( monitor, this, context, compileMode, force ) );
     }
 
     static bool PluginInfo( IActivityMonitor monitor,
                             Command command,
                             CKliEnv context,
-                            PluginCompileMode? compileMode )
+                            PluginCompileMode? compileMode,
+                            bool force )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -58,11 +60,19 @@ public sealed class CKliPluginInfo : Command
         try
         {
             world.SetExecutingCommand( command );
-            if( compileMode.HasValue
-                && compileMode.Value != world.DefinitionFile.CompileMode
-                && !world.SetPluginCompileMode( monitor, compileMode.Value ) )
+            if( compileMode.HasValue && compileMode.Value != world.DefinitionFile.CompileMode )
             {
-                return false;
+                if( !world.SetPluginCompileMode( monitor, compileMode.Value ) )
+                {
+                    return false;
+                }
+            }
+            else if( force )
+            {
+                if( !world.ForceRecompilePlugins( monitor ) )
+                {
+                    return false;
+                }
             }
             bool success = world.RaisePluginInfo( monitor, out var headerText, out var infos );
             context.Screen.DisplayPluginInfo( headerText, infos );
