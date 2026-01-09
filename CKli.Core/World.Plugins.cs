@@ -35,6 +35,16 @@ public sealed partial class World
         return true;
     }
 
+    internal bool ForceRecompilePlugins( IActivityMonitor monitor )
+    {
+        if( _pluginMachinery != null )
+        {
+            return _pluginMachinery.ForceRecompilePlugins( monitor, this );
+        }
+        monitor.Warn( "No plugin machinery available, nothing to recompile." );
+        return true;
+    }
+
     internal bool AddOrSetPluginPackage( IActivityMonitor monitor, string packageId, SVersion version )
     {
         // This creates a Stack Commit if the Stack's working folder is dirty.

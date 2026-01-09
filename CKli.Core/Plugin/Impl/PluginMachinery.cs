@@ -382,7 +382,13 @@ public sealed partial class PluginMachinery
     {
         Throw.DebugAssert( mode != _definitionFile.CompileMode );
         _definitionFile.SetPluginCompileMode( monitor, mode );
-        return OnPluginChanged( monitor, world, false, true ); 
+        return OnPluginChanged( monitor, world, false, true );
+    }
+
+    internal bool ForceRecompilePlugins( IActivityMonitor monitor, World world )
+    {
+        monitor.Info( "Forcing plugin recompilation." );
+        return OnPluginChanged( monitor, world, updateCompiledPlugins: true, reloadPlugins: true );
     }
 
     internal bool CreatePlugin( IActivityMonitor monitor, World world, string shortPluginName, string fullPluginName )
