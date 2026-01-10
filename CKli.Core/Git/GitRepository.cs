@@ -273,7 +273,16 @@ public sealed partial class GitRepository : IDisposable
     /// <returns>True on success, false on error.</returns>
     public bool FetchRemoteBranches( IActivityMonitor monitor, bool withTags, bool originOnly, string? branchSpec = null )
     {
-        using( monitor.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{DisplayPath}' with{(withTags ? "" : "out")} tags." ) )
+        if( string.IsNullOrEmpty( branchSpec ) )
+        {
+            branchSpec = null;
+        }
+        using( monitor.OpenInfo( $"Fetching {(branchSpec == null ? "all ": "")
+                                   }branches {(branchSpec != null ? $"like '{branchSpec}' " : "")
+                                   }from '{DisplayPath
+                                   }' {(originOnly ? "origin" : "all remotes")
+                                   } with{(withTags ? "" : "out")
+                                   } tags." ) )
         {
             try
             {
@@ -284,7 +293,7 @@ public sealed partial class GitRepository : IDisposable
                     var logMsg = $"Fetching remote '{remote.Name}'.";
                     if( !originOnly ) monitor.Info( logMsg );
                     IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
-                    if( !string.IsNullOrEmpty( branchSpec ) )
+                    if( branchSpec != null )
                     {
                         refSpecs = refSpecs.Select( r => r.Replace( "*", branchSpec ) );
                     }
