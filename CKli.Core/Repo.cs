@@ -37,7 +37,7 @@ public sealed class Repo
     /// <summary>
     /// Gets the 'origin' remote repository url.
     /// </summary>
-    public Uri OriginUrl => _git.OriginUrl;
+    public Uri OriginUrl => _git.RepositoryKey.OriginUrl;
 
     /// <summary>
     /// Gets this repo's working folder.
@@ -51,6 +51,7 @@ public sealed class Repo
 
     /// <summary>
     /// Gets the git status.
+    /// This status is computed on demand and cached.
     /// </summary>
     public GitRepository.SimpleStatusInfo GitStatus
     {

@@ -89,12 +89,12 @@ public sealed partial class StackRepository : IDisposable
     /// <summary>
     /// Gets whether this stack is public.
     /// </summary>
-    public bool IsPublic => _git.IsPublic;
+    public bool IsPublic => _git.RepositoryKey.IsPublic;
 
     /// <summary>
     /// Gets the stack's repository url.
     /// </summary>
-    public Uri OriginUrl => _git.OriginUrl;
+    public Uri OriginUrl => _git.RepositoryKey.OriginUrl;
 
     /// <summary>
     /// Gets a non empty path if this stack's <see cref="OriginUrl"/> is a file.
@@ -253,7 +253,7 @@ public sealed partial class StackRepository : IDisposable
         _stackRoot = stackRoot;
         _context = context;
         _stackName = stackName;
-        var originUrl = git.OriginUrl;
+        var originUrl = git.RepositoryKey.OriginUrl;
         if( originUrl.IsFile )
         {
             var p = new NormalizedPath( originUrl.LocalPath );
@@ -301,7 +301,7 @@ public sealed partial class StackRepository : IDisposable
         if( git != null )
         {
             var stackRoot = gitPath.RemoveLastPart();
-            var url = git.OriginUrl;
+            var url = git.RepositoryKey.OriginUrl;
             if( CheckOriginUrlStackSuffix( monitor, ref url, out var stackNameFromUrl ) )
             {
                 if( stackRoot.LastPart.Equals( stackNameFromUrl, StringComparison.OrdinalIgnoreCase ) )
@@ -313,7 +313,7 @@ public sealed partial class StackRepository : IDisposable
                 }
                 else if( !stackRoot.LastPart.Equals( DuplicatePrefix + stackNameFromUrl, StringComparison.OrdinalIgnoreCase ) )
                 {
-                    monitor.Error( $"Stack folder '{stackRoot.LastPart}' must be '{stackNameFromUrl}' or '{DuplicatePrefix}{stackNameFromUrl}' (case insensitive) since repository Url is '{git.OriginUrl}'." );
+                    monitor.Error( $"Stack folder '{stackRoot.LastPart}' must be '{stackNameFromUrl}' or '{DuplicatePrefix}{stackNameFromUrl}' (case insensitive) since repository Url is '{git.RepositoryKey.OriginUrl}'." );
                     error = true;
                 }
                 if( !error && git.FullCheckout( monitor, stackBranchName, skipPullStack ) )
@@ -611,7 +611,7 @@ public sealed partial class StackRepository : IDisposable
                 && !stackNameFromUrl.Equals( actualStackName, StringComparison.OrdinalIgnoreCase ) )
             {
                 monitor.Error( $"""
-                    The url '{gitStack.OriginUrl}' contains a Stack named '{actualStackName}'.
+                    The url '{gitStack.RepositoryKey.OriginUrl}' contains a Stack named '{actualStackName}'.
                     Names can differ in casing but no more than that: this Stack repository is not valid.
                     """ );
                 return false;

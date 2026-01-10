@@ -50,14 +50,9 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
-    /// Gets whether the Git repository is public or private.
+    /// Gets the <see cref="GitRepositoryKey"/>.
     /// </summary>
-    public bool IsPublic => _repositoryKey.IsPublic;
-
-    /// <summary>
-    /// Gets the remote origin url.
-    /// </summary>
-    public Uri OriginUrl => _repositoryKey.OriginUrl;
+    public GitRepositoryKey RepositoryKey => _repositoryKey;
 
     /// <summary>
     /// The short path to display.

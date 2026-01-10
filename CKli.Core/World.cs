@@ -435,7 +435,7 @@ public sealed partial class World
         Repo? repo = new Repo( this, repository, _layout[index].XElement, index, repoId, _firstRepo );
         _firstRepo = repo;
         _cachedRepositories[repository.WorkingFolder] = repo;
-        _cachedRepositories[repository.OriginUrl.ToString()] = repo;
+        _cachedRepositories[repository.RepositoryKey.OriginUrl.ToString()] = repo;
         _ckliRepoIndex.Add( repoId, repo );
         return repo;
 
