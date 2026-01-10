@@ -276,12 +276,29 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
 
     /// <summary>
     /// Fetches 'origin' (or all remotes) branches and optionally tags into this repository.
+    /// <para>
+    /// This uses the configured "fetch" ref specs (in the '.git/configuration' file) that defaults
+    /// (for the default 'origin' remote) to the single "+refs/heads/*:refs/remotes/origin/*".
+    /// See <see href="https://git-scm.com/book/en/v2/Git-Internals-The-Refspec"/>.
+    /// <list type="bullet">
+    ///     <item>When <paramref name="branchSpec"/> is null or empty. The ref specs are used as-is.</item>
+    ///     <item>
+    ///     When <paramref name="branchSpec"/> is specified. The '*' in all the ref specs are replaced with the branchSpec string,
+    ///     whatever it is: it may end with a '*' (partial globs) to cover more than one branch.
+    ///     </item>
+    /// </list>
+    /// This is a simple mechanism but powerful enough for our needs.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="withTags">Specify whether tags must be fetched from remote. When true, locally modified tags are lost.</param>
-    /// <param name="originOnly">False to fetch all the remote branches. By default, branches from only 'origin' remote are considered.</param>
+    /// <param name="withTags">
+    /// Specify whether tags that point to fetched objects must be fetched from remote.
+    /// When true, locally modified tags are lost.
+    /// </param>
+    /// <param name="originOnly">False to fetch all the remote branches. By default, only the 'origin' remote is considered.</param>
+    /// <param name="branchSpec">Optional branch specification. Example: "fix/v3.*".</param>
     /// <returns>True on success, false on error.</returns>
-    public bool FetchRemoteBranches( IActivityMonitor monitor, bool withTags, bool originOnly )
+    public bool FetchRemoteBranches( IActivityMonitor monitor, bool withTags, bool originOnly, string? branchSpec = null )
     {
         using( monitor.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{DisplayPath}' with{(withTags ? "" : "out")} tags." ) )
         {
@@ -294,6 +311,10 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
                     var logMsg = $"Fetching remote '{remote.Name}'.";
                     if( !originOnly ) monitor.Info( logMsg );
                     IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
+                    if( !string.IsNullOrEmpty( branchSpec ) )
+                    {
+                        refSpecs = refSpecs.Select( r => r.Replace( "*", branchSpec ) );
+                    }
                     Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                     {
                         CredentialsProvider = ( url, user, types ) => creds,
