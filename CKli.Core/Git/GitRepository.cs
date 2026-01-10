@@ -13,7 +13,7 @@ namespace CKli.Core;
 /// <summary>
 /// Encapsulates LibGit2Sharp <see cref="Repository"/>.
 /// </summary>
-public sealed partial class GitRepository : IGitHeadInfo, IDisposable
+public sealed partial class GitRepository : IDisposable
 {
     static readonly StatusOptions _checkDirtyOptions = new StatusOptions() { IncludeIgnored = false };
     readonly GitRepositoryKey _repositoryKey;
@@ -86,28 +86,6 @@ public sealed partial class GitRepository : IGitHeadInfo, IDisposable
             Throw.CheckNotNullArgument( value );
             _committer = value;
         }
-    }
-
-    /// <summary>
-    /// Gets the head information.
-    /// </summary>
-    public IGitHeadInfo Head => this;
-
-    string IGitHeadInfo.CommitSha => _git.Head.Tip.Sha;
-
-    string IGitHeadInfo.Message => _git.Head.Tip.Message;
-
-    DateTimeOffset IGitHeadInfo.CommitDate => _git.Head.Tip.Committer.When;
-
-    int? IGitHeadInfo.AheadOriginCommitCount => _git.Head.TrackingDetails.AheadBy;
-
-    int? IGitHeadInfo.BehindOriginCommitCount => _git.Head.TrackingDetails.BehindBy;
-
-    string? IGitHeadInfo.GetSha( string? path )
-    {
-        if( string.IsNullOrEmpty( path ) ) return _git.Head.Tip.Sha;
-        var e = _git.Head.Tip.Tree[path];
-        return e?.Target.Sha;
     }
 
     /// <summary>
