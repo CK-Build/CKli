@@ -36,6 +36,28 @@ dotnet tool update CKli -g --version 0.0.8--0007-dev --source https://pkgs.dev.a
 
 If you installed CKli globally, you can run `ckli` in any command prompt to start it.
 
+## Development & Local Testing
+
+To test your local changes without publishing to NuGet:
+
+```bash
+# 1. Build and pack
+dotnet build CKli.sln
+dotnet pack CKli/CKli.csproj
+
+# 2. Install as global tool (uninstall first if already installed)
+dotnet tool uninstall -g CKli
+dotnet tool install -g CKli --source ./CKli/bin/Debug --version 0.0.0-0
+
+# 3. Test your changes
+ckli --help
+ckli log
+
+# 4. When done, reinstall from NuGet
+dotnet tool uninstall -g CKli
+dotnet tool install -g CKli
+```
+
 ## The basics: Stack-World-Repo
 
 :warning: create a Demo-Stack. Idea: use an external OSS well-known project.
