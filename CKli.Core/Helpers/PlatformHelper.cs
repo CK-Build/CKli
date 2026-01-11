@@ -63,11 +63,15 @@ static class PlatformHelper
 
     static bool OpenPathWindows( IActivityMonitor monitor, string path, bool isFolder )
     {
+        // Use cmd.exe with 'start' command to open the file/folder in a detached process.
+        // This prevents the opened application from writing to our console.
+        // For instance, VSCode pollutes the console with lines like:
+        // "[main 2025-11-04T08:27:57.303Z] update#setState idle"
         using var p = Process.Start( new ProcessStartInfo
         {
-            FileName = path,
-            UseShellExecute = true,
-            Verb = isFolder ? "open" : string.Empty,
+            FileName = "cmd.exe",
+            Arguments = $"/c start \"\" \"{path}\"",
+            UseShellExecute = false,
             CreateNoWindow = true
         } );
         return p != null;
