@@ -82,7 +82,7 @@ sealed partial class ReflectionPluginCollector
             b.Append( """
                 ];
 
-                public static IPluginFactory? Get( PluginCollectorContext ctx )
+                public static IPluginFactory Get( PluginCollectorContext ctx )
                 {
                     if( !_configSignature.SequenceEqual( ctx.Signature ) ) return null;
 
