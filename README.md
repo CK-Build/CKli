@@ -42,8 +42,8 @@ To test your local changes without publishing to NuGet:
 
 ```bash
 # 1. Build and pack
-dotnet build CKli.sln
-dotnet pack CKli/CKli.csproj
+dotnet build CKli.sln -c Debug
+dotnet pack CKli/CKli.csproj -c Debug
 
 # 2. Install as global tool (uninstall first if already installed)
 dotnet tool uninstall -g CKli
