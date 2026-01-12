@@ -122,9 +122,9 @@ public sealed class CKliIssue : Command
                     {
                         var link = g.Key == null
                                     ? context.Screen.ScreenType.Text( world.Name.FullName )
-                                        .HyperLink( new Uri( $"file://{world.Name.WorldRoot}" ) )
+                                        .HyperLink( new Uri( world.Name.WorldRoot ) )
                                     : context.Screen.ScreenType.Text( g.Key.DisplayPath )
-                                        .HyperLink( new Uri( $"file://{g.Key.WorkingFolder}" ) );
+                                        .HyperLink( new Uri( g.Key.WorkingFolder ) );
                         var header = link.Box( marginRight: 1 ).AddRight( context.Screen.ScreenType.Text( $"({g.Count()})", TextEffect.Italic ) );
                         var repo = header.AddBelow( g.Select( i => i.ToRenderable( context.Screen.ScreenType ) ) );
                         context.Screen.Display( new Collapsable( repo ) );

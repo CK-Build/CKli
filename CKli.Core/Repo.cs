@@ -113,7 +113,7 @@ public sealed class Repo
         var folderStyle = new TextStyle( status.IsDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen, ConsoleColor.Black );
 
         // First Box.
-        IRenderable folder = screenType.Text( DisplayPath ).HyperLink( new Uri( $"file:///{WorkingFolder}" ) );
+        IRenderable folder = screenType.Text( DisplayPath ).HyperLink( new Uri( WorkingFolder ) );
         folder = status.IsDirty
                     ? folder.Box( paddingRight: 1 ).AddLeft( screenType.Text( "✱" ).Box( paddingRight: 1 ) )
                     : folder.Box( paddingLeft: 2, paddingRight: 1 );

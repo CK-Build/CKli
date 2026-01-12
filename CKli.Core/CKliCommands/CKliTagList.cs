@@ -66,7 +66,7 @@ sealed class CKliTagList : Command
                         return false;
                     }
                     var link = s.Text( repo.DisplayPath, effect: TextEffect.Bold | TextEffect.Invert )
-                                    .HyperLink( new Uri( $"file://{repo.WorkingFolder}" ) );
+                                    .HyperLink( new Uri( repo.WorkingFolder ) );
                     var header = link.Box( marginRight: 1 )
                                       .AddRight( s.Text( $"{tags.Tags.Length} local tags.", effect: TextEffect.Italic ) );
                     context.Screen.Display( new Collapsable( header.AddBelow( tags.ToRenderable( s ) ) ) );
@@ -95,7 +95,7 @@ sealed class CKliTagList : Command
                     var diff = new GitTagInfo.Diff( localTags, remoteTags );
 
                     var link = s.Text( repo.DisplayPath, effect: TextEffect.Bold | TextEffect.Invert )
-                                    .HyperLink( new Uri( $"file://{repo.WorkingFolder}" ) );
+                                    .HyperLink( new Uri( repo.WorkingFolder ) );
                     context.Screen.Display( new Collapsable( link.AddBelow( diff.ToRenderable( s ) ) ) );
 
                 }
