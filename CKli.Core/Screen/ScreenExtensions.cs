@@ -57,7 +57,7 @@ public static class ScreenExtensions
     public static IRenderable CreateDisplayHelpHeader( ScreenType screenType, CommandLineArguments cmdLine )
     {
         IRenderable header = screenType.Unit;
-        if( !cmdLine.HasHelp && cmdLine.RemainingCount > 0 )
+        if( !cmdLine.HasHelp && cmdLine.RemainingCount > 0 && cmdLine.IsClosed )
         {
             var args = cmdLine.GetRemainingArguments();
             header = screenType.Text( "Arguments:" ).Box()

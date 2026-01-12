@@ -503,7 +503,7 @@ public sealed partial class GitRepository : IDisposable
     /// <param name="continueOnError">True to continue on error.</param>
     /// <param name="fromAllRemotes">True to consider all remotes, not only 'origin'.</param>
     /// <param name="branchSpec">
-    /// Optional branch name filter that applies to the local branch name. Example: fix/v3.*".
+    /// Optional branch name filter that applies to the local branch name. Example: "fix/v3.*".
     /// See <see cref="FetchRemoteBranches(IActivityMonitor, bool, bool, string?)"/>.
     /// </param>
     /// <returns>True on success, false otherwise.</returns>
