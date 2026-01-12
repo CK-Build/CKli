@@ -14,6 +14,10 @@ public sealed partial class GitRepository
     /// Checks that a tag name is valid for CKli: it must obviously be non empty and contains
     /// only ascii characters and letters must be lowercase.
     /// <para>
+    /// This handles regular tag name and canonical tag names (start with "refs/tags/"): the standard
+    /// Git tag prefix is compatible with this rule.
+    /// </para>
+    /// <para>
     /// See <see cref="GitTagInfo.InvalidTags"/>.
     /// </para>
     /// </summary>
@@ -36,7 +40,7 @@ public sealed partial class GitRepository
     /// Deletes any number of local tags (empty <paramref name="tagNames"/> is a no-op).
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="tagNames">The tag names.</param>
+    /// <param name="tagNames">The tag names. They can be canonic (start with "refs/tags/") or regular.</param>
     /// <returns>True on success, false on error.</returns>
     public bool DeleteLocalTags( IActivityMonitor monitor, IEnumerable<string> tagNames )
     {
@@ -62,7 +66,7 @@ public sealed partial class GitRepository
     /// Deletes any number of remote tags (empty <paramref name="tagNames"/> is a no-op).
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="tagNames">The tag names.</param>
+    /// <param name="tagNames">The tag names. They can be canonic (start with "refs/tags/") or regular.</param>
     /// <param name="remoteName">The remote name to consider.</param>
     /// <returns>True on success, false on error.</returns>
     public bool DeleteRemoteTags( IActivityMonitor monitor, List<string> tagNames, string remoteName = "origin" )
@@ -76,7 +80,9 @@ public sealed partial class GitRepository
                 return false;
             }
             monitor.Trace( $"Deleting remote tags '{names}' from '{remote.Name}'." );
-            _git.Network.Push( remote, tagNames.Select( t => $":refs/tags/{t}" ), new PushOptions()
+            _git.Network.Push( remote, tagNames.Select( t => t.StartsWith( "refs/tags/", StringComparison.Ordinal )
+                                                                ? $":{t}"
+                                                                : $":refs/tags/{t}" ), new PushOptions()
             {
                 CredentialsProvider = ( url, user, types ) => creds
             } );
@@ -225,7 +231,7 @@ public sealed partial class GitRepository
     /// Local modifications of pulled tags are lost.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="tagNames">The tag names.</param>
+    /// <param name="tagNames">The tag names. They can be canonic (start with "refs/tags/") or regular.</param>
     /// <param name="remoteName">The remote name to consider.</param>
     /// <returns>True on success, false on error.</returns>
     public bool PullTags( IActivityMonitor monitor, IEnumerable<string> tagNames, string remoteName = "origin" )
@@ -240,11 +246,16 @@ public sealed partial class GitRepository
             }
             var logMsg = $"Fetching tags '{names}' from '{remote.Name}'.";
             monitor.Trace( logMsg );
-            Commands.Fetch( _git, remote.Name, tagNames.Select( t => $"+refs/tags/{t}:refs/tags/{t}" ), new FetchOptions()
-            {
-                CredentialsProvider = ( url, user, types ) => creds,
-                TagFetchMode = TagFetchMode.None
-            }, logMsg );
+            Commands.Fetch( _git,
+                            remote.Name,
+                            tagNames.Select( t => t.StartsWith( "refs/tags/", StringComparison.Ordinal )
+                                                                     ? $"+{t}:{t}"
+                                                                     : $"+refs/tags/{t}:refs/tags/{t}" ),
+                            new FetchOptions()
+                            {
+                                CredentialsProvider = ( url, user, types ) => creds,
+                                TagFetchMode = TagFetchMode.None
+                            }, logMsg );
             return true;
         }
         catch( Exception ex )
@@ -259,7 +270,7 @@ public sealed partial class GitRepository
     /// Modifications of the remote tags are lost: the local replace them.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="tagNames">The tag names.</param>
+    /// <param name="tagNames">The tag names. They can be canonic (start with "refs/tags/") or regular.</param>
     /// <param name="remoteName">The remote name to consider.</param>
     /// <returns>True on success, false on error.</returns>
     public bool PushTags( IActivityMonitor monitor, IEnumerable<string> tagNames, string remoteName = "origin" )
@@ -273,10 +284,14 @@ public sealed partial class GitRepository
                 return false;
             }
             monitor.Trace( $"Pushing tags '{names}' to '{remote.Name}'." );
-            _git.Network.Push( remote, tagNames.Select( t => $"+refs/tags/{t}" ), new PushOptions()
-            {
-                CredentialsProvider = ( url, user, types ) => creds
-            } );
+            _git.Network.Push( remote,
+                               tagNames.Select( t => t.StartsWith( "refs/tags/", StringComparison.Ordinal )
+                                                                    ? $"+{t}"
+                                                                    : $"+refs/tags/{t}" ),
+                               new PushOptions()
+                               {
+                                   CredentialsProvider = ( url, user, types ) => creds
+                               } );
             return true;
         }
         catch( Exception ex )
