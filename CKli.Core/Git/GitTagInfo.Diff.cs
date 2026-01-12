@@ -173,32 +173,48 @@ public sealed partial class GitTagInfo
 
         /// <summary>
         /// Renders this difference.
-        /// This is public mainly for tests.
         /// </summary>
         /// <param name="s">The screen type.</param>
         /// <param name="orderByTagName">
         /// True to order tags by their name rather than their target commit date that is the default.
-        /// Here again, this is mainly for tests.
+        /// This is mainly for tests.
         /// </param>
+        /// <param name="withFetchRequired">Displays the <see cref="UnavailableRemoteTags"/>.</param>
+        /// <param name="withLocalInvalidTags">Displays the local tags that are invalid (see <see cref="GitTagInfo.InvalidTags"/>).</param>
+        /// <param name="withRemoteInvalidTags">Displays the remote tags that are invalid (see <see cref="GitTagInfo.InvalidTags"/>).</param>
+        /// <param name="withConflicts">Displays the tags that are in conflict (see <see cref="Conflicts"/>).</param>
+        /// <param name="withRegularTags">Displays the regular tags (exists on both sides and have no issues).</param>
+        /// <param name="withLocalOnlyTags">Displays the tags that are only local.</param>
+        /// <param name="withRemoteOnlyTags">Displays the tags that are only on the remote.</param>
+        /// <param name="withDifferences">Displays the tags that exists on both sides and differ with the detail of their differences.</param>
         /// <returns>The renderable.</returns>
-        public IRenderable ToRenderable( ScreenType s, bool orderByTagName = false )
+        public IRenderable ToRenderable( ScreenType s,
+                                         bool orderByTagName = false,
+                                         bool withFetchRequired = true,
+                                         bool withLocalInvalidTags = true,
+                                         bool withRemoteInvalidTags = true,
+                                         bool withConflicts = true,
+                                         bool withRegularTags = true,
+                                         bool withLocalOnlyTags = true,
+                                         bool withRemoteOnlyTags = true,
+                                         bool withDifferences = true )
         {
             var display = s.Unit;
-            if( FetchRequired )
+            if( withFetchRequired && FetchRequired )
             {
                 display = display.AddBelow(
                     s.Text( $"Unavailable remote tags. A 'ckli fetch' MAY enable target commits resolution for:", foreColor: ConsoleColor.Yellow ),
                     s.Text( $"- {UnavailableRemoteTags.Concatenate()}.", foreColor: ConsoleColor.DarkYellow ) );
             }
-            if( _local.InvalidTags.Length > 0 )
+            if( withLocalInvalidTags && _local.InvalidTags.Length > 0 )
             {
                 display = display.AddBelow( _local.InvalidTagsToRenderable( s, "local ignored tags" ) );
             }
-            if( _remote.InvalidTags.Length > 0 )
+            if( withRemoteInvalidTags && _remote.InvalidTags.Length > 0 )
             {
                 display = display.AddBelow( _remote.InvalidTagsToRenderable( s, "remote ignored tags" ) );
             }
-            if( _stats._conflictCount > 0 )
+            if( withConflicts && _stats._conflictCount > 0 )
             {
                 var conflicts = Conflicts;
                 if( orderByTagName ) conflicts = conflicts.OrderBy( c => c.CanonicalName );
@@ -209,7 +225,7 @@ public sealed partial class GitTagInfo
             }
             if( display == s.Unit && _entries.Length == 0 )
             {
-                display = display.AddRight( s.Text( "No local nor remote tags." ) );
+                display = display.AddBelow( s.Text( "No local nor remote tags." ) );
             }
             else
             {
@@ -296,23 +312,23 @@ public sealed partial class GitTagInfo
                 Throw.DebugAssert( localCount == _stats._localOnlyCount );
                 Throw.DebugAssert( remoteCount == _stats._remoteOnlyCount );
                 Throw.DebugAssert( diffCount == _stats._differCount );
-                if( regular.Length > 0 )
+                if( withRegularTags && regular.Length > 0 )
                 {
                     display = display.AddBelow( s.Text( regular.ToString() ) );
                 }
-                if( localCount > 0 )
+                if( withLocalOnlyTags && localCount > 0 )
                 {
                     display = display.AddBelow( s.Text( $"{localCount} local only:", foreColor: ConsoleColor.Blue ),
                                                 s.Text( localOnly.ToString() ) );
 
                 }
-                if( remoteCount > 0 )
+                if( withRemoteOnlyTags && remoteCount > 0 )
                 {
                     display = display.AddBelow( s.Text( $"{remoteCount} remote only:", foreColor: ConsoleColor.Blue ),
                                                 s.Text( remoteOnly.ToString() ) );
 
                 }
-                if( diffCount > 0 )
+                if( withDifferences && diffCount > 0 )
                 {
                     display = display.AddBelow( s.Text( $"{diffCount} differences:", foreColor: ConsoleColor.Magenta ),
                                                 s.Text( difference.ToString() ) );
