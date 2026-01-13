@@ -1189,17 +1189,13 @@ public sealed partial class GitRepository : IDisposable
             {
                 Repository.Clone( git.OriginUrl.AbsoluteUri, workingFolder, new CloneOptions()
                 {
-                    FetchOptions =
-                                    {
-                                        CredentialsProvider = ( url, user, cred ) => creds
-                                    },
+                    FetchOptions = { CredentialsProvider = ( url, user, cred ) => creds },
                     Checkout = true
                 } );
                 var r = new Repository( workingFolder );
-                var remote = r.Network.Remotes.FirstOrDefault( rem => GitRepositoryKey.IsEquivalentRepositoryUri( new Uri( rem.Url, UriKind.Absolute ), git.OriginUrl ) );
-                if( remote == null || remote.Name != "origin" )
+                var o = r.Network.Remotes["origin"];
+                if( o == null || !GitRepositoryKey.IsEquivalentRepositoryUri( new Uri( o.Url, UriKind.Absolute ), git.OriginUrl ) )
                 {
-
                     monitor.Fatal( $"Existing '{workingFolder}' must have its 'origin' remote set to '{git.OriginUrl}'. This must be fixed manually." );
                     r.Dispose();
                     return null;
