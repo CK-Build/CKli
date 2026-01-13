@@ -92,7 +92,7 @@ sealed partial class ReflectionPluginCollector
             GeneratePluginCommandsArray( b );
 
             b.Append( """
-                    var cmds = new Dictionary<string,Command?>();
+                    var cmds = new Dictionary<string,Command>();
                     foreach( var c in pluginCommands )
                     {
                         cmds.Add( c.CommandPath, c );
