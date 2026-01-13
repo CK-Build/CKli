@@ -38,7 +38,6 @@ public partial class PullPushTests
                                              context.Committer,
                                              timPath,
                                              timPath.LastPart ).ShouldNotBeNull();
-        var timFilePath = timPath.AppendPart( "Some.txt" );
 
         var bobPath = context.CurrentDirectory.AppendPart( "Bob" );
         using var bob = GitRepository.Clone( TestHelper.Monitor,
@@ -46,7 +45,6 @@ public partial class PullPushTests
                                              context.Committer,
                                              bobPath,
                                              bobPath.LastPart ).ShouldNotBeNull();
-        var bobFilePath = bobPath.AppendPart( "Some.txt" );
 
         tim.CurrentBranchName.ShouldBe( "master" );
         bob.CurrentBranchName.ShouldBe( "master" );
@@ -57,8 +55,18 @@ public partial class PullPushTests
             noWay.ShouldBeNull();
         }
 
+        // We use use Tim to test the DeferredPushRefSpecs (for the "ckli-repo" tag) as he pushes its branches. 
+        tim.DeferredPushRefSpecs.Add( "+refs/tags/ckli-repo" );
+        var localRepoIdTag = tim.Repository.Tags.Add( "ckli-repo", tim.Repository.Head.Tip, tim.Committer, "I'm the repoId content.", allowOverwrite: false );
+        tim.GetRemoteTags( TestHelper.Monitor, out var timTags ).ShouldBeTrue();
+        timTags.IndexedTags.ContainsKey( "refs/tags/ckli-repo" ).ShouldBeFalse( "ckli-repo tag is still local only." );
+
         // Tim creates branch "test-1" with a commit and pushes it.
+        // This pushed the "ckli-repo" tag.
         CreateBranchAndPush( tim, 1 );
+        tim.DeferredPushRefSpecs.ShouldBeEmpty();
+        tim.GetRemoteTags( TestHelper.Monitor, out timTags ).ShouldBeTrue();
+        timTags.IndexedTags.ContainsKey( "refs/tags/ckli-repo" ).ShouldBeTrue( "The ckli-repo tag has been pushed." );
 
         // Bob fetches the "test-1" branch (unknown to him).
         {

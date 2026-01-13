@@ -75,7 +75,7 @@ public sealed partial class GitRepository
         if( names.Length == 0 ) return true;
         try
         {
-            if( !GetRemote( monitor, remoteName, out var remote, out var creds ) )
+            if( !GetRemote( monitor, remoteName, forWrite: true, out var remote, out var creds ) )
             {
                 return false;
             }
@@ -106,7 +106,7 @@ public sealed partial class GitRepository
     {
         try
         {
-            if( !GetRemote( monitor, remoteName, out var remote, out var creds ) )
+            if( !GetRemote( monitor, remoteName, forWrite: false, out var remote, out var creds ) )
             {
                 tags = null;
                 return false;
@@ -240,7 +240,7 @@ public sealed partial class GitRepository
         if( names.Length == 0 ) return true;
         try
         {
-            if( !GetRemote( monitor, remoteName, out var remote, out var creds ) )
+            if( !GetRemote( monitor, remoteName, forWrite: false, out var remote, out var creds ) )
             {
                 return false;
             }
@@ -277,28 +277,18 @@ public sealed partial class GitRepository
     {
         var names = tagNames.Concatenate();
         if( names.Length == 0 ) return true;
-        try
+        monitor.Trace( $"Pushing tags '{names}' to '{remoteName}'." );
+
+        if( !GetRemote( monitor, remoteName, forWrite: true, out var remote, out var creds ) )
         {
-            if( !GetRemote( monitor, remoteName, out var remote, out var creds ) )
-            {
-                return false;
-            }
-            monitor.Trace( $"Pushing tags '{names}' to '{remote.Name}'." );
-            _git.Network.Push( remote,
-                               tagNames.Select( t => t.StartsWith( "refs/tags/", StringComparison.Ordinal )
-                                                                    ? $"+{t}"
-                                                                    : $"+refs/tags/{t}" ),
-                               new PushOptions()
-                               {
-                                   CredentialsProvider = ( url, user, types ) => creds
-                               } );
-            return true;
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( "Error while pushing tags. This requires a manual fix.", ex );
             return false;
         }
+        return Push( monitor,
+                             remote,
+                             creds,
+                             tagNames.Select( t => t.StartsWith( "refs/tags/", StringComparison.Ordinal )
+                                                                    ? $"+{t}"
+                                                                    : $"+refs/tags/{t}" ) );
     }
 
     /// <summary>

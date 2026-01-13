@@ -432,6 +432,7 @@ public sealed partial class World
             }
             CreateOrUpdateCKliRepoTag( repository, _stackRepository, repoId );
         }
+        repository.DeferredPushRefSpecs.Add( "+refs/tags/ckli-repo" );
         Repo? repo = new Repo( this, repository, _layout[index].XElement, index, repoId, _firstRepo );
         _firstRepo = repo;
         _cachedRepositories[repository.WorkingFolder] = repo;

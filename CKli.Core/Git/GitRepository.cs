@@ -20,6 +20,7 @@ public sealed partial class GitRepository : IDisposable
     readonly Repository _git;
     readonly NormalizedPath _displayPath;
     readonly NormalizedPath _workingFolder;
+    readonly List<string> _deferredPushRefSpecs;
     Signature _committer;
 
     GitRepository( GitRepositoryKey repositoryKey,
@@ -36,6 +37,7 @@ public sealed partial class GitRepository : IDisposable
         _git = libRepository;
         _workingFolder = fullPath;
         _displayPath = displayPath;
+        _deferredPushRefSpecs = new List<string>();
 
         Throw.CheckArgument( _workingFolder.Path.Equals( new NormalizedPath( libRepository.Info.WorkingDirectory ), StringComparison.OrdinalIgnoreCase ) );
         Throw.CheckArgument( _workingFolder.Path.EndsWith( _displayPath, StringComparison.OrdinalIgnoreCase ) );
@@ -87,6 +89,23 @@ public sealed partial class GitRepository : IDisposable
             _committer = value;
         }
     }
+
+    /// <summary>
+    /// Gets a mutable list of ref specs (see <see href="<see href="https://git-scm.com/book/en/v2/Git-Internals-The-Refspec"/>"/>)
+    /// that will be implicitly pushed with the next push that will be done (can be <see cref="PushBranch(IActivityMonitor, Branch, bool)"/>,
+    /// or <see cref="PushTags(IActivityMonitor, IEnumerable{string}, string)"/>, etc.). Once pushed, this list is cleared.
+    /// <para>
+    /// This has been designed to handle the update of the "ckli-repo" tag: instead of requiring each Repo initialization to
+    /// systematically blindly push the "ckli-repo" tag (that costs and is 99.9% useless) or fetch the remote tags (that is a
+    /// costly <c>git_remote_ls</c> operation) to "cleverly" push the the "ckli-repo" only when needed, this deferring systematically
+    /// pushes the local "ckli-repo" tag among the first other references to push.
+    /// </para>
+    /// <para>
+    /// This enables purely local scenario without overhead and guaranties that the "ckli-repo" tag is properly initialized on
+    /// any "ckli aware repository".
+    /// </para>
+    /// </summary>
+    public List<string> DeferredPushRefSpecs => _deferredPushRefSpecs;
 
     /// <summary>
     /// Gets the LibGit2Sharp <see cref="Repository"/>.
@@ -332,7 +351,8 @@ public sealed partial class GitRepository : IDisposable
     ///     </item>
     /// </list>
     /// This doesn't create a local branch if the branch doesn't already exist locally or in the 'origin' remote.
-    /// The output <paramref name="branch"/> is updated (may be set to null if the tracked branch disappeared from the remote).
+    /// The output <paramref name="branch"/> is up-to-date: it can be null when the branch doesn't exist, and its <see cref="Branch.TrackedBranch"/>
+    /// can be null and even can become null if the tracked branch disappeared from the remote.
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="branchName">The human friendly branch name.</param>
@@ -469,12 +489,24 @@ public sealed partial class GitRepository : IDisposable
         }
     }
 
-    bool GetRemote( IActivityMonitor monitor,
-                    string remoteName,
-                    [NotNullWhen( true )] out Remote? remote,
-                    out UsernamePasswordCredentials? creds )
+    /// <summary>
+    /// Gets the LibGit <see cref="Remote"/> and <see cref="UsernamePasswordCredentials"/> to use for a
+    /// network operation.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="remoteName">The remote name.</param>
+    /// <param name="forWrite">True to obtain the write credentials, false for reading.</param>
+    /// <param name="remote">The remote on success.</param>
+    /// <param name="creds">The credentials to use: can be null if no credentials are required.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool GetRemote( IActivityMonitor monitor,
+                           string remoteName,
+                           bool forWrite,
+                           [NotNullWhen( true )] out Remote? remote,
+                           out UsernamePasswordCredentials? creds )
     {
-        if( !_repositoryKey.GetReadCredentials( monitor, out creds ) )
+        if( (forWrite && !_repositoryKey.GetWriteCredentials( monitor, out creds ))
+            || !_repositoryKey.GetReadCredentials( monitor, out creds ) )
         {
             remote = null;
             return false;
@@ -613,13 +645,16 @@ public sealed partial class GitRepository : IDisposable
     /// If the <paramref name="localBranch"/> is a remote branch this throws a <see cref="ArgumentException"/>.
     /// </para>
     /// <para>
-    /// A branch should always been fetched and merged before being pushed.
+    /// Whenever possible, a branch should always been fetched and merged before being pushed.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="localBranch">The local branch to push.</param>
     /// <param name="autoCreateRemoteBranch">
     /// True create the 'origin' remote branch if the branch has no tracked branch.
+    /// <para>
+    /// Caution: Before using this, the branch (or branches) must have been fetched.
+    /// </para>
     /// </param>
     /// <returns>True on success, false on error.</returns>
     public bool PushBranch( IActivityMonitor monitor, Branch localBranch, bool autoCreateRemoteBranch )
@@ -629,10 +664,7 @@ public sealed partial class GitRepository : IDisposable
         var branchName = localBranch.FriendlyName;
         using( monitor.OpenInfo( $"Pushing branch '{DisplayPath}/{branchName}'." ) )
         {
-            if( !_repositoryKey.GetWriteCredentials( monitor, out var creds ) )
-            {
-                return false;
-            }
+            string? remoteName = null;
             var tracked = localBranch.TrackedBranch;
             if( tracked == null )
             {
@@ -642,19 +674,50 @@ public sealed partial class GitRepository : IDisposable
                     return false;
                 }
                 monitor.Warn( $"Branch '{branchName}' has no tracked branch. Creating branch 'origin/{branchName}'." );
-                localBranch = _git.Branches.Update( localBranch, u => { u.Remote = "origin"; u.UpstreamBranch = localBranch.CanonicalName; } );
+                remoteName = "origin";
+                localBranch = _git.Branches.Update( localBranch, u => { u.Remote = remoteName; u.UpstreamBranch = localBranch.CanonicalName; } );
             }
             else if( tracked.RemoteName == null )
             {
                 monitor.Error( $"Branch '{branchName}' tracks branch '{tracked.CanonicalName}' that is not a remote branch." );
                 return false;
             }
+            else
+            {
+                remoteName = tracked.RemoteName;
+            }
+            // When the branch has been "autoCreateRemoteBranch", then this is null: the branch will be pushed.
             int? aheadBy = localBranch.TrackingDetails.AheadBy;
             if( aheadBy.HasValue && aheadBy.Value == 0 )
             {
                 monitor.CloseGroup( "Tracked branch is on the same commit. Push skipped." );
                 return true;
             }
+            if( !GetRemote( monitor, remoteName, forWrite: true, out var remote, out var creds ) )
+            {
+                return false;
+            }
+            return Push( monitor, remote, creds, [$"{localBranch.CanonicalName}:{localBranch.UpstreamBranchCanonicalName}"] );
+        }
+    }
+
+    /// <summary>
+    /// Low level push method that must be used whenever possible as this handles the <see cref="DeferredPushRefSpecs"/>.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="remote">The target remote.</param>
+    /// <param name="creds">The credentials to use. See <see cref="GetRemote(IActivityMonitor, string, bool, out Remote?, out UsernamePasswordCredentials?)"/>.</param>
+    /// <param name="pushRefSpecs">The ref specs to push.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool Push( IActivityMonitor monitor, Remote remote, UsernamePasswordCredentials? creds, IEnumerable<string> pushRefSpecs )
+    {
+        if( _deferredPushRefSpecs.Count > 0 )
+        {
+            pushRefSpecs = pushRefSpecs.Concat( _deferredPushRefSpecs );
+        }
+        var commonLogMsg = $"'{DisplayPath}' references '{pushRefSpecs.Concatenate( "', '" )}'";
+        using( monitor.OpenTrace( $"Pushing {commonLogMsg}." ) )
+        {
             try
             {
                 // Take no risk: consider that the error callback can be called concurrently
@@ -671,21 +734,22 @@ public sealed partial class GitRepository : IDisposable
                             """ );
                     }
                 };
-                _git.Network.Push( localBranch, options );
+                _git.Network.Push( remote, pushRefSpecs, options );
                 if( !errors.IsEmpty )
                 {
                     monitor.Error( $"""
-                While pushing '{DisplayPath}/{localBranch.FriendlyName}':
+                While pushing {commonLogMsg}':
                 {errors.Concatenate( Environment.NewLine )}
                 """ );
                     monitor.CloseGroup( $"{errors.Count} errors." );
                     return false;
                 }
+                _deferredPushRefSpecs.Clear();
                 return true;
             }
             catch( Exception ex )
             {
-                monitor.Error( $"While pushing '{DisplayPath}/{localBranch.FriendlyName}'.", ex );
+                monitor.Error( $"While pushing {commonLogMsg}.", ex );
                 return false;
             }
         }
