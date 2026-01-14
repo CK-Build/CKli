@@ -447,14 +447,24 @@ public sealed partial class StackRepository : IDisposable
     /// </param>
     /// <param name="url">The url of the remote.</param>
     /// <param name="isPublic">Whether this repository is public.</param>
-    /// <param name="allowDuplicateStack">True to create a "DuplicateOf-XX" stack folder if the stack is already available on this machine.</param>
-    /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branches in a stack repository.</param>
+    /// <param name="allowDuplicateStack">
+    /// True to create a "DuplicateOf-XX" stack folder if the stack is already available on this machine.
+    /// </param>
+    /// <param name="ignoreParentStack">
+    /// True to allow a stack to be cloned in an existing one.
+    /// This should be avoided (but is required in the tests of Stack plugins).
+    /// </param>
+    /// <param name="stackBranchName">
+    /// Specifies a branch name.
+    /// There should be no reason to use multiple branches in a stack repository.
+    /// </param>
     /// <returns>The repository or null on error.</returns>
     public static StackRepository? Clone( IActivityMonitor monitor,
                                           CKliEnv context,
                                           Uri url,
                                           bool isPublic,
                                           bool allowDuplicateStack = false,
+                                          bool ignoreParentStack = false,
                                           string stackBranchName = "main" )
     {
         Throw.CheckNotNullArgument( monitor );
@@ -491,13 +501,16 @@ public sealed partial class StackRepository : IDisposable
         var stackRoot = parentPath.AppendPart( stackFolderName );
 
         // Secure Stack inside Stack scenario.
-        var parentStack = FindGitStackPath( parentPath );
-        if( !parentStack.IsEmptyPath )
+        if( !ignoreParentStack )
         {
-            var stackAbove = parentStack.RemoveLastPart();
-            var safeRoot = stackAbove.RemoveLastPart().AppendPart( stackFolderName );
-            monitor.Warn( $"Resolved stack path '{stackRoot}' is inside stack '{stackAbove}': moving it to {safeRoot}." );
-            stackRoot = safeRoot;
+            var parentStack = FindGitStackPath( parentPath );
+            if( !parentStack.IsEmptyPath )
+            {
+                var stackAbove = parentStack.RemoveLastPart();
+                var safeRoot = stackAbove.RemoveLastPart().AppendPart( stackFolderName );
+                monitor.Warn( $"Resolved stack path '{stackRoot}' is inside stack '{stackAbove}': moving it to {safeRoot}." );
+                stackRoot = safeRoot;
+            }
         }
 
         // Don't clone if the resolved path exists.

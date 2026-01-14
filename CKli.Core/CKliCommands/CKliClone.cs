@@ -16,9 +16,10 @@ sealed class CKliClone : Command
                 [("stackUrl", "The url stack repository to clone from. The repository name must end with '-Stack'.")],
                 [],
                 [
-                    (["--private"],"Indicates a private repository. A Personal Access Token (or any other secret) is required."),
-                    (["--allow-duplicate"],"Allows a Stack that already exists locally to be cloned."),
-                ] ) 
+                    (["--private"], "Indicates a private repository. A Personal Access Token (or any other secret) is required."),
+                    (["--allow-duplicate"], "Allows a Stack that already exists locally to be cloned."),
+                    (["--ignore-parent-stack"], "Allows the cloned Stack to be inside an existing one."),
+                ] )
     {
     }
 
@@ -36,11 +37,12 @@ sealed class CKliClone : Command
         }
         bool p = cmdLine.EatFlag( "--private" );
         bool a = cmdLine.EatFlag( "--allow-duplicate" );
+        bool i = cmdLine.EatFlag( "--ignore-parent-stack" );
         if( !cmdLine.Close( monitor ) )
         {
             return ValueTask.FromResult( false );
         }
-        using( var stack = StackRepository.Clone( monitor, context, uri, !p, a ) )
+        using( var stack = StackRepository.Clone( monitor, context, uri, !p, a, i ) )
         {
             return ValueTask.FromResult( stack != null );
         }
