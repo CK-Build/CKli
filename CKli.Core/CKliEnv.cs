@@ -49,13 +49,23 @@ public sealed class CKliEnv
     /// <param name="currentDirectory">Current directory to consider.</param>
     /// <param name="secretsStore">Optional secrets store (overrides the default <see cref="CKliRootEnv.SecretsStore"/>).</param>
     /// <param name="screen">Optional screen (overrides the default <see cref="CKliRootEnv.Screen"/>).</param>
-    public CKliEnv( NormalizedPath currentDirectory, ISecretsStore? secretsStore = null, IScreen? screen = null )
+    /// <param name="findCurrentStackPath">
+    /// By default, <see cref="StackRepository.FindGitStackPath"/> is used from the current directory to initialize
+    /// the <see cref="CurrentStackPath"/>. Setting this to false ignores the current stack path.
+    /// </param>
+    public CKliEnv( NormalizedPath currentDirectory,
+                    ISecretsStore? secretsStore = null,
+                    IScreen? screen = null,
+                    bool findCurrentStackPath = true )
     {
         Throw.CheckArgument( !currentDirectory.IsEmptyPath );
         _currentDirectory = currentDirectory;
         _secretsStore = secretsStore ?? CKliRootEnv.SecretsStore;
         _screen = screen ?? CKliRootEnv.Screen;
-        _currentStackPath = StackRepository.FindGitStackPath( currentDirectory );
+        if( findCurrentStackPath )
+        {
+            _currentStackPath = StackRepository.FindGitStackPath( currentDirectory );
+        }
         _startCommandHandlingLocalTime = DateTimeOffset.Now;
     }
 

@@ -40,7 +40,7 @@ static partial class TestEnv
 
     static void Initialize()
     {
-        CKliRootEnv.Initialize( "Test", screen: new StringScreen() );
+        CKliRootEnv.Initialize( "Test", screen: new StringScreen(), findCurrentStackPath: false );
         InitializeRemotes();
         InitializeNuGetSource();
         // Single so that this throws if naming change.
@@ -236,7 +236,7 @@ static partial class TestEnv
         {
             Throw.CheckState( StackRepository.ClearRegistry( TestHelper.Monitor ) );
         }
-        return new CKliEnv( path, screen: new StringScreen() );
+        return new CKliEnv( path, screen: new StringScreen(), findCurrentStackPath: false );
 
         static void RemoveAllReadOnlyAttribute( string folder )
         {

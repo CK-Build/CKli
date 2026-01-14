@@ -42,8 +42,7 @@ public static partial class CKliRootEnv
     /// <param name="screen">Optional <see cref="StringScreen"/> to use or <see cref="NoScreen"/>.</param>
     /// <param name="findCurrentStackPath">
     /// By default, <see cref="StackRepository.FindGitStackPath"/> is used from the current directory to initialize
-    /// the <see cref="CurrentStackPath"/>. Setting this to false ignores the current stack path: this is typically
-    /// used in the tests of a Stack plugin.
+    /// the <see cref="CurrentStackPath"/>. Setting this to false ignores the current stack path.
     /// </param>
     public static void Initialize( string? instanceName = null,
                                    CommandLineArguments? arguments = null,
