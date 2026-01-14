@@ -21,6 +21,8 @@
 
   <!-- Consider the Remotes, Cloned and PackagedPlugins folders as pure
        content: their .csproj are ignored by the build system.
+       Note that there must not be any test projects in theses solutions:
+       the NUnitTestAdapter v6.0.0 discovers them regardless of this exclusion.
   -->
   <ItemGroup>
     <None Include="$(Content);Remotes\**;Cloned\**;PackagedPlugins\**" />

@@ -35,10 +35,20 @@ public static partial class CKliRootEnv
     /// <summary>
     /// Initializes the CKli environment.
     /// </summary>
-    /// <param name="instanceName">Used by tests (with "Test"). Can be used with other suffix if needed.</param>
+    /// <param name="instanceName">
+    /// Used by tests (with "Test"). Can be used with other suffix if needed. This drives the <see cref="AppLocalDataPath"/>.
+    /// </param>
     /// <param name="arguments">Optional arguments. when provided, this handles the <c>--screen</c> option.</param>
     /// <param name="screen">Optional <see cref="StringScreen"/> to use or <see cref="NoScreen"/>.</param>
-    public static void Initialize( string? instanceName = null, CommandLineArguments? arguments = null, IScreen? screen = null )
+    /// <param name="findCurrentStackPath">
+    /// By default, <see cref="StackRepository.FindGitStackPath"/> is used from the current directory to initialize
+    /// the <see cref="CurrentStackPath"/>. Setting this to false ignores the current stack path: this is typically
+    /// used in the tests of a Stack plugin.
+    /// </param>
+    public static void Initialize( string? instanceName = null,
+                                   CommandLineArguments? arguments = null,
+                                   IScreen? screen = null,
+                                   bool findCurrentStackPath = true )
     {
         Throw.CheckState( "Initialize can be called only once.", _appLocalDataPath.IsEmptyPath );
         _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create ),
@@ -46,8 +56,10 @@ public static partial class CKliRootEnv
         // To handle logs, we first must determine if we are in a Stack. If this is the case, then the Logs/ folder
         // will be .[Public|PrivateStack]/Logs, else the log will be in _appLocalDataPath/Out-of-Stack-Logs/.
         _currentDirectory = Environment.CurrentDirectory;
-        _currentStackPath = StackRepository.FindGitStackPath( _currentDirectory );
-
+        if( findCurrentStackPath )
+        {
+            _currentStackPath = StackRepository.FindGitStackPath( _currentDirectory );
+        }
         _screen = screen ?? CreateScreen( arguments );
 
         InitializeMonitoring( _currentDirectory, _currentStackPath );
