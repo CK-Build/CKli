@@ -66,8 +66,11 @@ static partial class TestEnv
         };
         var corePath = CopyMostRecentPackageToNuGetSource( "CKli.Core" );
         var pluginsPath = CopyMostRecentPackageToNuGetSource( "CKli.Plugins.Core" );
-        NuGetHelper.ClearGlobalCache( TestHelper.Monitor, "CKli.Core", null );
-        NuGetHelper.ClearGlobalCache( TestHelper.Monitor, "CKli.Plugins.Core", null );
+        var currentVersionString = pluginsPath.LastPart["CKli.Plugins.Core.".Length..^".nupkg".Length];
+        _cKliPluginsCoreVersion = SVersion.Parse( currentVersionString );
+
+        NuGetHelper.ClearGlobalCache( TestHelper.Monitor, "CKli.Core", currentVersionString );
+        NuGetHelper.ClearGlobalCache( TestHelper.Monitor, "CKli.Plugins.Core", currentVersionString );
 
         foreach( var nuget in Directory.EnumerateFiles( _nugetSourcePath ) )
         {
@@ -77,7 +80,6 @@ static partial class TestEnv
                 FileHelper.DeleteFile( TestHelper.Monitor, p ).ShouldBeTrue();
             }
         }
-        _cKliPluginsCoreVersion = SVersion.Parse( pluginsPath.LastPart["CKli.Plugins.Core.".Length..^".nupkg".Length] );
 
         static NormalizedPath CopyMostRecentPackageToNuGetSource( string projectFolder )
         {
