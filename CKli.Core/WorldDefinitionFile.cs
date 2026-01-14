@@ -553,6 +553,7 @@ public sealed class WorldDefinitionFile
                             // Enter "Repositories Proxy" mode.
                             if( !world.Stack.LocalProxyRepositoriesPath.IsEmptyPath )
                             {
+                                bool foundMapping = false;
                                 if( IsValidFolderName( aUrl.Value ) )
                                 {
                                     var candidate = world.Stack.LocalProxyRepositoriesPath.AppendPart( aUrl.Value );
@@ -560,9 +561,10 @@ public sealed class WorldDefinitionFile
                                     {
                                         url = new Uri( candidate );
                                         monitor.Trace( $"Automatic Repository Proxy mapping of Url=\"{aUrl.Value}\" to '{url}'." );
+                                        foundMapping = true;
                                     }
                                 }
-                                else
+                                if( !foundMapping )
                                 {
                                     monitor.Error( $"""
                                                 Invalid element:
