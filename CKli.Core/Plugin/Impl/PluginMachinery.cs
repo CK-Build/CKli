@@ -81,7 +81,7 @@ public sealed partial class PluginMachinery
 
     internal NormalizedPath CKliCompiledPluginsFile => _ckliCompiledPluginsFile.IsEmptyPath ? (_ckliCompiledPluginsFile = CKliPluginsFolder.AppendPart( "CKli.CompiledPlugins.cs" )) : _ckliCompiledPluginsFile;
 
-    internal NormalizedPath PluginTestsCSProjFilePath => _pluginTestsCSProjFilePath.IsEmptyPath ? (_pluginTestsCSProjFilePath = CKliPluginsFolder.Combine( "Tests/Plugins.Tests/Plugins.Tests.csproj" )) : _pluginTestsCSProjFilePath;
+    internal NormalizedPath PluginTestsCSProjFilePath => _pluginTestsCSProjFilePath.IsEmptyPath ? (_pluginTestsCSProjFilePath = Root.Combine( "Tests/Plugins.Tests/Plugins.Tests.csproj" )) : _pluginTestsCSProjFilePath;
 
     internal IPluginFactory PluginFactory => _pluginFactory;
 
@@ -320,33 +320,33 @@ public sealed partial class PluginMachinery
             var v = SVersion.TryParse( ckliPluginsCore.Attribute( "Version" )?.Value );
             if( !v.IsValid )
             {
-                monitor.Error( $"Invalid version in {ckliPluginsCore} (in '{DirectoryPackageProps}')." );
+                monitor.Error( $"Invalid version in {ckliPluginsCore} (in '{DirectoryPackageProps}'): {v.ErrorMessage}." );
                 return false;
             }
             var ckliVersion = World.CKliVersion.Version;
             Throw.Assert( ckliVersion != null );
-            if( v == ckliVersion )
+            if( v != ckliVersion )
             {
-                return true;
+                if( !_definitionFile.World.IsDefaultWorld )
+                {
+                    monitor.Error( $"""
+                                   This world '{_definitionFile.World.FullName}' is a Long Term Support world.
+                                   It uses CKli in version '{v}'. This CKli version is '{ckliVersion}'.
+                                   Please use the appropriate CKli version.
+                                   """ );
+                    return false;
+                }
+                monitor.Info( $"""
+                              Updating 'Directory.Package.props' file:
+                              {ckliPluginsCore}
+                              To use Version="{ckliVersion}".
+                              """ );
+                ckliPluginsCore.SetAttributeValue( "Version", ckliVersion );
+                d.SaveWithoutXmlDeclaration( DirectoryPackageProps );
             }
-            if( !_definitionFile.World.IsDefaultWorld )
-            {
-                monitor.Error( $"""
-                               This world '{_definitionFile.World.FullName}' is a Long Term Support world.
-                               It uses CKli in version '{v}'. This CKli version is '{ckliVersion}'.
-                               Please use the appropriate CKli version.
-                               """ );
-                return false;
-            }
-            monitor.Info( $"""
-                          Updating 'Directory.Package.props' file:
-                          {ckliPluginsCore}
-                          To use Version="{ckliVersion}".
-                          """ );
-            ckliPluginsCore.SetAttributeValue( "Version", ckliVersion );
-            d.SaveWithoutXmlDeclaration( DirectoryPackageProps );
-
             // Handling CKli.Testing version in 'Tests/Plugins.Tests/Plugins.Tests.csproj' if it exists.
+            // We do this even if the version in the Directory.Package.props was okay and if CKli.Testing
+            // is not referenced by the test project, we just emit a warning.
             if( File.Exists( PluginTestsCSProjFilePath ) )
             {
                 var testsCSProj = XDocument.Load( PluginTestsCSProjFilePath, LoadOptions.PreserveWhitespace );
@@ -356,19 +356,29 @@ public sealed partial class PluginMachinery
                 if( ckliTesting == null )
                 {
                     monitor.Warn( """
-                        Unable to find <PackageReference Include="CKli.Testing" /> element in 'Tests/Plugins.Tests/Plugins.Tests.csproj'.
+                        Unable to find <PackageReference Include="CKli.Testing" Version="..." /> element in 'Tests/Plugins.Tests/Plugins.Tests.csproj'.
                         Skipping CKli version update.
                         """ );
+                    return false;
                 }
                 else
                 {
-                    ckliTesting.SetAttributeValue( "Version", ckliVersion );
-                    monitor.Info( $"""
+                    v = SVersion.TryParse( ckliTesting.Attribute( "Version" )?.Value );
+                    if( !v.IsValid )
+                    {
+                        monitor.Error( $"Invalid version in {ckliTesting} (in '{PluginTestsCSProjFilePath}'): {v.ErrorMessage}." );
+                        return false;
+                    }
+                    if( v != ckliVersion )
+                    {
+                        monitor.Info( $"""
                           Updating 'Tests/Plugins.Tests/Plugins.Tests.csproj' file:
                           {ckliTesting}
                           To use Version="{ckliVersion}".
                           """ );
-                    testsCSProj.SaveWithoutXmlDeclaration( PluginTestsCSProjFilePath );
+                        ckliTesting.SetAttributeValue( "Version", ckliVersion );
+                        testsCSProj.SaveWithoutXmlDeclaration( PluginTestsCSProjFilePath );
+                    }
                 }
             }
 
