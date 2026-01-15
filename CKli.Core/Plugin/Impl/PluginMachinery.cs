@@ -350,7 +350,7 @@ public sealed partial class PluginMachinery
             if( File.Exists( PluginTestsCSProjFilePath ) )
             {
                 var testsCSProj = XDocument.Load( PluginTestsCSProjFilePath, LoadOptions.PreserveWhitespace );
-                var ckliTesting = d.Root?.Elements( "ItemGroup" )
+                var ckliTesting = testsCSProj.Root?.Elements( "ItemGroup" )
                                              .Elements( "PackageReference" )
                                              .FirstOrDefault( e => e.Attribute( "Include" )?.Value == "CKli.Testing" );
                 if( ckliTesting == null )
