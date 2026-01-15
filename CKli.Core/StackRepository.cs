@@ -374,16 +374,18 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="context">The basic command context.</param>
     /// <param name="error">True on error, false on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
+    /// <param name="pluginLoadMode">Optional plugin load mode. See <see cref="WorldPluginLoadMode"/>.</param>
     /// <returns>The resulting stack repository and world on success. Both are null on error of if no stack is found.</returns>
     public static (StackRepository? Stack, World? World) TryOpenWorldFromPath( IActivityMonitor monitor,
                                                                                CKliEnv context,
                                                                                out bool error,
-                                                                               bool skipPullStack = false )
+                                                                               bool skipPullStack = false,
+                                                                               WorldPluginLoadMode pluginLoadMode = WorldPluginLoadMode.Default )
     {
         var stack = TryOpenFromPath( monitor, context, out error, skipPullStack );
         if( stack != null )
         {
-            var w = World.Create( monitor, context.Screen.ScreenType, stack, context.CurrentDirectory );
+            var w = World.Create( monitor, context.Screen.ScreenType, stack, context.CurrentDirectory, pluginLoadMode );
             if( w == null )
             {
                 error = true;
@@ -407,12 +409,14 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="stack">The non null stack on success.</param>
     /// <param name="world">The non null world on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
+    /// <param name="pluginLoadMode">Optional plugin load mode. See <see cref="WorldPluginLoadMode"/>.</param>
     /// <returns>True on success, false on error.</returns>
     public static bool OpenWorldFromPath( IActivityMonitor monitor,
                                           CKliEnv context,
                                           [NotNullWhen( true )] out StackRepository? stack,
                                           [NotNullWhen( true )] out World? world,
-                                          bool skipPullStack = false )
+                                          bool skipPullStack = false,
+                                          WorldPluginLoadMode pluginLoadMode = WorldPluginLoadMode.Default )
     {
         world = null;
         stack = TryOpenFromPath( monitor, context, out bool error, skipPullStack );
@@ -425,7 +429,7 @@ public sealed partial class StackRepository : IDisposable
             monitor.Error( $"No stack found for path '{context.CurrentDirectory}'." );
             return false;
         }
-        world = World.Create( monitor, context.Screen.ScreenType, stack, context.CurrentDirectory );
+        world = World.Create( monitor, context.Screen.ScreenType, stack, context.CurrentDirectory, pluginLoadMode );
         if( world == null )
         {
             stack.Dispose();
@@ -435,6 +439,7 @@ public sealed partial class StackRepository : IDisposable
         stack._world = world;
         return true;
     }
+
     /// <summary>
     /// Clones a Stack and all its default world repositories to the local file system in a new folder
     /// from a stack repository.

@@ -118,7 +118,8 @@ public sealed partial class World
     internal static World? Create( IActivityMonitor monitor,
                                    ScreenType screenType,
                                    StackRepository stackRepository,
-                                   NormalizedPath path )
+                                   NormalizedPath path,
+                                   WorldPluginLoadMode pluginLoadMode )
     {
         var worldName = stackRepository.GetWorldNameFromPath( monitor, path );
         var definitionFile = worldName?.LoadDefinitionFile( monitor );
@@ -131,8 +132,26 @@ public sealed partial class World
         PluginMachinery? machinery = null;
         if( World.PluginLoader != null )
         {
-            machinery = new PluginMachinery( worldName, definitionFile );
-            machinery.Initialize( monitor );
+            if( pluginLoadMode == WorldPluginLoadMode.NoPlugins )
+            {
+                monitor.Trace( "WorldPluginLoadMode is NoPlugins: ignoring plugins." );
+            }
+            else
+            {
+                machinery = new PluginMachinery( worldName, definitionFile );
+                if( pluginLoadMode == WorldPluginLoadMode.UsePreCompiledPlugins )
+                {
+                    if( !machinery.InitializeWithPreCompiledPlugins( monitor ) )
+                    {                        
+                        monitor.Error( "Unable to load the World using WorldPluginLoadMode.UsePreCompiledPlugins." );
+                        return null;
+                    }
+                }
+                else
+                {
+                    machinery.Initialize( monitor );
+                }
+            }
         }
         else
         {

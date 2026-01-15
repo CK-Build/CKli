@@ -29,7 +29,7 @@ public sealed partial class PluginMachinery
 
         public string GenerateCode()
         {
-            throw new NotImplementedException();
+            throw new NotSupportedException();
         }
     }
 

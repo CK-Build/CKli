@@ -2,7 +2,7 @@
 
 CKli is a tool for <u>multi-repositories</u> stacks.
 It allows to automate actions (build, package upgrade, etc...), on <u>Worlds</u> (a group of repositories),
-and concentrates informations in a single place.
+and concentrates information in a single place.
 
 :warning: This is currently under development.
 
@@ -10,7 +10,7 @@ and concentrates informations in a single place.
 
 ### Prerequisites
 
-- [.NET SDK 8.0](https://dotnet.microsoft.com/download)
+- [.NET SDK 10.0](https://dotnet.microsoft.com/download)
 
 ### Installation
 
@@ -20,25 +20,18 @@ You should install it globally by running:
 ```powershell
 dotnet tool install CKli -g
 ```
-And update it with:
+And auto-update it with:
 
 ```powershell
-dotnet tool update <PACKAGE_ID> -g
+ckli update
 ```
-
-To use a CI build instead of the last stable release, specify the version and the Azure source feed:
-
-```powershell
-dotnet tool update CKli -g --version 0.0.8--0007-dev --source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json
-```
+The `update` command is described below.
 
 ### Run CKli
 
 If you installed CKli globally, you can run `ckli` in any command prompt to start it.
 
 ## The basics: Stack-World-Repo
-
-:warning: create a Demo-Stack. Idea: use an external OSS well-known project.
 
 A World is a set of Git repositories. The set is described by a simple XML file that lists the
 repositories and can organizes them in a folder structure:
@@ -66,6 +59,23 @@ Long Time Support (LTS) Worlds can be created any time from the a World (typical
 
 ## Core commands
 These commands are implemented by `CKli.Core`. They apply to any Git repositories.
+
+### `update --stable --prerelease --allow-downgrade`
+
+Auto updates CKli with a newer available version if it exists. Use `ckli --version` to display the
+currently installed version.
+
+By default, this will lookup for a stable version if the current version is a stable one.
+
+With `--stable`, stable versions only will be considered even if the current version is a prerelease.
+
+With `--prerelease`, prerelease versions will be considered (including CI builds) even if the current version is stable.
+
+The `--allow-downgrade` flags allows package downgrade. This is Useful to come back to the last stable version when
+the current version is a pre release.
+
+This command transparently updates the CKli version used by the `CKli.Plugins` solution. If a `Tests/Plugins.Tests` project
+exists, the version of the `CKli.Testing` package reference is also updated.
 
 ### `clone <url> --private --allow-duplicate`
 Clones a Stack and all its current World repositories in the current directory.
@@ -123,7 +133,7 @@ By default, the current directory selects the Repos unless `--all` is specified.
 
 `--to-all-remotes` considers all remotes instead of only the 'origin' remote.
 
-Any conflict is an error, unless `--continue-on-error` is specified, the first error stops
+Any conflict is an error. Unless `--continue-on-error` is specified, the first error stops
 the push.
 
 ### `repo add <url> --allow-lts`
@@ -184,19 +194,19 @@ external and optional plugins can be used.
 Plugins are written in .NET and distributed as NuGet packages or can be source code directly
 in the Stack repository.
 
-### `plugin --compile-mode`
+### `plugin info --compile-mode`
 
-Provides informations on installed plugins, their state, Xml configuration element and an optional message
+Provides information on installed plugins, their state, Xml configuration element and an optional message
 that can be produced by the plugin itself.
 
-`--compile-mode` is an advanced option to be used when developping plugins. Plugins are discovered
+`--compile-mode` is an advanced option to be used when developing plugins. Plugins are discovered
 once (after a creation, an install or a removal) via reflection and then compiled in `Release`
 with generated code that replaces all the reflection.
 
 A regular load is just an `Assembly.Load` (in a collectible `AssemblyLoadContext`) and a call to an
-initialization function that initializes the graph of objetc (command handlers, Plugin description, etc.).
+initialization function that initializes the graph of objects (command handlers, Plugin description, etc.).
 
-In very specific scenario (developping, debugging), it is possible to set the compile mode to `None` (plugins
+In very specific scenario (developing, debugging), it is possible to set the compile mode to `None` (plugins
 are not compiled, reflection is always used) or `Debug` to compile the plugins in debug configuration.
 
 ### `plugin create <name> --allow-lts`

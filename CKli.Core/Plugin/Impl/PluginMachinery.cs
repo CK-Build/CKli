@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Xml.Linq;
+using static CK.Monitoring.MultiLogReader;
 
 namespace CKli.Core;
 
@@ -35,6 +36,7 @@ public sealed partial class PluginMachinery
     NormalizedPath _ckliPluginsCSProj;
     NormalizedPath _ckliPluginsFile;
     NormalizedPath _ckliCompiledPluginsFile;
+    NormalizedPath _pluginTestsCSProjFilePath;
 
     // Fundamental singleton!
     // This MAY be transformed in a dictionary per World (key would be the RunFolder) to allow more than a
@@ -81,14 +83,16 @@ public sealed partial class PluginMachinery
 
     internal NormalizedPath CKliCompiledPluginsFile => _ckliCompiledPluginsFile.IsEmptyPath ? (_ckliCompiledPluginsFile = CKliPluginsFolder.AppendPart( "CKli.CompiledPlugins.cs" )) : _ckliCompiledPluginsFile;
 
+    internal NormalizedPath PluginTestsCSProjFilePath => _pluginTestsCSProjFilePath.IsEmptyPath ? (_pluginTestsCSProjFilePath = CKliPluginsFolder.Combine( "Tests/Plugins.Tests/Plugins.Tests.csproj" )) : _pluginTestsCSProjFilePath;
+
     internal IPluginFactory PluginFactory => _pluginFactory;
 
     internal PluginMachinery( LocalWorldName worldName, WorldDefinitionFile definitionFile )
     {
         _definitionFile = definitionFile;
         _name = $"{worldName.StackName}-Plugins{worldName.LTSName}";
-        _root = worldName.Stack.StackWorkingFolder.AppendPart( Name );
-        _runFolder = worldName.Stack.StackWorkingFolder.Combine( $"$Local/{Name}/bin/CKli.Plugins/run" );
+        _root = worldName.Stack.StackWorkingFolder.AppendPart( _name );
+        _runFolder = worldName.Stack.StackWorkingFolder.Combine( $"$Local/{_name}/bin/CKli.Plugins/run" );
         _dllPath = _runFolder.AppendPart( "CKli.Plugins.dll" );
     }
 
@@ -103,6 +107,27 @@ public sealed partial class PluginMachinery
             monitor.Warn( "Unable to load plugins. Working without plugins." );
             _pluginFactory = GetNoPluginFactory();
         }
+    }
+
+    internal bool InitializeWithPreCompiledPlugins( IActivityMonitor monitor )
+    {
+        Throw.DebugAssert( World.PluginLoader != null );
+        // Obtains the <Plugins> configurations. It is read for the first load only (it is cached).
+        // The PluginLoader binds each primary plugin to its configuration element.
+        var pluginsConfiguration = _definitionFile.ReadPluginsConfiguration( monitor );
+        if( pluginsConfiguration == null )
+        {
+            return false;
+        }
+        // There must be no alive loaded plugins now. 
+        if( !ReleaseCurrentSingleRunning( monitor ) )
+        {
+            return false;
+        }
+        // Loads the plugins.
+        var pluginContext = new PluginCollectorContext( _definitionFile.World, pluginsConfiguration );
+        _pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext, out bool recoverableError, out _singleFactory );
+        return _pluginFactory != null;
     }
 
     // First load.
@@ -145,7 +170,7 @@ public sealed partial class PluginMachinery
         Throw.DebugAssert( World.PluginLoader != null );
         using( monitor.OpenTrace( $"Recompiling CKli.Plugins and loading Plugin factory." ) )
         {
-            if( !RelaseCurrentSingleRunning( monitor )
+            if( !ReleaseCurrentSingleRunning( monitor )
                 || !DoCompilePlugins( monitor ) )
             {
                 return false;
@@ -165,7 +190,7 @@ public sealed partial class PluginMachinery
     {
         Throw.DebugAssert( World.PluginLoader != null );
         toRecompile = null;
-        // Obtains the <Plugins> configurations. It is read for the first load.
+        // Obtains the <Plugins> configurations. It is read for the first load only (it is cached).
         // The PluginLoader binds each primary plugin to its configuration element.
         var pluginsConfiguration = _definitionFile.ReadPluginsConfiguration( monitor );
         if( pluginsConfiguration == null )
@@ -173,7 +198,7 @@ public sealed partial class PluginMachinery
             return false;
         }
         // There must be no alive loaded plugins now. 
-        if( !RelaseCurrentSingleRunning( monitor ) )
+        if( !ReleaseCurrentSingleRunning( monitor ) )
         {
             return false;
         }
@@ -240,7 +265,7 @@ public sealed partial class PluginMachinery
         return pluginFactory != null;
     }
 
-    static bool RelaseCurrentSingleRunning( IActivityMonitor monitor )
+    static bool ReleaseCurrentSingleRunning( IActivityMonitor monitor )
     {
         if( _singleFactory != null && _singleFactory.IsAlive )
         {
@@ -314,12 +339,38 @@ public sealed partial class PluginMachinery
                 return false;
             }
             monitor.Info( $"""
-                          Updating 'Directory.Package.Props' file:
+                          Updating 'Directory.Package.props' file:
                           {ckliPluginsCore}
                           To use Version="{ckliVersion}".
                           """ );
             ckliPluginsCore.SetAttributeValue( "Version", ckliVersion );
             d.SaveWithoutXmlDeclaration( DirectoryPackageProps );
+
+            // Handling CKli.Testing version in 'Tests/Plugins.Tests/Plugins.Tests.csproj' if it exists.
+            if( File.Exists( PluginTestsCSProjFilePath ) )
+            {
+                var testsCSProj = XDocument.Load( PluginTestsCSProjFilePath, LoadOptions.PreserveWhitespace );
+                var ckliTesting = d.Root?.Elements( "ItemGroup" )
+                                             .Elements( "PackageReference" )
+                                             .FirstOrDefault( e => e.Attribute( "Include" )?.Value == "CKli.Testing" );
+                if( ckliTesting == null )
+                {
+                    monitor.Warn( """
+                        Unable to find <PackageReference Include="CKli.Testing" /> element in 'Tests/Plugins.Tests/Plugins.Tests.csproj'.
+                        Skipping CKli version update.
+                        """ );
+                }
+                else
+                {
+                    ckliTesting.SetAttributeValue( "Version", ckliVersion );
+                    monitor.Info( $"""
+                          Updating 'Tests/Plugins.Tests/Plugins.Tests.csproj' file:
+                          {ckliTesting}
+                          To use Version="{ckliVersion}".
+                          """ );
+                    testsCSProj.SaveWithoutXmlDeclaration( PluginTestsCSProjFilePath );
+                }
+            }
 
             monitor.Trace( $"Deleting '{CKliCompiledPluginsFile.LastPart}'." );
             if( !FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile ) )
