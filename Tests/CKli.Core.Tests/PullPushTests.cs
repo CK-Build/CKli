@@ -4,7 +4,6 @@ using Shouldly;
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;

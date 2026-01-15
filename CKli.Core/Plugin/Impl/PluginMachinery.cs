@@ -8,9 +8,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Xml.Linq;
-using static CK.Monitoring.MultiLogReader;
 
 namespace CKli.Core;
 
@@ -109,6 +107,7 @@ public sealed partial class PluginMachinery
         }
     }
 
+    [MethodImpl( MethodImplOptions.NoInlining )]
     internal bool InitializeWithPreCompiledPlugins( IActivityMonitor monitor )
     {
         Throw.DebugAssert( World.PluginLoader != null );
