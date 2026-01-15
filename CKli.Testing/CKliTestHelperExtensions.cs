@@ -2,6 +2,7 @@
 using CK.Core;
 using CK.Testing;
 using CKli.Core;
+using System;
 using System.Linq;
 using System.Runtime.Loader;
 using static CK.Testing.MonitorTestHelper;
@@ -25,6 +26,11 @@ public static class CKliTestHelperExtensions
     static CKliTestHelperExtensions()
     {
         Throw.CheckState( TestHelper.TestProjectFolder.Path.EndsWith( "/Tests/Plugins.Tests" ) );
+
+        // Preserves the assembly reference to CKli.Plugins.Core.
+        // Without this it is trimmed and the CKli.Plugins.Core is loaded in the plugins context
+        // (even if CKli.Loader itself is pre-loaded).
+        GC.KeepAlive( typeof( CKli.Plugins.PluginCollector ) );
 
         _remotesPath = TestHelper.TestProjectFolder.AppendPart( "Remotes" );
         _barePath = _remotesPath.AppendPart( "bare" );
