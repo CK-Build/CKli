@@ -32,7 +32,7 @@ public sealed class PluginConfiguration
     /// <summary>
     /// Gets whether this configuration is empty (no attributes, no child element nor text nodes or comments).
     /// <para>
-    /// This is not the same as the <see cref="XElement.IsEmpty"/> that can be true with a true <see cref="XElement.HasAttributes"/>.
+    /// This is not the same as the <see cref="XElement.IsEmpty"/> (that can be true with a true <see cref="XElement.HasAttributes"/>).
     /// </para>
     /// </summary>
     public bool IsEmptyConfiguration => _e.IsEmpty && !_e.HasAttributes;

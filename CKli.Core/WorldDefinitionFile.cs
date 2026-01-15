@@ -84,6 +84,10 @@ public sealed class WorldDefinitionFile
     /// <summary>
     /// Gets the &lt;Plugins /&gt; element.
     /// Must not be mutated otherwise a <see cref="InvalidOperationException"/> is raised.
+    /// <para>
+    /// For advanced scenarii, <see cref="RawEditPlugins(IActivityMonitor, Action{IActivityMonitor, XElement})"/>
+    /// can be used.
+    /// </para>
     /// </summary>
     public XElement Plugins => _plugins;
 
@@ -180,13 +184,32 @@ public sealed class WorldDefinitionFile
     /// <summary>
     /// Shallow and quick analysis of the &lt;Folder&gt; and &lt;Repository&gt; elements that
     /// checks the unicity of "Path" and "Url" attribute.
-    /// The list is ordered by the Path (that are absolute).
+    /// <para>
+    /// The sort order of this list drives the <see cref="Repo.Index"/> that is used by <see cref="RepoPluginBase{T}"/>
+    /// to associate extra information to the Repo.
+    /// By default this list keeps the order of the definition file. This can be changed by the static <see cref="RepoOrder"/>
+    /// configuration (this is currently unused).
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <returns>The layout of the repositories or null if errors have been detected.</returns>
     public IReadOnlyList<World.RepoLayout>? ReadLayout( IActivityMonitor monitor )
     {
         return _layout ??= GetRepositoryLayout( monitor, _root, _world );
+    }
+
+    /// <summary>
+    /// Enables low level direct manipulation of the <see cref="Plugins"/>.
+    /// Should be used with care.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="editor">The editor function to apply.</param>
+    public void RawEditPlugins( IActivityMonitor monitor, Action<IActivityMonitor,XElement> editor )
+    {
+        using( StartEdit() )
+        {
+            editor( monitor, _plugins );
+        }
     }
 
     /// <summary>
