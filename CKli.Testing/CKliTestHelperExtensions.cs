@@ -34,7 +34,7 @@ public static class CKliTestHelperExtensions
         Throw.CheckState( pluginFolderName.Contains( "-Plugins" ) );
         int idx = pluginFolderName.IndexOf( "-Plugins" );
         var stackName = pluginFolderName.Substring( 0, idx );
-        var ltsName = pluginFolderName.Substring( 0, idx + 8 );
+        var ltsName = pluginFolderName.Substring( idx + 8 );
         _worldName = new WorldName( stackName, ltsName );
 
         // The CKliRootEnv.AppLocalDataPath is: Environment.SpecialFolder.LocalApplicationData/CKli-Test-StackName-Plugins[LTSName].
@@ -72,5 +72,11 @@ public static class CKliTestHelperExtensions
         /// Gets the World name that contains the plugins (and these tests).
         /// </summary>
         public WorldName CKliWorldName => _worldName;
+
+        /// <summary>
+        /// Gets the <see cref="StackRepository.StackWorkingFolder"/> (the ".PrivateStack" or ".PublicStack" folder)
+        /// of the host stack.
+        /// </summary>
+        public NormalizedPath CKliStackWorkingFolder => helper.SolutionFolder;
     }
 }
