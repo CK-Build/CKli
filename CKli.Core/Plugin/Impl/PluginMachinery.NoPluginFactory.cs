@@ -11,9 +11,9 @@ public sealed partial class PluginMachinery
 
     sealed class NoPluginFactory : IPluginFactory
     {
-        sealed class EmptyPluginCollection : PluginCollection
+        sealed class NoPluginCollection : PluginCollection
         {
-            public EmptyPluginCollection()
+            public NoPluginCollection()
                 : base( [], [], CommandNamespace.Empty )
             {
             }
@@ -21,7 +21,7 @@ public sealed partial class PluginMachinery
 
         public PluginCompileMode CompileMode => PluginCompileMode.Release;
 
-        public PluginCollection Create( IActivityMonitor monitor, World world ) => new EmptyPluginCollection();
+        public PluginCollection Create( IActivityMonitor monitor, World world ) => new NoPluginCollection();
 
         public void Dispose()
         {

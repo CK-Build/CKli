@@ -151,6 +151,9 @@ public sealed partial class World
             monitor.Info( ScreenType.CKliScreenTag, "Plugins are disabled because there is no configured World.PluginLoader." );
         }
         var w = new World( stackRepository, screenType, worldName, definitionFile, layout, machinery );
+        // AcquirePlugins returns false on exception or when a plugin Initialize() method returns false.
+        // It returns true if the load fails and a NoPluginFactory that is used to create an empty plugin
+        // collection: in this case we want a World to be able to honor plugin add/remove plugin commands.
         if( (machinery != null || _directPluginFactory != null)
             && !w.AcquirePlugins( monitor ) )
         {

@@ -50,8 +50,10 @@ public sealed partial class PluginMachinery
     static Action<IActivityMonitor, XDocument>? _nuGetConfigFileHook;
 
     // Result, on success, is set by Create (on error, the failing Machinery is not exposed).
+    //
     // In OnPluginChanged, we first release the existing world plugins and call World.AcquirePlugins
     // only if we were able to reload the plugin factory.
+    //
     [AllowNull] IPluginFactory _pluginFactory;
 
     /// <summary>
