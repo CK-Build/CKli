@@ -50,7 +50,7 @@ public sealed partial class PluginMachinery
     static Action<IActivityMonitor, XDocument>? _nuGetConfigFileHook;
 
     // Result, on success, is set by Create (on error, the failing Machinery is not exposed).
-    // In OnPluginChanged, we first release the existing world plugins and call World.AcquirePlugin
+    // In OnPluginChanged, we first release the existing world plugins and call World.AcquirePlugins
     // only if we were able to reload the plugin factory.
     [AllowNull] IPluginFactory _pluginFactory;
 
@@ -321,6 +321,7 @@ public sealed partial class PluginMachinery
                               """ );
                 ckliPluginsCore.SetAttributeValue( "Version", ckliVersion );
                 d.SaveWithoutXmlDeclaration( DirectoryPackageProps );
+                mustRecompile = true;
             }
             // Handling CKli.Testing version in 'Tests/Plugins.Tests/Plugins.Tests.csproj' if it exists.
             // We do this even if the version in the Directory.Package.props was okay and if CKli.Testing
@@ -337,7 +338,6 @@ public sealed partial class PluginMachinery
                         Unable to find <PackageReference Include="CKli.Testing" Version="..." /> element in 'Tests/Plugins.Tests/Plugins.Tests.csproj'.
                         Skipping CKli version update.
                         """ );
-                    return false;
                 }
                 else
                 {
@@ -356,17 +356,18 @@ public sealed partial class PluginMachinery
                           """ );
                         ckliTesting.SetAttributeValue( "Version", ckliVersion );
                         testsCSProj.SaveWithoutXmlDeclaration( PluginTestsCSProjFilePath );
+                        mustRecompile = true;
                     }
                 }
             }
-
-            monitor.Trace( $"Deleting '{CKliCompiledPluginsFile.LastPart}'." );
-            if( !FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile ) )
+            if( mustRecompile )
             {
-                return false;
+                monitor.Trace( $"Deleting '{CKliCompiledPluginsFile.LastPart}'." );
+                if( !FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile ) )
+                {
+                    return false;
+                }
             }
-
-            mustRecompile = true;
             return true;
         }
         catch( Exception ex )
@@ -608,7 +609,7 @@ public sealed partial class PluginMachinery
         // a reset hard on failure).
         //
         // When reloadPlugins is true, we instantiate and initialize the plugins even if we won't use them: this is to ensure
-        // that everything works fine and to sollicitate Initialize() method that may update the Plugin configuration in
+        // that everything works fine and to call Initialize() method that may update the Plugin configuration in
         // the definition file.
         // This is a "useless" operation (because the plugins won't be used in this run) that costs but it's not every day that
         // a plugin is added, removed or updated.
