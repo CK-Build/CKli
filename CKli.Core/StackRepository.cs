@@ -363,11 +363,13 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="context">The basic command context.</param>
     /// <param name="error">True on error, false on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
+    /// <param name="withPlugins">False to totally skip plugin loading. This should only be used in very special scenarii.</param>
     /// <returns>The resulting stack repository and world on success. Both are null on error of if no stack is found.</returns>
     public static (StackRepository? Stack, World? World) TryOpenWorldFromPath( IActivityMonitor monitor,
                                                                                CKliEnv context,
                                                                                out bool error,
-                                                                               bool skipPullStack = false )
+                                                                               bool skipPullStack = false,
+                                                                               bool withPlugins = true )
     {
         var stack = TryOpenFromPath( monitor, context, out error, skipPullStack );
         if( stack != null )
@@ -375,7 +377,8 @@ public sealed partial class StackRepository : IDisposable
             var w = World.Create( monitor,
                                   context.Screen.ScreenType,
                                   stack,
-                                  context.CurrentDirectory );
+                                  context.CurrentDirectory,
+                                  withPlugins );
             if( w == null )
             {
                 error = true;
@@ -399,12 +402,14 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="stack">The non null stack on success.</param>
     /// <param name="world">The non null world on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
+    /// <param name="withPlugins">False to totally skip plugin loading. This should only be used in very special scenarii.</param>
     /// <returns>True on success, false on error.</returns>
     public static bool OpenWorldFromPath( IActivityMonitor monitor,
                                           CKliEnv context,
                                           [NotNullWhen( true )] out StackRepository? stack,
                                           [NotNullWhen( true )] out World? world,
-                                          bool skipPullStack = false )
+                                          bool skipPullStack = false,
+                                          bool withPlugins = true )
     {
         world = null;
         stack = TryOpenFromPath( monitor, context, out bool error, skipPullStack );
@@ -420,7 +425,8 @@ public sealed partial class StackRepository : IDisposable
         world = World.Create( monitor,
                               context.Screen.ScreenType,
                               stack,
-                              context.CurrentDirectory );
+                              context.CurrentDirectory,
+                              withPlugins );
         if( world == null )
         {
             stack.Dispose();

@@ -106,7 +106,7 @@ public sealed partial class PluginMachinery
         {
             // No way... Switch to the NoPluginFactory.
             monitor.Warn( "Unable to load plugins. Working without plugins." );
-            _pluginFactory = GetNoPluginFactory();
+            _pluginFactory = GetOnErrorPluginFactory();
         }
     }
 
@@ -276,7 +276,7 @@ public sealed partial class PluginMachinery
         // If the current factory is the NoPluginFactory, we do nothing: we keep
         // the _pluginFactory as-is: it will be replaced by an actual factory if a reload
         // succeeds.
-        if( _pluginFactory != null && _pluginFactory != _noPluginFactory )
+        if( _pluginFactory != null && _pluginFactory != _onErrorPluginFactory )
         {
             _pluginFactory.Dispose();
             _pluginFactory = null;

@@ -70,5 +70,9 @@ public sealed partial class World
         return loaded.Count == 0 || _events.SafeRaiseEvent( monitor, new PluginInfoEvent( monitor, this, infos ) );
     }
 
-    internal string? GetDisabledPluginsHeader() => _plugins == null ? "Failed to load Plugins." : null;
+    internal string? GetDisabledPluginsHeader() => _plugins == null
+                                                    ? "World has been loaded without Plugins."
+                                                    : _plugins.HasLoadError
+                                                        ? "Plugins failed to load."
+                                                        : null;
 }

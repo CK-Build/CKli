@@ -5,23 +5,26 @@ namespace CKli.Core;
 
 public sealed partial class PluginMachinery
 {
-    static IPluginFactory? _noPluginFactory;
+    static IPluginFactory? _onErrorPluginFactory;
 
-    static IPluginFactory GetNoPluginFactory() => _noPluginFactory ??= new NoPluginFactory();
+    static IPluginFactory GetOnErrorPluginFactory() => _onErrorPluginFactory ??= new OnErrorPluginFactory();
 
-    sealed class NoPluginFactory : IPluginFactory
+    sealed class OnErrorPluginFactory : IPluginFactory
     {
-        sealed class NoPluginCollection : PluginCollection
+        sealed class ErrorPluginCollection : PluginCollection
         {
-            public NoPluginCollection()
+            public ErrorPluginCollection()
                 : base( [], [], CommandNamespace.Empty )
             {
             }
+
+            public override bool HasLoadError => true;
+
         }
 
         public PluginCompileMode CompileMode => PluginCompileMode.Release;
 
-        public PluginCollection Create( IActivityMonitor monitor, World world ) => new NoPluginCollection();
+        public PluginCollection Create( IActivityMonitor monitor, World world ) => new ErrorPluginCollection();
 
         public void Dispose()
         {

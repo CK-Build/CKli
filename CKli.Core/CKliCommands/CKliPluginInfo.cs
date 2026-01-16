@@ -76,8 +76,8 @@ public sealed class CKliPluginInfo : Command
             }
             bool success = world.RaisePluginInfo( monitor, out var headerText, out var infos );
             context.Screen.DisplayPluginInfo( headerText, infos );
-            // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
-            return stack.Close( monitor );
+            bool pluginLoadFailed = world.PluginsLoadFailed;
+            return stack.Close( monitor ) && !pluginLoadFailed;
         }
         finally
         {

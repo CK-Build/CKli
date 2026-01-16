@@ -130,7 +130,8 @@ public sealed partial class World
     internal static World? Create( IActivityMonitor monitor,
                                    ScreenType screenType,
                                    StackRepository stackRepository,
-                                   NormalizedPath path )
+                                   NormalizedPath path,
+                                   bool withPlugins )
     {
         var worldName = stackRepository.GetWorldNameFromPath( monitor, path );
         var definitionFile = worldName?.LoadDefinitionFile( monitor );
@@ -141,20 +142,24 @@ public sealed partial class World
         }
         Throw.DebugAssert( worldName != null && definitionFile != null );
         PluginMachinery? machinery = null;
-        if( _directPluginFactory == null && _pluginLoader != null ) 
+        if( withPlugins && _directPluginFactory == null )
         {
-            machinery = new PluginMachinery( worldName, definitionFile );
-            machinery.Initialize( monitor );
-        }
-        else
-        {
-            monitor.Info( ScreenType.CKliScreenTag, "Plugins are disabled because there is no configured World.PluginLoader." );
+            if( _pluginLoader != null )
+            {
+                machinery = new PluginMachinery( worldName, definitionFile );
+                machinery.Initialize( monitor );
+            }
+            else
+            {
+                monitor.Info( ScreenType.CKliScreenTag, "Plugins are disabled because there is no configured World.PluginLoader." );
+            }
         }
         var w = new World( stackRepository, screenType, worldName, definitionFile, layout, machinery );
         // AcquirePlugins returns false on exception or when a plugin Initialize() method returns false.
-        // It returns true if the load fails and a NoPluginFactory that is used to create an empty plugin
+        // It returns true if the load fails and a NoPluginFactory is used to create an empty plugin
         // collection: in this case we want a World to be able to honor plugin add/remove plugin commands.
-        if( (machinery != null || _directPluginFactory != null)
+        if( withPlugins
+            && (machinery != null || _directPluginFactory != null)
             && !w.AcquirePlugins( monitor ) )
         {
             w = null;
@@ -164,6 +169,9 @@ public sealed partial class World
 
     internal bool AcquirePlugins( IActivityMonitor monitor )
     {
+        // This is called from OnPluginChanged only when _pluginMachinery != null.
+        // Otherwise this is called from Create and only when withPlugin is true and at least _directPluginFactory or _pluginMachinery exist.
+        Throw.DebugAssert( "Never called when created without plugins.", _directPluginFactory != null || _pluginMachinery != null );
         try
         {
             IPluginFactory? f = _directPluginFactory;

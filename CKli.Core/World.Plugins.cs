@@ -8,6 +8,11 @@ namespace CKli.Core;
 
 public sealed partial class World
 {
+    /// <summary>
+    /// This is true when World has been created without plugins.
+    /// </summary>
+    internal bool PluginsLoadFailed => _plugins?.HasLoadError is true;
+
     internal CommandNamespace Commands
     {
         get

@@ -33,7 +33,7 @@ public abstract class PluginCollection
     }
 
     /// <summary>
-    /// Gets the plugin informations.
+    /// Gets the plugins information.
     /// </summary>
     public IReadOnlyCollection<PluginInfo> Plugins => _plugins;
 
@@ -41,6 +41,11 @@ public abstract class PluginCollection
     /// Gets the the commands supported by the plugins.
     /// </summary>
     public CommandNamespace Commands => _commands;
+
+    /// <summary>
+    /// Gets whether this collection is empty because plugins failed to load.
+    /// </summary>
+    public virtual bool HasLoadError => false;
 
     internal bool CallPluginsInitialization( IActivityMonitor monitor )
     {
