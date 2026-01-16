@@ -1,4 +1,5 @@
 using CK.Core;
+using System;
 
 namespace CKli.Core;
 
@@ -61,16 +62,30 @@ public static class PluginStatusExtensions
     public static string GetTextStatus( this PluginStatus status )
     {
         if( status == PluginStatus.MissingImplementation )
-            return "Configured but no plugin installed.";
+            return "⚠ Configured but no plugin installed.";
         if( status == PluginStatus.Available )
             return "Available";
         if( (status & PluginStatus.DisabledByMissingConfiguration) != 0 )
-            return "Disabled, missing configuration.";
+            return "⚠ Disabled, missing configuration.";
         if( (status & PluginStatus.DisabledByConfiguration) != 0 )
             return "Disabled by configuration.";
         if( (status & PluginStatus.DisabledByDependency) != 0 )
             return "Disabled by disabled dependencies.";
         return Throw.CKException<string>( "Invalid status." );
+    }
+    public static Color GetStatusColor( this PluginStatus status )
+    {
+        if( status == PluginStatus.MissingImplementation )
+            return new Color( ConsoleColor.Black, ConsoleColor.Red );
+        if( status == PluginStatus.Available )
+            return new Color( ConsoleColor.Green, ConsoleColor.Black );
+        if( (status & PluginStatus.DisabledByMissingConfiguration) != 0 )
+            return new Color( ConsoleColor.Black, ConsoleColor.Red );
+        if( (status & PluginStatus.DisabledByConfiguration) != 0 )
+            return new Color( ConsoleColor.Yellow, ConsoleColor.Black );
+        if( (status & PluginStatus.DisabledByDependency) != 0 )
+            return new Color( ConsoleColor.Yellow, ConsoleColor.Black );
+        return Throw.CKException<Color>( "Invalid status." );
     }
 }
 

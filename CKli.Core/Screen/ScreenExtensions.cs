@@ -183,8 +183,8 @@ public static class ScreenExtensions
                     i => new Collapsable(
                             new ContentBox( s.Text( i.ShortName )
                                             .AddBelow(
-                                                s.Text( i.Status.GetTextStatus() )
-                                                .AddBelow( s.Text( i.Version?.Version?.ToString() ?? "<source based>", TextEffect.Italic )
+                                                s.Text( i.Status.GetTextStatus() ).Box( i.Status.GetStatusColor() )
+                                                .AddBelow( s.Text( i.Version?.Version?.ToString() ?? "<source>", TextEffect.Italic )
                                                 ).Box( paddingLeft: 3 ) ), paddingRight: 3 )
                             .AddRight( s.Text( i.Configuration?.ToString() ).Collapsable() )
                             .AddBelow( i.Message != null

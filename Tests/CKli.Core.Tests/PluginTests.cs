@@ -38,9 +38,9 @@ public class PluginTests
             display.ToString().ShouldBe( """
                 1 loaded plugins, 1 configured plugins.
 
-                > MyFirstOne          > <MyFirstOne />
-                │    Available        │ 
-                │    <source based>   │ 
+                > MyFirstOne     > <MyFirstOne />
+                │    Available   │ 
+                │    <source>    │ 
                 │ Message:
                 │    Message from 'MyFirstOne' plugin.
                 ❰✓❱
@@ -55,9 +55,9 @@ public class PluginTests
         display.ToString().ShouldBe( """
             1 loaded plugins, 1 configured plugins. (CompileMode: Debug)
 
-            > MyFirstOne          > <MyFirstOne />
-            │    Available        │ 
-            │    <source based>   │ 
+            > MyFirstOne     > <MyFirstOne />
+            │    Available   │ 
+            │    <source>    │ 
             │ Message:
             │    Message from 'MyFirstOne' plugin.
             ❰✓❱
