@@ -9,6 +9,10 @@ namespace CKli.Core;
 /// Local world name is a <see cref="WorldName"/> that also carries
 /// its local <see cref="WorldRoot"/> path, its definition file path and
 /// <see cref="WorldDefinitionFile"/> that is lazy loaded.
+/// <para>
+/// They are exposed by <see cref="StackRepository.WorldNames"/>. <see cref="StackRepository.GetWorldNameFromPath(IActivityMonitor, NormalizedPath)"/>
+/// can also be used.
+/// </para>
 /// </summary>
 public sealed class LocalWorldName : WorldName
 {
@@ -48,11 +52,20 @@ public sealed class LocalWorldName : WorldName
     /// <returns>The definition file or null on error.</returns>
     public WorldDefinitionFile? LoadDefinitionFile( IActivityMonitor monitor ) => _definitionFile ??= DoLoadDefinitionFile( monitor );
 
-    WorldDefinitionFile? DoLoadDefinitionFile( IActivityMonitor monitor )
+    internal bool CheckDefinitionFile( IActivityMonitor monitor )
     {
         if( !File.Exists( _xmlDescriptionFilePath ) )
         {
             monitor.Error( $"Missing file '{_xmlDescriptionFilePath}'." );
+            return false;
+        }
+        return true;
+    }
+
+    WorldDefinitionFile? DoLoadDefinitionFile( IActivityMonitor monitor )
+    {
+        if( !CheckDefinitionFile( monitor ) )
+        {
             return null;
         }
         try

@@ -27,8 +27,8 @@ public class StackRepositoryTests
                                                  allowDuplicateStack: false );
         stack.ShouldNotBeNull();
         stack.StackWorkingFolder.LastPart.ShouldBe( ".PublicStack" );
-        var localWorldName = stack.GetDefaultWorldName( TestHelper.Monitor );
-        localWorldName.ShouldNotBeNull();
+        var localWorldName = stack.DefaultWorldName;
+        localWorldName.LoadDefinitionFile( TestHelper.Monitor ).ShouldNotBeNull();
         localWorldName.IsDefaultWorld.ShouldBeTrue();
         localWorldName.WorldRoot.ShouldBe( context.CurrentDirectory.AppendPart( "CKt" ) );
         stack.WorldNames.Length.ShouldBe( 1, "There is no LTS world in CKt." );

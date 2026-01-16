@@ -213,6 +213,52 @@ public sealed class WorldDefinitionFile
     }
 
     /// <summary>
+    /// Gets whether this file has been modified (<see cref="SaveFile(IActivityMonitor)"/> will be
+    /// called by <see cref="StackRepository.Close(IActivityMonitor)"/>).
+    /// </summary>
+    public bool IsDirty => _isDirty;
+
+    /// <summary>
+    /// Saves this file if <see cref="IsDirty"/> is true otherwise does nothing.
+    /// <para>
+    /// This should rarely be called directly: <see cref="StackRepository.Close(IActivityMonitor)"/> automatically
+    /// saves its <see cref="World.DefinitionFile"/> if it has been modified.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool SaveFile( IActivityMonitor monitor )
+    {
+        Throw.CheckState( "The definition file is being edited.", !_allowEdit );
+        if( _isDirty )
+        {
+            var path = _world.XmlDescriptionFilePath;
+            try
+            {
+                _root.Document!.SaveWithoutXmlDeclaration( path );
+                _isDirty = false;
+                monitor.Trace( $"File '{path.LastPart}' saved." );
+                if( _layout != null )
+                {
+                    // Reloading the layout to honor sort and also to double check
+                    // that everything is fine.
+                    // We keep the container and change its content.
+                    var newLayout = GetRepositoryLayout( monitor, _root, _world );
+                    if( newLayout == null ) return false;
+                    _layout.Clear();
+                    _layout.AddRange( newLayout );
+                }
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"While saving '{path}'.", ex );
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
     /// Gets or sets an optional transformer of the &lt;Repository Url="..." /&gt; value.
     /// <para>
     /// This is mainly for tests. Note that this is applied when loading the xml file definition:
@@ -402,39 +448,6 @@ public sealed class WorldDefinitionFile
     {
         Throw.DebugAssert( _allowEdit );
         _root.Descendants( _xFolder ).Where( e => !e.HasElements ).Remove();
-    }
-
-    internal bool IsDirty => _isDirty;
-
-    internal bool SaveFile( IActivityMonitor monitor )
-    {
-        Throw.DebugAssert( !_allowEdit );
-        if( _isDirty )
-        {
-            var path = _world.XmlDescriptionFilePath;
-            try
-            {
-                _root.Document!.SaveWithoutXmlDeclaration( path );
-                _isDirty = false;
-                monitor.Trace( $"File '{path.LastPart}' saved." );
-                if( _layout != null )
-                {
-                    // Reloading the layout to honor sort and also to double check
-                    // that everything is fine.
-                    // We keep the container and change its content.
-                    var newLayout = GetRepositoryLayout( monitor, _root, _world );
-                    if( newLayout == null ) return false;
-                    _layout.Clear();
-                    _layout.AddRange( newLayout );
-                }
-            }
-            catch( Exception ex )
-            {
-                monitor.Error( $"While saving '{path}'.", ex );
-                return false;
-            }
-        }
-        return true;
     }
 
     static readonly XName _xPlugins = XNamespace.None + "Plugins";

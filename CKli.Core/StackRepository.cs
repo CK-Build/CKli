@@ -118,6 +118,10 @@ public sealed partial class StackRepository : IDisposable
 
     /// <summary>
     /// Gets the default world name (no <see cref="WorldName.LTSName"/>).
+    /// <para>
+    /// This is always available even if it's definition file doesn't exist. Use <see cref="GetDefaultWorldName(IActivityMonitor)"/>
+    /// 
+    /// </para>
     /// </summary>
     public LocalWorldName DefaultWorldName
     {
@@ -171,21 +175,6 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
-    /// Gets the default world if it exists or emits an error if it doesn't.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <returns>The default world if it exists.</returns>
-    public LocalWorldName? GetDefaultWorldName( IActivityMonitor monitor )
-    {
-        var defaultWorld = WorldNames.FirstOrDefault( w => w.LTSName == null );
-        if( defaultWorld == null )
-        {
-            monitor.Error( $"Stack '{StackRoot}': the default World definition is missing. Expecting file '{_git.WorkingFolder}/{StackName}.xml'." );
-        }
-        return defaultWorld;
-    }
-
-    /// <summary>
     /// Gets the world from a <paramref name="path"/> that must start with <see cref="StackRoot"/>.
     /// <para>
     /// This tries to find a LTS world if the path is below StackRoot and its first folder starts with '@' and is
@@ -210,7 +199,7 @@ public sealed partial class StackRepository : IDisposable
             }
             return worldName;
         }
-        return GetDefaultWorldName( monitor );
+        return DefaultWorldName.CheckDefinitionFile( monitor ) ? _defaultWorldName : null;
     }
 
     /// <summary>
