@@ -366,23 +366,6 @@ public sealed partial class StackRepository : IDisposable
         return true;
     }
 
-    static WorldPluginLoadMode _defaultPluginLoadMode;
-
-    /// <summary>
-    /// Gets or sets the <see cref="WorldPluginLoadMode"/> used by <see cref="TryOpenWorldFromPath"/>
-    /// and <see cref="OpenWorldFromPath"/>.
-    /// <para>
-    /// This is an advanced configuration that defaults to <see cref="WorldPluginLoadMode.Default"/>.
-    /// CKli.Testing sets it to <see cref="WorldPluginLoadMode.UsePreCompiledPlugins"/> to load test stacks
-    /// with the plugins of the world. 
-    /// </para>
-    /// </summary>
-    public static WorldPluginLoadMode DefaultPluginLoadMode
-    {
-        get => _defaultPluginLoadMode; 
-        set => _defaultPluginLoadMode = value;
-    }
-
     /// <summary>
     /// Tries to open a stack and a world from a <see cref="CKliEnv.CurrentDirectory"/>. If no stack is found on or above the path,
     /// this is not an error but <c>(null,null)</c> is returned.
@@ -391,13 +374,11 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="context">The basic command context.</param>
     /// <param name="error">True on error, false on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
-    /// <param name="pluginLoadMode">Optional plugin load mode. See <see cref="DefaultPluginLoadMode"/>.</param>
     /// <returns>The resulting stack repository and world on success. Both are null on error of if no stack is found.</returns>
     public static (StackRepository? Stack, World? World) TryOpenWorldFromPath( IActivityMonitor monitor,
                                                                                CKliEnv context,
                                                                                out bool error,
-                                                                               bool skipPullStack = false,
-                                                                               WorldPluginLoadMode? pluginLoadMode = null )
+                                                                               bool skipPullStack = false )
     {
         var stack = TryOpenFromPath( monitor, context, out error, skipPullStack );
         if( stack != null )
@@ -405,8 +386,7 @@ public sealed partial class StackRepository : IDisposable
             var w = World.Create( monitor,
                                   context.Screen.ScreenType,
                                   stack,
-                                  context.CurrentDirectory,
-                                  pluginLoadMode ?? _defaultPluginLoadMode );
+                                  context.CurrentDirectory );
             if( w == null )
             {
                 error = true;
@@ -430,14 +410,12 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="stack">The non null stack on success.</param>
     /// <param name="world">The non null world on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
-    /// <param name="pluginLoadMode">Optional plugin load mode. See <see cref="DefaultPluginLoadMode"/>.</param>
     /// <returns>True on success, false on error.</returns>
     public static bool OpenWorldFromPath( IActivityMonitor monitor,
                                           CKliEnv context,
                                           [NotNullWhen( true )] out StackRepository? stack,
                                           [NotNullWhen( true )] out World? world,
-                                          bool skipPullStack = false,
-                                          WorldPluginLoadMode? pluginLoadMode = null )
+                                          bool skipPullStack = false )
     {
         world = null;
         stack = TryOpenFromPath( monitor, context, out bool error, skipPullStack );
@@ -453,8 +431,7 @@ public sealed partial class StackRepository : IDisposable
         world = World.Create( monitor,
                               context.Screen.ScreenType,
                               stack,
-                              context.CurrentDirectory,
-                              pluginLoadMode ?? _defaultPluginLoadMode );
+                              context.CurrentDirectory );
         if( world == null )
         {
             stack.Dispose();

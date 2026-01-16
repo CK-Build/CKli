@@ -43,6 +43,7 @@ public sealed partial class World
                                                           out WeakReference? loader );
 
     static PluginLoaderFunction? _pluginLoader;
+    static IPluginFactory? _directPluginFactory;
 
     /// <summary>
     /// Gets or sets once the loader for plugins.
@@ -58,6 +59,18 @@ public sealed partial class World
             Throw.CheckState( "Once set, PluginLoader cannot be changed.", _pluginLoader == null || value != _pluginLoader );
             _pluginLoader = value;
         }
+    }
+
+    /// <summary>
+    /// Gets or sets a <see cref="IPluginFactory"/> that will be used instead of the regular <see cref="PluginLoader"/>.
+    /// <para>
+    /// This can always be set (not only once like the <see cref="PluginLoader"/>).
+    /// </para>
+    /// </summary>
+    public static IPluginFactory? DirectPluginFactory
+    {
+        get => _directPluginFactory;
+        set => _directPluginFactory = value;
     }
 
     readonly StackRepository _stackRepository;
@@ -117,8 +130,7 @@ public sealed partial class World
     internal static World? Create( IActivityMonitor monitor,
                                    ScreenType screenType,
                                    StackRepository stackRepository,
-                                   NormalizedPath path,
-                                   WorldPluginLoadMode pluginLoadMode )
+                                   NormalizedPath path )
     {
         var worldName = stackRepository.GetWorldNameFromPath( monitor, path );
         var definitionFile = worldName?.LoadDefinitionFile( monitor );
@@ -129,35 +141,17 @@ public sealed partial class World
         }
         Throw.DebugAssert( worldName != null && definitionFile != null );
         PluginMachinery? machinery = null;
-        if( World.PluginLoader != null )
+        if( _directPluginFactory == null && _pluginLoader != null ) 
         {
-            if( pluginLoadMode == WorldPluginLoadMode.NoPlugins )
-            {
-                monitor.Trace( "WorldPluginLoadMode is NoPlugins: ignoring plugins." );
-            }
-            else
-            {
-                machinery = new PluginMachinery( worldName, definitionFile );
-                if( pluginLoadMode == WorldPluginLoadMode.UsePreCompiledPlugins )
-                {
-                    if( !machinery.InitializeWithPreCompiledPlugins( monitor ) )
-                    {                        
-                        monitor.Error( "Unable to load the World using WorldPluginLoadMode.UsePreCompiledPlugins." );
-                        return null;
-                    }
-                }
-                else
-                {
-                    machinery.Initialize( monitor );
-                }
-            }
+            machinery = new PluginMachinery( worldName, definitionFile );
+            machinery.Initialize( monitor );
         }
         else
         {
             monitor.Info( ScreenType.CKliScreenTag, "Plugins are disabled because there is no configured World.PluginLoader." );
         }
         var w = new World( stackRepository, screenType, worldName, definitionFile, layout, machinery );
-        if( machinery != null
+        if( (machinery != null || _directPluginFactory != null)
             && !w.AcquirePlugins( monitor ) )
         {
             w = null;
@@ -167,10 +161,15 @@ public sealed partial class World
 
     internal bool AcquirePlugins( IActivityMonitor monitor )
     {
-        Throw.DebugAssert( _pluginMachinery != null );
         try
         {
-            _plugins = _pluginMachinery.PluginFactory.Create( monitor, this );
+            IPluginFactory? f = _directPluginFactory;
+            if( f == null )
+            {
+                Throw.DebugAssert( _pluginMachinery != null );
+                f = _pluginMachinery.PluginFactory;
+            }
+            _plugins = f.Create( monitor, this );
             return _plugins.CallPluginsInitialization( monitor );
         }
         catch( Exception ex )
@@ -183,16 +182,13 @@ public sealed partial class World
     internal void ReleasePlugins()
     {
         _events.ReleaseEvents();
-        if( _pluginMachinery != null )
+        if( _plugins != null )
         {
-            if( _plugins != null )
-            {
-                _plugins.Commands.Clear();
-                _plugins.DisposeDisposablePlugins();
-                _plugins = null;
-            }
-            _pluginMachinery.ReleasePluginFactory();
+            _plugins.Commands.Clear();
+            _plugins.DisposeDisposablePlugins();
+            _plugins = null;
         }
+        _pluginMachinery?.ReleasePluginFactory();
     }
 
     internal void DisposeRepositoriesAndReleasePlugins()

@@ -86,8 +86,7 @@ public sealed partial class World
                                       [NotNullWhen( true )] out string? shortName,
                                       [NotNullWhen( true )] out string? fullName )
     {
-        Throw.DebugAssert( _pluginMachinery != null );
-        if( !PluginMachinery.EnsureFullPluginName( monitor, pluginName, out shortName, out fullName ) )
+        if( !CheckBeforePluginChange( monitor, pluginName, out shortName, out fullName ) )
         {
             return false;
         }
@@ -109,10 +108,27 @@ public sealed partial class World
         return true;
     }
 
+    [MemberNotNullWhen( true, nameof( _pluginMachinery ) )]
+    bool CheckBeforePluginChange( IActivityMonitor monitor,
+                                  string pluginName,
+                                  [NotNullWhen( true )] out string? shortName,
+                                  [NotNullWhen( true )] out string? fullName )
+    {
+        if( !PluginMachinery.EnsureFullPluginName( monitor, pluginName, out shortName, out fullName ) )
+        {
+            return false;
+        }
+        if( _pluginMachinery == null )
+        {
+            monitor.Error( "No PluginMachinery, unable to add or remove plugin." );
+            return false;
+        }
+        return true;
+    }
+
     internal bool RemovePlugin( IActivityMonitor monitor, string pluginName )
     {
-        Throw.DebugAssert( _pluginMachinery != null );
-        if( !PluginMachinery.EnsureFullPluginName( monitor, pluginName, out var shortName, out var fullName ) )
+        if( !CheckBeforePluginChange( monitor, pluginName, out var shortName, out var fullName ) )
         {
             return false;
         }

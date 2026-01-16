@@ -108,28 +108,6 @@ public sealed partial class PluginMachinery
         }
     }
 
-    [MethodImpl( MethodImplOptions.NoInlining )]
-    internal bool InitializeWithPreCompiledPlugins( IActivityMonitor monitor )
-    {
-        Throw.DebugAssert( World.PluginLoader != null );
-        // Obtains the <Plugins> configurations. It is read for the first load only (it is cached).
-        // The PluginLoader binds each primary plugin to its configuration element.
-        var pluginsConfiguration = _definitionFile.ReadPluginsConfiguration( monitor );
-        if( pluginsConfiguration == null )
-        {
-            return false;
-        }
-        // There must be no alive loaded plugins now. 
-        if( !ReleaseCurrentSingleRunning( monitor ) )
-        {
-            return false;
-        }
-        // Loads the plugins.
-        var pluginContext = new PluginCollectorContext( _definitionFile.World, pluginsConfiguration );
-        _pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext, out bool recoverableError, out _singleFactory );
-        return _pluginFactory != null;
-    }
-
     // First load.
     bool FirstLoad( IActivityMonitor monitor, out PluginCollectorContext? toRecompile )
     {
