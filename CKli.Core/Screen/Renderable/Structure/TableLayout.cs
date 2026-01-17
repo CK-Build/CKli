@@ -32,7 +32,7 @@ public partial class TableLayout : IRenderable
     /// </summary>
     /// <param name="rows">The content rows.</param>
     /// <param name="columns">Optional columns definition.</param>
-    /// <returns>A TableLyout or the <paramref name="rows"/> if no columns can be inferred.</returns>
+    /// <returns>A TableLayout or the <paramref name="rows"/> if no columns can be inferred.</returns>
     public static IRenderable Create( IRenderable rows, params ImmutableArray<ColumnDefinition> columns )
     {
         var cols = new List<ColDef>();

@@ -180,17 +180,18 @@ public static class ScreenExtensions
             display = display.AddBelow(
                 s.EmptyString,
                 infos.Select(
-                    i => new Collapsable(
-                            new ContentBox( s.Text( i.ShortName )
-                                            .AddBelow(
-                                                s.Text( i.Status.GetTextStatus() ).Box( i.Status.GetStatusColor() )
-                                                .AddBelow( s.Text( i.Version?.Version?.ToString() ?? "<source>", TextEffect.Italic )
-                                                ).Box( paddingLeft: 3 ) ), paddingRight: 3 )
-                            .AddRight( s.Text( i.Configuration?.ToString() ).Collapsable() )
-                            .AddBelow( i.Message != null
-                                        ? s.Text( "Message:", ConsoleColor.DarkYellow )
-                                           .AddBelow( i.Message.Box( paddingLeft: 3, foreColor: ConsoleColor.Yellow ) )
-                                        : null ) ) )
+                    i => new Collapsable( s.Text( i.ShortName )
+                                           .AddBelow(
+                                               s.Text( i.Status.GetTextStatus() ).Box( i.Status.GetStatusColor() )
+                                                .AddBelow( s.Text( i.Version?.Version?.ToString() ?? "<source>", TextEffect.Italic ) )
+                                                .Box( paddingLeft: 3 ) )
+                                           .Box( paddingRight: 3 )
+                                           .AddRight( s.Text( i.Configuration?.ToString() ).Collapsable() )
+                                           .AddBelow( i.Message != null
+                                                        ? s.Text( "Message:", ConsoleColor.DarkYellow )
+                                                           .AddBelow( i.Message.Box( paddingLeft: 3, foreColor: ConsoleColor.Yellow )
+                                                           .Box() )
+                                                        : null ) ) )
                 );
         }
         screen.Display( display );

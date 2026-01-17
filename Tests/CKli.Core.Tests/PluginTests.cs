@@ -64,6 +64,30 @@ public class PluginTests
 
             """ );
 
+        // ckli plugin create MySecondOneWithLongName
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "create", "MySecondOneWithLongName" )).ShouldBeTrue();
+
+        display.Clear();
+        // ckli plugin info
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "info" )).ShouldBeTrue();
+        // We don't have a ColSpan capability in TableLayout yet. Here the Message should be in a "cell" with ColSpan: 2.
+        display.ToString().ShouldBe( """
+            2 loaded plugins, 2 configured plugins. (CompileMode: Debug)
+
+            > MyFirstOne     > <MyFirstOne />
+            │    Available   │ 
+            │    <source>    │ 
+            │ Message:
+            │    Message from 'MyFirstOne' plugin.
+            > MySecondOneWithLongName   > <MySecondOneWithLongName />
+            │    Available              │ 
+            │    <source>               │ 
+            │ Message:
+            │    Message from 'MySecondOneWithLongName' plugin.
+            ❰✓❱
+
+            """ );
+
         // ckli plugin remove MyFirstOne
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "remove", "MyFirstOne" )).ShouldBeTrue();
 
@@ -75,8 +99,13 @@ public class PluginTests
             logs.ShouldNotContain( "New 'MyFirstOne' in world 'One' plugin certainly requires some development." );
 
             display.ToString().ShouldBe( """
-                0 loaded plugins, 0 configured plugins. (CompileMode: Debug)
+                1 loaded plugins, 1 configured plugins. (CompileMode: Debug)
 
+                > MySecondOneWithLongName   > <MySecondOneWithLongName />
+                │    Available              │ 
+                │    <source>               │ 
+                │ Message:
+                │    Message from 'MySecondOneWithLongName' plugin.
                 ❰✓❱
 
                 """ );
