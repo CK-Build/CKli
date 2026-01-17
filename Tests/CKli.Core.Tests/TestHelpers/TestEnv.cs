@@ -43,9 +43,6 @@ static partial class TestEnv
         CKliRootEnv.Initialize( "Test", screen: new StringScreen(), findCurrentStackPath: false );
         InitializeRemotes();
         InitializeNuGetSource();
-        // Single so that this throws if naming change.
-        var nunitLoadContext = AssemblyLoadContext.All.Single( c => c.GetType().Name == "TestAssemblyLoadContext" );
-        CKli.Loader.PluginLoadContext.Initialize( nunitLoadContext );
         World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
     }
 

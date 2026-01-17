@@ -25,12 +25,17 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
     static Dictionary<string, Assembly>? _assemblies;
 
     /// <summary>
-    /// Depending on the host, the <see cref="AssemblyLoadContext.Default"/> may not be the load context
-    /// into which the application assemblies are loaded. For instance, NUnit3TestAdapter v6.0.0 loads 
-    /// the assemblies in a dedicated context (wasn't the case in v5.2.1).
+    /// Optional entry point... Depending on the host, the <see cref="AssemblyLoadContext.Default"/> may not be
+    /// the load context into which the application assemblies are loaded.
     /// <para>
     /// Fortunately, <see cref="AssemblyLoadContext.All"/> exposes all the contexts so we can consider
     /// another "Default" context when needed.
+    /// </para>
+    /// <para>
+    /// For instance, NUnit3TestAdapter v6.0.0 loads the assemblies in a dedicated context (wasn't the case in v5.2.1).
+    /// ...and this is no more the case for v6.1.0. It seems that the introduction of this "TestAssemblyLoadContext" was
+    /// a mess.
+    /// (So this is no more used but this entry point is kept because it may be required again.)
     /// </para>
     /// <para>
     /// This must obviously be called before the first call to <see cref="Load(IActivityMonitor, NormalizedPath, PluginCollectorContext, out bool, out WeakReference?)"/>.
