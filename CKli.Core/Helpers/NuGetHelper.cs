@@ -70,7 +70,7 @@ public static class NuGetHelper
         {
             mappings = new XElement( "packageSourceMapping",
                                      packageSources.Elements( "add" ).Attributes( "key" )
-                                        .Select( k => new XElement( "packageSource", new XAttribute( "key", k ),
+                                        .Select( k => new XElement( "packageSource", new XAttribute( "key", k.Value ),
                                                         new XElement( "package", new XAttribute( "pattern", "*" ) ) ) ) );
             root.Add( mappings );
             monitor.Trace( $"Missing <packageSourceMapping>, it is now fixed:{Environment.NewLine}{nugetConfigFile}" );
