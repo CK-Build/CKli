@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -55,8 +56,7 @@ sealed class CKliPull : Command
                             : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
                 if( repos == null ) return false;
 
-                bool withTags = true;
-                bool success = DoPull( monitor, fromAllRemotes, continueOnError, repos, withTags );
+                bool success = DoPull( monitor, fromAllRemotes, continueOnError, repos, withTags: true );
                 // Save a dirty World's DefinitionFile ony if no unhandled exception is thrown.
                 return stack.Close( monitor ) && success;
             }
