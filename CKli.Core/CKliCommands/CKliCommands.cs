@@ -22,8 +22,8 @@ public static class CKliCommands
         Add( cmds, new CKliFetch() );
         Add( cmds, new CKliIssue() );
 
-        //cmds.Add( "branch", null );
-        //Add( cmds, new CKliBranchPush() );
+        cmds.Add( "branch", null );
+        Add( cmds, new CKliBranchPush() );
 
         cmds.Add( "layout", null );
         Add( cmds, new CKliLayoutFix() );
