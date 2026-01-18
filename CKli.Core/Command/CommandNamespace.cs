@@ -45,7 +45,7 @@ public sealed class CommandNamespace
     /// </summary>
     /// <param name="screenType">The screen type.</param>
     /// <param name="helpPath">The optional help path. When null, all commands are considered.</param>
-    /// <param name="otherCommands">Optional secondary namespace from wich commands must be merged.</param>
+    /// <param name="otherCommands">Optional secondary namespace from which commands must be merged.</param>
     /// <returns>A list of commands that should display their definition.</returns>
     public List<CommandHelp> GetForHelp( ScreenType screenType, string? helpPath, CommandNamespace? otherCommands )
     {

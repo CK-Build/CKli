@@ -18,7 +18,7 @@ public sealed class PluginCollectionImpl : PluginCollection
     /// This supports the plugin infrastructure and is not intended to be called directly.
     /// </summary>
     /// <param name="instantiated">The plugin instances.</param>
-    /// <param name="plugins">The plugin informations.</param>
+    /// <param name="plugins">The plugin information.</param>
     /// <param name="commands">The commands.</param>
     /// <param name="pluginCommands">The plugin commands to bind.</param>
     public static PluginCollectionImpl CreateAndBindCommands( object[] instantiated,

@@ -43,7 +43,7 @@ public sealed partial class World
                                                           out WeakReference? loader );
 
     static PluginLoaderFunction? _pluginLoader;
-    static IPluginFactory? _directPluginFactory;
+    static Func<PluginCollectorContext, IPluginFactory>? _directPluginFactory;
 
     /// <summary>
     /// Gets or sets once the loader for plugins.
@@ -62,12 +62,12 @@ public sealed partial class World
     }
 
     /// <summary>
-    /// Gets or sets a <see cref="IPluginFactory"/> that will be used instead of the regular <see cref="PluginLoader"/>.
+    /// Gets or sets a factory for <see cref="IPluginFactory"/> that will be used instead of the regular <see cref="PluginLoader"/>.
     /// <para>
     /// This can always be set (not only once like the <see cref="PluginLoader"/>).
     /// </para>
     /// </summary>
-    public static IPluginFactory? DirectPluginFactory
+    public static Func<PluginCollectorContext, IPluginFactory>? DirectPluginFactory
     {
         get => _directPluginFactory;
         set => _directPluginFactory = value;
@@ -174,8 +174,17 @@ public sealed partial class World
         Throw.DebugAssert( "Never called when created without plugins.", _directPluginFactory != null || _pluginMachinery != null );
         try
         {
-            IPluginFactory? f = _directPluginFactory;
-            if( f == null )
+            IPluginFactory? f;
+            if( _directPluginFactory != null )
+            {
+                var pluginsConfiguration = _definitionFile.ReadPluginsConfiguration( monitor );
+                if( pluginsConfiguration == null )
+                {
+                    return false;
+                }
+                f = _directPluginFactory( new PluginCollectorContext( _name, pluginsConfiguration ) );
+            }
+            else
             {
                 Throw.DebugAssert( _pluginMachinery != null );
                 f = _pluginMachinery.PluginFactory;
