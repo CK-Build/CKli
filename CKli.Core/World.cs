@@ -494,8 +494,8 @@ public sealed partial class World
             if( !repoIdTrulyParsed ) repoId = default;
 
             string msg = repoId.IsValid
-                        ? "Unable to parse Id. A new CKliRepoId will be created."
-                        : "Found a valid CKliRepoId.";
+                        ? "Found a valid CKliRepoId."
+                        : "Unable to parse Id. A new CKliRepoId will be created.";
             if( !sameStack ) msg += $"""
 
                     Unable to find current Stack that is '{stackRepository.OriginUrl}'.
