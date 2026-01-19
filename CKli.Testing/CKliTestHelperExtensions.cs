@@ -280,7 +280,7 @@ public static partial class CKliTestHelperExtensions
         /// </summary>
         /// <param name="fullName">The <see cref="RemotesCollection.FullName"/> to use.</param>
         /// <returns>The remotes collection.</returns>
-        public static RemotesCollection OpenRemotes( string fullName )
+        public RemotesCollection OpenRemotes( string fullName )
         {
             Throw.DebugAssert( _remoteRepositories != null );
             var r = _remoteRepositories[fullName];
