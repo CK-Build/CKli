@@ -66,6 +66,15 @@ public sealed partial class StackRepository : IDisposable
     public NormalizedPath StackRoot => _stackRoot;
 
     /// <summary>
+    /// Gets the GitRepository.
+    /// <para>
+    /// This should be used with care and mainly from unit tests: nominal use of a StackDirectory
+    /// doesn't require a direct access to the repository. 
+    /// </para>
+    /// </summary>
+    public GitRepository GitRepository => _git;
+
+    /// <summary>
     /// Gets the path of the ".PrivateStack" or ".PublicStack". 
     /// </summary>
     public NormalizedPath StackWorkingFolder => _git.WorkingFolder;

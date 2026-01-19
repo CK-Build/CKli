@@ -291,7 +291,71 @@ public static partial class CKliTestHelperExtensions
             ZipFile.ExtractToDirectory( path + ".zip", path, overwriteFiles: false );
             return r;
         }
-
-
     }
+
+    /// <summary>
+    /// Uses a "Cloned/" folder (that has been handled by another test) to create a new "Remote/" one.
+    /// <list type="bullet">
+    ///     <item>The source "Cloned/builderMethodName" must exist and must obviously bet the result of a successful unit test.</item>
+    ///     <item>The target "Remote/stack(testState)" must not already exist.</item>
+    ///     <item>This removes the "origin" remote from all the repositories</item>
+    ///     <item>The source "Cloned/builderMethodName" is cleared once done.</item>
+    ///     <item>The "Remotes/Remotes.zip" must be updated thanks to the "ZipRemotes.ps1" script.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="builderMethodName">The name of the method that worked on the "Cloned/&lt;builderMethodName&gt;" to setup it. Example: "CKt_init_Async".</param>
+    /// <param name="stackName">The stack name to consider. Example: "CKt".</param>
+    /// <param name="testStateName">
+    /// The state name for the new Remote. Example: "(initialized)" will create "CKt(initialized)" remote folder.
+    /// Parentheses are required.
+    /// </param>
+    public static void CKliCreateRemoteFolderFromCloned( this IMonitorTestHelper helper, string builderMethodName, string stackName, string testStateName )
+    {
+        Throw.CheckArgument( !string.IsNullOrEmpty( testStateName ) && testStateName[0] == '(' && testStateName[^1] == ')' );
+
+        var source = TestHelper.CKliClonedPath.AppendPart( builderMethodName ).AppendPart( stackName );
+        var context = new CKliEnv( source );
+        if( !StackRepository.OpenWorldFromPath( TestHelper.Monitor, context, out var stack, out var world, skipPullStack: true, withPlugins: false ) )
+        {
+            Throw.CKException( $"Unable to open cloned stack from '{context.CurrentDirectory}'." );
+        }
+
+        var copyRoadmap = new List<(NormalizedPath, string)>() { (stack.StackWorkingFolder, stack.StackName + "-Stack") };
+        try
+        {
+            var allRepos = world.GetAllDefinedRepo( TestHelper.Monitor );
+            if( allRepos == null )
+            {
+                Throw.CKException( $"Unable to enumerate Repos in '{world.Name}'." );
+            }
+            foreach( var repo in allRepos )
+            {
+                if( !repo.GitRepository.CheckCleanCommit( TestHelper.Monitor ) )
+                {
+                    Throw.CKException( $"Repository '{repo.DisplayPath}' is dirty." );
+                }
+                repo.GitRepository.Repository.Network.Remotes.Remove( "origin" );
+                copyRoadmap.Add( (repo.WorkingFolder, repo.WorkingFolder.LastPart) );
+            }
+            stack.GitRepository.Repository.Network.Remotes.Remove( "origin" );
+        }
+        finally
+        {
+            stack.Dispose();
+        }
+
+        var destination = TestHelper.CKliRemotesPath.AppendPart( "CKt" + testStateName );
+        if( Directory.Exists( destination ) )
+        {
+            Throw.CKException( $"Target directory already exists: '{destination}'." );
+        }
+        foreach( var (path, name) in copyRoadmap )
+        {
+            var target = destination.AppendPart( name );
+            Directory.CreateDirectory( target );
+            FileUtil.CopyDirectory( new DirectoryInfo( path ), new DirectoryInfo( target ) );
+        }
+        TestHelper.InitializeClonedFolder( builderMethodName, clearStackRegistryFile: true );
+    }
+
 }
