@@ -85,11 +85,15 @@ foreach ($repo in $repos) {
 # Abort if any validation failed
 # ------------------------------------------------------------------
 if ($errors.Count -gt 0) {
-    Write-Error "Validation failed with the following issues:"
+    Write-Host ""
+    Write-Host "Validation failed with the following issues:" -ForegroundColor Red
+
     foreach ($err in $errors) {
-        Write-Error "  $err"
+        Write-Host "  - $err" -ForegroundColor Red
     }
-    exit 1
+
+    Write-Host ""
+    throw "Validation failed. See errors above."
 }
 
 # ------------------------------------------------------------------
