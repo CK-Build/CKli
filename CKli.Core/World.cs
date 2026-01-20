@@ -244,11 +244,25 @@ public sealed partial class World
     public WorldEvents Events => _events;
 
     /// <summary>
-    /// Finds a Repo among the already loaded ones by its <see cref="Repo.CKliRepoId"/>.
+    /// Finds a Repo by its <see cref="Repo.CKliRepoId"/>.
+    /// <para>
+    /// Setting <paramref name="alreadyLoadedOnly"/> to true is an optimization.
+    /// </para>
     /// </summary>
+    /// <param name="monitor">The monitor.</param>
     /// <param name="id">The repository identifier.</param>
+    /// <param name="alreadyLoadedOnly">True to not load all defined Repo and only consider the already loaded ones.</param>
     /// <returns>The Repo or null.</returns>
-    public Repo? FindByCKliRepoId( RandomId id ) => _ckliRepoIndex.GetValueOrDefault( id );
+    public Repo? FindByCKliRepoId( IActivityMonitor monitor, RandomId id, bool alreadyLoadedOnly = false )
+    {
+        if( !alreadyLoadedOnly
+            && !IsAllRepoLoaded
+            && GetAllDefinedRepo( monitor ) == null )
+        {
+            return null;
+        }
+        return _ckliRepoIndex.GetValueOrDefault( id );
+    }
 
     /// <summary>
     /// Gets whether a full path or a origin url is defined in this <see cref="Layout"/>.
@@ -495,12 +509,12 @@ public sealed partial class World
 
             string msg = repoId.IsValid
                         ? "Found a valid CKliRepoId."
-                        : "Unable to parse Id. A new CKliRepoId will be created.";
+                        : "Unable to parse Id. A new CKliRepoId will be generated.";
             if( !sameStack ) msg += $"""
 
-                    Unable to find current Stack that is '{stackRepository.OriginUrl}'.
+                    Stack has changed. It will be updated to '{stackRepository.OriginUrl}'.
                     """;
-            monitor.Warn( $"""
+            monitor.Log( repoId.IsValid ? LogLevel.Info : LogLevel.Warn, $"""
                 The 'ckli-repo' tag in '{git.DisplayPath}' is:
                 {message}
 
