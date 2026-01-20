@@ -288,21 +288,16 @@ public sealed partial class PluginMachinery
         mustRecompile = false;
         try
         {
+            // The DirectoryPackageProps is used by plugins (but not by the optional Plugins.Tests project).
             var d = XDocument.Load( DirectoryPackageProps, LoadOptions.PreserveWhitespace );
-            var ckliPluginsCore = d.Root?.Elements( "ItemGroup" )
-                                         .Elements( "PackageVersion" )
-                                         .FirstOrDefault( e => e.Attribute( "Include" )?.Value == "CKli.Plugins.Core" );
-            if( ckliPluginsCore == null )
+
+            // Handles CKli.Plugins.Core that must exist and this world must not be a LTS.
+            if( !ReadPackageVersion( monitor, d, "CKli.Plugins.Core", mustExist: true, DirectoryPackageProps, out XElement? ckliPluginsCore, out SVersion? v ) )
             {
-                monitor.Error( $"Unable to find <PackageVersion Include=\"CKli.Plugins.Core\" Version=\"...\" /> in '{DirectoryPackageProps}'." );
                 return false;
             }
-            var v = SVersion.TryParse( ckliPluginsCore.Attribute( "Version" )?.Value );
-            if( !v.IsValid )
-            {
-                monitor.Error( $"Invalid version in {ckliPluginsCore} (in '{DirectoryPackageProps}'): {v.ErrorMessage}." );
-                return false;
-            }
+            Throw.DebugAssert( ckliPluginsCore != null && v != null );
+
             var ckliVersion = World.CKliVersion.Version;
             Throw.Assert( ckliVersion != null );
             if( v != ckliVersion )
@@ -322,12 +317,24 @@ public sealed partial class PluginMachinery
                               To use Version="{ckliVersion}".
                               """ );
                 ckliPluginsCore.SetAttributeValue( "Version", ckliVersion );
-                d.SaveWithoutXmlDeclaration( DirectoryPackageProps );
                 mustRecompile = true;
             }
+            // Handles any standard plugins: their version is the same.
+            if( !UpdateStandardPluginVersion( monitor, ref mustRecompile, d, ckliVersion, "CKli.VSSolution.Plugin", DirectoryPackageProps ) )
+            {
+                return false;
+            }
+            if( mustRecompile )
+            {
+                d.SaveWithoutXmlDeclaration( DirectoryPackageProps );
+            }
+
             // Handling CKli.Testing version in 'Tests/Plugins.Tests/Plugins.Tests.csproj' if it exists.
+            // The Plugins.Tests project doesn't use the Central Package Version.
+            //
             // We do this even if the version in the Directory.Package.props was okay and if CKli.Testing
             // is not referenced by the test project, we just emit a warning.
+            //
             if( File.Exists( PluginTestsCSProjFilePath ) )
             {
                 var testsCSProj = XDocument.Load( PluginTestsCSProjFilePath, LoadOptions.PreserveWhitespace );
@@ -376,6 +383,54 @@ public sealed partial class PluginMachinery
         {
             monitor.Error( $"While checking CKli.Plugins.Core version in '{DirectoryPackageProps}'.", ex );
             return false;
+        }
+
+        static bool ReadPackageVersion( IActivityMonitor monitor, XDocument d, string name, bool mustExist, NormalizedPath directoryPackageProps, out XElement? ckliPluginsCore, out SVersion? v )
+        {
+            ckliPluginsCore = d.Root?.Elements( "ItemGroup" )
+                                         .Elements( "PackageVersion" )
+                                         .FirstOrDefault( e => e.Attribute( "Include" )?.Value == name );
+            if( ckliPluginsCore == null )
+            {
+                v = null;
+                if( mustExist )
+                {
+                    monitor.Error( $"Unable to find <PackageVersion Include=\"{name}\" Version=\"...\" /> in '{directoryPackageProps}'." );
+                    return false;
+                }
+                return true;
+            }
+            v = SVersion.TryParse( ckliPluginsCore.Attribute( "Version" )?.Value );
+            if( !v.IsValid )
+            {
+                monitor.Error( $"Invalid version in {ckliPluginsCore} (in '{directoryPackageProps}'): {v.ErrorMessage}." );
+                return false;
+            }
+            return true;
+        }
+
+        static bool UpdateStandardPluginVersion( IActivityMonitor monitor,
+                                                 ref bool mustRecompile,
+                                                 XDocument d,
+                                                 SVersion ckliVersion,
+                                                 string name,
+                                                 NormalizedPath directoryPackageProps )
+        {
+            if( !ReadPackageVersion( monitor, d, name, mustExist: false, directoryPackageProps, out XElement? ckliStandard, out SVersion v ) )
+            {
+                return false;
+            }
+            if( ckliStandard != null && v != ckliVersion )
+            {
+                monitor.Info( $"""
+                              Updating 'Directory.Package.props' file:
+                              {ckliStandard}
+                              To use Version="{ckliVersion}".
+                              """ );
+                ckliStandard.SetAttributeValue( "Version", ckliVersion );
+                mustRecompile = true;
+            }
+            return true;
         }
     }
 
