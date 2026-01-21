@@ -1141,6 +1141,71 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
+    /// Initializes a new Git repository in the specified working folder.
+    /// <para>
+    /// Unlike <see cref="Clone"/>, this creates a new repository locally rather than cloning from a remote.
+    /// An "origin" remote is set to the specified URL (can be a file:// URL for local-only stacks).
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store for credentials.</param>
+    /// <param name="committer">The signature to use when modifying the repository.</param>
+    /// <param name="workingFolder">The local working folder to initialize.</param>
+    /// <param name="displayPath">
+    /// The short path to display, relative to a well known root. It must not be empty.
+    /// </param>
+    /// <param name="isPublic">Whether this repository is public or private.</param>
+    /// <param name="originUrl">The URL to set as the "origin" remote. Can be a file:// URL for local-only stacks.</param>
+    /// <param name="branchName">The initial branch name. Defaults to "main".</param>
+    /// <returns>The GitRepository object or null on error.</returns>
+    public static GitRepository? Init( IActivityMonitor monitor,
+                                       ISecretsStore secretsStore,
+                                       Signature committer,
+                                       NormalizedPath workingFolder,
+                                       NormalizedPath displayPath,
+                                       bool isPublic,
+                                       Uri originUrl,
+                                       string branchName = "main" )
+    {
+        Throw.CheckNotNullArgument( monitor );
+        Throw.CheckArgument( !workingFolder.IsEmptyPath );
+        Throw.CheckArgument( !displayPath.IsEmptyPath );
+        Throw.CheckNotNullArgument( originUrl );
+        Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
+
+        using( monitor.OpenInfo( $"Initializing new repository at '{workingFolder}'." ) )
+        {
+            try
+            {
+                // Create the directory
+                Directory.CreateDirectory( workingFolder );
+
+                // Initialize the repository with the specified initial branch
+                Repository.Init( workingFolder, isBare: false );
+
+                var r = new Repository( workingFolder );
+
+                // Set the default branch to the specified branchName (instead of "master")
+                // For an unborn branch, we need to set HEAD as a symbolic reference
+                r.Refs.Add( "HEAD", $"refs/heads/{branchName}", allowOverwrite: true );
+
+                // Add origin remote
+                r.Network.Remotes.Add( "origin", originUrl.AbsoluteUri );
+                monitor.Info( $"Added 'origin' remote: {originUrl}" );
+
+                var gitKey = new GitRepositoryKey( secretsStore, originUrl, isPublic );
+
+                return new GitRepository( gitKey, committer, r, workingFolder, displayPath );
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"Failed to initialize repository at '{workingFolder}'.", ex );
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
     /// Opens a working folder. The <paramref name="workingFolder"/> must exist otherwise an error is logged.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
