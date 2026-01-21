@@ -1,6 +1,5 @@
 using CK.Core;
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,7 +11,6 @@ namespace CKli.Core;
 /// </summary>
 sealed class CKliLog : Command
 {
-    static string? _fileOpenerPath;
 
     internal CKliLog()
         : base( null,
@@ -66,44 +64,11 @@ sealed class CKliLog : Command
 
     static bool OpenLogFolder( IActivityMonitor monitor, string folder )
     {
-        using var p = Process.Start( new ProcessStartInfo()
-        {
-            FileName = folder,
-            UseShellExecute = true,
-            Verb = "open"
-        } );
-        return true;
+        return PlatformHelper.OpenFolder( monitor, folder );
     }
 
     static bool OpenLogFile( IActivityMonitor monitor, string path )
     {
-        if( _fileOpenerPath == null )
-        {
-            //
-            // This prevents the associated program to write its text to our console.
-            // For instance, VSCode pollutes the console with lines like:
-            // "[main 2025-11-04T08:27:57.303Z] update#setState idle"
-            //
-            _fileOpenerPath = Path.Combine( CKliRootEnv.AppLocalDataPath, "CmdOpenFile.bat" );
-            if( !File.Exists( _fileOpenerPath ) )
-            {
-                using( CKliRootEnv.AcquireAppMutex( monitor ) )
-                {
-                    File.WriteAllText( _fileOpenerPath, "start \"\" %1" );
-                }
-            }
-        }
-        using var p = Process.Start( new ProcessStartInfo()
-        {
-            FileName = _fileOpenerPath,
-            Arguments = '"' + path + '"',
-            CreateNoWindow = true,
-        } );
-        if( p == null )
-        {
-            monitor.Error( $"Unable to open log file '{path}'." );
-            return false;
-        }
-        return true;
+        return PlatformHelper.OpenFile( monitor, path );
     }
 }

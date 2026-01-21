@@ -31,6 +31,28 @@ The `update` command is described below.
 
 If you installed CKli globally, you can run `ckli` in any command prompt to start it.
 
+## Development & Local Testing
+
+To test your local changes without publishing to NuGet:
+
+```bash
+# 1. Build and pack
+dotnet build CKli.sln -c Debug
+dotnet pack CKli/CKli.csproj -c Debug
+
+# 2. Install as global tool (uninstall first if already installed)
+dotnet tool uninstall -g CKli
+dotnet tool install -g CKli --source ./CKli/bin/Debug --version 0.0.0-0
+
+# 3. Test your changes
+ckli --help
+ckli log
+
+# 4. When done, reinstall from NuGet
+dotnet tool uninstall -g CKli
+dotnet tool install -g CKli
+```
+
 ## The basics: Stack-World-Repo
 
 A World is a set of Git repositories. The set is described by a simple XML file that lists the

@@ -1,6 +1,7 @@
 using CK.Core;
 using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -70,11 +71,7 @@ sealed class CKliUpdate : Command
             {updateCmd}
             """ );
 
-        if( Environment.OSVersion.Platform == PlatformID.Unix )
-        {
-            monitor.Warn( "Sorry, this is not available on non Windows platform yet." );
-        }
-        else
+        if( RuntimeInformation.IsOSPlatform( OSPlatform.Windows ) )
         {
             // This uses windows PowerShell (based on NetFramework 4, the legacy one) should always be available.
             // The new PowerShell Core (based on .Net) is an opt-in.
@@ -87,6 +84,36 @@ sealed class CKliUpdate : Command
                 Arguments = $"-NoProfile -NoLogo -NonInteractive -ExecutionPolicy unrestricted -command {cmd}",
                 UseShellExecute = false
             } );
+        }
+        else if( RuntimeInformation.IsOSPlatform( OSPlatform.Linux ) || RuntimeInformation.IsOSPlatform( OSPlatform.OSX ) )
+        {
+            // On Unix platforms, use a shell script that waits for the current process to exit.
+            // kill -0 checks if process exists (POSIX standard, works on Linux and macOS).
+            // The wait loop checks every 0.5 seconds with a natural ~20 second timeout.
+            var shellCmd = $"while kill -0 {Environment.ProcessId} 2>/dev/null; do sleep 0.5; done; exec {updateCmd}";
+
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "/bin/sh",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                // Use ArgumentList to avoid .NET's argument parsing - pass arguments directly
+                psi.ArgumentList.Add( "-c" );
+                psi.ArgumentList.Add( shellCmd );
+                Process.Start( psi );
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( "Unable to start update process.", ex );
+                return ValueTask.FromResult( false );
+            }
+        }
+        else
+        {
+            monitor.Warn( $"Auto-update is not supported on this platform. Please run manually:\n{updateCmd}" );
         }
         return ValueTask.FromResult( true );
     }
