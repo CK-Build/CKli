@@ -102,12 +102,59 @@ exists, the version of the `CKli.Testing` package reference is also updated.
 ### `clone <url> --private --allow-duplicate`
 Clones a Stack and all its current World repositories in the current directory.
 
-`--private` drives the name of the Stack repository folder: it is `.PrivateStack/` 
+`--private` drives the name of the Stack repository folder: it is `.PrivateStack/`
 instead of `.PublicStack/`.
 
 `--allow-duplicate` must be specified if the same Stack has already been cloned
 and is available on the local system. In such case, the Stack's folder name will be
 `Duplicate-Of-XXX/` instead of `XXX/`.
+
+### `stack create <stackName> --url --private`
+Creates a new Stack locally in the current directory. Unlike `clone`, this creates
+a new empty stack rather than cloning from a remote.
+
+The `<stackName>` should not include the `-Stack` suffix (it will be added automatically
+to the remote URL if provided).
+
+`--url` (or `-u`) optionally specifies a remote URL. This sets up the origin remote
+but does not push. The remote repository must be created separately (e.g., on GitHub)
+before pushing.
+
+`--private` uses `.PrivateStack/` folder instead of `.PublicStack/`.
+
+Example:
+```bash
+# Create a new stack with a remote URL
+ckli stack create MyProject --url https://github.com/user/MyProject-Stack
+
+# Create a local-only stack
+ckli stack create MyLocalStack
+```
+
+### `stack info`
+Displays information about the current Stack: name, path, remote URL, current branch,
+and whether it's public or private.
+
+Must be run from within a Stack directory.
+
+### `stack set-remote-url <newUrl> --no-push`
+Changes the Stack's remote URL (origin). This updates both the git remote configuration
+and the local Stack registry.
+
+By default, a push is attempted after changing the URL to verify the new remote is
+accessible. Use `--no-push` to skip the push (useful when the remote doesn't exist yet
+or when you want to verify the change before pushing).
+
+The URL is validated and normalized (e.g., `.git` suffix is stripped).
+
+Example:
+```bash
+# Change remote and push to verify
+ckli stack set-remote-url https://github.com/neworg/MyProject-Stack
+
+# Change remote without pushing
+ckli stack set-remote-url https://github.com/neworg/MyProject-Stack --no-push
+```
 
 ### `log --folder`
 Opens the last log file. When `--folder` (or `-f`) is specified, the folder is opened instead

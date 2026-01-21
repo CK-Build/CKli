@@ -245,6 +245,74 @@ public sealed partial class StackRepository : IDisposable
         return result != CommitResult.Error && _git.PushBranch( monitor, _git.Repository.Head, autoCreateRemoteBranch: false );
     }
 
+    /// <summary>
+    /// Changes the stack's remote URL (origin).
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="newUrl">The new remote URL. Must be a valid, normalized URL.</param>
+    /// <param name="push">True to push after changing the URL.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool SetRemoteUrl( IActivityMonitor monitor, Uri newUrl, bool push = true )
+    {
+        Throw.CheckNotNullArgument( newUrl );
+        Throw.CheckArgument( newUrl.IsAbsoluteUri );
+
+        var oldUrl = _git.RepositoryKey.OriginUrl;
+        if( GitRepositoryKey.IsEquivalentRepositoryUri( oldUrl, newUrl ) )
+        {
+            monitor.Info( $"Remote URL is already '{newUrl}'." );
+            return true;
+        }
+
+        using( monitor.OpenInfo( $"Changing remote URL from '{oldUrl}' to '{newUrl}'." ) )
+        {
+            // Update the git remote
+            try
+            {
+                _git.Repository.Network.Remotes.Update( "origin", r => r.Url = newUrl.AbsoluteUri );
+                monitor.Trace( "Git remote 'origin' updated." );
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"Failed to update git remote 'origin'.", ex );
+                return false;
+            }
+
+            // Update the registry
+            try
+            {
+                Registry.RegisterNewStack( monitor, StackWorkingFolder, newUrl );
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"Failed to update registry.", ex );
+                // Try to revert the git remote change
+                try
+                {
+                    _git.Repository.Network.Remotes.Update( "origin", r => r.Url = oldUrl.AbsoluteUri );
+                    monitor.Warn( "Reverted git remote to original URL due to registry update failure." );
+                }
+                catch
+                {
+                    monitor.Error( "Failed to revert git remote after registry update failure. Manual fix required." );
+                }
+                return false;
+            }
+
+            // Push to verify the new remote is valid
+            if( push )
+            {
+                if( !_git.PushBranch( monitor, _git.Repository.Head, autoCreateRemoteBranch: false ) )
+                {
+                    monitor.Error( "Push to new remote failed. The remote URL has been changed but the remote may not exist or be accessible." );
+                    return false;
+                }
+                monitor.Info( "Successfully pushed to new remote." );
+            }
+        }
+        return true;
+    }
+
     StackRepository( GitRepository git, in NormalizedPath stackRoot, CKliEnv context, string stackName )
     {
         _git = git;
