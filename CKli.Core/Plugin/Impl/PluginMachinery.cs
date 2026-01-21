@@ -320,9 +320,12 @@ public sealed partial class PluginMachinery
                 mustRecompile = true;
             }
             // Handles any standard plugins: their version is the same.
-            if( !UpdateStandardPluginVersion( monitor, ref mustRecompile, d, ckliVersion, "CKli.VSSolution.Plugin", DirectoryPackageProps ) )
+            foreach( var name in PluginBase.StandardPluginNames )
             {
-                return false;
+                if( !UpdateStandardPluginVersion( monitor, ref mustRecompile, d, ckliVersion, name, DirectoryPackageProps ) )
+                {
+                    return false;
+                }
             }
             if( mustRecompile )
             {
@@ -416,7 +419,7 @@ public sealed partial class PluginMachinery
                                                  string name,
                                                  NormalizedPath directoryPackageProps )
         {
-            if( !ReadPackageVersion( monitor, d, name, mustExist: false, directoryPackageProps, out XElement? ckliStandard, out SVersion v ) )
+            if( !ReadPackageVersion( monitor, d, name, mustExist: false, directoryPackageProps, out XElement? ckliStandard, out SVersion? v ) )
             {
                 return false;
             }

@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
 
 namespace CKli.Core;
 
@@ -17,6 +18,12 @@ namespace CKli.Core;
 /// </summary>
 public abstract class PluginBase
 {
+    /// <summary>
+    /// A list of standard plugin names (co-released with CKli).
+    /// Their versions are automatically updated by "ckli update" followed by "ckli plugin info".
+    /// </summary>
+    public static readonly IReadOnlyList<string> StandardPluginNames = ["CKli.VSSolution.Plugin"];
+
     readonly World _world;
 
     /// <summary>
