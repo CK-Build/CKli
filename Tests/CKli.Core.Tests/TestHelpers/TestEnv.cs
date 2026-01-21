@@ -152,7 +152,8 @@ static partial class TestEnv
 
             // Extracts Remotes.zip content.
             // Disallow overwriting: .gitignore file and README.md must not be in the Zip archive.
-            ZipFile.ExtractToDirectory( zipPath, _remotesPath, overwriteFiles: false );
+            // Use custom extraction to handle Windows-created zips with backslash paths.
+            ExtractZipWithNormalizedPaths( zipPath, _remotesPath );
             // Fills the bare/ with the .zip of the bare repositories and creates the Remotes.txt
             // index file.
             var remotesIndex = new StringBuilder();
@@ -317,6 +318,36 @@ static partial class TestEnv
     public static void DeleteFile( string path )
     {
         FileHelper.DeleteFile( TestHelper.Monitor, path ).ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// Extracts a zip archive with path normalization to handle Windows-created zips on Linux.
+    /// Windows backslashes in entry paths are replaced with forward slashes.
+    /// </summary>
+    /// <param name="zipPath">The path to the zip file.</param>
+    /// <param name="destinationPath">The destination directory.</param>
+    static void ExtractZipWithNormalizedPaths( string zipPath, string destinationPath )
+    {
+        using var archive = ZipFile.OpenRead( zipPath );
+        foreach( var entry in archive.Entries )
+        {
+            // Normalize path separators (Windows backslashes to forward slashes).
+            var normalizedName = entry.FullName.Replace( '\\', '/' );
+
+            // Skip directory entries (they end with / or have empty Name).
+            if( string.IsNullOrEmpty( entry.Name ) )
+                continue;
+
+            var destPath = Path.Combine( destinationPath, normalizedName );
+            var destDir = Path.GetDirectoryName( destPath )!;
+
+            if( !Directory.Exists( destDir ) )
+                Directory.CreateDirectory( destDir );
+
+            // Don't overwrite existing files (.gitignore, README.md).
+            if( !File.Exists( destPath ) )
+                entry.ExtractToFile( destPath );
+        }
     }
 
 }
