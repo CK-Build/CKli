@@ -31,6 +31,28 @@ The `update` command is described below.
 
 If you installed CKli globally, you can run `ckli` in any command prompt to start it.
 
+## Development & Local Testing
+
+To test your local changes without publishing to NuGet:
+
+```bash
+# 1. Build and pack
+dotnet build CKli.sln -c Debug
+dotnet pack CKli/CKli.csproj -c Debug
+
+# 2. Install as global tool (uninstall first if already installed)
+dotnet tool uninstall -g CKli
+dotnet tool install -g CKli --source ./CKli/bin/Debug --version 0.0.0-0
+
+# 3. Test your changes
+ckli --help
+ckli log
+
+# 4. When done, reinstall from NuGet
+dotnet tool uninstall -g CKli
+dotnet tool install -g CKli
+```
+
 ## The basics: Stack-World-Repo
 
 A World is a set of Git repositories. The set is described by a simple XML file that lists the
@@ -77,15 +99,64 @@ the current version is a pre release.
 This command transparently updates the CKli version used by the `CKli.Plugins` solution. If a `Tests/Plugins.Tests` project
 exists, the version of the `CKli.Testing` package reference is also updated.
 
-### `clone <url> --private --allow-duplicate`
+### `clone <url> --private --allow-duplicate --ignore-parent-stack`
 Clones a Stack and all its current World repositories in the current directory.
 
-`--private` drives the name of the Stack repository folder: it is `.PrivateStack/` 
+`--private` drives the name of the Stack repository folder: it is `.PrivateStack/`
 instead of `.PublicStack/`.
 
 `--allow-duplicate` must be specified if the same Stack has already been cloned
 and is available on the local system. In such case, the Stack's folder name will be
 `Duplicate-Of-XXX/` instead of `XXX/`.
+
+`--ignore-parent-stack` allows the cloned Stack to be inside an existing one.
+
+### `stack create <stackName> --url --private`
+Creates a new Stack locally in the current directory. Unlike `clone`, this creates
+a new empty stack rather than cloning from a remote.
+
+The `<stackName>` should not include the `-Stack` suffix (it will be added automatically
+to the remote URL if provided).
+
+`--url` (or `-u`) optionally specifies a remote URL. This sets up the origin remote
+but does not push. The remote repository must be created separately (e.g., on GitHub)
+before pushing.
+
+`--private` uses `.PrivateStack/` folder instead of `.PublicStack/`.
+
+Example:
+```bash
+# Create a new stack with a remote URL
+ckli stack create MyProject --url https://github.com/user/MyProject-Stack
+
+# Create a local-only stack
+ckli stack create MyLocalStack
+```
+
+### `stack info`
+Displays information about the current Stack: name, path, remote URL, current branch,
+and whether it's public or private.
+
+Must be run from within a Stack directory.
+
+### `stack set-remote-url <newUrl> --no-push`
+Changes the Stack's remote URL (origin). This updates both the git remote configuration
+and the local Stack registry.
+
+By default, a push is attempted after changing the URL to verify the new remote is
+accessible. Use `--no-push` to skip the push (useful when the remote doesn't exist yet
+or when you want to verify the change before pushing).
+
+The URL is validated and normalized (e.g., `.git` suffix is stripped).
+
+Example:
+```bash
+# Change remote and push to verify
+ckli stack set-remote-url https://github.com/neworg/MyProject-Stack
+
+# Change remote without pushing
+ckli stack set-remote-url https://github.com/neworg/MyProject-Stack --no-push
+```
 
 ### `log --folder`
 Opens the last log file. When `--folder` (or `-f`) is specified, the folder is opened instead
@@ -94,7 +165,7 @@ of the last log file.
 The `Log/` folder is `%LocalAppData%/CKli/Out-of-Stack-Logs/` when CKli doesn't start is a Stack folder, otherwise
 each Stack keeps its own logs in their `.PublicStack/Logs` (or `.PrivateStack/Logs`). 
 
-### `pull -all --from-all-remotes --continue-on-error`
+### `pull --all --from-all-remotes --continue-on-error`
 
 Pulls (fetch-merge) the Stack repository and all current Repos' local branches that track a remote branch.
 Note that tags that point to the remote branches will be retrieved and will replace locally defined tags if they point
@@ -109,7 +180,7 @@ Any merge conflict is an error. Unless `--continue-on-error` is specified, the f
 
 A pull is implicitly executed first by `ckli push`. 
 
-### `fetch -all --with-tags --from-all-remotes`
+### `fetch --all --with-tags --from-all-remotes`
 Fetches all branches (and optionally tags) of the current Repos.
 
 By default, the current directory selects the Repos unless `--all` is specified.
@@ -120,7 +191,14 @@ Use `ckli tag list` to detect conflicts.
 
 `--from-all-remotes` fetches from all remotes instead of the 'origin' remote.
 
-### `push --stack-only -all --to-all-remotes --continue-on-error`
+### `branch push <branch> --all`
+Pushes the specified branch to its remote "origin", creating it if it doesn't exist yet.
+The branch is fetched and must be successfully merged before the push can succeed.
+
+By default, the current directory selects the Repos unless `--all` is specified.
+When applied to multiple Repos, a warning is emitted if the branch doesn't exist in a Repo.
+
+### `push --stack-only --all --to-all-remotes --continue-on-error`
 Pushes the Stack repository and all Repo's local branches that track a remote branch.
 A pull is done before: it must be successful for the actual push to be done.
 
@@ -135,6 +213,12 @@ By default, the current directory selects the Repos unless `--all` is specified.
 
 Any conflict is an error. Unless `--continue-on-error` is specified, the first error stops
 the push.
+
+### `repo list --by-branch`
+Lists the World's Repos with their folder path, current branch name, remote commit diffs, and remote origin URL.
+
+When `--by-branch` (or `-b`) is specified, repositories are grouped by their current branch name
+instead of being listed in definition order.
 
 ### `repo add <url> --allow-lts`
 Adds a new repository to the current world.
@@ -185,6 +269,48 @@ by `--ckli-` to avoid a name clash with an existing process argument.)
 
 Example: `ckli exec dotnet build --ckli-all` builds all the Repo of the Stack.
 
+### `tag list --local --remote --all`
+Lists local tags and/or remote tags from the current Repo or all the Repos.
+
+By default (without `--local` or `--remote`), both local and remote tags are fetched
+and a diff is displayed showing tags that exist only locally, only remotely, or in both.
+
+When `--local` is specified, only local tags are listed.
+
+When `--remote` is specified, only remote tags are listed.
+
+When `--all` is specified, lists tags for all the Repos of the current World
+(even if the current path is in a Repo).
+
+### `tag pull <tag names>`
+Pulls the specified tags from the remote "origin" into the current Repo.
+Local modifications of fetched tags are lost (the remote version replaces them).
+
+Tag names must contain only ASCII characters with lowercase letters (to avoid case sensitivity issues).
+
+Must be run from within a Repo directory.
+
+### `tag push <tag names>`
+Pushes the specified tags from the current Repo to its remote "origin".
+Modifications of remote tags are lost (the local version replaces them).
+
+Tag names must contain only ASCII characters with lowercase letters (to avoid case sensitivity issues).
+
+Must be run from within a Repo directory.
+
+### `tag delete <tag names> --with-remote --remote-only --allow-multi-repo`
+Deletes local tags (and/or optionally from the remote "origin").
+The operation is idempotent: tags that don't exist are silently ignored.
+
+By default, only local tags are deleted and the command must be run from within a single Repo.
+
+`--with-remote` deletes tags from both local and remote.
+
+`--remote-only` deletes remote tags only, keeping local ones.
+
+`--allow-multi-repo` allows the command to proceed when the current path is above multiple Repos.
+By default, the current path must be within a single Repo.
+
 ## Plugin commands
 
 The core commands of CKli handles Stack, World and Repo (Git repositories).
@@ -194,10 +320,12 @@ external and optional plugins can be used.
 Plugins are written in .NET and distributed as NuGet packages or can be source code directly
 in the Stack repository.
 
-### `plugin info --compile-mode`
+### `plugin info --compile-mode --force`
 
 Provides information on installed plugins, their state, Xml configuration element and an optional message
 that can be produced by the plugin itself.
+
+`--force` (or `-f`) forces plugin recompilation even if the compile mode hasn't changed.
 
 `--compile-mode` is an advanced option to be used when developing plugins. Plugins are discovered
 once (after a creation, an install or a removal) via reflection and then compiled in `Release`
