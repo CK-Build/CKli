@@ -319,7 +319,7 @@ public sealed partial class GitRepository : IDisposable
                     Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                     {
                         CredentialsProvider = ( url, user, types ) => creds,
-                        TagFetchMode = withTags ? TagFetchMode.All : TagFetchMode.None
+                        TagFetchMode = withTags ? TagFetchMode.Auto : TagFetchMode.None
                     }, logMsg );
                 }
                 return true;
