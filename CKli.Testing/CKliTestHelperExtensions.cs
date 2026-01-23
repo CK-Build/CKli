@@ -234,62 +234,149 @@ public static partial class CKliTestHelperExtensions
         /// of the host stack.
         /// </summary>
         public NormalizedPath CKliStackWorkingFolder => helper.SolutionFolder;
+    }
 
-        /// <summary>
-        /// Must be called by tests to cleanup their respective "Cloned/&lt;test-name&gt;" where they can clone
-        /// the stacks they want from the "Remotes" thanks to <see cref="RemotesCollection.Clone(NormalizedPath, Action{IActivityMonitor, XElement}?)"/>.
-        /// </summary>
-        /// <param name="methodTestName">The test name.</param>
-        /// <param name="clearStackRegistryFile">True to clear the stack registry (<see cref="StackRepository.ClearRegistry"/>).</param>
-        /// <returns>The path to the cleaned folder.</returns>
-        public NormalizedPath InitializeClonedFolder( [CallerMemberName] string? methodTestName = null, bool clearStackRegistryFile = true )
+
+    /// <summary>
+    /// Must be called by tests to cleanup their respective "Cloned/&lt;test-name&gt;" where they can clone
+    /// the stacks they want from the "Remotes" thanks to <see cref="RemotesCollection.Clone(NormalizedPath, Action{IActivityMonitor, XElement}?)"/>.
+    /// </summary>
+    /// <param name="methodTestName">The test name.</param>
+    /// <param name="clearStackRegistryFile">True to clear the stack registry (<see cref="StackRepository.ClearRegistry"/>).</param>
+    /// <returns>The path to the cleaned folder.</returns>
+    public static NormalizedPath InitializeClonedFolder( this IMonitorTestHelper helper, [CallerMemberName] string? methodTestName = null, bool clearStackRegistryFile = true )
+    {
+        var path = _clonedPath.AppendPart( methodTestName );
+        if( Directory.Exists( path ) )
         {
-            var path = _clonedPath.AppendPart( methodTestName );
-            if( Directory.Exists( path ) )
+            RemoveAllReadOnlyAttribute( path );
+            helper.CleanupFolder( path, ensureFolderAvailable: true );
+        }
+        else
+        {
+            Directory.CreateDirectory( path );
+        }
+        if( clearStackRegistryFile )
+        {
+            Throw.CheckState( StackRepository.ClearRegistry( TestHelper.Monitor ) );
+        }
+        return path;
+
+        static void RemoveAllReadOnlyAttribute( string folder )
+        {
+            var options = new EnumerationOptions
             {
-                RemoveAllReadOnlyAttribute( path );
-                helper.CleanupFolder( path, ensureFolderAvailable: true );
+                IgnoreInaccessible = false,
+                RecurseSubdirectories = true,
+                AttributesToSkip = FileAttributes.System
+            };
+            foreach( var f in Directory.EnumerateFiles( folder, "*", options ) )
+            {
+                File.SetAttributes( f, FileAttributes.Normal );
+            }
+        }
+    }
+
+    /// <summary>
+    /// Obtains a clean (unmodified) <see cref="RemotesCollection"/> that must exist.
+    /// </summary>
+    /// <param name="fullName">The <see cref="RemotesCollection.FullName"/> to use.</param>
+    /// <returns>The remotes collection.</returns>
+    public static RemotesCollection OpenRemotes( this IMonitorTestHelper helper, string fullName )
+    {
+        Throw.DebugAssert( _remoteRepositories != null );
+        var r = _remoteRepositories[fullName];
+        // Deletes the current repository that may have been modified
+        // and extracts a brand new bare git repository.
+        var path = _barePath.AppendPart( r.FullName );
+        FileHelper.DeleteFolder( TestHelper.Monitor, path ).ShouldBeTrue();
+        ZipFile.ExtractToDirectory( path + ".zip", path, overwriteFiles: false );
+        return r;
+    }
+
+    /// <summary>
+    /// Create or modify a "CKliTestModification.cs" file in the <paramref name="projectFolder"/> and
+    /// creates a new commit on a specified branch or on the currently checked out branch.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <param name="projectFolder">The project  folder (eg. "CKt.Core") relative to <see cref="CKliEnv.CurrentDirectory"/> (can be absolute).</param>
+    /// <param name="branchName">The branch name to update (or null to touch the working folder and commit on the current repository head).</param>
+    /// <param name="commitMessage">Optional commit message.</param>
+    public static void ModifyAndCreateCommit( this IMonitorTestHelper helper, CKliEnv context, NormalizedPath projectFolder, string? branchName, string? commitMessage = null )
+    {
+        var projectPath = context.CurrentDirectory.Combine( projectFolder ).ResolveDots();
+
+        if( string.IsNullOrEmpty( commitMessage ) )
+        {
+            commitMessage = $"// Touching {projectFolder.LastPart}.";
+        }
+
+        NormalizedPath gitPath = Repository.Discover( projectPath );
+        if( gitPath.IsEmptyPath )
+        {
+            if( !Directory.Exists( projectPath ) )
+            {
+                Throw.ArgumentException( nameof( projectFolder ), $"""
+                    Path '{projectPath}' doesn't exist. It has been combined from:
+                    context.CurrentDirectory = '{context.CurrentDirectory}'
+                    and:
+                    projectFolder: '{projectFolder}'
+                    """ );
+            }
+            Throw.ArgumentException( nameof( projectFolder ), $"Unable to find the .git folder from '{projectPath}'." );
+        }
+        gitPath = gitPath.RemoveLastPart();
+        using( var git = new Repository( gitPath ) )
+        {
+            if( branchName != null )
+            {
+                var b = git.Branches[branchName];
+                if( b == null )
+                {
+                    Throw.ArgumentException( $"Unable to find branch '{branchName}'." );
+                }
+                if( !b.IsCurrentRepositoryHead )
+                {
+                    TreeDefinition tDef = TreeDefinition.From( b.Tip.Tree );
+                    gitPath.TryGetRelativePathTo( projectPath, out var relativeProjectPath ).ShouldBeTrue();
+                    if( tDef[relativeProjectPath] == null )
+                    {
+                        Throw.ArgumentException( $"Unable to find '{relativeProjectPath}' in branch '{branchName}'." );
+                    }
+                    var filePath = relativeProjectPath.AppendPart( "CKliTestModification.cs" );
+
+                    string text = "// Created";
+                    TreeEntryDefinition? fileDef = tDef[filePath];
+                    if( fileDef != null )
+                    {
+                        if( fileDef.TargetType != TreeEntryTargetType.Blob || fileDef.Mode != Mode.NonExecutableFile )
+                        {
+                            Throw.InvalidOperationException( $"Entry '{filePath}' in branch '{branchName}' is not a non executable Blob." );
+                        }
+                        var blob = git.Lookup<Blob>( fileDef.TargetId );
+                        text = blob.GetContentText() + $"{Environment.NewLine}{DateTime.UtcNow}";
+                    }
+                    ObjectId textId = git.ObjectDatabase.Write<Blob>( Encoding.UTF8.GetBytes( text ) );
+                    tDef.Add( filePath, textId, Mode.NonExecutableFile );
+                    var newTree = git.ObjectDatabase.CreateTree( tDef );
+                    var newCommit = git.ObjectDatabase.CreateCommit( context.Committer, context.Committer, commitMessage, newTree, [b.Tip], prettifyMessage: true );
+                    git.Refs.UpdateTarget( b.Reference, newCommit.Id, null );
+                    return;
+                }
+            }
+            // Either the branchName is null (the user wants to work in the head) or the
+            // branch is the one currently checked out: use the working folder.
+            var sourceFilePath = projectPath.AppendPart( "CKliTestModification.cs" );
+            if( !File.Exists( sourceFilePath ) )
+            {
+                File.WriteAllText( sourceFilePath, "// Created" );
             }
             else
             {
-                Directory.CreateDirectory( path );
+                File.WriteAllText( sourceFilePath, File.ReadAllText( sourceFilePath ) + $"{Environment.NewLine}{DateTime.UtcNow}" );
             }
-            if( clearStackRegistryFile )
-            {
-                Throw.CheckState( StackRepository.ClearRegistry( TestHelper.Monitor ) );
-            }
-            return path;
-
-            static void RemoveAllReadOnlyAttribute( string folder )
-            {
-                var options = new EnumerationOptions
-                {
-                    IgnoreInaccessible = false,
-                    RecurseSubdirectories = true,
-                    AttributesToSkip = FileAttributes.System
-                };
-                foreach( var f in Directory.EnumerateFiles( folder, "*", options ) )
-                {
-                    File.SetAttributes( f, FileAttributes.Normal );
-                }
-            }
-        }
-
-        /// <summary>
-        /// Obtains a clean (unmodified) <see cref="RemotesCollection"/> that must exist.
-        /// </summary>
-        /// <param name="fullName">The <see cref="RemotesCollection.FullName"/> to use.</param>
-        /// <returns>The remotes collection.</returns>
-        public RemotesCollection OpenRemotes( string fullName )
-        {
-            Throw.DebugAssert( _remoteRepositories != null );
-            var r = _remoteRepositories[fullName];
-            // Deletes the current repository that may have been modified
-            // and extracts a brand new bare git repository.
-            var path = _barePath.AppendPart( r.FullName );
-            FileHelper.DeleteFolder( TestHelper.Monitor, path ).ShouldBeTrue();
-            ZipFile.ExtractToDirectory( path + ".zip", path, overwriteFiles: false );
-            return r;
+            Commands.Stage( git, "*" );
+            git.Commit( commitMessage, context.Committer, context.Committer );
         }
     }
 
