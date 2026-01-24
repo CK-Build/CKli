@@ -1,65 +1,195 @@
 using CK.Core;
 using CSemVer;
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 
 namespace CKli;
 
 /// <summary>
-/// Minimal package instance. There's no constraint on the <see cref="PackageId"/> except that it cannot
-/// be empty or whitespace. This applies to any package management system.
+/// Encapsulates a package@version information. Can be used fo other kind of packages than NuGet.
+/// <para>
+/// This is a readonly record struct: value equality is handled by default and we add a comparison
+/// based on <paramref name="PackageId"/> first and then <see cref="Version"/>.
+/// </para>
 /// </summary>
-public sealed class PackageInstance
+/// <param name="PackageId">The package name. Will be null for <c>default</c>.</param>
+/// <param name="Version">The version of this instance. Will be null for <c>default</c>.</param>
+public readonly record struct PackageInstance( string PackageId, SVersion Version ) : IComparable<PackageInstance>
 {
-    readonly string _packageId;
-    readonly SVersion _version;
+    /// <summary>
+    /// Gets whether this value is valid (not the <c>default</c>).
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(PackageId), nameof(Version))]
+    public bool IsValid => PackageId != null && Version != null;
 
     /// <summary>
-    /// Get the package name.
+    /// Gets the "package.version.nupkg" file name.
     /// </summary>
-    public string PackageId => _packageId;
+    /// <returns>The NuGet package file name.</returns>
+    public string ToNupkgFileName() => $"{PackageId}.{Version}.nupkg";
 
     /// <summary>
-    /// Get the version.
+    /// Tries to match "xxx@version" pattern (that is the <see cref="ToString()"/> representation).
+    /// The <paramref name="head"/> is not forwarded on error.
     /// </summary>
-    public SVersion Version => _version;
-
-    /// <summary>
-    /// Initializes a new valid package instance.
-    /// </summary>
-    /// <param name="name">Package name.</param>
-    /// <param name="version">Package version.</param>
-    public PackageInstance( string name, SVersion version )
-    {
-        Throw.CheckNotNullOrWhiteSpaceArgument( name );
-        Throw.CheckNotNullArgument( version );
-        _packageId = name;
-        _version = version;
-    }
-
-    PackageInstance( SVersion version, string name )
-    {
-        _packageId = name;
-        _version = version;
-    }
-
-    /// <summary>
-    /// Tries to parse a "packageId@version" name.
-    /// </summary>
-    /// <param name="s">The string to parse.</param>
-    /// <param name="result">The non null result on success.</param>
+    /// <param name="head">The head.</param>
+    /// <param name="instance">The instance on success.</param>
     /// <returns>True on success, false otherwise.</returns>
-    public static bool TryParse( ReadOnlySpan<char> s, [NotNullWhen( true )] out PackageInstance? result )
+    public static bool TryMatch( ref ReadOnlySpan<char> head, out PackageInstance instance )
     {
-        result = null;
-        s = s.Trim();
-        int idxAt = s.IndexOf( '@' );
-        if( idxAt <= 0 ) return false;
-        var n = s.Slice( 0, idxAt );
-        var head = s.Slice( idxAt + 1 );
-        var v = SVersion.TryParse( ref head );
-        if( !v.IsValid || !head.IsEmpty ) return false;
-        result = new PackageInstance( v, new string( n ) );
+        instance = default;
+        int idx = head.IndexOf( '@' );
+        if( idx <= 0 ) return false;
+        var rest = head.Slice( idx + 1 );
+        var v = SVersion.TryParse( ref rest );
+        if( !v.IsValid ) return false;
+
+        instance = new PackageInstance( new string( head.Slice( 0, idx ) ), v );
+        head = rest;
         return true;
     }
+
+    /// <summary>
+    /// Tries to parse "xxx@version" pattern (that is the <see cref="ToString()"/> representation).
+    /// </summary>
+    /// <param name="s">The string to parse.</param>
+    /// <param name="instance">The instance on success.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public static bool TryParse( ReadOnlySpan<char> s, out PackageInstance instance ) => TryMatch( ref s, out instance );
+
+    /// <summary>
+    /// Supports ordering by <see cref="PackageId"/> and <see cref="Version"/>.
+    /// </summary>
+    /// <param name="other">The other package.</param>
+    /// <returns>Standard comparison value.</returns>
+    public int CompareTo( PackageInstance other )
+    {
+        int cmp = StringComparer.Ordinal.Compare( PackageId, other.PackageId );
+        return cmp == 0 ? Version.CompareTo( other.Version ) : cmp;
+    }
+
+    /// <summary>
+    /// Parses the result of a "dotnet package list" call.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="jsonPackageList">The json string to parse.</param>
+    /// <param name="buildInfo">Any object: its ToString() method will be used for error and warning logs.</param>
+    /// <param name="packages">The consumed package instances.</param>
+    /// <returns>True on success, false on error.</returns>
+    public static bool ReadConsumedPackages( IActivityMonitor monitor,
+                                             string jsonPackageList,
+                                             object buildInfo,
+                                             out ImmutableArray<PackageInstance> packages )
+    {
+        try
+        {
+            using var d = JsonDocument.Parse( jsonPackageList );
+            if( !ReadProblems( monitor, buildInfo, d ) )
+            {
+                packages = [];
+                return false;
+            }
+            packages = ReadPackages( d );
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While reading Package list for '{buildInfo}'.", ex );
+            packages = [];
+            return false;
+        }
+
+        static bool ReadProblems( IActivityMonitor monitor, object buildInfo, JsonDocument d )
+        {
+            bool hasWarning = false;
+            if( d.RootElement.TryGetProperty( "problems"u8, out var problems ) )
+            {
+                foreach( var p in problems.EnumerateArray() )
+                {
+                    if( p.GetProperty( "level"u8 ).GetString() == "error" )
+                    {
+                        monitor.Error( $"Package list for '{buildInfo}' has errors. See logs." );
+                        return false;
+                    }
+                    else
+                    {
+                        hasWarning = true;
+                    }
+                }
+            }
+            if( hasWarning )
+            {
+                monitor.Warn( $"Package list for '{buildInfo}' has warnings. See logs." );
+            }
+            return true;
+        }
+
+        static ImmutableArray<PackageInstance> ReadPackages( JsonDocument d )
+        {
+            var result = new SortedSet<PackageInstance>();
+            foreach( var p in d.RootElement.GetProperty( "projects"u8 ).EnumerateArray() )
+            {
+                foreach( var f in p.GetProperty( "frameworks"u8 ).EnumerateArray() )
+                {
+                    foreach( var package in f.GetProperty( "topLevelPackages"u8 ).EnumerateArray() )
+                    {
+                        string? packageId = package.GetProperty( "id"u8 ).GetString();
+                        if( string.IsNullOrWhiteSpace( packageId ) )
+                        {
+                            Throw.InvalidDataException( $"Null or empty 'topLevelPackages.id' property." );
+                        }
+                        result.Add( new PackageInstance( packageId,
+                                                              SVersion.Parse( package.GetProperty( "resolvedVersion"u8 ).GetString() ) ) );
+                    }
+                }
+            }
+            return result.ToImmutableArray();
+        }
+
+    }
+
+
+    /// <summary>
+    /// Tries to parse a "package.version.nupkg" file name.
+    /// </summary>
+    /// <param name="fileName">The file name to parse.</param>
+    /// <param name="version">The non null parsed version on success.</param>
+    /// <param name="packageIdLength">The package name length.</param>
+    /// <returns>True on success, false if the file name cannot be parsed.</returns>
+    public static bool TryParseNupkgFileName( ReadOnlySpan<char> fileName,
+                                              [NotNullWhen( true )] out SVersion? version,
+                                              out int packageIdLength )
+    {
+        var h = fileName;
+        for(; ; )
+        {
+            var nextDot = h.IndexOf( '.' );
+            // Consider 2 consecutive .. to be invalid.
+            if( nextDot <= 0 ) break;
+            h = h.Slice( nextDot + 1 );
+            if( h.Length > 0 && char.IsAsciiDigit( h[0] ) )
+            {
+                packageIdLength = fileName.Length - h.Length - 1;
+                version = SVersion.TryParse( ref h );
+                // Here we allow a starting digit in the package id because this is legit (tested):
+                // Successfully created package '...\package\debug\Truc.0Machin.1.0.0.nupkg
+                if( version.IsValid )
+                {
+                    return h.TryMatch( ".nupkg" ) && h.Length == 0;
+                }
+            }
+        }
+        version = null;
+        packageIdLength = 0;
+        return false;
+    }
+
+    /// <summary>
+    /// Returns "<see cref="PackageId"/>@<see cref="Version"/>".
+    /// </summary>
+    /// <returns>The package@version string.</returns>
+    public override string ToString() => $"{PackageId}@{Version}";
 }
