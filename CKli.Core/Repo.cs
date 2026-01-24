@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Text;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -150,6 +151,37 @@ public sealed class Repo
                                         : TextStyle.None );
         }
     }
+
+    /// <summary>
+    /// Helper to use with non sensitive commands: arguments and standard output and error is logged.
+    /// <para>
+    /// Use <see cref="ProcessRunner.RunProcess"/> directly if sensitive information may appear.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor: its <see cref="IActivityMonitor.ParallelLogger"/> will be used.</param>
+    /// <param name="args">The arguments.</param>
+    /// <param name="stdOut">Optional capture of the standard output.</param>
+    /// <param name="stdErr">Optional capture of the standard error.</param>
+    /// <returns>True if the exist code is 0, false otherwise.</returns>
+    public bool RunDotnet( IActivityMonitor monitor, string args, StringBuilder? stdOut = null, StringBuilder? stdErr = null )
+    {
+        using( monitor.OpenInfo( $"Executing 'dotnet {args}' in '{_git.DisplayPath}'." ) )
+        {
+            var e = ProcessRunner.RunProcess( monitor.ParallelLogger,
+                                              "dotnet",
+                                              args,
+                                              _git.WorkingFolder,
+                                              stdOut: stdOut,
+                                              stdErr: stdErr );
+            if( e != 0 )
+            {
+                monitor.CloseGroup( $"Failed with code '{e}'." );
+                return false;
+            }
+        }
+        return true;
+    }
+
 
     /// <summary>
     /// Overridden to return the <see cref="DisplayPath"/>.

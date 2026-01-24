@@ -23,8 +23,13 @@ public static class ProcessRunner
 
     /// <summary>
     /// Starts and wait for the end of an external process, optionally handles a timeout and
-    /// standard output and/or error capture. Always log the output and error as <see cref="LogLevel.Trace"/>
-    /// and <see cref="StdOutTag"/> or <see cref="StdErrTag"/>.
+    /// standard output and/or error capture.
+    /// <para>
+    /// This doesn't open a log group, logs the <paramref name="arguments"/> nor the exit code and this is intended:
+    /// arguments may contain sensitive information and running a process may be "hidden". By setting <paramref name="noLog"/>
+    /// to true, nothing is logged otherwise, by default, the standard output and error are <see cref="LogLevel.Trace"/>
+    /// with <see cref="StdOutTag"/> and <see cref="StdErrTag"/>.
+    /// </para>
     /// <para>
     /// This is a very basic helper that suits our needs.
     /// For more complex needs, you'd better use Cli.Wrap (https://github.com/Tyrrrz/CliWrap).
@@ -38,6 +43,7 @@ public static class ProcessRunner
     /// <param name="timeout">Optional timeout in milliseconds.</param>
     /// <param name="stdOut">Optional standard output collector.</param>
     /// <param name="stdErr">Optional standard error collector.</param>
+    /// <param name="noLog">True to log the standard output and error.</param>
     /// <returns>The exit status code or null if timeout occurred.</returns>
     public static int? RunProcess( IActivityLineEmitter logger,
                                    string fileName,
@@ -46,16 +52,21 @@ public static class ProcessRunner
                                    Dictionary<string, string>? environmentVariables = null,
                                    int timeout = Timeout.Infinite,
                                    StringBuilder? stdOut = null,
-                                   StringBuilder? stdErr = null )
+                                   StringBuilder? stdErr = null,
+                                   bool noLog = false )
     {
+        var blind = stdOut == null && stdErr == null && noLog;
         var info = new ProcessStartInfo( fileName, arguments )
         {
             WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
         };
+        if( !blind )
+        {
+            info.RedirectStandardOutput = true;
+            info.RedirectStandardError = true;
+            info.StandardOutputEncoding = Encoding.UTF8;
+            info.StandardErrorEncoding = Encoding.UTF8;
+        }
         if( environmentVariables != null && environmentVariables.Count > 0 )
         {
             foreach( var kv in environmentVariables ) info.EnvironmentVariables.Add( kv.Key, kv.Value );
@@ -63,10 +74,13 @@ public static class ProcessRunner
         using var process = new Process { StartInfo = info };
         if( stdOut == null )
         {
-            process.OutputDataReceived += ( sender, data ) =>
+            if( !noLog )
             {
-                if( data.Data != null ) logger.Trace( StdOutTag, data.Data );
-            };
+                process.OutputDataReceived += ( sender, data ) =>
+                {
+                    if( data.Data != null ) logger.Trace( StdOutTag, data.Data );
+                };
+            }
         }
         else
         {
@@ -74,17 +88,20 @@ public static class ProcessRunner
             {
                 if( data.Data != null )
                 {
-                    logger.Trace( StdOutTag, data.Data );
+                    if( !noLog ) logger.Trace( StdOutTag, data.Data );
                     stdOut.AppendLine( data.Data );
                 }
             };
         }
         if( stdErr == null )
         {
-            process.ErrorDataReceived += ( sender, data ) =>
+            if( !noLog )
             {
-                if( data.Data != null ) logger.Trace( StdErrTag, data.Data );
-            };
+                process.ErrorDataReceived += ( sender, data ) =>
+                {
+                    if( data.Data != null ) logger.Trace( StdErrTag, data.Data );
+                };
+            }
         }
         else
         {
@@ -92,14 +109,17 @@ public static class ProcessRunner
             {
                 if( data.Data != null )
                 {
-                    logger.Trace( StdErrTag, data.Data );
+                    if( !noLog ) logger.Trace( StdErrTag, data.Data );
                     stdErr.AppendLine( data.Data );
                 }
             };
         }
         process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
+        if( !blind )
+        {
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+        }
         if( timeout > 0 )
         {
             bool exited = process.WaitForExit( timeout );
