@@ -12,7 +12,7 @@ using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
 
-    [TestFixture]
+[TestFixture]
 public partial class TagTests
 {
     [Test]

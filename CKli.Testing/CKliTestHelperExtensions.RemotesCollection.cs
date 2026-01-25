@@ -1,8 +1,10 @@
 
 using CK.Core;
 using CKli.Core;
+using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
@@ -32,9 +34,11 @@ public static partial class CKliTestHelperExtensions
         }
 
         /// <summary>
-        /// Gets the full name (with the optional parentheses).
+        /// Gets the full name (with the optional state name in parentheses).
         /// </summary>
         public string FullName => _fullName;
+
+        public NormalizedPath StackLocalFolderPath => _remotesPath.AppendPart( _fullName ).AppendPart( _stackName+"-Stack" );
 
         /// <summary>
         /// Gets the stack name. There must be a "StackName-Stack" repository folder that
@@ -74,8 +78,11 @@ public static partial class CKliTestHelperExtensions
         /// Returns a <see cref="CKliEnv"/> context for the default World of this RemotesCollection.
         /// </para>
         /// Clones these <see cref="Repositories"/> in the <paramref name="clonedFolder"/>'s <see cref="CKliEnv.CurrentDirectory"/>
-        /// that must be inside the <see cref="_clonedPath"/> and configures its default World plugins with the host's stack's default
-        /// World plugins configuration.
+        /// that must be inside the <see cref="_clonedPath"/> and:
+        /// <list type="bullet">
+        ///     <item>Configures its default World plugins with the host's stack's default World plugins configuration.</item>
+        ///     <item>Copies the "$Local" from the "Remotes/<see cref="FullName"/>/<see cref="StackName"/>-Stack/$Local".</item>
+        /// </list>
         /// </summary>
         /// <param name="clonedFolder">The cloned folder of the unit test.</param>
         /// <param name="pluginConfigurationEditor">Optional plugin configuration editor.</param>
@@ -96,7 +103,6 @@ public static partial class CKliTestHelperExtensions
             {
                 Throw.CKException( $"Unable to open default World of cloned test Stack from '{context.CurrentDirectory}'." );
             }
-
             try
             {
                 // Injects Plugins configuration of the host world into the world definition of the world to test.
@@ -114,6 +120,11 @@ public static partial class CKliTestHelperExtensions
             {
                 stack.Dispose();
             }
+            // Copy the $Local folder.
+            var local = _remotesPath.AppendPart( _fullName )
+                          .AppendPart( _stackName + "-Stack" )
+                          .AppendPart( "$Local" );
+            FileUtil.CopyDirectory( new DirectoryInfo( local ), new DirectoryInfo( context.CurrentStackPath.AppendPart( "$Local" ) ) );
             return context;
 
 
