@@ -41,7 +41,7 @@ public sealed class DebugRenderer : IRenderTarget
 
     void IRenderTarget.EndUpdate() { }
 
-    void IRenderTarget.EndOfLine( bool newLine )
+    void IRenderTarget.EndOfLine( bool newLine, bool fill )
     {
         _current = WriteDiffStyle( _b, _current, TextStyle.Default );
         if( newLine ) _b.Append( '⮐' ).AppendLine();

@@ -200,9 +200,10 @@ sealed partial class AnsiScreen
                     bool refresh = TrackScreenWidthChange();
 
                     var w = new FixedBufferWriter( _workingBuffer.AsSpan() );
+                    w.Append( "\u001b[0;39;49m" ); // Reset to terminal defaults before erase.
                     w.EraseScreen( CursorRelativeSpan.After );
                     w.Append( AnsiCodes.RemoveProgressIndicator() );
-                    w.AppendStyle( TextStyle.Default.Color, TextEffect.Regular );
+                    w.AppendStyle( TextStyle.Default.Color, TextEffect.Regular ); // Re-establish colors for any subsequent output.
                     w.ShowCursor( true );
                     _target.RawWrite( w.Text );
                     _lastRenderedLineCount = 0;

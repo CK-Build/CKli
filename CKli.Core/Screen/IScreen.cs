@@ -23,7 +23,8 @@ public interface IScreen
     /// </summary>
     /// <param name="renderable">The renderable to display.</param>
     /// <param name="newLine">False to not append a new line after the renderable.</param>
-    void Display( IRenderable renderable, bool newLine = true );
+    /// <param name="fill">True to fill the rest of each line with the current background color.</param>
+    void Display( IRenderable renderable, bool newLine = true, bool fill = true );
 
     /// <summary>
     /// Gets the width of the screen.

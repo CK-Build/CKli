@@ -68,11 +68,14 @@ sealed partial class AnsiScreen
             return style;
         }
 
-        public void EndOfLine( bool newLine )
+        public void EndOfLine( bool newLine, bool fill = true )
         {
-            _current = TextStyle.Default;
-            Span<char> b = stackalloc char[16];
+            Span<char> b = stackalloc char[24];
             var w = new FixedBufferWriter( b );
+            // Optionally erase to end of line - fills with current background color.
+            if( fill ) w.EraseLine( CursorRelativeSpan.After );
+            // Then reset to default style.
+            _current = TextStyle.Default;
             w.AppendStyle( _current.Color, _current.Effect );
             if( newLine ) w.Append( '\n' );
             RawWrite( w.Text );

@@ -26,7 +26,7 @@ public sealed class StringScreen : IScreen
     public ScreenType ScreenType => ScreenType.Default;
 
     /// <inheritdoc />
-    public void Display( IRenderable renderable, bool newLine = true ) => renderable.Render( _renderer, newLine );
+    public void Display( IRenderable renderable, bool newLine = true, bool fill = true ) => renderable.Render( _renderer, newLine, fill );
 
     /// <inheritdoc />
     public int Width => IScreen.MaxScreenWidth;
@@ -68,7 +68,7 @@ public sealed class StringScreen : IScreen
 
         public void Write( ReadOnlySpan<char> s, TextStyle style ) => _b.Append( s );
 
-        public void EndOfLine( bool newLine )
+        public void EndOfLine( bool newLine, bool fill = true )
         {
             if( newLine )
             {

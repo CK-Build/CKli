@@ -143,7 +143,7 @@ public class SegmentRenderer
     /// </summary>
     protected virtual void Render() => RenderContent();
 
-    internal static void Render( IEnumerable<IRenderable> renderables, IRenderTarget target, bool newLine )
+    internal static void Render( IEnumerable<IRenderable> renderables, IRenderTarget target, bool newLine, bool fill = true )
     {
         target.BeginUpdate();
         var e = renderables.GetEnumerator();
@@ -157,7 +157,7 @@ public class SegmentRenderer
                 for( int line = 0; line < r.Height; line++ )
                 {
                     RenderLine( r, target, line, r.Height );
-                    target.EndOfLine( hasMore || newLine || line < r.Height - 1 );
+                    target.EndOfLine( hasMore || newLine || line < r.Height - 1, fill );
                 }
             }
             while( !hasMore );
@@ -165,13 +165,13 @@ public class SegmentRenderer
         target.EndUpdate();
     }
 
-    internal static void Render( IRenderable r, IRenderTarget target, bool newLine )
+    internal static void Render( IRenderable r, IRenderTarget target, bool newLine, bool fill = true )
     {
         target.BeginUpdate();
         for( int line = 0; line < r.Height; line++ )
         {
             RenderLine( r, target, line, r.Height );
-            target.EndOfLine( newLine || line < r.Height - 1 );
+            target.EndOfLine( newLine || line < r.Height - 1, fill );
         }
         target.EndUpdate();
     }

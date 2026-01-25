@@ -11,7 +11,7 @@ public sealed class NoScreen : IScreen
     public ScreenType ScreenType => ScreenType.Default;
 
     /// <inheritdoc />
-    public void Display( IRenderable renderable, bool newLine = true ) { }
+    public void Display( IRenderable renderable, bool newLine = true, bool fill = true ) { }
 
     /// <inheritdoc />
     public int Width => IScreen.MaxScreenWidth;

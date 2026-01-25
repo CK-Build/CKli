@@ -18,7 +18,8 @@ public static class RenderableExtensions
     /// <param name="r">This renderable.</param>
     /// <param name="target">The target renderer.</param>
     /// <param name="newLine">False to not append a new line after the renderable.</param>
-    public static void Render( this IRenderable r, IRenderTarget target, bool newLine = true ) => SegmentRenderer.Render( r, target, newLine );
+    /// <param name="fill">True to fill the rest of each line with the current background color.</param>
+    public static void Render( this IRenderable r, IRenderTarget target, bool newLine = true, bool fill = true ) => SegmentRenderer.Render( r, target, newLine, fill );
 
     /// <summary>
     /// Renders these renderables into the provided <see cref="IRenderTarget"/>.
@@ -26,7 +27,8 @@ public static class RenderableExtensions
     /// <param name="renderables">This renderables.</param>
     /// <param name="target">The target renderer.</param>
     /// <param name="newLine">False to not append a new line after the last renderable.</param>
-    public static void Render( this IEnumerable<IRenderable> renderables, IRenderTarget target, bool newLine = true ) => SegmentRenderer.Render( renderables, target, newLine );
+    /// <param name="fill">True to fill the rest of each line with the current background color.</param>
+    public static void Render( this IEnumerable<IRenderable> renderables, IRenderTarget target, bool newLine = true, bool fill = true ) => SegmentRenderer.Render( renderables, target, newLine, fill );
 
     /// <summary>
     /// Renders this into the provided string builder.

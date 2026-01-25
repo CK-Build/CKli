@@ -133,7 +133,7 @@ public sealed partial class InteractiveScreen : IScreen
     }
 
     /// <inheritdoc />
-    public void Display( IRenderable renderable, bool newLine = true ) => _body.Content.Add( (renderable, newLine) );
+    public void Display( IRenderable renderable, bool newLine = true, bool fill = true ) => _body.Content.Add( (renderable, newLine) );
 
     /// <inheritdoc />
     public void ScreenLog( LogLevel level, string text ) => _screen.ScreenLog( level, text );

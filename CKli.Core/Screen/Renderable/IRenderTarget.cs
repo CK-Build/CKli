@@ -28,7 +28,8 @@ public interface IRenderTarget
     /// Must write the end of the line.
     /// </summary>
     /// <param name="newLine">False to not start a new line.</param>
-    void EndOfLine( bool newLine = true );
+    /// <param name="fill">True to fill the rest of the line with the current background color.</param>
+    void EndOfLine( bool newLine = true, bool fill = true );
 
     /// <summary>
     /// Gets the screen type.

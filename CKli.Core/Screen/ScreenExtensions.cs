@@ -16,9 +16,10 @@ public static class ScreenExtensions
     /// <param name="screen">This screen.</param>
     /// <param name="renderable">The renderable factory.</param>
     /// <param name="newLine">False to not append a new line after the renderable.</param>
-    public static void Display( this IScreen screen, Func<ScreenType, IRenderable> renderable, bool newLine = true )
+    /// <param name="fill">True to fill the rest of each line with the current background color.</param>
+    public static void Display( this IScreen screen, Func<ScreenType, IRenderable> renderable, bool newLine = true, bool fill = true )
     {
-        screen.Display( renderable( screen.ScreenType ), newLine );
+        screen.Display( renderable( screen.ScreenType ), newLine, fill );
     }
 
     /// <summary>
@@ -209,11 +210,11 @@ public static class ScreenExtensions
         {
             if( success )
             {
-                screen.Display( screen.ScreenType.Text( "❰✓❱", ConsoleColor.Black, ConsoleColor.DarkGreen ) );
+                screen.Display( screen.ScreenType.Text( "❰✓❱", ConsoleColor.Black, ConsoleColor.DarkGreen ), true, false );
             }
             else
             {
-                screen.Display( screen.ScreenType.Text( "❌ Failed", ConsoleColor.Black, ConsoleColor.Red ) );
+                screen.Display( screen.ScreenType.Text( "❌ Failed", ConsoleColor.Black, ConsoleColor.Red ), true, false );
             }
         }
     }

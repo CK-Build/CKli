@@ -24,14 +24,14 @@ sealed partial class AnsiScreen : IScreen
 
     public ScreenType ScreenType => _screenType;
 
-    public void Display( IRenderable renderable, bool newLine = true )
+    public void Display( IRenderable renderable, bool newLine = true, bool fill = true )
     {
         _animation.Hide( false );
         if( renderable.Width > _animation.ScreenWidth )
         {
             renderable = renderable.SetWidth( _animation.ScreenWidth, false );
         }
-        renderable.Render( _target, newLine );
+        renderable.Render( _target, newLine, fill );
         _animation.Show();
     }
 
@@ -50,6 +50,11 @@ sealed partial class AnsiScreen : IScreen
     void IScreen.Close()
     {
         _animation.Dispose();
+        // Reset attributes + explicitly set default fg/bg colors + erase to end of screen.
+        // SGR 39 = default foreground, SGR 49 = default background.
+        // Must be before RestoreConsoleMode which may disable VT processing on Windows.
+        Console.Out.Write( "\u001b[0;39;49m\u001b[J" );
+        Console.Out.Flush();
         Console.OutputEncoding = _originalOutputEncoding;
         AnsiDetector.RestoreConsoleMode( _originalConsoleMode );
     }
