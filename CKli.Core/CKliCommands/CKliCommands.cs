@@ -35,11 +35,14 @@ public static class CKliCommands
         Add( cmds, new CKliRepoList() );
         Add( cmds, new CKliRepoAdd() );
         Add( cmds, new CKliRepoRemove() );
+        //Add( cmds, new CKliRepoMove() ); => Moves to another stack (target repo may have a boost version).
+        //Add( cmds, new CKliRepoMigrate() ); => Moves the remote git => new origin url.
 
-        cmds.Add( "stack", null );
-        Add( cmds, new CKliStackCreate() );
-        Add( cmds, new CKliStackInfo() );
-        Add( cmds, new CKliStackSetRemoteUrl() );
+        cmds.Add( "remote", null );
+        cmds.Add( "remote stack", null );
+        Add( cmds, new CKliRemoteStackCreate() );
+        Add( cmds, new CKliRemoteStackInfo() ); // => Merge with "repo list" ?
+        Add( cmds, new CKliRemoteStackMigrate() );
 
         cmds.Add( "plugin", null );
         Add( cmds, new CKliPluginAdd() );

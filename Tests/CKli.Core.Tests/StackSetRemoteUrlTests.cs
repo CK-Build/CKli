@@ -19,8 +19,7 @@ public class StackSetRemoteUrlTests
         var context = TestEnv.EnsureCleanFolder();
 
         // Create a stack
-        using var stack = StackRepository.Create( TestHelper.Monitor, context,
-                                                  "UrlTest", isPublic: true );
+        using var stack = StackRepository.Create( TestHelper.Monitor, context, "UrlTest", isPublic: true );
         stack.ShouldNotBeNull();
 
         var oldUrl = stack.OriginUrl;
@@ -74,14 +73,14 @@ public class StackSetRemoteUrlTests
 
         // Create stack first
         ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "stack", "create", "NormTest" ) ).ShouldBeTrue();
+                                         "remote", "stack", "create", "NormTest" ) ).ShouldBeTrue();
 
         context = context.ChangeDirectory( "NormTest" );
 
         // URL with .git suffix should be normalized by the command
         var urlWithGit = "file:///tmp/test/NormRemote-Stack.git";
         ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "stack", "set-remote-url", urlWithGit, "--no-push" ) ).ShouldBeTrue();
+                                         "remote", "stack", "migrate", urlWithGit, "--no-push" ) ).ShouldBeTrue();
 
         // Verify .git suffix was stripped
         var stackPath = context.CurrentDirectory.AppendPart( ".PublicStack" );
@@ -118,14 +117,14 @@ public class StackSetRemoteUrlTests
 
         // Create stack first
         ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "stack", "create", "CmdUrlTest" ) ).ShouldBeTrue();
+                                         "remote", "stack", "create", "CmdUrlTest" ) ).ShouldBeTrue();
 
         context = context.ChangeDirectory( "CmdUrlTest" );
 
         // Change the remote URL via command
         var newUrl = "file:///tmp/test/CmdRemote-Stack";
         ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "stack", "set-remote-url", newUrl, "--no-push" ) ).ShouldBeTrue();
+                                         "remote", "stack", "migrate", newUrl, "--no-push" ) ).ShouldBeTrue();
 
         // Verify
         var stackPath = context.CurrentDirectory.AppendPart( ".PublicStack" );
@@ -142,7 +141,7 @@ public class StackSetRemoteUrlTests
 
         // Try to set URL without being in a stack
         ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "stack", "set-remote-url", "file:///tmp/test/NoStack-Stack", "--no-push" ) ).ShouldBeFalse();
+                                         "remote", "stack", "migrate", "file:///tmp/test/NoStack-Stack", "--no-push" ) ).ShouldBeFalse();
     }
 
     [Test]
@@ -152,13 +151,13 @@ public class StackSetRemoteUrlTests
 
         // Create stack first
         ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "stack", "create", "InvalidUrlTest" ) ).ShouldBeTrue();
+                                         "remote", "stack", "create", "InvalidUrlTest" ) ).ShouldBeTrue();
 
         context = context.ChangeDirectory( "InvalidUrlTest" );
 
         // Relative URL should fail validation
         ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "stack", "set-remote-url", "not-a-valid-url", "--no-push" ) ).ShouldBeFalse();
+                                         "remote", "stack", "migrate", "not-a-valid-url", "--no-push" ) ).ShouldBeFalse();
     }
 
     [Test]

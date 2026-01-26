@@ -7,11 +7,11 @@ namespace CKli.Core;
 /// <summary>
 /// Stack set-remote-url command - changes the stack's remote URL (origin).
 /// </summary>
-sealed class CKliStackSetRemoteUrl : Command
+sealed class CKliRemoteStackMigrate : Command
 {
-    internal CKliStackSetRemoteUrl()
+    internal CKliRemoteStackMigrate()
         : base( null,
-                "stack set-remote-url",
+                "remote stack migrate",
                 "Changes the stack's remote URL (origin).",
                 [("newUrl", "The new remote URL for the stack.")],
                 [],

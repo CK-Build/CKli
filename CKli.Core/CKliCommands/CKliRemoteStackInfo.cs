@@ -6,11 +6,11 @@ namespace CKli.Core;
 /// <summary>
 /// Stack info command - displays information about the current stack.
 /// </summary>
-sealed class CKliStackInfo : Command
+sealed class CKliRemoteStackInfo : Command
 {
-    internal CKliStackInfo()
+    internal CKliRemoteStackInfo()
         : base( null,
-                "stack info",
+                "remote stack info",
                 "Displays Stack information: remote URL, current branch, and commit status.",
                 [], [], [] )
     {

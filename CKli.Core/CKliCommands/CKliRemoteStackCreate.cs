@@ -7,11 +7,11 @@ namespace CKli.Core;
 /// <summary>
 /// Stack create command - creates a new, non-existing stack locally.
 /// </summary>
-sealed class CKliStackCreate : Command
+sealed class CKliRemoteStackCreate : Command
 {
-    internal CKliStackCreate()
+    internal CKliRemoteStackCreate()
         : base( null,
-                "stack create",
+                "remote stack create",
                 "Creates a new Stack in the current directory.",
                 [("stackName", "The name of the stack to create (without '-Stack' suffix).")],
                 [(["--url", "-u"], "Optional remote URL. Sets up origin but does not push.", false)],

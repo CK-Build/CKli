@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -43,11 +44,17 @@ sealed class CKliRepoList : Command
             var repos = world.GetAllDefinedRepo( monitor );
             if( repos == null ) return false;
 
-            var screenType = context.Screen.ScreenType;
-            IRenderable display;
+            IRenderable display = context.RenderableUnit;
+            var screenType = display.ScreenType;
+
+            //IRenderable display = new Collapsable( screenType.Text( $"Stack:" )
+            //                                                 .AddRight( screenType.Text( stack.StackName ).Box( marginLeft:1, foreColor:ConsoleColor.White )
+            //                                                 .AddRight( screenType.Text( stack.StackWorkingFolder.LastPart ).HyperLink( new Uri( stack.StackWorkingFolder ) ) ) )
+            //                                                 .AddBelow( screenType.Text( stack.OriginUrl.ToString() ).HyperLink( stack.OriginUrl ) ) );
+
             if( byBranch )
             {
-                display = screenType.Unit.AddBelow(
+                display = display.AddBelow(
                     repos.GroupBy( r => r.GitStatus.CurrentBranchName )
                          .OrderBy( g => g.Key )
                          .Select( g => new Collapsable(
@@ -59,8 +66,7 @@ sealed class CKliRepoList : Command
             }
             else
             {
-                display = context.RenderableUnit
-                                 .AddBelow( repos.Select( r => r.ToRenderable( screenType, true, true, true ) ) )
+                display = display.AddBelow( repos.Select( r => r.ToRenderable( screenType, true, true, true ) ) )
                                  .TableLayout();
             }
             context.Screen.Display( display );

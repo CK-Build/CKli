@@ -122,27 +122,27 @@ public class StackCreateTests
     }
 
     [Test]
-    public async Task stack_create_command_Async()
+    public async Task remote_stack_create_command_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
 
-        ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "stack", "create", "CmdTest" ) ).ShouldBeTrue();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context,
+                                       "remote", "stack", "create", "CmdTest" ) ).ShouldBeTrue();
 
-        // Verify stack was created
+        // Verify stack was created.
         Directory.Exists( context.CurrentDirectory.Combine( "CmdTest/.PublicStack" ) )
             .ShouldBeTrue();
     }
 
     [Test]
-    public async Task stack_create_with_private_flag_Async()
+    public async Task remote_stack_create_with_private_flag_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
 
         ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "stack", "create", "PrivCmd", "--private" ) ).ShouldBeTrue();
+                                         "remote", "stack", "create", "CmdTest", "--private" ) ).ShouldBeTrue();
 
-        Directory.Exists( context.CurrentDirectory.Combine( "PrivCmd/.PrivateStack" ) )
+        Directory.Exists( context.CurrentDirectory.Combine( "CmdTest/.PrivateStack" ) )
             .ShouldBeTrue();
     }
 
@@ -154,14 +154,14 @@ public class StackCreateTests
 
         // Create stack first
         ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "stack", "create", "InfoTest" ) ).ShouldBeTrue();
+                                         "remote", "stack", "create", "InfoTest" ) ).ShouldBeTrue();
 
         context = context.ChangeDirectory( "InfoTest" );
         display.Clear();
 
         // Run stack info
         ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "stack", "info" ) ).ShouldBeTrue();
+                                         "remote", "stack", "info" ) ).ShouldBeTrue();
 
         var output = display.ToString();
         output.ShouldContain( "InfoTest" );
