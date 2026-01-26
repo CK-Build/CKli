@@ -75,7 +75,7 @@ public sealed partial class GitRepository : IDisposable
     /// <summary>
     /// Gets the git provider kind.
     /// </summary>
-    public KnownGitProvider KnownGitProvider => _repositoryKey.KnownGitProvider;
+    public KnownCloudGitProvider KnownGitProvider => _repositoryKey.KnownGitProvider;
 
     /// <summary>
     /// Gets or sets the signature to use when modifying this repository.
@@ -1207,6 +1207,11 @@ public sealed partial class GitRepository : IDisposable
 
     /// <summary>
     /// Opens a working folder. The <paramref name="workingFolder"/> must exist otherwise an error is logged.
+    /// <para>
+    /// When <paramref name="expectedOriginUrl"/> is not null, the current "origin" must be
+    /// the same (case insensitive) or it is an error otherwise casing mismatch is fixed automatically.
+    /// If there is no current "origin", it is created.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="committer">The signature to use when modifying the repository.</param>
@@ -1217,15 +1222,17 @@ public sealed partial class GitRepository : IDisposable
     /// (This is often the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
     /// </param>
     /// <param name="isPublic">Whether this repository is a public or private one.</param>
+    /// <param name="expectedOriginUrl">Optional expected "origin" url.</param>
     /// <returns>The SimpleGitRepository object or null on error.</returns>
     public static GitRepository? Open( IActivityMonitor monitor,
                                        ISecretsStore secretsStore,
                                        Signature committer,
                                        NormalizedPath workingFolder,
                                        NormalizedPath displayPath,
-                                       bool isPublic )
+                                       bool isPublic,
+                                       Uri? expectedOriginUrl = null )
     {
-        var r = OpenWorkingFolder( monitor, workingFolder, warnOnly: false );
+        var r = OpenWorkingFolder( monitor, workingFolder, warnOnly: false, expectedOriginUrl );
         if( r == null ) return null;
 
         var gitKey = new GitRepositoryKey( secretsStore, r.Value.OriginUrl, isPublic );
@@ -1278,17 +1285,25 @@ public sealed partial class GitRepository : IDisposable
 
     /// <summary>
     /// Tries to open an existing working folder. An "origin" remote must exist.
+    /// <para>
+    /// When <paramref name="expectedOriginUrl"/> is not null, the current "origin" must be
+    /// the same (case insensitive) or it is an error otherwise casing mismatch is fixed automatically.
+    /// If there is no current "origin", it is created.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="workingFolder">The local working folder (above the .git folder).</param>
     /// <param name="warnOnly">True to emit only warnings on error, false to emit errors.</param>
+    /// <param name="expectedOriginUrl">Optional expected "origin" url.</param>
     /// <returns>The LibGit2Sharp repository object and its "origin" Url or null on error.</returns>
     public static (Repository Repository, Uri OriginUrl)? OpenWorkingFolder( IActivityMonitor monitor,
                                                                              NormalizedPath workingFolder,
-                                                                             bool warnOnly )
+                                                                             bool warnOnly,
+                                                                             Uri? expectedOriginUrl = null )
     {
         Throw.CheckNotNullArgument( monitor );
         Throw.CheckArgument( !workingFolder.IsEmptyPath );
+        Throw.CheckArgument( expectedOriginUrl == null || expectedOriginUrl.IsAbsoluteUri );
         try
         {
             var errorLevel = warnOnly ? LogLevel.Warn : LogLevel.Error;
@@ -1303,26 +1318,52 @@ public sealed partial class GitRepository : IDisposable
                 monitor.Log( errorLevel, $"Git folder '{gitFolderPath}' exists but is not a valid Repository. This must be fixed manually." );
                 return null;
             }
+            Uri? originUrl = null;
             var r = new Repository( workingFolder );
             var origin = r.Network.Remotes.FirstOrDefault( rem => rem.Name == "origin" );
             if( origin == null )
             {
-                monitor.Log( errorLevel, $"""
+                if( expectedOriginUrl == null )
+                {
+                    monitor.Log( errorLevel, $"""
                                           Existing '{workingFolder}' must have an 'origin' remote. Remotes are: '{r.Network.Remotes.Select( r => r.Name ).Concatenate( "', '" )}'.
                                           This must be fixed manually.
                                           """ );
-                r.Dispose();
-                return null;
+                    r.Dispose();
+                    return null;
+                }
+                origin = r.Network.Remotes.Add( "origin", expectedOriginUrl.ToString() );
+                originUrl = expectedOriginUrl;
             }
-            
-            if( !Uri.TryCreate( origin.Url, UriKind.Absolute, out var originUrl ) )
+            else
             {
-                monitor.Log( errorLevel, $"""
+                if( !Uri.TryCreate( origin.Url, UriKind.Absolute, out originUrl ) )
+                {
+                    monitor.Log( errorLevel, $"""
                                           Existing '{workingFolder}' has its 'origin' that is not a valid absolute Uri: '{origin.Url}'.
                                           This must be fixed manually.
                                           """ );
-                r.Dispose();
-                return null;
+                    r.Dispose();
+                    return null;
+                }
+                if( expectedOriginUrl != null )
+                {
+                    if( !GitRepositoryKey.OrdinalIgnoreCaseUrlEqualityComparer.Equals( expectedOriginUrl, originUrl ) )
+                    {
+                        monitor.Log( errorLevel, $"""
+                                          Existing '{workingFolder}' has its 'origin' set to '{origin.Url}' but the expected origin is '{expectedOriginUrl}'.
+                                          This must be fixed manually.
+                                          """ );
+                        r.Dispose();
+                        return null;
+                    }
+                    if( !StringComparer.Ordinal.Equals( expectedOriginUrl.ToString(), origin.Url.ToString() ) )
+                    {
+                        monitor.Trace( $"Fixed case for origin url of '{workingFolder}' from '{origin.Url}' to '{expectedOriginUrl}'." );
+                        r.Network.Remotes.Update( "origin", u => u.Url = expectedOriginUrl.ToString() );
+                        originUrl = expectedOriginUrl;
+                    }
+                }
             }
             EnsureFirstCommit( monitor, r );
             return (r, originUrl);

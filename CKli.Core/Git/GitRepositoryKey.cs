@@ -27,7 +27,7 @@ public partial class GitRepositoryKey
 
     readonly Uri _originUrl;
     readonly ISecretsStore _secretsStore;
-    readonly KnownGitProvider _knownGitProvider;
+    readonly KnownCloudGitProvider _knownGitProvider;
     readonly bool _isPublic;
 
     string? _prefixPAT;
@@ -48,11 +48,11 @@ public partial class GitRepositoryKey
         _secretsStore = secretsStore;
         _isPublic = isPublic;
 
-        if( url.Authority.Equals( "github.com", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownGitProvider.GitHub;
-        else if( url.Authority.Equals( "gitlab.com", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownGitProvider.GitLab;
-        else if( url.Authority.Equals( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownGitProvider.AzureDevOps;
-        else if( url.Authority.Equals( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownGitProvider.Bitbucket;
-        else if( url.Scheme == Uri.UriSchemeFile ) _knownGitProvider = KnownGitProvider.FileSystem;
+        if( url.Authority.Equals( "github.com", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownCloudGitProvider.GitHub;
+        else if( url.Authority.Equals( "gitlab.com", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownCloudGitProvider.GitLab;
+        else if( url.Authority.Equals( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownCloudGitProvider.AzureDevOps;
+        else if( url.Authority.Equals( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownCloudGitProvider.Bitbucket;
+        else if( url.Scheme == Uri.UriSchemeFile ) _knownGitProvider = KnownCloudGitProvider.FileSystem;
     }
 
     /// <summary>
@@ -71,7 +71,7 @@ public partial class GitRepositoryKey
     /// <summary>
     /// Gets the known Git provider.
     /// </summary>
-    public KnownGitProvider KnownGitProvider => _knownGitProvider;
+    public KnownCloudGitProvider KnownGitProvider => _knownGitProvider;
 
     /// <summary>
     /// Tries to get the credentials to be able to read the remote repository.
@@ -140,14 +140,14 @@ public partial class GitRepositoryKey
             {
                 switch( KnownGitProvider )
                 {
-                    case KnownGitProvider.Unknown:
+                    case KnownCloudGitProvider.Unknown:
                         Regex badChars = BadPATChars();
-                        string key = badChars.Replace( OriginUrl.Host + "_" + OriginUrl.LocalPath, "_" );
+                        string key = badChars.Replace( OriginUrl.Host + "_", "_" );
                         key = key.ToUpperInvariant();
                         if( !key.EndsWith( "_GIT" ) ) key += "_GIT";
                         _prefixPAT = key;
                         break;
-                    case KnownGitProvider.AzureDevOps:
+                    case KnownCloudGitProvider.AzureDevOps:
                         var regex = AzureDevOps().Match( OriginUrl.PathAndQuery );
                         string organization = regex.Groups[1].Value;
                         _prefixPAT = "AZURE_GIT_" + organization

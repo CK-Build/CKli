@@ -429,7 +429,8 @@ public sealed partial class World
                                                  _stackRepository.Context.Committer,
                                                  p,
                                                  p.RemoveFirstPart( _name.WorldRoot.Parts.Count ),
-                                                 _stackRepository.IsPublic );
+                                                 _stackRepository.IsPublic,
+                                                 _layout[index].Url );
             if( repository != null )
             {
                 repo = CreateRepo( monitor, index, repository );
@@ -450,7 +451,8 @@ public sealed partial class World
                                                          _stackRepository.Context.Committer,
                                                          p,
                                                          p.RemoveFirstPart( _name.WorldRoot.Parts.Count ),
-                                                         _stackRepository.IsPublic );
+                                                         _stackRepository.IsPublic,
+                                                         _layout[index].Url );
                     if( repository != null )
                     {
                         repo = CreateRepo( monitor, index, repository );
@@ -470,8 +472,8 @@ public sealed partial class World
                 repoId = RandomId.CreateRandom();
             }
             CreateOrUpdateCKliRepoTag( repository, _stackRepository, repoId );
+            repository.DeferredPushRefSpecs.Add( "+refs/tags/ckli-repo" );
         }
-        repository.DeferredPushRefSpecs.Add( "+refs/tags/ckli-repo" );
         Repo? repo = new Repo( this, repository, _layout[index].XElement, index, repoId, _firstRepo );
         _firstRepo = repo;
         _cachedRepositories[repository.WorkingFolder] = repo;

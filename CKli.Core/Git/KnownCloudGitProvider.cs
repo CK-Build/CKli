@@ -1,14 +1,14 @@
 namespace CKli.Core;
 
 /// <summary>
-/// Defines the Git host CKli knows and handles.
+/// Defines the "global" cloud Git host CKli knows and handles.
 /// </summary>
-public enum KnownGitProvider
+public enum KnownCloudGitProvider
 {
     /// <summary>
     /// Unknown Git provider.
     /// <see cref="GitRepositoryKey.ReadPATKeyName"/> and <see cref="GitRepositoryKey.WritePATKeyName"/> are what they are
-    /// based on <see cref="GitRepository.OriginUrl"/>.
+    /// based on <see cref="GitRepositoryKey.OriginUrl"/>'s <see cref="System.Uri.Authority"/>.
     /// </summary>
     Unknown = 0,
 
