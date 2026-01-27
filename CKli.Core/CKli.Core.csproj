@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="CSemVer" Version="13.0.0" />
+    <PackageReference Include="CK.CanaryPackage" Version="1.0.0" />
     <PackageReference Include="CK.Monitoring" Version="25.1.0" />
     <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.1" />

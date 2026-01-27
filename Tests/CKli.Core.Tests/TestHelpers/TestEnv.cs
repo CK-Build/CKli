@@ -9,7 +9,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.Loader;
 using System.Text;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
@@ -27,6 +26,8 @@ static partial class TestEnv
 
     static SVersion? _cKliPluginsCoreVersion;
     static XDocument? _packagedDirectoryPackagesProps;
+    static HashSet<string>? _alreadyPackagedPlugins;
+
     static Dictionary<string, RemotesCollection>? _remoteRepositories;
 
     [OneTimeSetUp]
@@ -257,8 +258,16 @@ static partial class TestEnv
     /// </summary>
     /// <param name="projectName">The project name (in Plugins/ folder).</param>
     /// <param name="version">Optional version that can differ from the <see cref="CKliPluginsCoreVersion"/>.</param>
-    public static void EnsurePluginPackage( string projectName, string? version = null )
+    /// <returns>The path to the .nupkg file.</returns>
+    public static NormalizedPath EnsurePluginPackage( string projectName, string? version = null )
     {
+        // Will throw if version is invalid and this is good.
+        var v = version != null ? SVersion.Parse( version ) : _cKliPluginsCoreVersion;
+        var resultNupkgPath = _nugetSourcePath.AppendPart( $"{projectName}.{v}.nupkg" );
+        if( _alreadyPackagedPlugins != null && _alreadyPackagedPlugins.Contains( resultNupkgPath ) )
+        {
+            return resultNupkgPath;
+        }
         if( _packagedDirectoryPackagesProps == null )
         {
             // Setting the "CKli.Plugins.Core" package in the current version (from the NuGetSource).
@@ -279,7 +288,6 @@ static partial class TestEnv
         // Clear any cached version of the new package.
         NuGetHelper.ClearGlobalCache( TestHelper.Monitor, projectName, null );
 
-        var v = version != null ? SVersion.Parse( version ) : _cKliPluginsCoreVersion;
 
         var path = _packagedPluginsPath.AppendPart( projectName );
         var args = $"""pack -tl:off --no-dependencies -o "{_nugetSourcePath}" -c {TestHelper.BuildConfiguration} /p:IsPackable=true /p:Version={v} /p:RestoreAdditionalSources="{_nugetSourcePath}" """;
@@ -289,6 +297,11 @@ static partial class TestEnv
             """ );
         ProcessRunner.RunProcess( TestHelper.Monitor.ParallelLogger, "dotnet", args, path, null )
             .ShouldBe( 0 );
+
+        File.Exists( resultNupkgPath ).ShouldBeTrue();
+        _alreadyPackagedPlugins ??= new HashSet<string>();
+        _alreadyPackagedPlugins.Add( resultNupkgPath );
+        return resultNupkgPath;
     }
 
     /// <summary>

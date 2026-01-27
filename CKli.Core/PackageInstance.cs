@@ -163,22 +163,25 @@ public readonly record struct PackageInstance( string PackageId, SVersion Versio
                                               [NotNullWhen( true )] out SVersion? version,
                                               out int packageIdLength )
     {
-        var h = fileName;
-        for(; ; )
+        if( fileName.EndsWith( ".nupkg", StringComparison.Ordinal ) )
         {
-            var nextDot = h.IndexOf( '.' );
-            // Consider 2 consecutive .. to be invalid.
-            if( nextDot <= 0 ) break;
-            h = h.Slice( nextDot + 1 );
-            if( h.Length > 0 && char.IsAsciiDigit( h[0] ) )
+            var h = fileName[..^6];
+            for(; ; )
             {
-                packageIdLength = fileName.Length - h.Length - 1;
-                version = SVersion.TryParse( ref h );
-                // Here we allow a starting digit in the package id because this is legit (tested):
-                // Successfully created package '...\package\debug\Truc.0Machin.1.0.0.nupkg
-                if( version.IsValid )
+                var nextDot = h.IndexOf( '.' );
+                // Consider 2 consecutive .. to be invalid.
+                if( nextDot <= 0 ) break;
+                h = h.Slice( nextDot + 1 );
+                if( h.Length > 0 && char.IsAsciiDigit( h[0] ) )
                 {
-                    return h.TryMatch( ".nupkg" ) && h.Length == 0;
+                    packageIdLength = fileName.Length - h.Length - 1;
+                    version = SVersion.TryParse( ref h );
+                    // Here we allow a starting digit in the package id because this is legit (tested):
+                    // Successfully created package '...\package\debug\Truc.0Machin.1.0.0.nupkg
+                    if( version.IsValid )
+                    {
+                        return h.Length == 0;
+                    }
                 }
             }
         }
