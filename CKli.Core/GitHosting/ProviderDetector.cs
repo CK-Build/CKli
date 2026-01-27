@@ -107,9 +107,10 @@ public static class ProviderDetector
                 return provider;
             }
 
-            monitor.Error( $"Could not detect Git hosting provider for '{host}'. " +
-                "Ensure the hostname contains a provider hint (e.g., 'gitea.company.com') " +
-                "or that valid credentials are configured." );
+            monitor.Error( $"""
+                        Could not detect Git hosting provider for '{host}'. 
+                        Ensure the hostname contains a provider hint (e.g., 'gitea.company.com') or that valid credentials are configured.
+                        """ );
             return null;
         }
     }
