@@ -53,7 +53,8 @@ sealed class CKliMaintenanceHostingArchive : Command
                 return false;
             }
 
-            monitor.Info( $"Repository {parsed.Value.Owner}/{parsed.Value.RepoName} has been archived." );
+            var screenType = context.Screen.ScreenType;
+            context.Screen.Display( screenType.SuccessMessage( $"Repository archived: {parsed.Value.Owner}/{parsed.Value.RepoName}" ) );
             return true;
         }
     }

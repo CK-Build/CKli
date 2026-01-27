@@ -217,6 +217,47 @@ public static class ScreenExtensions
             }
         }
     }
+
+    /// <summary>
+    /// Creates a success message with a green checkmark icon.
+    /// </summary>
+    public static IRenderable SuccessMessage( this ScreenType s, string message )
+        => s.Text( "❰✓❱", ConsoleColor.Black, ConsoleColor.DarkGreen ).Box( marginRight: 1 ).AddRight( s.Text( message ) );
+
+    /// <summary>
+    /// Creates a warning message with a yellow warning icon.
+    /// </summary>
+    public static IRenderable WarningMessage( this ScreenType s, string message )
+        => s.Text( "⚠", ConsoleColor.Black, ConsoleColor.Yellow ).Box( marginRight: 1 ).AddRight( s.Text( message ) );
+
+    /// <summary>
+    /// Creates a labeled field with cyan label and value.
+    /// </summary>
+    public static IRenderable LabeledField( this ScreenType s, string label, string? value )
+        => s.Text( $"{label}:", ConsoleColor.Cyan ).Box( marginRight: 1 ).AddRight( s.Text( value ?? "(none)" ) );
+
+    /// <summary>
+    /// Creates a labeled field for a boolean value with checkmark/cross icon.
+    /// </summary>
+    public static IRenderable BooleanField( this ScreenType s, string label, bool value )
+        => s.Text( $"{label}:", ConsoleColor.Cyan ).Box( marginRight: 1 ).AddRight(
+            s.Text( value ? "✓ Yes" : "✗ No", value ? ConsoleColor.Green : ConsoleColor.Red ) );
+
+    /// <summary>
+    /// Creates a labeled URL field with optional hyperlink.
+    /// </summary>
+    public static IRenderable UrlField( this ScreenType s, string label, string? url )
+    {
+        if( url == null ) return s.LabeledField( label, null );
+        return s.Text( $"{label}:", ConsoleColor.Cyan ).Box( marginRight: 1 ).AddRight(
+            s.Text( url, ConsoleColor.Blue ).HyperLink( new Uri( url ) ) );
+    }
+
+    /// <summary>
+    /// Creates a labeled date field.
+    /// </summary>
+    public static IRenderable DateField( this ScreenType s, string label, DateTimeOffset? date )
+        => s.LabeledField( label, date?.ToString( "yyyy-MM-dd HH:mm:ss" ) );
 }
 
 

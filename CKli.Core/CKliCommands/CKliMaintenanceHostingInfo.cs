@@ -55,17 +55,17 @@ sealed class CKliMaintenanceHostingInfo : Command
             var screenType = context.Screen.ScreenType;
 
             var display = screenType.Unit
-                .AddBelow( screenType.Text( $"Repository: {info.Owner}/{info.Name}" ) )
-                .AddBelow( screenType.Text( $"Description: {info.Description ?? "(none)"}" ) )
-                .AddBelow( screenType.Text( $"Private: {info.IsPrivate}" ) )
-                .AddBelow( screenType.Text( $"Archived: {info.IsArchived}" ) )
-                .AddBelow( screenType.Text( $"Empty: {info.IsEmpty}" ) )
-                .AddBelow( screenType.Text( $"Default branch: {info.DefaultBranch ?? "(none)"}" ) )
-                .AddBelow( screenType.Text( $"HTTPS URL: {info.CloneUrlHttps ?? "(none)"}" ) )
-                .AddBelow( screenType.Text( $"SSH URL: {info.CloneUrlSsh ?? "(none)"}" ) )
-                .AddBelow( screenType.Text( $"Web URL: {info.WebUrl ?? "(none)"}" ) )
-                .AddBelow( screenType.Text( $"Created: {info.CreatedAt?.ToString( "yyyy-MM-dd HH:mm:ss" ) ?? "(unknown)"}" ) )
-                .AddBelow( screenType.Text( $"Updated: {info.UpdatedAt?.ToString( "yyyy-MM-dd HH:mm:ss" ) ?? "(unknown)"}" ) );
+                .AddBelow( screenType.LabeledField( "Repository", $"{info.Owner}/{info.Name}" ) )
+                .AddBelow( screenType.LabeledField( "Description", info.Description ) )
+                .AddBelow( screenType.BooleanField( "Private", info.IsPrivate ) )
+                .AddBelow( screenType.BooleanField( "Archived", info.IsArchived ) )
+                .AddBelow( screenType.BooleanField( "Empty", info.IsEmpty ) )
+                .AddBelow( screenType.LabeledField( "Default Branch", info.DefaultBranch ) )
+                .AddBelow( screenType.UrlField( "HTTPS URL", info.CloneUrlHttps ) )
+                .AddBelow( screenType.LabeledField( "SSH URL", info.CloneUrlSsh ) )
+                .AddBelow( screenType.UrlField( "Web URL", info.WebUrl ) )
+                .AddBelow( screenType.DateField( "Created", info.CreatedAt ) )
+                .AddBelow( screenType.DateField( "Updated", info.UpdatedAt ) );
 
             context.Screen.Display( display );
             return true;

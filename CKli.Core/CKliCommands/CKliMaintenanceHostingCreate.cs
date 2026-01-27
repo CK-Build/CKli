@@ -88,11 +88,10 @@ sealed class CKliMaintenanceHostingCreate : Command
             var info = result.Data!;
             var screenType = context.Screen.ScreenType;
 
-            var display = screenType.Unit
-                .AddBelow( screenType.Text( $"Repository created: {info.Owner}/{info.Name}" ) )
-                .AddBelow( screenType.Text( $"HTTPS URL: {info.CloneUrlHttps}" ) )
-                .AddBelow( screenType.Text( $"SSH URL: {info.CloneUrlSsh}" ) )
-                .AddBelow( screenType.Text( $"Web URL: {info.WebUrl}" ) );
+            var display = screenType.SuccessMessage( $"Repository created: {info.Owner}/{info.Name}" )
+                .AddBelow( screenType.UrlField( "HTTPS URL", info.CloneUrlHttps ).Box( marginLeft: 4 ) )
+                .AddBelow( screenType.LabeledField( "SSH URL", info.CloneUrlSsh ).Box( marginLeft: 4 ) )
+                .AddBelow( screenType.UrlField( "Web URL", info.WebUrl ).Box( marginLeft: 4 ) );
 
             context.Screen.Display( display );
             return true;

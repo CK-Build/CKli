@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core.GitHosting;
+using System;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -35,7 +36,9 @@ sealed class CKliMaintenanceHostingDelete : Command
 
         if( !force )
         {
-            monitor.Error( "Deletion requires --force flag to confirm. This action is irreversible." );
+            var screenType = context.Screen.ScreenType;
+            context.Screen.Display( screenType.WarningMessage( "Deletion requires --force flag to confirm." )
+                .AddBelow( screenType.Text( "This action is irreversible.", ConsoleColor.Yellow ).Box( marginLeft: 4 ) ) );
             return false;
         }
 
@@ -63,7 +66,8 @@ sealed class CKliMaintenanceHostingDelete : Command
                 return false;
             }
 
-            monitor.Info( $"Repository {parsed.Value.Owner}/{parsed.Value.RepoName} has been deleted." );
+            var screenType = context.Screen.ScreenType;
+            context.Screen.Display( screenType.SuccessMessage( $"Repository deleted: {parsed.Value.Owner}/{parsed.Value.RepoName}" ) );
             return true;
         }
     }
