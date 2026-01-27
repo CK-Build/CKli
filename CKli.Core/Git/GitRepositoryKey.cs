@@ -141,33 +141,65 @@ public partial class GitRepositoryKey
                 switch( KnownGitProvider )
                 {
                     case KnownCloudGitProvider.Unknown:
-                        Regex badChars = BadPATChars();
-                        string key = badChars.Replace( OriginUrl.Host + "_", "_" );
-                        key = key.ToUpperInvariant();
-                        if( !key.EndsWith( "_GIT" ) ) key += "_GIT";
+                        string key = Secure( OriginUrl.Host.ToUpperInvariant() );
+                        if( !key.EndsWith( "_GIT", StringComparison.Ordinal ) )
+                        {
+                            key += key[^1] == '_' ? "GIT" : "_GIT";
+                        }
                         _prefixPAT = key;
                         break;
                     case KnownCloudGitProvider.AzureDevOps:
-                        var regex = AzureDevOps().Match( OriginUrl.PathAndQuery );
-                        string organization = regex.Groups[1].Value;
-                        _prefixPAT = "AZURE_GIT_" + organization
-                                        .ToUpperInvariant()
-                                        .Replace( '-', '_' )
-                                        .Replace( ' ', '_' );
-                        break;
+                        {
+                            _prefixPAT = GetStandardPathPrefixWithOrganization( "AZUREDEVOPS_", OriginUrl );
+                            break;
+                        }
+                    case KnownCloudGitProvider.GitHub:
+                        {
+                            _prefixPAT = GetStandardPathPrefixWithOrganization( "GITHUB_", OriginUrl );
+                            break;
+                        }
+                    case KnownCloudGitProvider.GitLab:
+                        {
+                            _prefixPAT = GetStandardPathPrefixWithOrganization( "GITLAB_", OriginUrl );
+                            break;
+                        }
+                    case KnownCloudGitProvider.Bitbucket:
+                        {
+                            _prefixPAT = GetStandardPathPrefixWithOrganization( "BITBUCKET_", OriginUrl );
+                            break;
+                        }
+                    case KnownCloudGitProvider.FileSystem:
+                        {
+                            _prefixPAT = "FILESYSTEM_GIT";
+                            break;
+                        }
                     default:
-                        _prefixPAT = KnownGitProvider.ToString().ToUpperInvariant() + "_GIT";
+                        Throw.NotSupportedException();
                         break;
                 }
             }
             return _prefixPAT;
+
+            static string Secure( string s )
+            {
+                Throw.DebugAssert( "Already in upper case.", s.ToUpperInvariant() == s );
+                BadPATChars().Replace( s, "_" );
+                return s;
+            }
+
+            static string GetStandardPathPrefixWithOrganization( string prefix, Uri originUrl )
+            {
+                var regex = CommonPrefixOrganizationPattern().Match( originUrl.PathAndQuery );
+                string organization = Secure( regex.Groups[1].Value.ToUpperInvariant() );
+                return prefix + organization;
+            }
         }
     }
 
-    [GeneratedRegex( "[^A-Za-z_0-9]" )]
+    [GeneratedRegex( "[^A-Z_0-9]" )]
     private static partial Regex BadPATChars();
     [GeneratedRegex( @"/([^\/]*)" )]
-    private static partial Regex AzureDevOps();
+    private static partial Regex CommonPrefixOrganizationPattern();
 
     /// <summary>
     /// Overridden to return the OriginUrl. 
