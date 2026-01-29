@@ -18,7 +18,7 @@ public static partial class RemoteUrlParser
     private static partial Regex SshSchemeUrlRegex();
 
     /// <summary>
-    /// Normalizes a Git remote URL to HTTPS format.
+    /// Normalizes a Git remote to use the <see cref="Uri.UriSchemeHttps"/>.
     /// </summary>
     /// <param name="remoteUrl">The URL to normalize (SSH or HTTPS).</param>
     /// <returns>The normalized HTTPS URL, or null if parsing failed.</returns>

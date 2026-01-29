@@ -1,9 +1,11 @@
-namespace CKli.Core.GitHosting;
+using CK.Core;
+
+namespace CKli.Core;
 
 /// <summary>
 /// Options for creating a new repository.
 /// </summary>
-public sealed class RepositoryCreateOptions
+public sealed class HostedRepositoryCreateOptions
 {
     /// <summary>
     /// Generates a default repository description.
@@ -19,25 +21,21 @@ public sealed class RepositoryCreateOptions
     }
 
     /// <summary>
-    /// Gets or sets the repository owner (organization or user).
-    /// </summary>
-    public required string Owner { get; init; }
-
-    /// <summary>
-    /// Gets or sets the repository name.
-    /// </summary>
-    public required string Name { get; init; }
-
-    /// <summary>
     /// Gets or sets the repository description.
+    /// <para>
+    /// This is ignored by the <see cref="KnownCloudGitProvider.FileSystem"/> provider.
+    /// </para>
     /// </summary>
     public string? Description { get; init; }
 
     /// <summary>
     /// Gets or sets whether the repository should be private.
-    /// Defaults to false (public).
+    /// When let to null, defaults to the (opposite of) <see cref="GitHostingProvider.IsDefaultPublic"/>.
+    /// <para>
+    /// This is ignored by the <see cref="KnownCloudGitProvider.FileSystem"/> provider.
+    /// </para>
     /// </summary>
-    public bool IsPrivate { get; init; }
+    public bool? IsPrivate { get; init; }
 
     /// <summary>
     /// Gets or sets whether to initialize the repository with a README.
@@ -52,14 +50,20 @@ public sealed class RepositoryCreateOptions
     public string? DefaultBranch { get; init; }
 
     /// <summary>
-    /// Gets or sets the .gitignore template to use.
+    /// Gets or sets the optional .gitignore template to use.
     /// Provider-specific (e.g., "VisualStudio", "Node", "Python").
+    /// <para>
+    /// This is ignored by the <see cref="KnownCloudGitProvider.FileSystem"/> provider.
+    /// </para>
     /// </summary>
     public string? GitIgnoreTemplate { get; init; }
 
     /// <summary>
-    /// Gets or sets the license template to use.
+    /// Gets or sets the optional license template to use.
     /// Provider-specific (e.g., "MIT", "Apache-2.0", "GPL-3.0").
+    /// <para>
+    /// This is ignored by the <see cref="KnownCloudGitProvider.FileSystem"/> provider.
+    /// </para>
     /// </summary>
     public string? LicenseTemplate { get; init; }
 }

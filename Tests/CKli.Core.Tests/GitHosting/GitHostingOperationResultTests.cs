@@ -80,25 +80,23 @@ public class GitHostingOperationResultTests
     [Test]
     public void Generic_Ok_creates_successful_result_with_data()
     {
-        var data = new RepositoryInfo
+        var data = new HostedRepositoryInfo
         {
-            Owner = "owner",
-            Name = "repo"
+            RepoPath = "owner/repo"
         };
 
-        var result = GitHostingOperationResult<RepositoryInfo>.Ok( data );
+        var result = GitHostingOperationResult<HostedRepositoryInfo>.Ok( data );
 
         result.Success.ShouldBeTrue();
         result.Data.ShouldNotBeNull();
-        result.Data!.Owner.ShouldBe( "owner" );
-        result.Data!.Name.ShouldBe( "repo" );
+        result.Data!.RepoPath.ShouldBe( "owner/repo" );
         result.ErrorMessage.ShouldBeNull();
     }
 
     [Test]
     public void Generic_Fail_creates_failed_result_without_data()
     {
-        var result = GitHostingOperationResult<RepositoryInfo>.Fail( "Error", 500 );
+        var result = GitHostingOperationResult<HostedRepositoryInfo>.Fail( "Error", 500 );
 
         result.Success.ShouldBeFalse();
         result.Data.ShouldBeNull();

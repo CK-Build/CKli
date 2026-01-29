@@ -13,7 +13,7 @@ public static class NuGetHelper
 {
     static string? _globalCachePath;
 
-    static string GlobalCachePath => _globalCachePath ?? Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.UserProfile ), ".nuget/packages" );
+    static string GlobalCachePath => _globalCachePath ??= Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.UserProfile ), ".nuget/packages" );
 
     /// <summary>
     /// Removes a package instance or all versions of a package from NuGet global cache.

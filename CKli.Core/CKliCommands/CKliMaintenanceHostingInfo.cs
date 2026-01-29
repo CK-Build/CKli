@@ -29,7 +29,7 @@ sealed class CKliMaintenanceHostingInfo : Command
             return false;
         }
 
-        var provider = await ProviderDetector.ResolveProviderAsync( monitor, context.SecretsStore, url );
+        var provider = await GitHostingProviderDetector.ResolveProviderAsync( monitor, context.SecretsStore, url );
         if( provider == null )
         {
             return false;

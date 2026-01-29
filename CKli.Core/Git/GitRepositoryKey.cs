@@ -11,7 +11,7 @@ namespace CKli.Core;
 /// Encapsulates <see cref="KnownGitProvider"/> lookup from a repository url and
 /// <see cref="ReadPATKeyName"/> and <see cref="WritePATKeyName"/> formatting.
 /// </summary>
-public partial class GitRepositoryKey
+public partial class GitRepositoryKey : IGitRepositoryAccessKey
 {
     sealed class UriComparer : IEqualityComparer<Uri>
     {
@@ -19,6 +19,11 @@ public partial class GitRepositoryKey
 
         public int GetHashCode( [DisallowNull] Uri obj ) => StringComparer.OrdinalIgnoreCase.GetHashCode( obj.ToString() );
     }
+
+    /// <summary>
+    /// The <see cref="PrefixPAT"/> used for <see cref="KnownCloudGitProvider.FileSystem"/>.
+    /// </summary>
+    public const string FileSystemPrefixPAT = "FILESYSTEM_GIT";
 
     /// <summary>
     /// An equality comparer for Url that uses <see cref="StringComparer.OrdinalIgnoreCase"/>.
@@ -30,29 +35,59 @@ public partial class GitRepositoryKey
     readonly KnownCloudGitProvider _knownGitProvider;
     readonly bool _isPublic;
 
+    string? _repoName;
     string? _prefixPAT;
     string? _readPATKeyName;
     UsernamePasswordCredentials? _readCreds;
     string? _writePATKeyName;
     UsernamePasswordCredentials? _writeCreds;
+    IGitRepositoryAccessKey? _revertedAccessKey;
 
     /// <summary>
     /// Initializes a new <see cref="GitRepositoryKey"/>.
+    /// This calls <see cref="ThrowArgumentExceptionOnInvalidUrl"/> on the <paramref name="url"/>. Use the
+    /// <see cref="Create(IActivityMonitor, ISecretsStore, Uri, bool)"/> factory method for exception-less
+    /// initialization.
     /// </summary>
     /// <param name="secretsStore">The secrets store to use.</param>
     /// <param name="url">The url of the remote.</param>
     /// <param name="isPublic">Whether this repository is public.</param>
     public GitRepositoryKey( ISecretsStore secretsStore, Uri url, bool isPublic )
+        : this( url, isPublic, secretsStore )
     {
-        _originUrl = CheckAndNormalizeRepositoryUrl( url );
+        ThrowArgumentExceptionOnInvalidUrl( url );
+    }
+
+    GitRepositoryKey( Uri url, bool isPublic, ISecretsStore secretsStore )
+    {
+        _originUrl = url;
         _secretsStore = secretsStore;
         _isPublic = isPublic;
 
-        if( url.Authority.Equals( "github.com", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownCloudGitProvider.GitHub;
-        else if( url.Authority.Equals( "gitlab.com", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownCloudGitProvider.GitLab;
-        else if( url.Authority.Equals( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownCloudGitProvider.AzureDevOps;
-        else if( url.Authority.Equals( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) ) _knownGitProvider = KnownCloudGitProvider.Bitbucket;
-        else if( url.Scheme == Uri.UriSchemeFile ) _knownGitProvider = KnownCloudGitProvider.FileSystem;
+        if( url.Scheme == Uri.UriSchemeFile ) _knownGitProvider = KnownCloudGitProvider.FileSystem;
+        else if( url.Authority.Equals( "github.com", StringComparison.Ordinal ) ) _knownGitProvider = KnownCloudGitProvider.GitHub;
+        else if( url.Authority.Equals( "gitlab.com", StringComparison.Ordinal ) ) _knownGitProvider = KnownCloudGitProvider.GitLab;
+        else if( url.Authority.Equals( "dev.azure.com", StringComparison.Ordinal ) ) _knownGitProvider = KnownCloudGitProvider.AzureDevOps;
+        else if( url.Authority.Equals( "bitbucket.org", StringComparison.Ordinal ) ) _knownGitProvider = KnownCloudGitProvider.Bitbucket;
+    }
+
+    /// <summary>
+    /// Creates a <see cref="GitRepositoryKey"/> only if <paramref name="url"/> is valid or emits an error and returns null.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store to use.</param>
+    /// <param name="url">The url of the remote.</param>
+    /// <param name="isPublic">Whether this repository is public.</param>
+    /// <returns>The repository key on success, null on error.</returns>
+    public static GitRepositoryKey? Create( IActivityMonitor monitor, ISecretsStore secretsStore, Uri url, bool isPublic )
+    {
+        var urlError = GetRepositoryUrlError( url );
+        if( urlError != null )
+        {
+            monitor.Error( urlError );
+            return null;
+        }
+        return new GitRepositoryKey( url, isPublic, secretsStore );
     }
 
     /// <summary>
@@ -62,33 +97,42 @@ public partial class GitRepositoryKey
 
     /// <summary>
     /// Gets the remote origin url.
-    /// This is checked in the constructor as an absolute url and if the url has no query part 
-    /// and the path ends with ".git", the trailing .git is removed.
-    /// See https://stackoverflow.com/a/11069413/. 
+    /// <para>
+    /// See <see cref="GetRepositoryUrlError(Uri)"/> for invariants.
+    /// </para>
     /// </summary>
     public Uri OriginUrl => _originUrl;
 
     /// <summary>
-    /// Gets the known Git provider.
+    /// Gets the valid repository name.
     /// </summary>
-    public KnownCloudGitProvider KnownGitProvider => _knownGitProvider;
+    [MemberNotNull( nameof( _repoName ) )]
+    public string RepositoryName => _repoName ??= new string( System.IO.Path.GetFileName( _originUrl.ToString().AsSpan() ) );
 
     /// <summary>
-    /// Tries to get the credentials to be able to read the remote repository.
-    /// This is always successful and <paramref name="creds"/> is null when <see cref="IsPublic"/> is true.
+    /// Gets whether this <see cref="RepositoryName"/> ends with "-Stack" (case insensitive) and the prefix, the stack name,
+    /// is at least 2 characters long.
     /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="creds">The credentials to use.</param>
-    /// <returns>True on success, false on error.</returns>
+    public bool IsStackRepository => RepositoryName.EndsWith( "-Stack", StringComparison.OrdinalIgnoreCase ) && _repoName.Length >= 8;
+
+    /// <inheritdoc />
+    public KnownCloudGitProvider KnownGitProvider => _knownGitProvider;
+
+    /// <inheritdoc />
     public bool GetReadCredentials( IActivityMonitor monitor, out UsernamePasswordCredentials? creds )
     {
+        return DoReadCredentials( monitor, _isPublic, out creds );
+    }
+
+    bool DoReadCredentials( IActivityMonitor monitor, bool isPublic, out UsernamePasswordCredentials? creds )
+    {
+        if( isPublic )
+        {
+            creds = null;
+            return true;
+        }
         if( _readCreds == null )
         {
-            if( _isPublic )
-            {
-                creds = null;
-                return true;
-            }
             var pat = _secretsStore.TryGetRequiredSecret( monitor, WritePATKeyName, ReadPATKeyName );
             _readCreds = pat != null
                             ? new UsernamePasswordCredentials() { Username = "CKli", Password = pat }
@@ -98,13 +142,8 @@ public partial class GitRepositoryKey
         return creds != null;
     }
 
-    /// <summary>
-    /// Tries to get the credentials to be able to push to the remote repository.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="creds">The credentials to use.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool GetWriteCredentials( IActivityMonitor monitor, [NotNullWhen(true)]out UsernamePasswordCredentials? creds )
+    /// <inheritdoc />
+    public bool GetWriteCredentials( IActivityMonitor monitor, [NotNullWhen( true )] out UsernamePasswordCredentials? creds )
     {
         if( _writeCreds == null )
         {
@@ -117,17 +156,19 @@ public partial class GitRepositoryKey
         return creds != null;
     }
 
-    /// <summary>
-    /// Gets the basic, read/clone, PAT key name for this repository.
-    /// This PAT is required only if the repository is not public.
-    /// </summary>
+    /// <inheritdoc />
     public string ReadPATKeyName => _readPATKeyName ??= PrefixPAT + "_READ_PAT";
 
-    /// <summary>
-    /// Gets the write PAT key name for this repository.
-    /// This PAT must allow pushes to the repository.
-    /// </summary>
+    /// <inheritdoc />
     public string WritePATKeyName => _writePATKeyName ??= PrefixPAT + "_WRITE_PAT";
+
+    /// <inheritdoc />
+    public IGitRepositoryAccessKey ToPublicAccessKey() => _isPublic ? this : GetRevertedAccessKey();
+
+    /// <inheritdoc />
+    public IGitRepositoryAccessKey ToPrivateAccessKey() => _isPublic ? GetRevertedAccessKey() : this;
+
+    IGitRepositoryAccessKey GetRevertedAccessKey() => _revertedAccessKey ??= new RevertedKey( this );
 
     /// <summary>
     /// Common PAT prefix built from <see cref="KnownGitProvider"/> and <see cref="OriginUrl"/>.
@@ -138,39 +179,47 @@ public partial class GitRepositoryKey
         {
             if( _prefixPAT == null )
             {
+                Throw.DebugAssert( "Absolute https:// or file:// without query part.",
+                                      (_originUrl.Scheme.Equals( "https", StringComparison.Ordinal )
+                                        || _originUrl.Scheme.Equals( "file", StringComparison.Ordinal ))
+                                      && _originUrl.IsAbsoluteUri
+                                      && _originUrl.Query.Length == 0 );
+
                 switch( KnownGitProvider )
                 {
                     case KnownCloudGitProvider.Unknown:
-                        string key = Secure( OriginUrl.Host.ToUpperInvariant() );
-                        if( !key.EndsWith( "_GIT", StringComparison.Ordinal ) )
+                        string prefix = _originUrl.GetComponents( UriComponents.Host | UriComponents.Port | UriComponents.KeepDelimiter,
+                                                                  UriFormat.Unescaped );
+                        prefix = Secure( prefix );
+                        if( prefix.Length == 0 )
                         {
-                            key += key[^1] == '_' ? "GIT" : "_GIT";
+                            Throw.CKException( $"Unable to derive a PAT prefix from url '{_originUrl}'." );
                         }
-                        _prefixPAT = key;
+                        _prefixPAT = ConcatFirstPathPart( prefix, _originUrl );
                         break;
                     case KnownCloudGitProvider.AzureDevOps:
                         {
-                            _prefixPAT = GetStandardPathPrefixWithOrganization( "AZUREDEVOPS_", OriginUrl );
+                            _prefixPAT = ConcatFirstPathPart( "AZUREDEVOPS_", OriginUrl );
                             break;
                         }
                     case KnownCloudGitProvider.GitHub:
                         {
-                            _prefixPAT = GetStandardPathPrefixWithOrganization( "GITHUB_", OriginUrl );
+                            _prefixPAT = ConcatFirstPathPart( "GITHUB_", OriginUrl );
                             break;
                         }
                     case KnownCloudGitProvider.GitLab:
                         {
-                            _prefixPAT = GetStandardPathPrefixWithOrganization( "GITLAB_", OriginUrl );
+                            _prefixPAT = ConcatFirstPathPart( "GITLAB_", OriginUrl );
                             break;
                         }
                     case KnownCloudGitProvider.Bitbucket:
                         {
-                            _prefixPAT = GetStandardPathPrefixWithOrganization( "BITBUCKET_", OriginUrl );
+                            _prefixPAT = ConcatFirstPathPart( "BITBUCKET_", OriginUrl );
                             break;
                         }
                     case KnownCloudGitProvider.FileSystem:
                         {
-                            _prefixPAT = "FILESYSTEM_GIT";
+                            _prefixPAT = FileSystemPrefixPAT;
                             break;
                         }
                     default:
@@ -187,19 +236,30 @@ public partial class GitRepositoryKey
                 return s;
             }
 
-            static string GetStandardPathPrefixWithOrganization( string prefix, Uri originUrl )
+            static string ConcatFirstPathPart( string prefix, Uri originUrl )
             {
-                var regex = CommonPrefixOrganizationPattern().Match( originUrl.PathAndQuery );
-                string organization = Secure( regex.Groups[1].Value.ToUpperInvariant() );
-                return prefix + organization;
+                Throw.DebugAssert( "Already in upper case.", prefix.ToUpperInvariant() == prefix );
+                var part = GetFirstPathPart( originUrl );
+                return part.Length > 0
+                        ? part[0] != '_' && prefix[^1] != '_'
+                                        ? prefix + '_' + part
+                                        : prefix + part
+                        : prefix;
+            }
+
+            static string GetFirstPathPart( Uri originUrl )
+            {
+                var m = FirstPathPart().Match( originUrl.AbsolutePath );
+                return m.Success ? Secure( m.Groups[1].Value.ToUpperInvariant() ) : "";
             }
         }
     }
 
     [GeneratedRegex( "[^A-Z_0-9]" )]
     private static partial Regex BadPATChars();
-    [GeneratedRegex( @"/([^\/]*)" )]
-    private static partial Regex CommonPrefixOrganizationPattern();
+
+    [GeneratedRegex( @"^/*([^\/]*)", RegexOptions.CultureInvariant )]
+    private static partial Regex FirstPathPart();
 
     /// <summary>
     /// Overridden to return the OriginUrl. 
@@ -208,78 +268,61 @@ public partial class GitRepositoryKey
     public override string ToString() => _originUrl.ToString();
 
     /// <summary>
-    /// Normalizes a valid, absolute, url. If the path ends with ".git" (case insensitive), this suffix is removed.
-    /// Throws a <see cref="ArgumentException"/> if <see cref="Uri.IsAbsoluteUri"/> is false.
+    /// Validates a Url that can be used for a GitRepositoryKey.
+    /// <list type="bullet">
+    ///     <item>The url is absolute (<see cref="Uri.IsAbsoluteUri"/> is true).</item>
+    ///     <item>The url has no query part (<see cref="Uri.Query"/> is empty).</item>
+    ///     <item>The url doesn't end with ".git". See https://stackoverflow.com/a/11069413/.</item>
+    ///     <item>The only allowed schemes are <see cref="Uri.UriSchemeFile"/> and <see cref="Uri.UriSchemeHttps"/>.</item>
+    ///     <item>For "https://", the <see cref="Uri.Authority"/> is in lowercase.</item>
+    ///     <item>The url must end with a segment that satisfies <see cref="WorldName.IsValidRepositoryName"/>.</item>
+    /// </list>
     /// </summary>
-    /// <param name="url">The valid, absolute, url.</param>
-    /// <returns>The normalized url.</returns>
-    public static Uri CheckAndNormalizeRepositoryUrl( Uri url )
+    /// <param name="url">The url to validate.</param>
+    /// <returns>A non null message if something's wrong.</returns>
+    public static string? GetRepositoryUrlError( Uri url )
     {
-        Throw.CheckNotNullArgument( url );
         if( !url.IsAbsoluteUri || url.Query.Length > 0 )
         {
-            Throw.ArgumentException( nameof( url ), $"Invalid Url: '{url}' must be absolute and have no query part." );
+            return $"Invalid Url: '{url}' must be absolute and have no query part.";
         }
-        // Ensure that all suffixes are removed.
-        while( url.AbsolutePath.EndsWith( ".git", StringComparison.OrdinalIgnoreCase ) )
+        if( url.Scheme != Uri.UriSchemeFile )
         {
-            var s = url.AbsoluteUri;
-            url = new Uri( s.Remove( s.Length - 4 ) );
+            var a = url.Authority;
+            if( a.ToLowerInvariant() != a )
+            {
+                return $"Invalid Url: '{url}' must have lower case authority ('{a}' should be '{a.ToLowerInvariant()}').";
+            }
+            if( url.Scheme != Uri.UriSchemeHttps )
+            {
+                return $"Invalid Url: '{url}' must have '{Uri.UriSchemeHttps}' or '{Uri.UriSchemeFile}' scheme.";
+            }
         }
-        return url;
-    }
-
-    /// <summary>
-    /// Normalizes a repository url (see <see cref="CheckAndNormalizeRepositoryUrl(Uri)"/>) and extracts the
-    /// repository name that must be valid (see <see cref="WorldName.IsValidRepositoryName"/>).
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="url">Any url (can be null).</param>
-    /// <param name="repositoryFromUrl">The valid repository name extracted from the url on success.</param>
-    /// <returns>The normalized url or null on error.</returns>
-    public static Uri? CheckAndNormalizeRepositoryUrl( IActivityMonitor monitor, Uri? url, out string? repositoryFromUrl )
-    {
-        repositoryFromUrl = null;
-        if( url == null || !url.IsAbsoluteUri || url.Query.Length > 0 )
+        var sUrl = url.ToString();
+        if( sUrl.EndsWith( ".git", StringComparison.OrdinalIgnoreCase ) )
         {
-            monitor.Error( $"Invalid Url: '{url}' must be absolute and have no query part." );
-            return null;
+            return $"Invalid Url: '{sUrl}' must not end with '.git'.";
         }
-        // Ensure that all suffixes are removed.
-        string absolutePath = url.AbsolutePath;
-        while( absolutePath.EndsWith( ".git", StringComparison.OrdinalIgnoreCase ) )
-        {
-            var s = url.AbsoluteUri;
-            url = new Uri( s.Remove( s.Length - 4 ) );
-            absolutePath = url.AbsolutePath;
-        }
-        // Consider that all Git providers follow this pattern: the last part of the path is the repository name.
-        // If this must be tweaked for some providers (like the "no query" restriction above), we are at the
-        // right place to exploit the KnownGitProvider enum...
-        var n = System.IO.Path.GetFileName( absolutePath.AsSpan() );
+        var n = System.IO.Path.GetFileName( sUrl.AsSpan() );
         if( !WorldName.IsValidRepositoryName( n ) )
         {
-            monitor.Error( $"Invalid repository Url: the last path part must be a valid repository name: '{url}'." );
-            return null;
+            return $"Invalid Url: the last path part must be a valid repository name: '{url}'.";
         }
-        repositoryFromUrl = new string( n );
-        return url;
+        return null;
     }
 
     /// <summary>
-    /// Checks that the 2 urls's string, after a call to <see cref="CheckAndNormalizeRepositoryUrl(Uri)"/>
-    /// are <see cref="StringComparison.OrdinalIgnoreCase"/> equal.
-    /// This is a lot of computation for a boolean and it is hard to "optimize" since we never know if the urls
-    /// have already been normalized.
+    /// Throws an <see cref="ArgumentException"/> if <see cref="GetRepositoryUrlError(Uri)"/> returns
+    /// a non null message.
     /// </summary>
-    /// <param name="u1">First valid and absolute url.</param>
-    /// <param name="u2">Second valid and absolute url.</param>
-    /// <returns>Whether the 2 urls are equivalent.</returns>
-    public static bool IsEquivalentRepositoryUri( Uri u1, Uri u2 )
+    /// <param name="url">The url to validate (null throws a <see cref="ArgumentNullException"/>).</param>
+    public static void ThrowArgumentExceptionOnInvalidUrl( [NotNull] Uri? url, string parameterName = "url" )
     {
-        u1 = CheckAndNormalizeRepositoryUrl( u1 );
-        u2 = CheckAndNormalizeRepositoryUrl( u2 );
-        return OrdinalIgnoreCaseUrlEqualityComparer.Equals( u1, u2 );
+        Throw.CheckNotNullArgument( url, parameterName );
+        var error = GetRepositoryUrlError( url );
+        if( error != null )
+        {
+            Throw.ArgumentException( nameof( url ), error );
+        }
     }
-
 }

@@ -1,31 +1,30 @@
+using CK.Core;
 using System;
 
-namespace CKli.Core.GitHosting;
+namespace CKli.Core;
 
 /// <summary>
 /// Represents information about a repository.
 /// </summary>
-public sealed record RepositoryInfo
+public sealed record HostedRepositoryInfo
 {
     /// <summary>
-    /// Gets or sets the repository owner (organization or user).
+    /// Gets or sets the repository path in the hosting provider.
+    /// <para>
+    /// The repository name is the <see cref="NormalizedPath.LastPart"/>.
+    /// </para>
     /// </summary>
-    public required string Owner { get; init; }
-
-    /// <summary>
-    /// Gets or sets the repository name.
-    /// </summary>
-    public required string Name { get; init; }
-
-    /// <summary>
-    /// Gets or sets the repository description.
-    /// </summary>
-    public string? Description { get; init; }
+    public required NormalizedPath RepoPath { get; init; }
 
     /// <summary>
     /// Gets or sets whether the repository is private.
     /// </summary>
     public bool IsPrivate { get; init; }
+
+    /// <summary>
+    /// Gets or sets the repository description.
+    /// </summary>
+    public string? Description { get; init; }
 
     /// <summary>
     /// Gets or sets whether the repository is archived.
@@ -43,14 +42,9 @@ public sealed record RepositoryInfo
     public string? DefaultBranch { get; init; }
 
     /// <summary>
-    /// Gets or sets the HTTPS clone URL.
+    /// Gets or sets the clone url.
     /// </summary>
-    public string? CloneUrlHttps { get; init; }
-
-    /// <summary>
-    /// Gets or sets the SSH clone URL.
-    /// </summary>
-    public string? CloneUrlSsh { get; init; }
+    public string? CloneUrl { get; init; }
 
     /// <summary>
     /// Gets or sets the web URL for viewing the repository.

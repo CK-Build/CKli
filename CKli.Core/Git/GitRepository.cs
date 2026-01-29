@@ -1257,6 +1257,7 @@ public sealed partial class GitRepository : IDisposable
         using( monitor.OpenInfo( $"Cloning '{workingFolder}' from '{git.OriginUrl}'." ) )
         {
             if( !git.GetReadCredentials( monitor, out var creds ) ) return null;
+            Repository? r = null;
             try
             {
                 Repository.Clone( git.OriginUrl.AbsoluteUri, workingFolder, new CloneOptions()
@@ -1264,20 +1265,14 @@ public sealed partial class GitRepository : IDisposable
                     FetchOptions = { CredentialsProvider = ( url, user, cred ) => creds },
                     Checkout = true
                 } );
-                var r = new Repository( workingFolder );
-                var o = r.Network.Remotes["origin"];
-                if( o == null || !GitRepositoryKey.IsEquivalentRepositoryUri( new Uri( o.Url, UriKind.Absolute ), git.OriginUrl ) )
-                {
-                    monitor.Fatal( $"Existing '{workingFolder}' must have its 'origin' remote set to '{git.OriginUrl}'. This must be fixed manually." );
-                    r.Dispose();
-                    return null;
-                }
+                r = new Repository( workingFolder );
                 EnsureFirstCommit( monitor, r );
                 return r;
             }
             catch( Exception ex )
             {
                 monitor.Error( "Git clone failed. Leaving existing directory as-is.", ex );
+                r?.Dispose();
                 return null;
             }
         }

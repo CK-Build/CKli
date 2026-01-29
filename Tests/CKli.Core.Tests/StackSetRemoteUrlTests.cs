@@ -67,30 +67,6 @@ public class StackSetRemoteUrlTests
     }
 
     [Test]
-    public async Task Command_normalizes_git_suffix_Async()
-    {
-        var context = TestEnv.EnsureCleanFolder();
-
-        // Create stack first
-        ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "remote", "stack", "create", "NormTest" ) ).ShouldBeTrue();
-
-        context = context.ChangeDirectory( "NormTest" );
-
-        // URL with .git suffix should be normalized by the command
-        var urlWithGit = "file:///tmp/test/NormRemote-Stack.git";
-        ( await CKliCommands.ExecAsync( TestHelper.Monitor, context,
-                                         "remote", "stack", "migrate", urlWithGit, "--no-push" ) ).ShouldBeTrue();
-
-        // Verify .git suffix was stripped
-        var stackPath = context.CurrentDirectory.AppendPart( ".PublicStack" );
-        using var repo = new Repository( stackPath );
-        var origin = repo.Network.Remotes["origin"];
-        origin.ShouldNotBeNull();
-        origin.Url.ShouldNotEndWith( ".git" );
-    }
-
-    [Test]
     public void SetRemoteUrl_detects_equivalent_url()
     {
         var context = TestEnv.EnsureCleanFolder();

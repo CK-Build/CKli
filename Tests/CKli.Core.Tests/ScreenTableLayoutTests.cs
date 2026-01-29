@@ -327,7 +327,7 @@ public class ScreenTableLayoutTests
         {
         }
 
-        protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
+        internal protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
         {
             return ValueTask.FromResult( true );
         }

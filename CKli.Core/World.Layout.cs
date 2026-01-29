@@ -36,7 +36,7 @@ sealed partial class World
     /// This can be called only if <see cref="CanChangeLayout"/> is true otherwise an <see cref="InvalidOperationException"/> is thrown.
     /// </para>
     /// <list type="number">
-    ///     <item>The uri must be a valid absolute url.</item>
+    ///     <item>The uri must be valid (see <see cref="GitRepositoryKey.GetRepositoryUrlError(Uri)"/>) and must not be a "-Stack" repository.</item>
     ///     <item>No existing repository must exist with the same repository name.</item>
     ///     <item>The path must be <see cref="LocalWorldName.WorldRoot"/> or starts with it (it should not end with the repository name).</item>
     ///     <item>The path must not be below any existing repository.</item>
@@ -45,16 +45,23 @@ sealed partial class World
     /// </list>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="repositoryUri">The repository url.</param>
+    /// <param name="repositoryUrl">The repository url.</param>
     /// <param name="folderPath">The absolute folder path inside <see cref="LocalWorldName.WorldRoot"/>.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool AddRepository( IActivityMonitor monitor, Uri repositoryUri, NormalizedPath folderPath )
+    public bool AddRepository( IActivityMonitor monitor, Uri repositoryUrl, NormalizedPath folderPath )
     {
         Throw.CheckState( CanChangeLayout );
-        // Check the Uri.
-        repositoryUri = GitRepositoryKey.CheckAndNormalizeRepositoryUrl( monitor, repositoryUri, out var repoName )!;
-        if( repositoryUri == null ) return false;
-        using var _ = monitor.OpenInfo( $"Adding '{repoName}' ({repositoryUri}) to world '{_name.FullName}'." );
+        var gitKey = GitRepositoryKey.Create( monitor, _name.Stack.SecretsStore, repositoryUrl, _name.Stack.IsPublic );
+        if( gitKey == null )
+        {
+            return false;
+        }
+        if( gitKey.IsStackRepository )
+        {
+            monitor.Error( $"Cannot add a '-Stack' repository to a World." );
+            return false;
+        }
+        using var _ = monitor.OpenInfo( $"Adding '{gitKey.RepositoryName}' ({repositoryUrl}) to world '{_name.FullName}'." );
         // Check the folder path.
         if( !folderPath.StartsWith( _name.WorldRoot, strict: false ) )
         {
@@ -64,17 +71,17 @@ sealed partial class World
         // And normalize it: it now ends with the repository name from the Uri.
         // The sub folders path without the trailing repository name.
         NormalizedPath subFolderPath;
-        if( folderPath.LastPart.Equals( repoName, StringComparison.OrdinalIgnoreCase ) )
+        if( folderPath.LastPart.Equals( gitKey.RepositoryName, StringComparison.OrdinalIgnoreCase ) )
         {
             // Normalize case and obtains the sub folder path.
             subFolderPath = folderPath.RemoveLastPart();
-            folderPath = subFolderPath.AppendPart( repoName );
-            monitor.Warn( $"Useless '{repoName}' specified in last folder of '{folderPath}'." );
+            folderPath = subFolderPath.AppendPart( gitKey.RepositoryName );
+            monitor.Warn( $"Useless '{gitKey.RepositoryName}' specified in last folder of '{folderPath}'." );
         }
         else
         {
             subFolderPath = folderPath;
-            folderPath = folderPath.AppendPart( repoName );
+            folderPath = folderPath.AppendPart( gitKey.RepositoryName );
         }
         // Each path part must be a valid folder name.
         foreach( var f in subFolderPath.Parts.Skip( _name.WorldRoot.Parts.Count ) )
@@ -100,10 +107,10 @@ sealed partial class World
                     """ );
                 return false;
             }
-            if( path.LastPart.Equals( repoName, StringComparison.OrdinalIgnoreCase ) )
+            if( path.LastPart.Equals( gitKey.RepositoryName, StringComparison.OrdinalIgnoreCase ) )
             {
                 monitor.Error( $"""
-                    Cannot add repository '{repositoryUri}'.
+                    Cannot add repository '{repositoryUrl}'.
                     A repository with the same name exists: '{uri}' cloned at '{path}'.
                     """ );
                 return false;
@@ -120,15 +127,14 @@ sealed partial class World
             return false;
         }
         // ...and we must ensure that it can be cloned.
-        var gitKey = new GitRepositoryKey( _name.Stack.SecretsStore, repositoryUri, _name.Stack.IsPublic );
         using( var libGit = GitRepository.CloneWorkingFolder( monitor, gitKey, folderPath ) )
         {
             if( libGit == null ) return false;
             // The working folder is successfully cloned.
             // We can dispose the Repository and update the definition file.
         }
-        if( !_name.Stack.Commit( monitor, $"Before adding repository '{folderPath.LastPart}' ({repositoryUri}) in world {_name.FullName}." )
-            || !_definitionFile.AddRepository( monitor, folderPath, subFolderPath.Parts.Skip( _name.WorldRoot.Parts.Count ), repositoryUri ) )
+        if( !_name.Stack.Commit( monitor, $"Before adding repository '{folderPath.LastPart}' ({repositoryUrl}) in world {_name.FullName}." )
+            || !_definitionFile.AddRepository( monitor, folderPath, subFolderPath.Parts.Skip( _name.WorldRoot.Parts.Count ), repositoryUrl ) )
         {
             return false;
         }
@@ -544,7 +550,7 @@ sealed partial class World
                 var repo = world.TryLoadDefinedGitRepository( monitor, workingFolder, mustExist: false );
                 if( repo != null )
                 {
-                    Throw.DebugAssert( "Already normalized.", GitRepositoryKey.CheckAndNormalizeRepositoryUrl( repo.OriginUrl ) == repo.OriginUrl );
+                    Throw.DebugAssert( "Already validated.", GitRepositoryKey.GetRepositoryUrlError( repo.OriginUrl ) == null );
                     return repo.OriginUrl;
                 }
                 // No luck: there is a layout issue!
@@ -558,16 +564,19 @@ sealed partial class World
             }
         }
 
-        static Uri? CheckUri( IActivityMonitor monitor, Uri? uri, string gitConfigPath, bool forXif )
+        static Uri? CheckUri( IActivityMonitor monitor, Uri url, string gitConfigPath, bool forXif )
         {
-            uri = GitRepositoryKey.CheckAndNormalizeRepositoryUrl( monitor, uri, out var repoName );
-            if( uri == null )
+            var urlError = GitRepositoryKey.GetRepositoryUrlError( url );
+            if( urlError != null )
             {
-                monitor.Error( $"Invalid origin url in '{gitConfigPath}'." );
+                monitor.Error( $"""
+                    Invalid origin url in '{gitConfigPath}':
+                    {urlError}
+                    """ );
             }
             else if( forXif )
             {
-                Throw.DebugAssert( repoName != null );
+                var repoName = Path.GetFileName( url.ToString().AsSpan() );
                 Throw.DebugAssert( gitConfigPath.EndsWith( "/.git/config" ) && "/.git/config".Length == 12 );
                 int idxExpectedRepoName = gitConfigPath.Length - 12 - repoName.Length;
                 if( idxExpectedRepoName < 0
@@ -581,7 +590,7 @@ sealed partial class World
                     return null;
                 }
             }
-            return uri;
+            return url;
         }
 
     }

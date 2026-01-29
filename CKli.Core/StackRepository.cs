@@ -246,7 +246,8 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
-    /// Changes the stack's remote URL (origin).
+    /// Changes the stack's "origin" remote.
+    /// <see cref="GitRepositoryKey.ThrowArgumentExceptionOnInvalidUrl"/> is called.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="newUrl">The new remote URL. Must be a valid, normalized URL.</param>
@@ -254,17 +255,16 @@ public sealed partial class StackRepository : IDisposable
     /// <returns>True on success, false on error.</returns>
     public bool SetRemoteUrl( IActivityMonitor monitor, Uri newUrl, bool push = true )
     {
-        Throw.CheckNotNullArgument( newUrl );
-        Throw.CheckArgument( newUrl.IsAbsoluteUri );
+        GitRepositoryKey.ThrowArgumentExceptionOnInvalidUrl( newUrl, nameof( newUrl ) );
 
         var oldUrl = _git.RepositoryKey.OriginUrl;
-        if( GitRepositoryKey.IsEquivalentRepositoryUri( oldUrl, newUrl ) )
+        if( oldUrl == newUrl )
         {
             monitor.Info( $"Remote URL is already '{newUrl}'." );
             return true;
         }
 
-        using( monitor.OpenInfo( $"Changing remote URL from '{oldUrl}' to '{newUrl}'." ) )
+        using( monitor.OpenInfo( $"Changing 'origin' remote url from '{oldUrl}' to '{newUrl}'." ) )
         {
             // Update the git remote
             try
@@ -290,7 +290,7 @@ public sealed partial class StackRepository : IDisposable
                 try
                 {
                     _git.Repository.Network.Remotes.Update( "origin", r => r.Url = oldUrl.AbsoluteUri );
-                    monitor.Warn( "Reverted git remote to original URL due to registry update failure." );
+                    monitor.Warn( "Reverted git remote to original url due to registry update failure." );
                 }
                 catch
                 {
@@ -304,7 +304,7 @@ public sealed partial class StackRepository : IDisposable
             {
                 if( !_git.PushBranch( monitor, _git.Repository.Head, autoCreateRemoteBranch: false ) )
                 {
-                    monitor.Error( "Push to new remote failed. The remote URL has been changed but the remote may not exist or be accessible." );
+                    monitor.Error( "Push to new remote failed. The remote url has been changed but the remote may not exist or be accessible." );
                     return false;
                 }
                 monitor.Info( "Successfully pushed to new remote." );
@@ -367,8 +367,7 @@ public sealed partial class StackRepository : IDisposable
         if( git != null )
         {
             var stackRoot = gitPath.RemoveLastPart();
-            var url = git.RepositoryKey.OriginUrl;
-            if( CheckOriginUrlStackSuffix( monitor, ref url, out var stackNameFromUrl ) )
+            if( CheckOriginUrlStackSuffix( monitor, git.RepositoryKey, out var stackNameFromUrl ) )
             {
                 if( stackRoot.LastPart.Equals( stackNameFromUrl, StringComparison.OrdinalIgnoreCase ) )
                 {
@@ -524,7 +523,7 @@ public sealed partial class StackRepository : IDisposable
     /// in <see cref="CKliEnv.CurrentDirectory"/>). This context is immutable. To open the newly cloned stack, a new CKLiEnv must be
     /// obtained (for instance by calling <see cref="CKliEnv.ChangeDirectory(NormalizedPath)"/>).
     /// </param>
-    /// <param name="url">The url of the remote.</param>
+    /// <param name="url">The url of the remote. <see cref="GitRepositoryKey.ThrowArgumentExceptionOnInvalidUrl(Uri?, string)"/> is called.</param>
     /// <param name="isPublic">Whether this repository is public.</param>
     /// <param name="allowDuplicateStack">
     /// True to create a "DuplicateOf-XX" stack folder if the stack is already available on this machine.
@@ -549,7 +548,6 @@ public sealed partial class StackRepository : IDisposable
         Throw.CheckNotNullArgument( monitor );
         Throw.CheckNotNullArgument( context );
         Throw.CheckArgument( context.CurrentStackPath.IsEmptyPath );
-        Throw.CheckNotNullArgument( url );
         Throw.CheckNotNullArgument( stackBranchName );
         var parentPath = context.CurrentDirectory;
         if( !parentPath.IsRooted
@@ -559,11 +557,13 @@ public sealed partial class StackRepository : IDisposable
         {
             monitor.Error( $"Invalid path '{parentPath}': it must be rooted and not end with {PublicStackName} or {PrivateStackName}." );
         }
-        if( !CheckOriginUrlStackSuffix( monitor, ref url!, out var stackNameFromUrl ) )
+
+        // This calls GitRepositoryKey.ThrowArgumentExceptionOnInvalidUrl( url );
+        var stackGitKey = new GitRepositoryKey( context.SecretsStore, url, isPublic );
+        if( !CheckOriginUrlStackSuffix( monitor, stackGitKey, out var stackNameFromUrl ) )
         {
             return null;
         }
-
         // Default folder name is the stackNameFromUrl.
         var stackFolderName = stackNameFromUrl;
         var already = Registry.CheckExistingStack( monitor, url );
@@ -607,7 +607,6 @@ public sealed partial class StackRepository : IDisposable
 
         NormalizedPath gitPath = stackRoot.AppendPart( isPublic ? PublicStackName : PrivateStackName );
 
-        var stackGitKey = new GitRepositoryKey( context.SecretsStore, url, isPublic );
         var git = GitRepository.Clone( monitor,
                                        stackGitKey,
                                        context.Committer,
@@ -997,19 +996,16 @@ public sealed partial class StackRepository : IDisposable
     }
 
     static bool CheckOriginUrlStackSuffix( IActivityMonitor monitor,
-                                           [NotNullWhen( true )] ref Uri? stackUrl,
+                                           GitRepositoryKey repoKey,
                                            [NotNullWhen( true )] out string? stackNameFromUrl )
     {
-        stackNameFromUrl = null;
-        stackUrl = GitRepositoryKey.CheckAndNormalizeRepositoryUrl( monitor, stackUrl, out stackNameFromUrl );
-        if( stackUrl == null ) return false;
-        Throw.DebugAssert( stackNameFromUrl != null );
-        if( stackNameFromUrl.EndsWith( "-Stack", StringComparison.OrdinalIgnoreCase ) && stackNameFromUrl.Length >= 8 )
+        if( repoKey.IsStackRepository )
         {
-            stackNameFromUrl = stackNameFromUrl.Substring( 0, stackNameFromUrl.Length - 6 );
+            stackNameFromUrl = repoKey.RepositoryName[..^6];
             return true;
         }
-        monitor.Error( $"The repository Url '{stackUrl}' must have '-Stack' suffix (and the stack name must be at least 2 characters)." );
+        stackNameFromUrl = null;
+        monitor.Error( $"The repository Url '{repoKey.OriginUrl}' must have '-Stack' suffix (and the stack name must be at least 2 characters)." );
         return false;
     }
 }

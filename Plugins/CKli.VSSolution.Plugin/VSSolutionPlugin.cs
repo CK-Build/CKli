@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using LibGit2Sharp;
 using Microsoft.VisualStudio.SolutionPersistence.Model;
 using Microsoft.VisualStudio.SolutionPersistence.Serializer;
 using System;
@@ -43,6 +44,69 @@ public sealed partial class VSSolutionPlugin : PrimaryRepoPlugin<VSSolutionInfo>
         }
     }
 
+    static Stream? OpenBlob( IActivityMonitor monitor, Commit commit, string path )
+    {
+        var entry = commit[path];
+        if( entry != null )
+        {
+            if( entry.Target.IsMissing )
+            {
+                monitor.Warn( $"Entry '{path}' in commit '{commit.Sha}' is missing." );
+                return null;
+            }
+            if( entry.Target is not Blob b )
+            {
+                monitor.Warn( $"Entry '{path}' in commit '{commit.Sha}' is not a Blob but a '{entry.TargetType}'." );
+                return null;
+            }
+            return b.GetContentStream();
+        }
+        return null;
+    }
+
+    public VSSolutionInfo GetVSSolutionInfo( IActivityMonitor monitor, Repo repo, Commit commit )
+    {
+        Throw.CheckArgument( ((IBelongToARepository)commit).Repository == repo.GitRepository.Repository );
+        var solution = ReadSlnOrSlnxFile( monitor, commit, repo.WorkingFolder.LastPart, out var slnPath );
+        if( solution == null )
+        {
+
+        }
+        // No luck.
+        var candidates = commit.Tree.Where( e => e.TargetType == TreeEntryTargetType.Blob
+                                                    && (e.Name.EndsWith( ".sln", StringComparison.OrdinalIgnoreCase )
+                                                        || e.Name.EndsWith( ".slnx", StringComparison.OrdinalIgnoreCase )) )
+                                    .Select( e => e.Name )
+                                    .ToList();
+        monitor.Warn( $"Unable to read solution from commit '{commit.Sha}' of '{repo.DisplayPath}'." );
+        return new VSSolutionInfo( repo, candidates );
+
+        static SolutionModel? ReadSlnOrSlnxFile( IActivityMonitor monitor, Commit commit, string name, out string slnPath )
+        {
+            Stream? stream = null;
+            try
+            {
+                slnPath = name + ".sln";
+                stream = OpenBlob( monitor, commit, slnPath );
+                if( stream != null )
+                {
+                    return SolutionSerializers.SlnFileV12.OpenAsync( stream, default ).Result;
+                }
+                slnPath += 'x';
+                stream = OpenBlob( monitor, commit, slnPath );
+                if( stream != null )
+                {
+                    return SolutionSerializers.SlnXml.OpenAsync( stream, default ).Result;
+                }
+                return null;
+            }
+            finally
+            {
+                stream?.Dispose();
+            }
+        }
+    }
+
     /// <inheritdoc />
     protected override VSSolutionInfo Create( IActivityMonitor monitor, Repo repo )
     {
@@ -64,8 +128,7 @@ public sealed partial class VSSolutionPlugin : PrimaryRepoPlugin<VSSolutionInfo>
     static string? GetValidProjectName( NormalizedPath filePath, SolutionProjectModel p, ref List<SolutionProjectModel>? ignoredProjects )
     {
         Throw.DebugAssert( ".csproj".Length == 7 );
-        if( !filePath.LastPart.EndsWith( ".csproj" )
-            || filePath.LastPart[..^7].Equals( "CodeCakeBuilder", StringComparison.OrdinalIgnoreCase ) )
+        if( !filePath.LastPart.EndsWith( ".csproj" ) )
         {
             ignoredProjects ??= new List<SolutionProjectModel>();
             ignoredProjects.Add( p );

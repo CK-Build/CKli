@@ -55,7 +55,7 @@ internal sealed class GitHubClient : IDisposable
     /// <summary>
     /// Gets repository information.
     /// </summary>
-    public async Task<GitHostingOperationResult<RepositoryInfo>> GetRepositoryAsync(
+    public async Task<GitHostingOperationResult<HostedRepositoryInfo>> GetRepositoryAsync(
         IActivityMonitor monitor,
         string owner,
         string repoName,
@@ -64,13 +64,13 @@ internal sealed class GitHubClient : IDisposable
         try
         {
             var response = await _httpClient.GetAsync( $"repos/{owner}/{repoName}", ct );
-            var result = await HandleResponseAsync<RepositoryInfo>( monitor, response, MapToRepositoryInfo, ct );
+            var result = await HandleResponseAsync<HostedRepositoryInfo>( monitor, response, MapToRepositoryInfo, ct );
 
             if( result.Success && result.Data != null )
             {
                 // Check if repo is empty by checking if any refs exist
                 var isEmpty = await CheckIsEmptyAsync( owner, repoName, ct );
-                return GitHostingOperationResult<RepositoryInfo>.Ok( result.Data with { IsEmpty = isEmpty } );
+                return GitHostingOperationResult<HostedRepositoryInfo>.Ok( result.Data with { IsEmpty = isEmpty } );
             }
 
             return result;
@@ -78,7 +78,7 @@ internal sealed class GitHubClient : IDisposable
         catch( Exception ex )
         {
             monitor.Error( $"Failed to get repository {owner}/{repoName}", ex );
-            return GitHostingOperationResult<RepositoryInfo>.Fail( ex.Message );
+            return GitHostingOperationResult<HostedRepositoryInfo>.Fail( ex.Message );
         }
     }
 
@@ -107,9 +107,9 @@ internal sealed class GitHubClient : IDisposable
     /// <summary>
     /// Creates a new repository.
     /// </summary>
-    public async Task<GitHostingOperationResult<RepositoryInfo>> CreateRepositoryAsync(
+    public async Task<GitHostingOperationResult<HostedRepositoryInfo>> CreateRepositoryAsync(
         IActivityMonitor monitor,
-        RepositoryCreateOptions options,
+        HostedRepositoryCreateOptions options,
         CancellationToken ct = default )
     {
         try
@@ -140,12 +140,12 @@ internal sealed class GitHubClient : IDisposable
                 response = await _httpClient.PostAsJsonAsync( url, request, s_jsonOptions, ct );
             }
 
-            return await HandleResponseAsync<RepositoryInfo>( monitor, response, MapToRepositoryInfo, ct );
+            return await HandleResponseAsync<HostedRepositoryInfo>( monitor, response, MapToRepositoryInfo, ct );
         }
         catch( Exception ex )
         {
             monitor.Error( $"Failed to create repository {options.Owner}/{options.Name}", ex );
-            return GitHostingOperationResult<RepositoryInfo>.Fail( ex.Message );
+            return GitHostingOperationResult<HostedRepositoryInfo>.Fail( ex.Message );
         }
     }
 
@@ -250,18 +250,16 @@ internal sealed class GitHubClient : IDisposable
         }
     }
 
-    static RepositoryInfo MapToRepositoryInfo( GitHubRepository repo )
+    static HostedRepositoryInfo MapToRepositoryInfo( GitHubRepository repo )
     {
-        return new RepositoryInfo
+        return new HostedRepositoryInfo
         {
-            Owner = repo.Owner?.Login ?? repo.FullName.Split( '/' )[0],
-            Name = repo.Name,
+            RepoPath = repo.FullName,
             Description = repo.Description,
             IsPrivate = repo.Private,
             IsArchived = repo.Archived,
             DefaultBranch = repo.DefaultBranch,
-            CloneUrlHttps = repo.CloneUrl,
-            CloneUrlSsh = repo.SshUrl,
+            CloneUrl = repo.CloneUrl,
             WebUrl = repo.HtmlUrl,
             CreatedAt = repo.CreatedAt,
             UpdatedAt = repo.UpdatedAt

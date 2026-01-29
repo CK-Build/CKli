@@ -42,7 +42,7 @@ sealed class CKliMaintenanceHostingDelete : Command
             return false;
         }
 
-        var provider = await ProviderDetector.ResolveProviderAsync( monitor, context.SecretsStore, url );
+        var provider = await GitHostingProviderDetector.ResolveProviderAsync( monitor, context.SecretsStore, url );
         if( provider == null )
         {
             return false;
@@ -57,7 +57,7 @@ sealed class CKliMaintenanceHostingDelete : Command
                 return false;
             }
 
-            monitor.Warn( $"Deleting repository {parsed.Value.Owner}/{parsed.Value.RepoName} on {provider.InstanceId}..." );
+            monitor.Warn( $"Deleting repository {parsed.Value.Owner}/{parsed.Value.RepoName} on {provider.HostName}..." );
 
             var result = await provider.DeleteRepositoryAsync( monitor, parsed.Value.Owner, parsed.Value.RepoName );
             if( !result.Success )

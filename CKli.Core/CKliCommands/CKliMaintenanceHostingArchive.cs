@@ -29,7 +29,7 @@ sealed class CKliMaintenanceHostingArchive : Command
             return false;
         }
 
-        var provider = await ProviderDetector.ResolveProviderAsync( monitor, context.SecretsStore, url );
+        var provider = await GitHostingProviderDetector.ResolveProviderAsync( monitor, context.SecretsStore, url );
         if( provider == null )
         {
             return false;
@@ -44,7 +44,7 @@ sealed class CKliMaintenanceHostingArchive : Command
                 return false;
             }
 
-            monitor.Info( $"Archiving repository {parsed.Value.Owner}/{parsed.Value.RepoName} on {provider.InstanceId}..." );
+            monitor.Info( $"Archiving repository {parsed.Value.Owner}/{parsed.Value.RepoName} on {provider.HostName}..." );
 
             var result = await provider.ArchiveRepositoryAsync( monitor, parsed.Value.Owner, parsed.Value.RepoName );
             if( !result.Success )
