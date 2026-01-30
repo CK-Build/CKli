@@ -1,12 +1,8 @@
 using System;
 using System.IO;
-using System.Linq;
-using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CK.Core;
-using CKli.Core.GitHosting;
-using CKli.Core.GitHosting.Providers;
 using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;

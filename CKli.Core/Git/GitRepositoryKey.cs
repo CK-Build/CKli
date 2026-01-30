@@ -1,17 +1,14 @@
 using CK.Core;
-using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Text.RegularExpressions;
 
 namespace CKli.Core;
 
 /// <summary>
-/// Encapsulates <see cref="KnownGitProvider"/> lookup from a repository url and
-/// <see cref="ReadPATKeyName"/> and <see cref="WritePATKeyName"/> formatting.
+/// Centralizes url manipulation and provides a <see cref="IGitRepositoryAccessKey"/>.
 /// </summary>
-public partial class GitRepositoryKey : IGitRepositoryAccessKey
+public partial class GitRepositoryKey
 {
     sealed class UriComparer : IEqualityComparer<Uri>
     {
@@ -30,18 +27,8 @@ public partial class GitRepositoryKey : IGitRepositoryAccessKey
     /// </summary>
     public static readonly IEqualityComparer<Uri> OrdinalIgnoreCaseUrlEqualityComparer = new UriComparer();
 
-    readonly Uri _originUrl;
-    readonly ISecretsStore _secretsStore;
-    readonly KnownCloudGitProvider _knownGitProvider;
-    readonly bool _isPublic;
-
+    readonly OriginalKey _accessKey;
     string? _repoName;
-    string? _prefixPAT;
-    string? _readPATKeyName;
-    UsernamePasswordCredentials? _readCreds;
-    string? _writePATKeyName;
-    UsernamePasswordCredentials? _writeCreds;
-    IGitRepositoryAccessKey? _revertedAccessKey;
 
     /// <summary>
     /// Initializes a new <see cref="GitRepositoryKey"/>.
@@ -60,15 +47,14 @@ public partial class GitRepositoryKey : IGitRepositoryAccessKey
 
     GitRepositoryKey( Uri url, bool isPublic, ISecretsStore secretsStore )
     {
-        _originUrl = url;
-        _secretsStore = secretsStore;
-        _isPublic = isPublic;
-
-        if( url.Scheme == Uri.UriSchemeFile ) _knownGitProvider = KnownCloudGitProvider.FileSystem;
-        else if( url.Authority.Equals( "github.com", StringComparison.Ordinal ) ) _knownGitProvider = KnownCloudGitProvider.GitHub;
-        else if( url.Authority.Equals( "gitlab.com", StringComparison.Ordinal ) ) _knownGitProvider = KnownCloudGitProvider.GitLab;
-        else if( url.Authority.Equals( "dev.azure.com", StringComparison.Ordinal ) ) _knownGitProvider = KnownCloudGitProvider.AzureDevOps;
-        else if( url.Authority.Equals( "bitbucket.org", StringComparison.Ordinal ) ) _knownGitProvider = KnownCloudGitProvider.Bitbucket;
+        KnownCloudGitProvider p;
+        if( url.Scheme == Uri.UriSchemeFile ) p = KnownCloudGitProvider.FileSystem;
+        else if( url.Authority.Equals( "github.com", StringComparison.Ordinal ) ) p = KnownCloudGitProvider.GitHub;
+        else if( url.Authority.Equals( "gitlab.com", StringComparison.Ordinal ) ) p = KnownCloudGitProvider.GitLab;
+        else if( url.Authority.Equals( "dev.azure.com", StringComparison.Ordinal ) ) p = KnownCloudGitProvider.AzureDevOps;
+        else if( url.Authority.Equals( "bitbucket.org", StringComparison.Ordinal ) ) p = KnownCloudGitProvider.Bitbucket;
+        else p = KnownCloudGitProvider.Unknown;
+        _accessKey = new OriginalKey( url, secretsStore, p, isPublic );
     }
 
     /// <summary>
@@ -93,7 +79,7 @@ public partial class GitRepositoryKey : IGitRepositoryAccessKey
     /// <summary>
     /// Gets whether the Git repository is public.
     /// </summary>
-    public bool IsPublic => _isPublic;
+    public bool IsPublic => _accessKey.IsPublic;
 
     /// <summary>
     /// Gets the remote origin url.
@@ -101,13 +87,18 @@ public partial class GitRepositoryKey : IGitRepositoryAccessKey
     /// See <see cref="GetRepositoryUrlError(Uri)"/> for invariants.
     /// </para>
     /// </summary>
-    public Uri OriginUrl => _originUrl;
+    public Uri OriginUrl => _accessKey._originUrl;
+
+    /// <summary>
+    /// Gets the access key for this repository.
+    /// </summary>
+    public IGitRepositoryAccessKey AccessKey => _accessKey; 
 
     /// <summary>
     /// Gets the valid repository name.
     /// </summary>
     [MemberNotNull( nameof( _repoName ) )]
-    public string RepositoryName => _repoName ??= new string( System.IO.Path.GetFileName( _originUrl.ToString().AsSpan() ) );
+    public string RepositoryName => _repoName ??= new string( System.IO.Path.GetFileName( _accessKey._originUrl.ToString().AsSpan() ) );
 
     /// <summary>
     /// Gets whether this <see cref="RepositoryName"/> ends with "-Stack" (case insensitive) and the prefix, the stack name,
@@ -116,156 +107,11 @@ public partial class GitRepositoryKey : IGitRepositoryAccessKey
     public bool IsStackRepository => RepositoryName.EndsWith( "-Stack", StringComparison.OrdinalIgnoreCase ) && _repoName.Length >= 8;
 
     /// <inheritdoc />
-    public KnownCloudGitProvider KnownGitProvider => _knownGitProvider;
-
-    /// <inheritdoc />
-    public bool GetReadCredentials( IActivityMonitor monitor, out UsernamePasswordCredentials? creds )
-    {
-        return DoReadCredentials( monitor, _isPublic, out creds );
-    }
-
-    bool DoReadCredentials( IActivityMonitor monitor, bool isPublic, out UsernamePasswordCredentials? creds )
-    {
-        if( isPublic )
-        {
-            creds = null;
-            return true;
-        }
-        if( _readCreds == null )
-        {
-            var pat = _secretsStore.TryGetRequiredSecret( monitor, WritePATKeyName, ReadPATKeyName );
-            _readCreds = pat != null
-                            ? new UsernamePasswordCredentials() { Username = "CKli", Password = pat }
-                            : null;
-        }
-        creds = _readCreds;
-        return creds != null;
-    }
-
-    /// <inheritdoc />
-    public bool GetWriteCredentials( IActivityMonitor monitor, [NotNullWhen( true )] out UsernamePasswordCredentials? creds )
-    {
-        if( _writeCreds == null )
-        {
-            var pat = _secretsStore.TryGetRequiredSecret( monitor, WritePATKeyName );
-            _writeCreds = pat != null
-                            ? new UsernamePasswordCredentials() { Username = "CKli", Password = pat }
-                            : null;
-        }
-        creds = _writeCreds;
-        return creds != null;
-    }
-
-    /// <inheritdoc />
-    public string ReadPATKeyName => _readPATKeyName ??= PrefixPAT + "_READ_PAT";
-
-    /// <inheritdoc />
-    public string WritePATKeyName => _writePATKeyName ??= PrefixPAT + "_WRITE_PAT";
-
-    /// <inheritdoc />
-    public IGitRepositoryAccessKey ToPublicAccessKey() => _isPublic ? this : GetRevertedAccessKey();
-
-    /// <inheritdoc />
-    public IGitRepositoryAccessKey ToPrivateAccessKey() => _isPublic ? GetRevertedAccessKey() : this;
-
-    IGitRepositoryAccessKey GetRevertedAccessKey() => _revertedAccessKey ??= new RevertedKey( this );
-
-    /// <summary>
-    /// Common PAT prefix built from <see cref="KnownGitProvider"/> and <see cref="OriginUrl"/>.
-    /// </summary>
-    public string PrefixPAT
-    {
-        get
-        {
-            if( _prefixPAT == null )
-            {
-                Throw.DebugAssert( "Absolute https:// or file:// without query part.",
-                                      (_originUrl.Scheme.Equals( "https", StringComparison.Ordinal )
-                                        || _originUrl.Scheme.Equals( "file", StringComparison.Ordinal ))
-                                      && _originUrl.IsAbsoluteUri
-                                      && _originUrl.Query.Length == 0 );
-
-                switch( KnownGitProvider )
-                {
-                    case KnownCloudGitProvider.Unknown:
-                        string prefix = _originUrl.GetComponents( UriComponents.Host | UriComponents.Port | UriComponents.KeepDelimiter,
-                                                                  UriFormat.Unescaped );
-                        prefix = Secure( prefix );
-                        if( prefix.Length == 0 )
-                        {
-                            Throw.CKException( $"Unable to derive a PAT prefix from url '{_originUrl}'." );
-                        }
-                        _prefixPAT = ConcatFirstPathPart( prefix, _originUrl );
-                        break;
-                    case KnownCloudGitProvider.AzureDevOps:
-                        {
-                            _prefixPAT = ConcatFirstPathPart( "AZUREDEVOPS_", OriginUrl );
-                            break;
-                        }
-                    case KnownCloudGitProvider.GitHub:
-                        {
-                            _prefixPAT = ConcatFirstPathPart( "GITHUB_", OriginUrl );
-                            break;
-                        }
-                    case KnownCloudGitProvider.GitLab:
-                        {
-                            _prefixPAT = ConcatFirstPathPart( "GITLAB_", OriginUrl );
-                            break;
-                        }
-                    case KnownCloudGitProvider.Bitbucket:
-                        {
-                            _prefixPAT = ConcatFirstPathPart( "BITBUCKET_", OriginUrl );
-                            break;
-                        }
-                    case KnownCloudGitProvider.FileSystem:
-                        {
-                            _prefixPAT = FileSystemPrefixPAT;
-                            break;
-                        }
-                    default:
-                        Throw.NotSupportedException();
-                        break;
-                }
-            }
-            return _prefixPAT;
-
-            static string Secure( string s )
-            {
-                Throw.DebugAssert( "Already in upper case.", s.ToUpperInvariant() == s );
-                BadPATChars().Replace( s, "_" );
-                return s;
-            }
-
-            static string ConcatFirstPathPart( string prefix, Uri originUrl )
-            {
-                Throw.DebugAssert( "Already in upper case.", prefix.ToUpperInvariant() == prefix );
-                var part = GetFirstPathPart( originUrl );
-                return part.Length > 0
-                        ? part[0] != '_' && prefix[^1] != '_'
-                                        ? prefix + '_' + part
-                                        : prefix + part
-                        : prefix;
-            }
-
-            static string GetFirstPathPart( Uri originUrl )
-            {
-                var m = FirstPathPart().Match( originUrl.AbsolutePath );
-                return m.Success ? Secure( m.Groups[1].Value.ToUpperInvariant() ) : "";
-            }
-        }
-    }
-
-    [GeneratedRegex( "[^A-Z_0-9]" )]
-    private static partial Regex BadPATChars();
-
-    [GeneratedRegex( @"^/*([^\/]*)", RegexOptions.CultureInvariant )]
-    private static partial Regex FirstPathPart();
-
     /// <summary>
     /// Overridden to return the OriginUrl. 
     /// </summary>
     /// <returns>A readable string.</returns>
-    public override string ToString() => _originUrl.ToString();
+    public override string ToString() => _accessKey._originUrl.ToString();
 
     /// <summary>
     /// Validates a Url that can be used for a GitRepositoryKey.

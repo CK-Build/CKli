@@ -197,6 +197,7 @@ public sealed partial class World
         {
             _plugins.Commands.Clear();
             _plugins.DisposeDisposablePlugins();
+            GitHostingProvider.ReleaseAllPluginProviders()
             _plugins = null;
         }
         _pluginMachinery?.ReleasePluginFactory();

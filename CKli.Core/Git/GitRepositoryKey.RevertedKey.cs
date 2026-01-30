@@ -8,9 +8,10 @@ public partial class GitRepositoryKey
 {
     sealed class RevertedKey : IGitRepositoryAccessKey
     {
-        readonly GitRepositoryKey _origin;
+        readonly OriginalKey _origin;
+        string? _toString;
 
-        public RevertedKey( GitRepositoryKey origin ) => _origin = origin;
+        public RevertedKey( OriginalKey origin ) => _origin = origin;
 
         public bool IsPublic => !_origin.IsPublic;
 
@@ -35,5 +36,7 @@ public partial class GitRepositoryKey
         public IGitRepositoryAccessKey ToPrivateAccessKey() => _origin.IsPublic ? this : _origin;
 
         public IGitRepositoryAccessKey ToPublicAccessKey() => _origin.IsPublic ? _origin : this;
+
+        public override string ToString() => _toString ??= $"{PrefixPAT} ({(_origin.IsPublic ? "private" : "public")})";
     }
 }

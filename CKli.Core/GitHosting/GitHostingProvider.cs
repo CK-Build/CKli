@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core.GitHosting.Providers;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,7 +10,12 @@ namespace CKli.Core;
 
 /// <summary>
 /// Provides Git hosting API operations.
+/// <para>
+/// File system (with LibGit2Sharp), GitHub, GitLab and Gitea support is available
+/// by design but plugins can bring support for other hosts.
+/// </para>
 /// </summary>
+[DebuggerDisplay( "{ToString(),nq}" )]
 public abstract partial class GitHostingProvider
 {
     readonly string _baseUrl;
@@ -20,9 +26,9 @@ public abstract partial class GitHostingProvider
     // Instantiated by factory methods.
     static Dictionary<(string,bool), GitHostingProvider?>? _providers;
 
-    protected GitHostingProvider( string baseUrl,
-                                  KnownCloudGitProvider cloudGitProvider,
-                                  IGitRepositoryAccessKey gitKey )
+    private protected GitHostingProvider( string baseUrl,
+                                          KnownCloudGitProvider cloudGitProvider,
+                                          IGitRepositoryAccessKey gitKey )
     {
         _baseUrl = baseUrl;
         _cloudGitProvider = cloudGitProvider;
@@ -59,13 +65,13 @@ public abstract partial class GitHostingProvider
     public string BaseUrl => _baseUrl;
 
     /// <summary>
-    /// Gets the <see cref="IGitRepositoryAccessKey"/> to use.
+    /// Gets the <see cref="IGitRepositoryAccessKey"/> used by this provider.
     /// </summary>
-    protected IGitRepositoryAccessKey GitKey => _gitKey;
+    public IGitRepositoryAccessKey GitKey => _gitKey;
 
     /// <summary>
     /// Gets whether this provider is able to archive a repository.
-    /// Not all providers have this capability (<see cref="GitHostingType.FileSystem"/> doesn't).
+    /// Not all providers have this capability (<see cref="KnownCloudGitProvider.FileSystem"/> doesn't).
     /// </summary>
     public abstract bool CanArchiveRepository { get; }
 
@@ -114,4 +120,11 @@ public abstract partial class GitHostingProvider
     public abstract Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                         NormalizedPath repoPath,
                                                                         CancellationToken ct = default );
+
+    /// <summary>
+    /// Returns this <see cref="ProviderType"/> and its <see cref="GitKey"/>.
+    /// </summary>
+    /// <returns>This provider readable name.</returns>
+    public sealed override string ToString() => $"{ProviderType} - {GitKey}";
+
 }

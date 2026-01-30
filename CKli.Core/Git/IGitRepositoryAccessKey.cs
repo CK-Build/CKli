@@ -6,7 +6,8 @@ namespace CKli.Core;
 
 /// <summary>
 /// Captures access PAT names associated to a repository or a set of repositories: this
-/// is potentially independent of a specific repository.
+/// is potentially independent of a specific repository. This is the key that identifies a <see cref="GitHostingProvider"/>:
+/// the <see cref="ToString()"/> is used as the key.
 /// <para>
 /// When <see cref="IsPublic"/> is true, the <see cref="GetReadCredentials(IActivityMonitor, out UsernamePasswordCredentials?)"/>
 /// always succeeds and outputs a null credentials.
@@ -79,4 +80,11 @@ public interface IGitRepositoryAccessKey
     /// </summary>
     /// <returns>The associated public access key.</returns>
     IGitRepositoryAccessKey ToPrivateAccessKey();
+
+    /// <summary>
+    /// Returns "<see cref="PrefixPAT"/>(<see cref="IsPublic"/>)" information.
+    /// This is used as a key to identify a <see cref="GitHostingProvider"/>.
+    /// </summary>
+    /// <returns>The PAT prefix and whether this key is public.</returns>
+    string ToString();
 }
