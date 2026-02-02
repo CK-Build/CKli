@@ -1,9 +1,18 @@
+using CK.Core;
+using CKli.Core.GitHosting.Models.GitHub;
+using LibGit2Sharp;
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Security.AccessControl;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using CK.Core;
-using LibGit2Sharp;
+using static CK.Core.CheckedWriteStream;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace CKli.Core.GitHosting.Providers;
 
@@ -14,12 +23,17 @@ namespace CKli.Core.GitHosting.Providers;
 /// </summary>
 sealed partial class GitHubProvider : HttpGitHostingProvider
 {
+    GitHubProvider( string baseUrl, IGitRepositoryAccessKey gitKey, Uri baseApiUrl )
+        : base( baseUrl, gitKey, baseApiUrl, alwaysUseAuthentication: true )
+    {
+    }
+
     /// <summary>
     /// Constructor for the cloud https://github.com.
     /// </summary>
     /// <param name="gitKey">The git key to use.</param>
     public GitHubProvider( IGitRepositoryAccessKey gitKey )
-        : base( "https://github.com", KnownCloudGitProvider.GitHub, gitKey, new Uri( "https://api.github.com/" ) )
+        : this( "https://github.com", gitKey, new Uri( "https://api.github.com/" ) )
     {
     }
 
@@ -33,83 +47,143 @@ sealed partial class GitHubProvider : HttpGitHostingProvider
     /// but this may change.
     /// </param>
     public GitHubProvider( string baseUrl, IGitRepositoryAccessKey gitKey, string authority )
-        : base( baseUrl, KnownCloudGitProvider.Unknown, gitKey, new Uri( $"https://{authority}/api/v3/" ) )
+        : this( baseUrl, gitKey, new Uri( $"https://{authority}/api/v3/" ) )
     {
     }
 
-    public override bool CanArchiveRepository => true;
-
-    public override async Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor, NormalizedPath repoPath, CancellationToken ct = default )
+    protected override void DefaultConfigure( HttpClient client )
     {
-        if( !CheckRepoNameAndWriteAccess( monitor, repoPath, out var creds ) )
-        {
-            return false;
-        }
-
-        throw new NotImplementedException();
+        base.DefaultConfigure( client );
+        client.DefaultRequestHeaders.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/vnd.github+json" ) );
+        client.DefaultRequestHeaders.Add( "X-GitHub-Api-Version", "2022-11-28" );
     }
 
-
-    public override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
-                                                                             NormalizedPath repoPath,
-                                                                             HostedRepositoryCreateOptions? options = null,
-                                                                             CancellationToken ct = default )
-    {
-        if( !CheckRepoNameAndWriteAccess( monitor, repoPath, out var creds ) )
-        {
-            return null;
-        }
-
-        throw new NotImplementedException();
-    }
-
-    public override async Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
-                                                            NormalizedPath repoPath,
-                                                            CancellationToken ct = default )
-    {
-        if( !CheckRepoNameAndWriteAccess( monitor, repoPath, out var creds ) )
-        {
-            return false;
-        }
-
-        throw new NotImplementedException();
-    }
-
-    public override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
-                                                                              NormalizedPath repoPath,
-                                                                              CancellationToken ct = default )
-    {
-        if( !CheckValidRepoPath( monitor, repoPath ) )
-        {
-            return null;
-        }
-        if( !GitKey.GetReadCredentials( monitor, out var creds ) )
-        {
-            return null;
-        }
-
-        throw new NotImplementedException();
-    }
-
-    bool CheckRepoNameAndWriteAccess( IActivityMonitor monitor,
-                                      NormalizedPath repoPath,
-                                      [NotNullWhen(true)]out UsernamePasswordCredentials? creds )
-    {
-        if( !CheckValidRepoPath( monitor, repoPath ) )
-        {
-            creds = null;
-            return false;
-        }
-        return GitKey.GetWriteCredentials( monitor, out creds );
-    }
-
-    static bool CheckValidRepoPath( IActivityMonitor monitor, NormalizedPath repoPath )
+    protected override NormalizedPath ValidateRepoPath( IActivityMonitor monitor, NormalizedPath repoPath )
     {
         if( repoPath.Parts.Count != 2 )
         {
             monitor.Error( $"Invalid GitHub repository path '{repoPath}'. Must be '<owner>/<name>'." );
-            return false;
+            return default;
         }
-        return true;
+        return repoPath;
     }
+
+    protected override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
+                                                                                 HttpClient client,
+                                                                                 RetryHelper retryHelper,
+                                                                                 NormalizedPath repoPath,
+                                                                                 CancellationToken ct = default )
+    {
+        using var response = await client.GetAsync( $"repos/{repoPath}", ct ).ConfigureAwait( false );
+        return await ReadHostedRepositoryInfoAsync( monitor, response, ct ).ConfigureAwait( false );
+    }
+
+    protected override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
+                                                                                HttpClient client,
+                                                                                RetryHelper retryHelper,
+                                                                                NormalizedPath repoPath,
+                                                                                HostedRepositoryCreateOptions? options = null,
+                                                                                CancellationToken ct = default )
+    {
+        var request = new GitHubCreateRepoRequest
+        {
+            Name = repoPath.LastPart,
+            Description = options?.Description,
+            Private = options?.IsPrivate ?? !IsDefaultPublic,
+            AutoInit = options?.AutoInit ?? false,
+            GitignoreTemplate = options?.GitIgnoreTemplate,
+            LicenseTemplate = options?.LicenseTemplate
+        };
+
+        // Determine if we're creating in an org or for the authenticated user
+        // If owner matches authenticated user, use user/repos
+        // Otherwise, use /orgs/{org}/repos
+        var url = $"orgs/{repoPath.FirstPart}/repos";
+
+        var response = await client.PostAsJsonAsync( url, request, ct );
+
+        // If 404 on org endpoint, the owner might be a user - try user repos endpoint.
+        if( response.StatusCode == System.Net.HttpStatusCode.NotFound )
+        {
+            // For user repos, we use user/repos endpoint
+            // This requires the owner to be the authenticated user
+            url = "user/repos";
+            response = await client.PostAsJsonAsync( url, request, ct );
+        }
+        return await ReadHostedRepositoryInfoAsync( monitor, response, ct ).ConfigureAwait( false );
+    }
+
+    public override bool CanArchiveRepository => true;
+
+    protected override async Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
+                                                                HttpClient client,
+                                                                RetryHelper retryHelper,
+                                                                NormalizedPath repoPath,
+                                                                CancellationToken ct = default )
+    {
+        throw new NotImplementedException();
+    }
+
+    protected override async Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
+                                                               HttpClient client,
+                                                               RetryHelper retryHelper,
+                                                               NormalizedPath repoPath,
+                                                               CancellationToken ct = default )
+    {
+        throw new NotImplementedException();
+    }
+
+    static async Task<HostedRepositoryInfo?> ReadHostedRepositoryInfoAsync( IActivityMonitor monitor, HttpResponseMessage response, CancellationToken ct )
+    {
+        Throw.DebugAssert( response.IsSuccessStatusCode );
+        var r = await response.Content.ReadFromJsonAsync<GitHubRepository>( JsonSerializerOptions.Default, ct );
+        if( r == null )
+        {
+
+        }
+        return r == null
+                ? null
+                : new HostedRepositoryInfo()
+                {
+                    RepoPath = new NormalizedPath( r.FullName ),
+                    Description = r.Description,
+                    IsPrivate = r.Private,
+                    IsArchived = r.Archived,
+                    DefaultBranch = r.DefaultBranch,
+                    CloneUrl = r.CloneUrl,
+                    WebUrl = r.HtmlUrl,
+                    CreatedAt = r.CreatedAt,
+                    UpdatedAt = r.UpdatedAt
+                };
+    }
+
+    // From: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#exceeding-the-rate-limit
+    //
+    // If you exceed your primary rate limit, you will receive a 403 or 429 response, and the x-ratelimit-remaining header will be 0.
+    // You should not retry your request until after the time specified by the x-ratelimit-reset header.
+    //
+    // If you exceed a secondary rate limit, you will receive a 403 or 429 response and an error message that indicates that you
+    // exceeded a secondary rate limit.
+    // If the retry-after response header is present, you should not retry your request until after that many seconds has elapsed.
+    // If the x-ratelimit-remaining header is 0, you should not retry your request until after the time, in UTC epoch seconds, specified
+    // by the x-ratelimit-reset header.
+    //
+    // Otherwise, wait for at least one minute before retrying.
+    // If your request continues to fail due to a secondary rate limit,
+    // wait for an exponentially increasing amount of time between retries,
+    // and throw an error after a specific number of retries.
+            //if( response.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests )
+            //{
+            //    TimeSpan minFromRateLimit = TimeSpan.Zero;
+            //    TimeSpan minFromRetryHeader = TimeSpan.Zero;
+            //    if( response.Headers.TryGetValues( "x-ratelimit-remaining", out var v )
+            //        && v.FirstOrDefault() == "0"
+            //        && response.Headers.TryGetValues( "x-ratelimit-reset", out v ) )
+            //    {
+            //        if( int.TryParse( v.FirstOrDefault(), out int minSecondsToWait ) && minSecondsToWait > 0 )
+            //        {
+            //            minFromRateLimit = TimeSpan.FromSeconds( minSecondsToWait );
+            //        }
+            //    }
 }
+

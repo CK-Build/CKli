@@ -24,10 +24,9 @@ public abstract partial class GitHostingProvider // Factory methods.
                                                       CancellationToken cancellation = default )
     {
         // Fast path, non async, for KnownGitProvider.
-        _providers ??= new Dictionary<(string, bool), GitHostingProvider?>();
+        _providers ??= new Dictionary<string, GitHostingProvider?>();
         var aKey = gitKey.AccessKey;
-        var key = (aKey.PrefixPAT, aKey.IsPublic);
-        if( !_providers.TryGetValue( key, out var hosting ) )
+        if( !_providers.TryGetValue( aKey.ToString(), out var hosting ) )
         {
             if( aKey.KnownGitProvider != KnownCloudGitProvider.Unknown )
             {
@@ -43,9 +42,26 @@ public abstract partial class GitHostingProvider // Factory methods.
                 // Slow path.
                 return CreateNewAsync( monitor, gitKey, cancellation );
             }
-            _providers.Add( key, hosting );
+            hosting = ValidateCanReadAndRegisterProvider( monitor, aKey, hosting );
         }
         return Task.FromResult( hosting );
+    }
+
+    static GitHostingProvider? ValidateCanReadAndRegisterProvider( IActivityMonitor monitor,
+                                                                   IGitRepositoryAccessKey aKey,
+                                                                   GitHostingProvider? hosting )
+    {
+        Throw.DebugAssert( _providers != null );
+        if( hosting != null && !hosting.GitKey.GetReadCredentials( monitor, out _ ) )
+        {
+            if( hosting is IDisposable d )
+            {
+                d.Dispose();
+            }
+            hosting = null;
+        }
+        _providers.Add( aKey.ToString(), hosting );
+        return hosting;
     }
 
     static async Task<GitHostingProvider?> CreateNewAsync( IActivityMonitor monitor,
@@ -86,8 +102,7 @@ public abstract partial class GitHostingProvider // Factory methods.
         {
             monitor.Error( $"While resolving hosting provider for '{gitKey.OriginUrl}'.", ex );
         }
-        _providers.Add( (gitKey.AccessKey.PrefixPAT, gitKey.AccessKey.IsPublic), result );
-        return result;
+        return ValidateCanReadAndRegisterProvider( monitor, gitKey.AccessKey, result );
     }
 
 
@@ -96,16 +111,6 @@ public abstract partial class GitHostingProvider // Factory methods.
                                                         GitRepositoryKey gitKey,
                                                         string authority )
     {
-        if( _pluginResolvers != null )
-        {
-            // No catch here: if this fails, it must break everything.
-            GitHostingProvider? result = null;
-            foreach( var provider in _pluginResolvers )
-            {
-                result = provider.TryCreateFromUrlPattern( monitor, baseUrl, gitKey, authority );
-                if( result != null ) return result;
-            }
-        }
         // Check for GitHub Enterprise pattern (e.g., github.company.com)
         if( authority.Contains( "github", StringComparison.Ordinal ) )
         {

@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Text.Json.Serialization;
 
@@ -47,3 +48,4 @@ internal sealed class GitHubRepository
     [JsonPropertyName( "owner" )]
     public GitHubOwner? Owner { get; set; }
 }
+

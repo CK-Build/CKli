@@ -11,35 +11,25 @@ namespace CKli.Core;
 /// <summary>
 /// Provides Git hosting API operations.
 /// <para>
-/// File system (with LibGit2Sharp), GitHub, GitLab and Gitea support is available
-/// by design but plugins can bring support for other hosts.
+/// File system (with LibGit2Sharp), GitHub, GitLab and Gitea support is currently available.
 /// </para>
 /// </summary>
 [DebuggerDisplay( "{ToString(),nq}" )]
 public abstract partial class GitHostingProvider
 {
     readonly string _baseUrl;
-    readonly KnownCloudGitProvider _cloudGitProvider;
     readonly IGitRepositoryAccessKey _gitKey;
     string? _hostingType;
 
     // Instantiated by factory methods.
-    static Dictionary<(string,bool), GitHostingProvider?>? _providers;
+    static Dictionary<string, GitHostingProvider?>? _providers;
 
     private protected GitHostingProvider( string baseUrl,
-                                          KnownCloudGitProvider cloudGitProvider,
                                           IGitRepositoryAccessKey gitKey )
     {
         _baseUrl = baseUrl;
-        _cloudGitProvider = cloudGitProvider;
         _gitKey = gitKey;
     }
-
-    /// <summary>
-    /// Gets the cloud provider type for this instance.
-    /// Returns <see cref="KnownCloudGitProvider.Unknown"/> for self-hosted or enterprise instances.
-    /// </summary>
-    public KnownCloudGitProvider CloudProvider => _cloudGitProvider;
 
     /// <summary>
     /// Gets the type of this provider.
@@ -70,10 +60,15 @@ public abstract partial class GitHostingProvider
     public IGitRepositoryAccessKey GitKey => _gitKey;
 
     /// <summary>
-    /// Gets whether this provider is able to archive a repository.
-    /// Not all providers have this capability (<see cref="KnownCloudGitProvider.FileSystem"/> doesn't).
+    /// Gets information about a repository.
     /// </summary>
-    public abstract bool CanArchiveRepository { get; }
+    /// <param name="monitor">The activity monitor.</param>
+    /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The result containing the repository info or null on error.</returns>
+    public abstract Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
+                                                                        NormalizedPath repoPath,
+                                                                        CancellationToken ct = default );
 
     /// <summary>
     /// Creates a new repository.
@@ -87,6 +82,12 @@ public abstract partial class GitHostingProvider
                                                                        NormalizedPath repoPath,
                                                                        HostedRepositoryCreateOptions? options = null,
                                                                        CancellationToken ct = default );
+
+    /// <summary>
+    /// Gets whether this provider is able to archive a repository.
+    /// Not all providers have this capability (<see cref="KnownCloudGitProvider.FileSystem"/> doesn't).
+    /// </summary>
+    public abstract bool CanArchiveRepository { get; }
 
     /// <summary>
     /// Archives a repository.
@@ -109,17 +110,6 @@ public abstract partial class GitHostingProvider
     public abstract Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
                                                       NormalizedPath repoPath,
                                                       CancellationToken ct = default );
-
-    /// <summary>
-    /// Gets information about a repository.
-    /// </summary>
-    /// <param name="monitor">The activity monitor.</param>
-    /// <param name="repoPath">The repository path in this provider.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>The result containing the repository info or null on error.</returns>
-    public abstract Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
-                                                                        NormalizedPath repoPath,
-                                                                        CancellationToken ct = default );
 
     /// <summary>
     /// Returns this <see cref="ProviderType"/> and its <see cref="GitKey"/>.
