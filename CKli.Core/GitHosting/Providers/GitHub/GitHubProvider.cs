@@ -64,7 +64,6 @@ sealed partial class GitHubProvider : HttpGitHostingProvider
 
     protected override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                                  HttpClient client,
-                                                                                 RetryHelper retryHelper,
                                                                                  NormalizedPath repoPath,
                                                                                  CancellationToken cancellation = default )
     {
@@ -74,7 +73,6 @@ sealed partial class GitHubProvider : HttpGitHostingProvider
 
     protected override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                                 HttpClient client,
-                                                                                RetryHelper retryHelper,
                                                                                 NormalizedPath repoPath,
                                                                                 HostedRepositoryCreateOptions? options = null,
                                                                                 CancellationToken cancellation = default )
@@ -93,13 +91,11 @@ sealed partial class GitHubProvider : HttpGitHostingProvider
         // If owner matches authenticated user, use user/repos
         // Otherwise, use /orgs/{org}/repos
         var url = $"orgs/{repoPath.FirstPart}/repos";
-        retryHelper.AdditionalSuccessStatus.Add( 404 );
         var response = await client.PostAsJsonAsync( url, request, cancellation );
 
         // If 404 on org endpoint, the owner might be a user - try user repos endpoint.
         if( response.StatusCode == System.Net.HttpStatusCode.NotFound )
         {
-            retryHelper.AdditionalSuccessStatus.Remove( 404 );
             // For user repos, we use user/repos endpoint
             // This requires the owner to be the authenticated user
             url = "user/repos";
@@ -112,7 +108,6 @@ sealed partial class GitHubProvider : HttpGitHostingProvider
 
     protected override async Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
                                                                 HttpClient client,
-                                                                RetryHelper retryHelper,
                                                                 NormalizedPath repoPath,
                                                                 CancellationToken cancellation )
     {
@@ -123,7 +118,6 @@ sealed partial class GitHubProvider : HttpGitHostingProvider
 
     protected override async Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
                                                                HttpClient client,
-                                                               RetryHelper retryHelper,
                                                                NormalizedPath repoPath,
                                                                CancellationToken cancellation = default )
     {

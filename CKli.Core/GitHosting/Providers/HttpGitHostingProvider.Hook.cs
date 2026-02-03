@@ -14,7 +14,6 @@ public abstract partial class HttpGitHostingProvider
     {
         readonly HttpGitHostingProvider _provider;
         readonly IActivityMonitor _monitor;
-        readonly RetryHelper _retryHelper;
         readonly CancellationToken _userCancellation;
         // Required to handle the Timeout detection.
         internal HttpClient? _httpClient;
@@ -22,13 +21,11 @@ public abstract partial class HttpGitHostingProvider
 
         internal Hook( HttpGitHostingProvider provider,
                        IActivityMonitor monitor,
-                       RetryHelper retryHelper,
                        CancellationToken userCancellation )
             : base( provider._handler )
         {
             _provider = provider;
             _monitor = monitor;
-            _retryHelper = retryHelper;
             _userCancellation = userCancellation;
         }
 
@@ -40,7 +37,7 @@ public abstract partial class HttpGitHostingProvider
         protected override Task<HttpResponseMessage> SendAsync( HttpRequestMessage request, CancellationToken finalCancellation )
         {
             _startedTickCount = Environment.TickCount64;
-            return _provider.OnSendHookAsync( _monitor, request, BaseSendAsync, _retryHelper, finalCancellation );
+            return _provider.OnSendHookAsync( _monitor, request, BaseSendAsync, finalCancellation );
         }
 
         async Task<HttpResponseMessage> BaseSendAsync( HttpRequestMessage request, CancellationToken finalCancellation )
