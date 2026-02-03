@@ -64,11 +64,11 @@ public abstract partial class GitHostingProvider
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The result containing the repository info or null on error.</returns>
     public abstract Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                         NormalizedPath repoPath,
-                                                                        CancellationToken ct = default );
+                                                                        CancellationToken cancellation = default );
 
     /// <summary>
     /// Creates a new repository.
@@ -76,12 +76,12 @@ public abstract partial class GitHostingProvider
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
     /// <param name="options">The repository creation options.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The created repository info or null on error.</returns>
     public abstract Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                        NormalizedPath repoPath,
                                                                        HostedRepositoryCreateOptions? options = null,
-                                                                       CancellationToken ct = default );
+                                                                       CancellationToken cancellation = default );
 
     /// <summary>
     /// Gets whether this provider is able to archive a repository.
@@ -94,22 +94,22 @@ public abstract partial class GitHostingProvider
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
     public abstract Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
                                                        NormalizedPath repoPath,
-                                                       CancellationToken ct = default );
+                                                       CancellationToken cancellation = default );
 
     /// <summary>
     /// Deletes a repository.
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
     public abstract Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
                                                       NormalizedPath repoPath,
-                                                      CancellationToken ct = default );
+                                                      CancellationToken cancellation = default );
 
     /// <summary>
     /// Returns this <see cref="ProviderType"/> and its <see cref="GitKey"/>.

@@ -1,15 +1,22 @@
+using CK.Core;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace CKli.Core;
+namespace CKli.Core.GitHosting.Providers;
 
 /// <summary>
 /// Special content implementation that captures a <see cref="System.Exception"/>, intended
 /// to be used as a <see cref="HttpResponseMessage.Content"/>.
+/// <para>
+/// This is managed by the <see cref="HttpGitHostingProvider"/> (because of the internal hook and how
+/// it has to be instantiated that is better hidden). If this pattern deemed to be successful, we may
+/// attempt to generalize it.
+/// </para>
 /// <para>
 /// This intentionally breaks the <see cref="HttpContent"/> contract: this is not serializable because
 /// this lives on the receive side only.
@@ -28,14 +35,12 @@ public sealed class HttpExceptionContent : HttpContent
     public const HttpStatusCode HttpExceptionStatusCode = (HttpStatusCode)666;
 
     readonly Exception _ex;
+    readonly HttpRequestCancellationSource _cancellationSource;
 
-    /// <summary>
-    /// Initializes a new content with the exception.
-    /// </summary>
-    /// <param name="ex">The exception.</param>
-    public HttpExceptionContent( Exception ex )
+    HttpExceptionContent( Exception ex, HttpRequestCancellationSource cancellationSource )
     {
         _ex = ex;
+        _cancellationSource = cancellationSource;
     }
 
     /// <summary>
@@ -44,17 +49,18 @@ public sealed class HttpExceptionContent : HttpContent
     public Exception Exception => _ex;
 
     /// <summary>
-    /// Creates a <see cref="HttpResponseMessage"/> with a <see cref="HttpExceptionContent"/> content.
+    /// Gets whether the request has been canceled, and the cancellation source if it has been determined.
     /// </summary>
-    /// <param name="request">The originating content.</param>
-    /// <param name="ex">The exception.</param>
-    /// <returns>A response message with a exception content.</returns>
-    public static HttpResponseMessage CreateResponseMessage( HttpRequestMessage request, Exception ex )
+    public HttpRequestCancellationSource CancellationSource => _cancellationSource;
+
+    internal static HttpResponseMessage CreateResponseMessage( HttpRequestMessage request,
+                                                               Exception ex,
+                                                               HttpRequestCancellationSource cancellationSource )
     {
         HttpResponseMessage response = new HttpResponseMessage( HttpExceptionStatusCode );
         response.ReasonPhrase = ex.Message;
         response.RequestMessage = request;
-        response.Content = new HttpExceptionContent( ex );
+        response.Content = new HttpExceptionContent( ex, cancellationSource );
         return response;
     }
 

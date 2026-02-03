@@ -19,7 +19,7 @@ sealed class FileSystemProvider : GitHostingProvider
 
     public override Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
                                                        NormalizedPath repoPath,
-                                                       CancellationToken ct = default )
+                                                       CancellationToken cancellation = default )
     {
         return Task.FromException<bool>( new NotSupportedException( ProviderType ) );
     }
@@ -27,7 +27,7 @@ sealed class FileSystemProvider : GitHostingProvider
     public override Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                        NormalizedPath repoPath,
                                                                        HostedRepositoryCreateOptions? options = null,
-                                                                       CancellationToken ct = default )
+                                                                       CancellationToken cancellation = default )
     {
         return Task.FromResult<HostedRepositoryInfo?>( CreateRepository( monitor, repoPath, options ) );
     }
@@ -88,7 +88,7 @@ sealed class FileSystemProvider : GitHostingProvider
         }
     }
 
-    public override Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor, NormalizedPath repoPath, CancellationToken ct = default )
+    public override Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor, NormalizedPath repoPath, CancellationToken cancellation = default )
     {
         try
         {
@@ -119,7 +119,7 @@ sealed class FileSystemProvider : GitHostingProvider
 
     public override Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                         NormalizedPath repoPath,
-                                                                        CancellationToken ct = default )
+                                                                        CancellationToken cancellation = default )
     {
         return Task.FromResult<HostedRepositoryInfo?>( GetRepositoryInfo( monitor, repoPath ) );
     }

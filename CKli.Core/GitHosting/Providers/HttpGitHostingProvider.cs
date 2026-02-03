@@ -57,15 +57,15 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     /// <inheritdoc />
     public sealed override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                                      NormalizedPath repoPath,
-                                                                                     CancellationToken ct = default )
+                                                                                     CancellationToken cancellation = default )
     {
-        if( !EnsureReadAccess( monitor, ref repoPath, out var c, out var retryHelper ) )
+        if( !EnsureReadAccess( monitor, ref repoPath, out var client, out var retryHelper, cancellation ) )
         {
             return null;
         }
         try
         {
-            return await GetRepositoryInfoAsync( monitor, c, retryHelper, repoPath, ct ).ConfigureAwait( false );
+            return await GetRepositoryInfoAsync( monitor, client, retryHelper, repoPath, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -74,7 +74,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         finally
         {
-            c.Dispose();
+            client.Dispose();
         }
     }
 
@@ -85,18 +85,21 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                            HttpClient client,
                                                                            RetryHelper retryHelper,
                                                                            NormalizedPath repoPath,
-                                                                           CancellationToken ct );
+                                                                           CancellationToken cancellation );
 
     /// <inheritdoc />
-    public sealed override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor, NormalizedPath repoPath, HostedRepositoryCreateOptions? options = null, CancellationToken ct = default )
+    public sealed override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
+                                                                                    NormalizedPath repoPath,
+                                                                                    HostedRepositoryCreateOptions? options = null,
+                                                                                    CancellationToken cancellation = default )
     {
-        if( !EnsureWriteAccess( monitor, ref repoPath, out var c, out var retryHelper ) )
+        if( !EnsureWriteAccess( monitor, ref repoPath, out var client, out var retryHelper, cancellation ) )
         {
             return null;
         }
         try
         {
-            return await CreateRepositoryAsync( monitor, c, retryHelper, repoPath, options, ct ).ConfigureAwait( false );
+            return await CreateRepositoryAsync( monitor, client, retryHelper, repoPath, options, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -105,26 +108,26 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         finally
         {
-            c.Dispose();
+            client.Dispose();
         }
     }
 
     /// <inheritdoc cref="GitHostingProvider.CreateRepositoryAsync(IActivityMonitor, NormalizedPath, HostedRepositoryCreateOptions?, CancellationToken)"/>
     /// <param name="retryHelper">The retry helper.</param>
     /// <param name="client">The HttpClient to use.</param>
-    protected abstract Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor, HttpClient client, RetryHelper retryHelper, NormalizedPath repoPath, HostedRepositoryCreateOptions? options, CancellationToken ct );
+    protected abstract Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor, HttpClient client, RetryHelper retryHelper, NormalizedPath repoPath, HostedRepositoryCreateOptions? options, CancellationToken cancellation );
 
     /// <inheritdoc />
-    public sealed override async Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor, NormalizedPath repoPath, CancellationToken ct = default )
+    public sealed override async Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor, NormalizedPath repoPath, CancellationToken cancellation = default )
     {
         Throw.CheckState( CanArchiveRepository );
-        if( !EnsureWriteAccess( monitor, ref repoPath, out var c, out var retryHelper ) )
+        if( !EnsureWriteAccess( monitor, ref repoPath, out var client, out var retryHelper, cancellation ) )
         {
             return false;
         }
         try
         {
-            return await ArchiveRepositoryAsync( monitor, c, retryHelper, repoPath, ct ).ConfigureAwait( false );
+            return await ArchiveRepositoryAsync( monitor, client, retryHelper, repoPath, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -133,25 +136,31 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         finally
         {
-            c.Dispose();
+            client.Dispose();
         }
     }
 
     /// <inheritdoc cref="GitHostingProvider.ArchiveRepositoryAsync(IActivityMonitor, NormalizedPath, CancellationToken)"/>
     /// <param name="client">The HttpClient to use.</param>
     /// <param name="retryHelper">The retry helper.</param>
-    protected abstract Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor, HttpClient client, RetryHelper retryHelper, NormalizedPath repoPath, CancellationToken ct );
+    protected abstract Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
+                                                          HttpClient client,
+                                                          RetryHelper retryHelper,
+                                                          NormalizedPath repoPath,
+                                                          CancellationToken cancellation );
 
     /// <inheritdoc />
-    public sealed override async Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor, NormalizedPath repoPath, CancellationToken ct = default )
+    public sealed override async Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
+                                                                   NormalizedPath repoPath,
+                                                                   CancellationToken cancellation = default )
     {
-        if( !EnsureWriteAccess( monitor, ref repoPath, out var c, out var retryHelper ) )
+        if( !EnsureWriteAccess( monitor, ref repoPath, out var client, out var retryHelper, cancellation ) )
         {
             return false;
         }
         try
         {
-            return await DeleteRepositoryAsync( monitor, c, retryHelper, repoPath, ct ).ConfigureAwait( false );
+            return await DeleteRepositoryAsync( monitor, client, retryHelper, repoPath, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -160,19 +169,24 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         finally
         {
-            c.Dispose();
+            client.Dispose();
         }
     }
 
     /// <inheritdoc cref="GitHostingProvider.DeleteRepositoryAsync(IActivityMonitor, NormalizedPath, CancellationToken)"/>
     /// <param name="client">The HttpClient to use.</param>
     /// <param name="retryHelper">The retry helper.</param>
-    protected abstract Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor, HttpClient client, RetryHelper retryHelper, NormalizedPath repoPath, CancellationToken ct );
+    protected abstract Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
+                                                         HttpClient client,
+                                                         RetryHelper retryHelper,
+                                                         NormalizedPath repoPath,
+                                                         CancellationToken cancellation );
 
     bool EnsureReadAccess( IActivityMonitor monitor,
                            ref NormalizedPath repoPath,
                            [NotNullWhen(true)]out HttpClient? httpClient,
-                           [NotNullWhen(true)]out RetryHelper? retryHelper )
+                           [NotNullWhen(true)]out RetryHelper? retryHelper,
+                           CancellationToken userCancellation )
     {
         httpClient = null;
         retryHelper = null;
@@ -194,14 +208,15 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         {
             return false;
         }
-        CreateClient( monitor, creds?.Password, out httpClient, out retryHelper );
+        CreateClient( monitor, creds?.Password, out httpClient, out retryHelper, userCancellation );
         return true;
     }
 
     bool EnsureWriteAccess( IActivityMonitor monitor,
                             ref NormalizedPath repoPath,
                             [NotNullWhen( true )] out HttpClient? httpClient,
-                            [NotNullWhen( true )] out RetryHelper? retryHelper )
+                            [NotNullWhen( true )] out RetryHelper? retryHelper,
+                           CancellationToken userCancellation )
     {
         httpClient = null;
         retryHelper = null;
@@ -211,14 +226,19 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         {
             return false;
         }
-        CreateClient( monitor, creds.Password, out httpClient, out retryHelper );
+        CreateClient( monitor, creds.Password, out httpClient, out retryHelper, userCancellation );
         return true;
     }
 
-    void CreateClient( IActivityMonitor monitor, string? secret, out HttpClient httpClient, out RetryHelper retryHelper )
+    void CreateClient( IActivityMonitor monitor,
+                       string? secret,
+                       out HttpClient httpClient,
+                       out RetryHelper retryHelper,
+                       CancellationToken userCancellation )
     {
-        Hook h = new Hook( this, monitor, retryHelper = CreateRetryHelper() );
+        Hook h = new Hook( this, monitor, retryHelper = CreateRetryHelper(), userCancellation );
         httpClient = new HttpClient( h );
+        h._httpClient = httpClient;
         DefaultConfigure( httpClient );
         SetAuthorizationHeader( httpClient.DefaultRequestHeaders, secret );
     }
@@ -291,7 +311,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         {
             return OnSuccessfulResponse( monitor, response );
         }
-        delay = retryHelper.OnUnsuccessfulResponse( monitor, response );
+        delay = retryHelper.OnFailedResponse( monitor, response );
         if( delay != null )
         {
             await Task.Delay( delay.Value, cancellationToken ).ConfigureAwait( false );

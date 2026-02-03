@@ -1,18 +1,12 @@
 using CK.Core;
 using CKli.Core.GitHosting.Models.GitHub;
-using LibGit2Sharp;
 using System;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Security.AccessControl;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using static CK.Core.CheckedWriteStream;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace CKli.Core.GitHosting.Providers;
 
@@ -72,10 +66,10 @@ sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                                  HttpClient client,
                                                                                  RetryHelper retryHelper,
                                                                                  NormalizedPath repoPath,
-                                                                                 CancellationToken ct = default )
+                                                                                 CancellationToken cancellation = default )
     {
-        using var response = await client.GetAsync( $"repos/{repoPath}", ct ).ConfigureAwait( false );
-        return await ReadHostedRepositoryInfoAsync( monitor, response, ct ).ConfigureAwait( false );
+        using var response = await client.GetAsync( $"repos/{repoPath}", cancellation ).ConfigureAwait( false );
+        return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
     }
 
     protected override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
@@ -83,7 +77,7 @@ sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                                 RetryHelper retryHelper,
                                                                                 NormalizedPath repoPath,
                                                                                 HostedRepositoryCreateOptions? options = null,
-                                                                                CancellationToken ct = default )
+                                                                                CancellationToken cancellation = default )
     {
         var request = new GitHubCreateRepoRequest
         {
@@ -99,18 +93,19 @@ sealed partial class GitHubProvider : HttpGitHostingProvider
         // If owner matches authenticated user, use user/repos
         // Otherwise, use /orgs/{org}/repos
         var url = $"orgs/{repoPath.FirstPart}/repos";
-
-        var response = await client.PostAsJsonAsync( url, request, ct );
+        retryHelper.AdditionalSuccessStatus.Add( 404 );
+        var response = await client.PostAsJsonAsync( url, request, cancellation );
 
         // If 404 on org endpoint, the owner might be a user - try user repos endpoint.
         if( response.StatusCode == System.Net.HttpStatusCode.NotFound )
         {
+            retryHelper.AdditionalSuccessStatus.Remove( 404 );
             // For user repos, we use user/repos endpoint
             // This requires the owner to be the authenticated user
             url = "user/repos";
-            response = await client.PostAsJsonAsync( url, request, ct );
+            response = await client.PostAsJsonAsync( url, request, cancellation );
         }
-        return await ReadHostedRepositoryInfoAsync( monitor, response, ct ).ConfigureAwait( false );
+        return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
     }
 
     public override bool CanArchiveRepository => true;
@@ -119,31 +114,35 @@ sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                 HttpClient client,
                                                                 RetryHelper retryHelper,
                                                                 NormalizedPath repoPath,
-                                                                CancellationToken ct = default )
+                                                                CancellationToken cancellation )
     {
-        throw new NotImplementedException();
+        var request = new GitHubUpdateRepoRequest { Archived = true };
+        var response = await client.PatchAsJsonAsync( $"repos/{repoPath}", request, cancellation );
+        return response.IsSuccessStatusCode;
     }
 
     protected override async Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
                                                                HttpClient client,
                                                                RetryHelper retryHelper,
                                                                NormalizedPath repoPath,
-                                                               CancellationToken ct = default )
+                                                               CancellationToken cancellation = default )
     {
-        throw new NotImplementedException();
+        var response = await client.DeleteAsync( $"repos/{repoPath}", cancellation );
+        return response.IsSuccessStatusCode;
     }
 
-    static async Task<HostedRepositoryInfo?> ReadHostedRepositoryInfoAsync( IActivityMonitor monitor, HttpResponseMessage response, CancellationToken ct )
+    static async Task<HostedRepositoryInfo?> ReadHostedRepositoryInfoAsync( IActivityMonitor monitor,
+                                                                            HttpResponseMessage response,
+                                                                            CancellationToken cancellation )
     {
         Throw.DebugAssert( response.IsSuccessStatusCode );
-        var r = await response.Content.ReadFromJsonAsync<GitHubRepository>( JsonSerializerOptions.Default, ct );
+        var r = await response.Content.ReadFromJsonAsync<GitHubRepository>( JsonSerializerOptions.Default, cancellation );
         if( r == null )
         {
-
+            monitor.Error( $"Empty response from '{response.RequestMessage?.RequestUri}'." );
+            return null;
         }
-        return r == null
-                ? null
-                : new HostedRepositoryInfo()
+        return new HostedRepositoryInfo()
                 {
                     RepoPath = new NormalizedPath( r.FullName ),
                     Description = r.Description,

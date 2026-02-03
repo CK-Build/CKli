@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,6 +18,7 @@ public abstract partial class HttpGitHostingProvider
         int _regularRetryCount;
         int _maxRegularRetryCount;
         int _overallRetryCount;
+        List<int>? _additionalSuccessStatus;
 
         /// <summary>
         /// Initializes a new retry helper.
@@ -45,14 +47,21 @@ public abstract partial class HttpGitHostingProvider
         }
 
         /// <summary>
+        /// Gets a list of <see cref="HttpResponseMessage.StatusCode"/> values that <see cref="IsSuccessfulResponse(HttpResponseMessage)"/>
+        /// will consider valid.
+        /// </summary>
+        public List<int> AdditionalSuccessStatus => _additionalSuccessStatus ??= new List<int>();
+
+        /// <summary>
         /// Gets whether this response must be considered successful.
-        /// Returns <see cref="HttpResponseMessage.IsSuccessStatusCode"/> by default.
+        /// Returns <see cref="HttpResponseMessage.IsSuccessStatusCode"/> and considers <see cref="AdditionalSuccessStatus"/> by default.
         /// </summary>
         /// <param name="response">The response message.</param>
         /// <returns>True if this is a successful response, false otherwise.</returns>
         public virtual bool IsSuccessfulResponse( HttpResponseMessage response )
         {
-            return response.IsSuccessStatusCode;
+            return response.IsSuccessStatusCode
+                   || (_additionalSuccessStatus != null && _additionalSuccessStatus.Contains( (int)response.StatusCode ));
         }
 
         /// <summary>
@@ -65,9 +74,14 @@ public abstract partial class HttpGitHostingProvider
         /// <param name="monitor">The monitor.</param>
         /// <param name="response">The unsuccessful response.</param>
         /// <returns>The delay to wait, null otherwise.</returns>
-        public virtual TimeSpan? OnUnsuccessfulResponse( IActivityMonitor monitor, HttpResponseMessage response )
+        public virtual TimeSpan? OnFailedResponse( IActivityMonitor monitor, HttpResponseMessage response )
         {
-            Throw.CheckArgument( !response.IsSuccessStatusCode );
+            Throw.CheckArgument( !IsSuccessfulResponse( response ) );
+
+            if( response.Content is HttpExceptionContent ex && ex.CancellationSource != HttpRequestCancellationSource.None )
+            {
+                return null;
+            }
             return UseRetryAfter( monitor, response )
                    ?? FinalUseRegularNextDelay( monitor, response );
         }
@@ -85,7 +99,7 @@ public abstract partial class HttpGitHostingProvider
             if( retryAfterDelay is not null )
             {
                 ++_overallRetryCount;
-                monitor.Warn( $"Received '{response.StatusCode}' from '{response.RequestMessage?.RequestUri}'. Waiting for '{retryAfterDelay}' based on retry-after header." );
+                monitor.Warn( $"Waiting for '{retryAfterDelay}' based on retry-after header." );
                 return retryAfterDelay;
             }
             return null;
@@ -114,27 +128,6 @@ public abstract partial class HttpGitHostingProvider
         }
 
         /// <summary>
-        /// Helper that calls <see cref="UseRegularNextDelay"/> and logs a warning or
-        /// calls <see cref="OnGiveUp(IActivityMonitor, Exception)"/>.
-        /// </summary>
-        /// <param name="monitor">The monitor.</param>
-        /// <param name="ex">The exception.</param>
-        /// <returns>The delay to wait, null otherwise.</returns>
-        protected virtual TimeSpan? FinalUseRegularNextDelay( IActivityMonitor monitor, Exception ex )
-        {
-            var delay = UseRegularNextDelay();
-            if( delay > TimeSpan.Zero )
-            {
-                monitor.Warn( $"Retrying in '{delay}'.", ex );
-            }
-            else
-            {
-                OnGiveUp( monitor, ex );
-            }
-            return delay;
-        }
-
-        /// <summary>
         /// Helper that calls <see cref="UseRegularNextDelay"/> and logs a warning or calls <see cref="OnGiveUp(IActivityMonitor, HttpResponseMessage)"/>.
         /// </summary>
         /// <param name="monitor">The monitor.</param>
@@ -145,7 +138,7 @@ public abstract partial class HttpGitHostingProvider
             var delay = UseRegularNextDelay();
             if( delay > TimeSpan.Zero )
             {
-                monitor.Warn( $"Received '{response.StatusCode}' from '{response.RequestMessage?.RequestUri}'. Retrying in '{delay}'." );
+                monitor.Warn( $"Retrying in '{delay}'." );
             }
             else
             {
@@ -162,18 +155,7 @@ public abstract partial class HttpGitHostingProvider
         /// <param name="response">The unsuccessful response.</param>
         protected virtual void OnGiveUp( IActivityMonitor monitor, HttpResponseMessage response )
         {
-            monitor.Error( $"Received '{response.StatusCode}' from '{response.RequestMessage?.RequestUri}'. Giving up after {OverallRetryCount} retries." );
-        }
-
-        /// <summary>
-        /// Called when <see cref="MaxRegularRetryCount"/> has been reached.
-        /// Logs the final error message.
-        /// </summary>
-        /// <param name="monitor">The monitor.</param>
-        /// <param name="ex">The exception.</param>
-        protected virtual void OnGiveUp( IActivityMonitor monitor, Exception ex )
-        {
-            monitor.Error( $"Giving up after {OverallRetryCount} retries.", ex );
+            monitor.Error( $"Giving up after {OverallRetryCount} retries." );
         }
     }
 }
