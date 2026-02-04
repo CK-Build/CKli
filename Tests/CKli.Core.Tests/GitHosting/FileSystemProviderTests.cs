@@ -19,11 +19,11 @@ public class FileSystemProviderTests
         var secretsStore = new RecordingSecretsStore();
 
         var gitKey1 = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p1 = await GitHostingProvider.GetAsync( TestHelper.Monitor, gitKey1 );
+        var p1 = gitKey1.AccessKey.HostingProvider;
         p1.ShouldNotBeNull().ProviderType.ShouldBe( "FileSystemProvider" );
 
         var gitKey2 = new GitRepositoryKey( secretsStore, new Uri( "//Some/path" ), isPublic: true );
-        var p2 = await GitHostingProvider.GetAsync( TestHelper.Monitor, gitKey2 );
+        var p2 = gitKey2.AccessKey.HostingProvider;
         p2.ShouldNotBeNull().ProviderType.ShouldBe( "FileSystemProvider" );
 
         p1.ShouldBeSameAs( p2 );
@@ -31,17 +31,17 @@ public class FileSystemProviderTests
         p1.BaseUrl.ToString().ShouldBe( "file://" );
 
         var privKey1 = new GitRepositoryKey( secretsStore, new Uri( "//Some/path" ), isPublic: false );
-        var priv1 = await GitHostingProvider.GetAsync( TestHelper.Monitor, privKey1 );
+        var priv1 = privKey1.AccessKey.HostingProvider;
         priv1.ShouldNotBeNull().ProviderType.ShouldBe( "FileSystemProvider" );
 
+        priv1.ShouldBeSameAs( p1 );
+
         var privKey2 = new GitRepositoryKey( secretsStore, new Uri( "X:\\Another" ), isPublic: false );
-        var priv2 = await GitHostingProvider.GetAsync( TestHelper.Monitor, privKey2 );
+        var priv2 = privKey2.AccessKey.HostingProvider;
         priv2.ShouldNotBeNull().ProviderType.ShouldBe( "FileSystemProvider" );
 
-        priv1.ShouldBeSameAs( priv2 );
-        priv1.IsDefaultPublic.ShouldBeFalse();
-
-        priv1.ShouldNotBeSameAs( p1 );
+        priv2.ShouldBeSameAs( priv1 );
+        priv1.IsDefaultPublic.ShouldBeTrue();
     }
 
     [Test]
@@ -49,20 +49,23 @@ public class FileSystemProviderTests
     {
         var secretsStore = new RecordingSecretsStore();
         var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p = await GitHostingProvider.GetAsync( TestHelper.Monitor, key );
+        var p = key.AccessKey.HostingProvider;
         p.ShouldNotBeNull();
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
-            var info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, TestHelper.TestProjectFolder.AppendPart( "No way" ) );
+            var info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, TestHelper.TestProjectFolder.AppendPart( "No way" ), mustExist: true );
             info.ShouldBeNull();
-            logs.ShouldContain( l => Regex.IsMatch( l.Replace( '\\', '/' ),
-                                                    @"Directory \.git not found at '.*/CKli/Tests/CKli\.Core\.Tests/No way'\." ) );
+            logs.ShouldContain( l => Regex.IsMatch( l, @"Expected Git repository at 'file://.*CKli/Tests/CKli\.Core\.Tests/No way' is missing\." ) );
+
+            info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, TestHelper.TestProjectFolder.AppendPart( "No way" ), mustExist: false );
+            info.ShouldNotBeNull();
+            info.Exists.ShouldBeFalse();
         }
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
-            var info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, TestHelper.SolutionFolder );
+            var info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, TestHelper.SolutionFolder, mustExist: true );
             info.ShouldBeNull();
             logs.ShouldContain( l => Regex.IsMatch( l.Replace( '\\', '/' ),
                                                     @"Expected bare \.git repository at '.*/CKli'\." ) );
@@ -74,23 +77,18 @@ public class FileSystemProviderTests
     {
         var secretsStore = new RecordingSecretsStore();
         var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p = await GitHostingProvider.GetAsync( TestHelper.Monitor, key );
+        var p = key.AccessKey.HostingProvider;
         p.ShouldNotBeNull();
 
         var bareCKtStack = TestHelper.TestProjectFolder.Combine( "Remotes/bare/CKt/CKt-Stack" );
-        var info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, bareCKtStack );
+        var info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, bareCKtStack, mustExist: true );
         info.ShouldNotBeNull();
-        info.DefaultBranch.ShouldBe( "master" );
         info.CloneUrl.ShouldBe( "file://" + bareCKtStack );
-        info.IsEmpty.ShouldBeFalse();
 
-        // One-Stack head is on main.
         var bareOneStack = TestHelper.TestProjectFolder.Combine( "Remotes/bare/One/One-Stack" );
-        info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, bareOneStack );
+        info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, bareOneStack, mustExist: true );
         info.ShouldNotBeNull();
-        info.DefaultBranch.ShouldBe( "main" );
         info.CloneUrl.ShouldBe( "file://" + bareOneStack );
-        info.IsEmpty.ShouldBeFalse();
     }
 
     [Test]
@@ -98,7 +96,7 @@ public class FileSystemProviderTests
     {
         var secretsStore = new RecordingSecretsStore();
         var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p = await GitHostingProvider.GetAsync( TestHelper.Monitor, key );
+        var p = key.AccessKey.HostingProvider;
         p.ShouldNotBeNull();
 
         // The parent of the .git folder must not exist.
@@ -135,7 +133,7 @@ public class FileSystemProviderTests
     {
         var secretsStore = new RecordingSecretsStore();
         var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p = await GitHostingProvider.GetAsync( TestHelper.Monitor, key );
+        var p = key.AccessKey.HostingProvider;
         p.ShouldNotBeNull();
 
         // The parent of the .git folder must not exist.
@@ -145,9 +143,7 @@ public class FileSystemProviderTests
             var repoPath = new NormalizedPath( tempPath ).AppendPart( "Repo1" );
             var info = await p.CreateRepositoryAsync( TestHelper.Monitor, repoPath );
             info.ShouldNotBeNull();
-            info.DefaultBranch.ShouldBe( "master" );
             info.CloneUrl.ShouldNotBeNull().ShouldBe( "file://" + repoPath );
-            info.IsEmpty.ShouldBeTrue();
 
             var clonePath = new NormalizedPath( tempPath ).AppendPart( "Cloned" );
             var uri = new Uri( info.CloneUrl );
@@ -166,7 +162,7 @@ public class FileSystemProviderTests
     {
         var secretsStore = new RecordingSecretsStore();
         var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p = await GitHostingProvider.GetAsync( TestHelper.Monitor, key );
+        var p = key.AccessKey.HostingProvider;
         p.ShouldNotBeNull();
 
         // The parent of the .git folder must not exist.
@@ -174,25 +170,17 @@ public class FileSystemProviderTests
         try
         {
             var repoPath = new NormalizedPath( tempPath ).AppendPart( "Repo1" );
-            using( TestHelper.Monitor.CollectTexts( out var logs ) )
-            {
-                var info = await p.CreateRepositoryAsync( TestHelper.Monitor, repoPath, new HostedRepositoryCreateOptions
-                {
-                    DefaultBranch = "stable",
-                    AutoInit = true
-                } );
-                logs.ShouldContain( "Repository creation option DefaultBranch, AutoInit, LicenseTemplate, Description and GitIgnoreTemplate are ignored by the FileSystemProvider." );
-                info.ShouldNotBeNull();
-                info.CloneUrl.ShouldNotBeNull().ShouldBe( "file://" + repoPath );
+            var info = await p.CreateRepositoryAsync( TestHelper.Monitor, repoPath );
+            info.ShouldNotBeNull();
+            info.CloneUrl.ShouldNotBeNull().ShouldBe( "file://" + repoPath );
 
-                var clonePath = new NormalizedPath( tempPath ).AppendPart( "Cloned" );
-                var uri = new Uri( info.CloneUrl );
+            var clonePath = new NormalizedPath( tempPath ).AppendPart( "Cloned" );
+            var uri = new Uri( info.CloneUrl );
 
-                using var cloned = new Repository( Repository.Clone( uri.LocalPath, clonePath ) );
-                cloned.ShouldNotBeNull();
-                // Unfortunately...
-                cloned.Head.FriendlyName.ShouldBe( "master" );
-            }
+            using var cloned = new Repository( Repository.Clone( uri.LocalPath, clonePath ) );
+            cloned.ShouldNotBeNull();
+            // Unfortunately...
+            cloned.Head.FriendlyName.ShouldBe( "master" );
         }
         finally
         {

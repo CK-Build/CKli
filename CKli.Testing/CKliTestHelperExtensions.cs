@@ -11,7 +11,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Runtime.Loader;
 using System.Text;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
@@ -235,7 +234,6 @@ public static partial class CKliTestHelperExtensions
         /// </summary>
         public NormalizedPath CKliStackWorkingFolder => helper.SolutionFolder;
     }
-
 
     /// <summary>
     /// Must be called by tests to cleanup their respective "Cloned/&lt;test-name&gt;" where they can clone

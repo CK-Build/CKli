@@ -11,51 +11,30 @@ using System.Threading.Tasks;
 namespace CKli.Core.GitHosting.Providers;
 
 /// <summary>
-/// GitHub hosting provider implementation.
-/// Supports https://github.com and GitHub Enterprise instances.
+/// Gitea hosting provider implementation.
+/// Gitea is self-hosted only - there is no official cloud instance.
+/// <para>
+/// This provider is almost a clone of the <see cref="GitHubProvider"/>.
+/// </para>
 /// </summary>
-public sealed partial class GitHubProvider : HttpGitHostingProvider
+public sealed partial class GiteaProvider : HttpGitHostingProvider
 {
-    GitHubProvider( string baseUrl, IGitRepositoryAccessKey gitKey, Uri baseApiUrl )
-        : base( baseUrl, gitKey, baseApiUrl, alwaysUseAuthentication: true )
-    {
-    }
-
-    /// <summary>
-    /// Constructor for the cloud https://github.com (internal only).
-    /// </summary>
-    /// <param name="gitKey">The git key to use.</param>
-    internal GitHubProvider( IGitRepositoryAccessKey gitKey )
-        : this( "https://github.com", gitKey, new Uri( "https://api.github.com" ) )
-    {
-    }
-
-    /// <summary>
-    /// Constructor for a GitHub server.
-    /// </summary>
-    /// <param name="baseUrl">The <see cref="HttpGitHostingProvider.BaseApiUrl"/>.</param>
-    /// <param name="gitKey">The git key to use.</param>
-    /// <param name="authority">
-    /// The authority: currently UriComponents.UserInfo | UriComponents.Host | UriComponents.Port
-    /// but this may change.
-    /// </param>
-    public GitHubProvider( string baseUrl, IGitRepositoryAccessKey gitKey, string authority )
-        : this( baseUrl, gitKey, new Uri( $"https://{authority}/api/v3" ) )
+    public GiteaProvider( string baseUrl, IGitRepositoryAccessKey gitKey, string authority )
+        : base( baseUrl, gitKey, new Uri( $"https://{authority}/api/v3" ), alwaysUseAuthentication: false )
     {
     }
 
     protected override void DefaultConfigure( HttpClient client )
     {
         base.DefaultConfigure( client );
-        client.DefaultRequestHeaders.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/vnd.github+json" ) );
-        client.DefaultRequestHeaders.Add( "X-GitHub-Api-Version", "2022-11-28" );
+        client.DefaultRequestHeaders.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/json" ) );
     }
 
     protected override NormalizedPath ValidateRepoPath( IActivityMonitor monitor, NormalizedPath repoPath )
     {
         if( repoPath.Parts.Count != 2 )
         {
-            monitor.Error( $"Invalid GitHub repository path '{repoPath}'. Must be '<owner>/<name>'." );
+            monitor.Error( $"Invalid Gitea repository path '{repoPath}'. Must be '<owner>/<name>'." );
             return default;
         }
         return repoPath;
@@ -93,7 +72,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                                 bool? isPrivate = null,
                                                                                 CancellationToken cancellation = default )
     {
-        var request = new GitHubCreateRepoRequest
+        var request = new GiteaCreateRepoRequest
         {
             Name = repoPath.LastPart,
             Description = "Created by CKli.",
@@ -125,7 +104,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                 bool archive,
                                                                 CancellationToken cancellation )
     {
-        var update = new GitHubUpdateArchiveRequest { Archived = archive };
+        var update = new GiteaUpdateArchiveRequest { Archived = archive };
         var response = await client.PatchAsJsonAsync( $"repos/{repoPath}", update, cancellation );
         return response.IsSuccessStatusCode;
     }
@@ -139,12 +118,12 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         return response.IsSuccessStatusCode;
     }
 
-    static async Task<GitHubRepositoryInfo?> ReadGitHubRepositoryInfoAsync( IActivityMonitor monitor,
+    static async Task<GiteaRepositoryInfo?> ReadGiteaRepositoryInfoAsync( IActivityMonitor monitor,
                                                                         HttpResponseMessage response,
                                                                         CancellationToken cancellation )
     {
         Throw.DebugAssert( response.IsSuccessStatusCode );
-        var r = await response.Content.ReadFromJsonAsync<GitHubRepositoryInfo>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
+        var r = await response.Content.ReadFromJsonAsync<GiteaRepositoryInfo>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
         if( r == null )
         {
             monitor.Error( $"Empty response from '{response.RequestMessage?.RequestUri}'." );
@@ -157,59 +136,21 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                             HttpResponseMessage response,
                                                                             CancellationToken cancellation )
     {
-        var gitHubInfo = await ReadGitHubRepositoryInfoAsync( monitor, response, cancellation );
-        return gitHubInfo != null
+        var giteaInfo = await ReadGiteaRepositoryInfoAsync( monitor, response, cancellation );
+        return giteaInfo != null
                 ? new HostedRepositoryInfo()
                 {
-                    RepoPath = new NormalizedPath( gitHubInfo.FullName ),
-                    Description = gitHubInfo.Description,
-                    IsPrivate = gitHubInfo.Private,
-                    IsArchived = gitHubInfo.Archived,
-                    CloneUrl = gitHubInfo.CloneUrl,
-                    WebUrl = gitHubInfo.HtmlUrl,
-                    CreatedAt = gitHubInfo.CreatedAt,
-                    UpdatedAt = gitHubInfo.UpdatedAt
+                    RepoPath = new NormalizedPath( giteaInfo.FullName ),
+                    Description = giteaInfo.Description,
+                    IsPrivate = giteaInfo.Private,
+                    IsArchived = giteaInfo.Archived,
+                    CloneUrl = giteaInfo.CloneUrl,
+                    WebUrl = giteaInfo.HtmlUrl,
+                    CreatedAt = giteaInfo.CreatedAt,
+                    UpdatedAt = giteaInfo.UpdatedAt
                 }
                 : null;
     }
-
-    // Support (TODO) with the HttpRetryState (or a specialization of it).
-    // The HttpRetryState should be registered in HttpRequestMessage.Options.
-    // 
-    // From: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#exceeding-the-rate-limit
-    //
-    // If you exceed your primary rate limit, you will receive a 403 or 429 response, and the x-ratelimit-remaining header will be 0.
-    // You should not retry your request until after the time specified by the x-ratelimit-reset header.
-    //
-    // If you exceed a secondary rate limit, you will receive a 403 or 429 response and an error message that indicates that you
-    // exceeded a secondary rate limit.
-    // If the retry-after response header is present, you should not retry your request until after that many seconds has elapsed.
-    // If the x-ratelimit-remaining header is 0, you should not retry your request until after the time, in UTC epoch seconds, specified
-    // by the x-ratelimit-reset header.
-    //
-    // Otherwise, wait for at least one minute before retrying.
-    // If your request continues to fail due to a secondary rate limit,
-    // wait for an exponentially increasing amount of time between retries,
-    // and throw an error after a specific number of retries.
-    //
-    //
-    //if( response.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests )
-    //{
-    //    TimeSpan minFromRateLimit = TimeSpan.Zero;
-    //    if( response.Headers.TryGetValues( "x-ratelimit-remaining", out var v )
-    //        && v.FirstOrDefault() == "0"
-    //        && response.Headers.TryGetValues( "x-ratelimit-reset", out v ) )
-    //    {
-    //        if( int.TryParse( v.FirstOrDefault(), out int minSecondsToWait ) && minSecondsToWait > 0 )
-    //        {
-    //            minFromRateLimit = TimeSpan.FromSeconds( minSecondsToWait );
-    //        }
-    //    }
-    //
-    //    protected override Task<TimeSpan?> OnFailedResponseAsync( IActivityMonitor monitor, HttpRequestMessage request, HttpResponseMessage response )
-    //    {
-    //        return base.OnFailedResponseAsync( monitor, request, response );
-    //    }
 
 }
 

@@ -1,7 +1,5 @@
 using CK.Core;
-using CKli.Core.GitHosting.Providers;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,7 +7,7 @@ using System.Threading.Tasks;
 namespace CKli.Core;
 
 /// <summary>
-/// Provides Git hosting API operations.
+/// Provides Git hosting API operations. This is a base class for all hosting providers.
 /// <para>
 /// File system (with LibGit2Sharp), GitHub, GitLab and Gitea support is currently available.
 /// </para>
@@ -21,9 +19,11 @@ public abstract partial class GitHostingProvider
     readonly IGitRepositoryAccessKey _gitKey;
     string? _hostingType;
 
-    // Instantiated by factory methods.
-    static Dictionary<string, GitHostingProvider?>? _providers;
-
+    /// <summary>
+    /// Initializes a new provider.
+    /// </summary>
+    /// <param name="baseUrl">The <see cref="BaseUrl"/>.</param>
+    /// <param name="gitKey">The git key.</param>
     private protected GitHostingProvider( string baseUrl,
                                           IGitRepositoryAccessKey gitKey )
     {
@@ -42,7 +42,7 @@ public abstract partial class GitHostingProvider
     /// This is based on the first <see cref="GitRepositoryKey"/> used to resolve this provider.
     /// </para>
     /// </summary>
-    public bool IsDefaultPublic => _gitKey.IsPublic;
+    public bool IsDefaultPublic => _gitKey.IsPublic ?? true;
 
     /// <summary>
     /// Gets the base url. For url based providers, this is based on the <see cref="UriPartial.Authority"/>,
@@ -55,7 +55,11 @@ public abstract partial class GitHostingProvider
     public string BaseUrl => _baseUrl;
 
     /// <summary>
-    /// Gets the <see cref="IGitRepositoryAccessKey"/> used by this provider.
+    /// Gets the <see cref="IGitRepositoryAccessKey"/> that:
+    /// <list type="number">
+    ///     <item>Identifies this provider.</item>
+    ///     <item>Is used by this provider to resolve required secrets.</item>
+    /// </list>
     /// </summary>
     public IGitRepositoryAccessKey GitKey => _gitKey;
 
@@ -64,10 +68,15 @@ public abstract partial class GitHostingProvider
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="mustExist">
+    /// True to emit an error and return null if the <paramref name="repoPath"/> doesn't exist.
+    /// False to obtain a result with a false <see cref="HostedRepositoryInfo.Exists"/>.
+    /// </param>
     /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The result containing the repository info or null on error.</returns>
     public abstract Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                         NormalizedPath repoPath,
+                                                                        bool mustExist,
                                                                         CancellationToken cancellation = default );
 
     /// <summary>
@@ -75,12 +84,14 @@ public abstract partial class GitHostingProvider
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
-    /// <param name="options">The repository creation options.</param>
+    /// <param name="isPrivate">Whether the repository must be private.
+    /// When let to null, defaults to the (opposite of) <see cref="IsDefaultPublic"/>.
+    /// </param>
     /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The created repository info or null on error.</returns>
     public abstract Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                        NormalizedPath repoPath,
-                                                                       HostedRepositoryCreateOptions? options = null,
+                                                                       bool? isPrivate = null,
                                                                        CancellationToken cancellation = default );
 
     /// <summary>
@@ -94,10 +105,12 @@ public abstract partial class GitHostingProvider
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="archive">True to archive, false to unarchive.</param>
     /// <param name="cancellation">Cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
     public abstract Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
                                                        NormalizedPath repoPath,
+                                                       bool archive,
                                                        CancellationToken cancellation = default );
 
     /// <summary>

@@ -4,24 +4,28 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.Core;
 
-public partial class GitRepositoryKey
+partial class GitRepositoryAccessKey
 {
     sealed class RevertedKey : IGitRepositoryAccessKey
     {
-        readonly OriginalKey _origin;
+        readonly GitRepositoryAccessKey _origin;
         string? _toString;
 
-        public RevertedKey( OriginalKey origin ) => _origin = origin;
+        public RevertedKey( GitRepositoryAccessKey origin )
+        {
+            Throw.DebugAssert( "Never instantiated for null IsPublic.", origin.IsPublic is not null );
+            _origin = origin;
+        }
 
-        public bool IsPublic => !_origin.IsPublic;
-
-        public KnownCloudGitProvider KnownGitProvider => _origin.KnownGitProvider;
+        public bool? IsPublic => !_origin.IsPublic!.Value;
 
         public string PrefixPAT => _origin.PrefixPAT;
 
         public string ReadPATKeyName => _origin.ReadPATKeyName;
 
         public string WritePATKeyName => _origin.WritePATKeyName;
+
+        public GitHostingProvider? HostingProvider => _origin.HostingProvider;
 
         public bool GetReadCredentials( IActivityMonitor monitor, out UsernamePasswordCredentials? creds )
         {
@@ -33,10 +37,11 @@ public partial class GitRepositoryKey
             return _origin.GetWriteCredentials( monitor, out creds );
         }
 
-        public IGitRepositoryAccessKey ToPrivateAccessKey() => _origin.IsPublic ? this : _origin;
+        public IGitRepositoryAccessKey ToPrivateAccessKey() => !_origin.IsPublic!.Value ? this : _origin;
 
-        public IGitRepositoryAccessKey ToPublicAccessKey() => _origin.IsPublic ? _origin : this;
+        public IGitRepositoryAccessKey ToPublicAccessKey() => _origin.IsPublic!.Value ? _origin : this;
 
-        public override string ToString() => _toString ??= $"{PrefixPAT} ({(_origin.IsPublic ? "private" : "public")})";
+        public override string ToString() => _toString ??= AccessKeyToString( PrefixPAT, !_origin.IsPublic!.Value );
     }
+
 }

@@ -1,9 +1,9 @@
 using CK.Core;
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,10 +16,6 @@ namespace CKli.Core.GitHosting.Providers;
 /// This is managed by the <see cref="HttpGitHostingProvider"/> (because of the internal hook and how
 /// it has to be instantiated that is better hidden). If this pattern deemed to be successful, we may
 /// attempt to generalize it.
-/// </para>
-/// <para>
-/// This intentionally breaks the <see cref="HttpContent"/> contract: this is not serializable because
-/// this lives on the receive side only.
 /// </para>
 /// </summary>
 public sealed class HttpExceptionContent : HttpContent
@@ -36,6 +32,8 @@ public sealed class HttpExceptionContent : HttpContent
 
     readonly Exception _ex;
     readonly HttpRequestCancellationSource _cancellationSource;
+    CKExceptionData? _exData;
+    byte[]? _utf8Text;
 
     HttpExceptionContent( Exception ex, HttpRequestCancellationSource cancellationSource )
     {
@@ -64,19 +62,24 @@ public sealed class HttpExceptionContent : HttpContent
         return response;
     }
 
+    CKExceptionData ToData() => _exData ??= CKExceptionData.CreateFrom( _ex );
+    byte[] ToUtf8Text() => _utf8Text ??= Encoding.UTF8.GetBytes( ToData().ToString() );
+
     protected override void SerializeToStream( Stream stream, TransportContext? context, CancellationToken cancellationToken )
     {
-        throw new NotSupportedException();
+        stream.Write( ToUtf8Text() );
     }
 
     protected override Task SerializeToStreamAsync( Stream stream, TransportContext? context )
     {
-        throw new NotSupportedException();
+        var bytes = ToUtf8Text();
+        return stream.WriteAsync( bytes, 0, bytes.Length );
     }
 
     protected override bool TryComputeLength( out long length )
     {
-        throw new NotSupportedException();
+        length = ToUtf8Text().Length;
+        return true;
     }
 
     /// <summary>

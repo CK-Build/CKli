@@ -10,11 +10,17 @@ public sealed record HostedRepositoryInfo
 {
     /// <summary>
     /// Gets or sets the repository path in the hosting provider.
+    /// This is empty if the repository doesn't exist.
     /// <para>
     /// The repository name is the <see cref="NormalizedPath.LastPart"/>.
     /// </para>
     /// </summary>
     public required NormalizedPath RepoPath { get; init; }
+
+    /// <summary>
+    /// Gets whether this repository exists.
+    /// </summary>
+    public bool Exists => !RepoPath.IsEmptyPath;
 
     /// <summary>
     /// Gets or sets whether the repository is private.
@@ -30,16 +36,6 @@ public sealed record HostedRepositoryInfo
     /// Gets or sets whether the repository is archived.
     /// </summary>
     public bool IsArchived { get; init; }
-
-    /// <summary>
-    /// Gets or sets whether the repository is empty (has no commits).
-    /// </summary>
-    public bool IsEmpty { get; init; }
-
-    /// <summary>
-    /// Gets or sets the default branch name.
-    /// </summary>
-    public string? DefaultBranch { get; init; }
 
     /// <summary>
     /// Gets or sets the clone url.

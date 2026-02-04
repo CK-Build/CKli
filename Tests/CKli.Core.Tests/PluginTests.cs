@@ -1,5 +1,4 @@
 using CK.Core;
-using CKli.Core.GitHosting.Providers;
 using NUnit.Framework;
 using Shouldly;
 using System.IO;

@@ -11,28 +11,66 @@ namespace CKli.Core.GitHosting.Providers;
 sealed class FileSystemProvider : GitHostingProvider
 {
     internal FileSystemProvider( IGitRepositoryAccessKey gitKey )
-        : base( "file://", KnownCloudGitProvider.FileSystem, gitKey )
+        : base( "file://", gitKey )
     {
     }
 
     public override bool CanArchiveRepository => false;
 
-    public override Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
-                                                       NormalizedPath repoPath,
-                                                       CancellationToken cancellation = default )
+    public override Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
+                                                                        NormalizedPath repoPath,
+                                                                        bool mustExist,
+                                                                        CancellationToken cancellation = default )
     {
-        return Task.FromException<bool>( new NotSupportedException( ProviderType ) );
+        return Task.FromResult<HostedRepositoryInfo?>( GetRepositoryInfo( monitor, repoPath, mustExist ) );
+    }
+
+
+    HostedRepositoryInfo? GetRepositoryInfo( IActivityMonitor monitor, NormalizedPath repoPath, bool mustExist )
+    {
+        try
+        {
+            var pGit = Path.Combine( Path.GetFullPath( repoPath ), ".git" );
+            if( !Directory.Exists( pGit ) )
+            {
+                if( mustExist )
+                {
+                    monitor.Error( $"Expected Git repository at '{BaseUrl}{repoPath}' is missing." );
+                    return null;
+                }
+                return new HostedRepositoryInfo { RepoPath = default };
+            }
+            using var repo = new Repository( pGit );
+            if( !repo.Info.IsBare )
+            {
+                monitor.Error( $"Expected bare .git repository at '{repoPath}'." );
+                return null;
+            }
+            return new HostedRepositoryInfo
+            {
+                RepoPath = repoPath,
+                CloneUrl = "file://" + repoPath,
+                CreatedAt = Directory.GetCreationTimeUtc( pGit ),
+                IsPrivate = !IsDefaultPublic,
+                UpdatedAt = Directory.GetLastWriteTimeUtc( pGit ),
+            };
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While getting repository info for '{repoPath}'.", ex );
+            return null;
+        }
     }
 
     public override Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                        NormalizedPath repoPath,
-                                                                       HostedRepositoryCreateOptions? options = null,
+                                                                       bool? isPrivate = null,
                                                                        CancellationToken cancellation = default )
     {
-        return Task.FromResult<HostedRepositoryInfo?>( CreateRepository( monitor, repoPath, options ) );
+        return Task.FromResult<HostedRepositoryInfo?>( CreateRepository( monitor, repoPath ) );
     }
 
-    HostedRepositoryInfo? CreateRepository( IActivityMonitor monitor, NormalizedPath repoPath, HostedRepositoryCreateOptions? options )
+    HostedRepositoryInfo? CreateRepository( IActivityMonitor monitor, NormalizedPath repoPath )
     {
         try
         {
@@ -49,35 +87,13 @@ sealed class FileSystemProvider : GitHostingProvider
             }
             var pGit = Path.Combine( folder, ".git" );
             using var repo = new Repository( Repository.Init( pGit, isBare: true ) );
-            Throw.DebugAssert( repo.Head.Tip == null );
-            var defBranchName = repo.Head.FriendlyName;
-            Throw.DebugAssert( "libgit2 defaults to master.", defBranchName == "master" );
-            // But... I failed to change the default branch. The rewriting of the HEAD file works
-            // but the Repository.Clone sticks to master (unlike git clone). So I suspect libgit2
-            // here to be a little bit lost when the repository is empty. This has to be investigated
-            // but I spent way too much time on this, so give upe for now.
-            bool isEmpty = true;
-            if( options != null )
-            {
-                bool notSupported = options.AutoInit
-                                    || options.DefaultBranch != null
-                                    || options.LicenseTemplate != null
-                                    || options.Description != null
-                                    || options.GitIgnoreTemplate != null;
-                if( notSupported )
-                {
-                    monitor.Warn( "Repository creation option DefaultBranch, AutoInit, LicenseTemplate, Description and GitIgnoreTemplate " +
-                                  "are ignored by the FileSystemProvider." );
-                }
-            }
+            Throw.DebugAssert( "The repo is empty. The head is 'unborn'.", repo.Head.Tip == null );
             return new HostedRepositoryInfo
             {
                 RepoPath = repoPath,
                 CloneUrl = "file://" + repoPath,
                 CreatedAt = Directory.GetCreationTimeUtc( pGit ),
-                DefaultBranch = "master",
-                IsPrivate = options?.IsPrivate ?? !IsDefaultPublic,
-                IsEmpty = isEmpty,
+                IsPrivate = !IsDefaultPublic,
                 UpdatedAt = Directory.GetLastWriteTimeUtc( pGit ),
             };
         }
@@ -117,44 +133,12 @@ sealed class FileSystemProvider : GitHostingProvider
         }
     }
 
-    public override Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
-                                                                        NormalizedPath repoPath,
-                                                                        CancellationToken cancellation = default )
+    public override Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
+                                                       NormalizedPath repoPath,
+                                                       bool archive,
+                                                       CancellationToken cancellation = default )
     {
-        return Task.FromResult<HostedRepositoryInfo?>( GetRepositoryInfo( monitor, repoPath ) );
+        return Task.FromException<bool>( new NotSupportedException( ProviderType ) );
     }
 
-    HostedRepositoryInfo? GetRepositoryInfo( IActivityMonitor monitor, NormalizedPath repoPath )
-    {
-        try
-        {
-            var pGit = Path.Combine( Path.GetFullPath( repoPath ), ".git" );
-            if( !Directory.Exists( pGit ) )
-            {
-                monitor.Error( $"Directory .git not found at '{repoPath}'." );
-                return null;
-            }
-            using var repo = new Repository( pGit );
-            if( !repo.Info.IsBare )
-            {
-                monitor.Error( $"Expected bare .git repository at '{repoPath}'." );
-                return null;
-            }
-            return new HostedRepositoryInfo
-            {
-                RepoPath = repoPath,
-                CloneUrl = "file://" + repoPath,
-                CreatedAt = Directory.GetCreationTimeUtc( pGit ),
-                DefaultBranch = repo.Head?.FriendlyName,
-                IsPrivate = !IsDefaultPublic,
-                IsEmpty = !repo.Commits.Any(),
-                UpdatedAt = Directory.GetLastWriteTimeUtc( pGit ),
-            };
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( $"While getting repository info for '{repoPath}'.", ex );
-            return null;
-        }
-    }
 }

@@ -1,8 +1,6 @@
 using CK.Core;
 using System;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -21,9 +19,6 @@ public sealed class Repo
     readonly RandomId _repoId;
     internal readonly Repo? _nextRepo;
     GitRepository.SimpleStatusInfo _status;
-
-    GitHostingProvider? _gitHostingProvider;
-    bool _gitHostingProviderDone;
 
     internal Repo( World world, GitRepository git, XElement configuration, int index, RandomId repoId, Repo? nextRepo )
     {
@@ -98,28 +93,6 @@ public sealed class Repo
     /// </para>
     /// </summary>
     public RandomId CKliRepoId => _repoId;
-
-    /// <summary>
-    /// Tries to resolve the <see cref="GitHostingProvider"/> for this repository.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="cancellation">Optional cancellation token.</param>
-    /// <returns>The hosting provider or null if it cannot be resolved.</returns>
-    public ValueTask<GitHostingProvider?> GetHostingProviderAsync( IActivityMonitor monitor, CancellationToken cancellation = default  )
-    {
-        if( _gitHostingProviderDone )
-        {
-            return ValueTask.FromResult( _gitHostingProvider );
-        }
-        return DoGetHostingProviderAsync( monitor, cancellation );
-    }
-
-    async ValueTask<GitHostingProvider?> DoGetHostingProviderAsync( IActivityMonitor monitor, CancellationToken cancellation )
-    {
-        _gitHostingProvider = await GitHostingProvider.GetAsync( monitor, _git.RepositoryKey, cancellation );
-        _gitHostingProviderDone = true;
-        return _gitHostingProvider;
-    }
 
     /// <summary>
     /// Returns the <see cref="DisplayPath"/> (with its link to <see cref="WorkingFolder"/>) as a <see cref="ContentBox"/>

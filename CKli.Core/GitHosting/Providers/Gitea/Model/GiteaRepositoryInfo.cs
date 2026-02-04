@@ -1,13 +1,9 @@
-using CK.Core;
 using System;
 using System.Text.Json.Serialization;
 
-namespace CKli.Core.GitHosting.Models.GitHub;
+namespace CKli.Core.GitHosting.Providers;
 
-/// <summary>
-/// GitHub API response model for a repository.
-/// </summary>
-internal sealed class GitHubRepository
+internal sealed class GiteaRepositoryInfo
 {
     [JsonPropertyName( "id" )]
     public long Id { get; set; }
@@ -27,14 +23,8 @@ internal sealed class GitHubRepository
     [JsonPropertyName( "archived" )]
     public bool Archived { get; set; }
 
-    [JsonPropertyName( "default_branch" )]
-    public string? DefaultBranch { get; set; }
-
     [JsonPropertyName( "clone_url" )]
     public string? CloneUrl { get; set; }
-
-    [JsonPropertyName( "ssh_url" )]
-    public string? SshUrl { get; set; }
 
     [JsonPropertyName( "html_url" )]
     public string? HtmlUrl { get; set; }
@@ -44,8 +34,4 @@ internal sealed class GitHubRepository
 
     [JsonPropertyName( "updated_at" )]
     public DateTime? UpdatedAt { get; set; }
-
-    [JsonPropertyName( "owner" )]
-    public GitHubOwner? Owner { get; set; }
 }
-

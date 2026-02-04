@@ -6,7 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace CKli.Core;
 
 /// <summary>
-/// Centralizes url manipulation and provides a <see cref="IGitRepositoryAccessKey"/>.
+/// Centralizes url manipulation and provides the <see cref="AccessKey"/> to the repository.
 /// </summary>
 public partial class GitRepositoryKey
 {
@@ -27,8 +27,11 @@ public partial class GitRepositoryKey
     /// </summary>
     public static readonly IEqualityComparer<Uri> OrdinalIgnoreCaseUrlEqualityComparer = new UriComparer();
 
-    readonly OriginalKey _accessKey;
+    readonly Uri _originUrl;
+    readonly ISecretsStore _secretsStore;
+    IGitRepositoryAccessKey? _accessKey;
     string? _repoName;
+    bool _isPublic;
 
     /// <summary>
     /// Initializes a new <see cref="GitRepositoryKey"/>.
@@ -47,14 +50,9 @@ public partial class GitRepositoryKey
 
     GitRepositoryKey( Uri url, bool isPublic, ISecretsStore secretsStore )
     {
-        KnownCloudGitProvider p;
-        if( url.Scheme == Uri.UriSchemeFile ) p = KnownCloudGitProvider.FileSystem;
-        else if( url.Authority.Equals( "github.com", StringComparison.Ordinal ) ) p = KnownCloudGitProvider.GitHub;
-        else if( url.Authority.Equals( "gitlab.com", StringComparison.Ordinal ) ) p = KnownCloudGitProvider.GitLab;
-        else if( url.Authority.Equals( "dev.azure.com", StringComparison.Ordinal ) ) p = KnownCloudGitProvider.AzureDevOps;
-        else if( url.Authority.Equals( "bitbucket.org", StringComparison.Ordinal ) ) p = KnownCloudGitProvider.Bitbucket;
-        else p = KnownCloudGitProvider.Unknown;
-        _accessKey = new OriginalKey( url, secretsStore, p, isPublic );
+        _originUrl = url;
+        _isPublic = isPublic;
+        _secretsStore = secretsStore;
     }
 
     /// <summary>
@@ -79,7 +77,7 @@ public partial class GitRepositoryKey
     /// <summary>
     /// Gets whether the Git repository is public.
     /// </summary>
-    public bool IsPublic => _accessKey.IsPublic;
+    public bool IsPublic => _isPublic;
 
     /// <summary>
     /// Gets the remote origin url.
@@ -87,18 +85,18 @@ public partial class GitRepositoryKey
     /// See <see cref="GetRepositoryUrlError(Uri)"/> for invariants.
     /// </para>
     /// </summary>
-    public Uri OriginUrl => _accessKey._originUrl;
+    public Uri OriginUrl => _originUrl;
 
     /// <summary>
     /// Gets the access key for this repository.
     /// </summary>
-    public IGitRepositoryAccessKey AccessKey => _accessKey; 
+    public IGitRepositoryAccessKey AccessKey => _accessKey ??= GitRepositoryAccessKey.Get( _secretsStore, _originUrl, _isPublic ); 
 
     /// <summary>
     /// Gets the valid repository name.
     /// </summary>
     [MemberNotNull( nameof( _repoName ) )]
-    public string RepositoryName => _repoName ??= new string( System.IO.Path.GetFileName( _accessKey._originUrl.ToString().AsSpan() ) );
+    public string RepositoryName => _repoName ??= new string( System.IO.Path.GetFileName( _originUrl.ToString().AsSpan() ) );
 
     /// <summary>
     /// Gets whether this <see cref="RepositoryName"/> ends with "-Stack" (case insensitive) and the prefix, the stack name,
@@ -106,12 +104,11 @@ public partial class GitRepositoryKey
     /// </summary>
     public bool IsStackRepository => RepositoryName.EndsWith( "-Stack", StringComparison.OrdinalIgnoreCase ) && _repoName.Length >= 8;
 
-    /// <inheritdoc />
     /// <summary>
     /// Overridden to return the OriginUrl. 
     /// </summary>
     /// <returns>A readable string.</returns>
-    public override string ToString() => _accessKey._originUrl.ToString();
+    public override string ToString() => _originUrl.ToString();
 
     /// <summary>
     /// Validates a Url that can be used for a GitRepositoryKey.

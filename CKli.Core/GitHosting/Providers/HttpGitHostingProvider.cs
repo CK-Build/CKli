@@ -1,11 +1,8 @@
 using CK.Core;
 using System;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -57,6 +54,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     /// <inheritdoc />
     public sealed override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                                      NormalizedPath repoPath,
+                                                                                     bool mustExist,
                                                                                      CancellationToken cancellation = default )
     {
         if( !EnsureReadAccess( monitor, ref repoPath, out var client, cancellation ) )
@@ -65,7 +63,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         try
         {
-            return await GetRepositoryInfoAsync( monitor, client, repoPath, cancellation ).ConfigureAwait( false );
+            return await GetRepositoryInfoAsync( monitor, client, repoPath, mustExist, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -83,12 +81,13 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     protected abstract Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                            HttpClient client,
                                                                            NormalizedPath repoPath,
+                                                                           bool mustExist,
                                                                            CancellationToken cancellation );
 
     /// <inheritdoc />
     public sealed override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                                     NormalizedPath repoPath,
-                                                                                    HostedRepositoryCreateOptions? options = null,
+                                                                                    bool? isPrivate = null,
                                                                                     CancellationToken cancellation = default )
     {
         if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
@@ -97,7 +96,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         try
         {
-            return await CreateRepositoryAsync( monitor, client, repoPath, options, cancellation ).ConfigureAwait( false );
+            return await CreateRepositoryAsync( monitor, client, repoPath, isPrivate, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -110,16 +109,19 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
     }
 
-    /// <inheritdoc cref="GitHostingProvider.CreateRepositoryAsync(IActivityMonitor, NormalizedPath, HostedRepositoryCreateOptions?, CancellationToken)"/>
+    /// <inheritdoc cref="GitHostingProvider.CreateRepositoryAsync(IActivityMonitor, NormalizedPath, bool?, CancellationToken)"/>
     /// <param name="client">The HttpClient to use.</param>
     protected abstract Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                           HttpClient client,
                                                                           NormalizedPath repoPath,
-                                                                          HostedRepositoryCreateOptions? options,
+                                                                          bool? isPrivate,
                                                                           CancellationToken cancellation );
 
     /// <inheritdoc />
-    public sealed override async Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor, NormalizedPath repoPath, CancellationToken cancellation = default )
+    public sealed override async Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
+                                                                    NormalizedPath repoPath,
+                                                                    bool archive,
+                                                                    CancellationToken cancellation = default )
     {
         Throw.CheckState( CanArchiveRepository );
         if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
@@ -128,7 +130,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         try
         {
-            return await ArchiveRepositoryAsync( monitor, client, repoPath, cancellation ).ConfigureAwait( false );
+            return await ArchiveRepositoryAsync( monitor, client, repoPath, archive, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -146,6 +148,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     protected abstract Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
                                                           HttpClient client,
                                                           NormalizedPath repoPath,
+                                                          bool archive,
                                                           CancellationToken cancellation );
 
     /// <inheritdoc />
@@ -196,7 +199,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         // want to use public, unauthenticated, API access (because the API requires authentication
         // even on a public repository or because of rate limits).
         // TODO: Add GetOptionalReadCredentials that doesn't trigger error nor warning.
-        Throw.DebugAssert( creds != null || GitKey.IsPublic );
+        Throw.DebugAssert( creds != null || IsDefaultPublic );
         if( creds == null
             && _alwaysUseAuthentication
             && !GitKey.ToPrivateAccessKey().GetReadCredentials( monitor, out creds ) )
@@ -210,7 +213,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     bool EnsureWriteAccess( IActivityMonitor monitor,
                             ref NormalizedPath repoPath,
                             [NotNullWhen( true )] out HttpClient? httpClient,
-                           CancellationToken userCancellation )
+                            CancellationToken userCancellation )
     {
         httpClient = null;
         repoPath = ValidateRepoPath( monitor, repoPath );
@@ -270,6 +273,20 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                 : null;
     }
 
+
+    /// <summary>
+    /// Logs a standard "Repository not found" error and always returns null.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="repoPath">The not found repository.</param>
+    /// <returns>Always null.</returns>
+    protected HostedRepositoryInfo? LogErrorNotFound( IActivityMonitor monitor, NormalizedPath repoPath )
+    {
+        monitor.Error( $"Expected Git repository at '{BaseUrl}/{repoPath}' is missing." );
+        return null;
+    }
+
+
     /// <summary>
     /// Hook called on requests (provides a <see cref="DelegatingHandler"/> capability).
     /// </summary>
@@ -283,6 +300,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> sendAsync,
                                                                        CancellationToken cancellationToken )
     {
+        OnStartRequest( monitor, request );
         TimeSpan? delay;
         HttpResponseMessage response;
         retry:
@@ -291,13 +309,25 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         {
             return OnSuccessfulResponse( monitor, response );
         }
-        delay = await OnFailedResponseAsync( monitor, response );
+        delay = await OnFailedResponseAsync( monitor, request, response );
         if( delay != null )
         {
             await Task.Delay( delay.Value, cancellationToken ).ConfigureAwait( false );
             goto retry;
         }
         return response;
+    }
+
+    /// <summary>
+    /// Extension point called by <see cref="OnSendHookAsync"/>. Does nothing by default.
+    /// <para>
+    /// Per request state must be registered in <see cref="HttpRequestMessage.Options"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="request">The starting request.</param>
+    protected virtual void OnStartRequest( IActivityMonitor monitor, HttpRequestMessage request )
+    {
     }
 
     /// <summary>
@@ -315,6 +345,10 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     /// Called by default <see cref="OnSendHookAsync"/> when a successful response has been received
     /// (according to <see cref="IsSuccessfulResponse(HttpResponseMessage)"/>).
     /// Does nothing by default: returns the <paramref name="response"/> as-is and logs nothing.
+    /// <para>
+    /// Per request state should have been registered in <see cref="HttpRequestMessage.Options"/>
+    /// by <see cref="OnStartRequest(IActivityMonitor, HttpRequestMessage)"/>.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="response">The successful response.</param>
@@ -330,22 +364,36 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     /// <para>
     /// By default calls <see cref="LogResponse"/> and doesn't retry (returns a null delay).
     /// </para>
-    /// Does nothing by default: returns a null delay.
+    /// <para>
+    /// Per request state (lke a <see cref="HttpRetryState"/> instance) should have been registered
+    /// in <see cref="HttpRequestMessage.Options"/> by <see cref="OnStartRequest(IActivityMonitor, HttpRequestMessage)"/>.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
+    /// <param name="request">The sent request (should be the same as <see cref="HttpResponseMessage.RequestMessage"/>).</param>
     /// <param name="response">The unsuccessful response.</param>
     /// <returns>The delay to wait before retrying, null to not retry an consider this response as the final one.</returns>
-    protected virtual async Task<TimeSpan?> OnFailedResponseAsync( IActivityMonitor monitor, HttpResponseMessage response )
+    protected virtual async Task<TimeSpan?> OnFailedResponseAsync( IActivityMonitor monitor, HttpRequestMessage request, HttpResponseMessage response )
     {
         await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
         return null;
     }
 
+    /// <summary>
+    /// Basically emits the response int the <paramref name="monitor"/>.
+    /// <para>
+    /// Note that logging the request should be avoided: authorization headers, tokens, etc. should not be logged.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The target monitor.</param>
+    /// <param name="response">The response to log.</param>
+    /// <param name="logLevel">The log level.</param>
+    /// <returns>The awaitable.</returns>
     protected virtual async Task LogResponseAsync( IActivityMonitor monitor, HttpResponseMessage response, LogLevel logLevel )
     {
         string dumpResponse = await response.Content.ReadAsStringAsync().ConfigureAwait( false );
         monitor.Log( logLevel, $"""
-            Request '{response.RequestMessage?.RequestUri}' received:
+            Request {response.RequestMessage?.Method.Method} '{response.RequestMessage?.RequestUri}' received:
             {response}
             With content:
             {dumpResponse}

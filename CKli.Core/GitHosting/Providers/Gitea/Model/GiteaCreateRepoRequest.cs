@@ -3,9 +3,9 @@ using System.Text.Json.Serialization;
 namespace CKli.Core.GitHosting.Providers;
 
 /// <summary>
-/// GitHub API request model for creating a repository.
+/// Gitea API request model for creating a repository.
 /// </summary>
-internal sealed class GitHubCreateRepoRequest
+internal sealed class GiteaCreateRepoRequest
 {
     [JsonPropertyName( "name" )]
     public required string Name { get; set; }
@@ -20,11 +20,11 @@ internal sealed class GitHubCreateRepoRequest
     [JsonPropertyName( "auto_init" )]
     public bool AutoInit { get; set; }
 
-    [JsonPropertyName( "gitignore_template" )]
+    [JsonPropertyName( "gitignores" )]
     [JsonIgnore( Condition = JsonIgnoreCondition.WhenWritingNull )]
-    public string? GitignoreTemplate { get; set; }
+    public string? Gitignores { get; set; }
 
-    [JsonPropertyName( "license_template" )]
+    [JsonPropertyName( "license" )]
     [JsonIgnore( Condition = JsonIgnoreCondition.WhenWritingNull )]
-    public string? LicenseTemplate { get; set; }
+    public string? License { get; set; }
 }
