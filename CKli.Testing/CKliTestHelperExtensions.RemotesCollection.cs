@@ -124,9 +124,12 @@ public static partial class CKliTestHelperExtensions
             var local = _remotesPath.AppendPart( _fullName )
                           .AppendPart( _stackName + "-Stack" )
                           .AppendPart( "$Local" );
-            FileUtil.CopyDirectory( new DirectoryInfo( local ), new DirectoryInfo( context.CurrentStackPath.AppendPart( "$Local" ) ) );
+            var source = new DirectoryInfo( local );
+            if( source.Exists )
+            {
+                FileUtil.CopyDirectory( source, new DirectoryInfo( context.CurrentStackPath.AppendPart( "$Local" ) ) );
+            }
             return context;
-
 
             static void CloneOrThrow( CKliEnv context, Uri stackUri, string stackName, bool privateStack )
             {
