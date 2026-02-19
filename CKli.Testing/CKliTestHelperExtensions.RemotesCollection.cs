@@ -37,6 +37,9 @@ public static partial class CKliTestHelperExtensions
         /// </summary>
         public string FullName => _fullName;
 
+        /// <summary>
+        /// Gets the "XXX-Stack" folder in the <see cref="FullName"/> folder.
+        /// </summary>
         public NormalizedPath StackLocalFolderPath => _remotesPath.AppendPart( _fullName ).AppendPart( _stackName+"-Stack" );
 
         /// <summary>
@@ -85,6 +88,9 @@ public static partial class CKliTestHelperExtensions
         /// </summary>
         /// <param name="clonedFolder">The cloned folder of the unit test.</param>
         /// <param name="pluginConfigurationEditor">Optional plugin configuration editor.</param>
+        /// <param name="privateStack">
+        /// Whether to clone the stack as a private stack (in a ".PrivateStack" folder) or a public stack (in a ".PublicStack" folder).
+        /// </param>
         /// <returns>The default world cloned context.</returns>
         public CKliEnv Clone( NormalizedPath clonedFolder, Action<IActivityMonitor, XElement>? pluginConfigurationEditor = null, bool privateStack = false )
         {
@@ -147,6 +153,10 @@ public static partial class CKliTestHelperExtensions
             }
         }
 
+        /// <summary>
+        /// Overridden to return the full name and the number of repositories.
+        /// </summary>
+        /// <returns>A readable string.</returns>
         public override string ToString() => $"{_fullName} - {_repositoryNames.Length} repositories";
     }
 }

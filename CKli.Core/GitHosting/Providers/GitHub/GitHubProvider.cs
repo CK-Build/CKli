@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 
 namespace CKli.Core.GitHosting.Providers;
 
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+
 /// <summary>
 /// GitHub hosting provider implementation.
 /// Supports https://github.com and GitHub Enterprise instances.
@@ -33,7 +35,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
     /// <summary>
     /// Constructor for a GitHub server.
     /// </summary>
-    /// <param name="baseUrl">The <see cref="HttpGitHostingProvider.BaseUrl"/>.</param>
+    /// <param name="baseUrl">The <see cref="GitHostingProvider.BaseUrl"/>.</param>
     /// <param name="gitKey">The git key to use.</param>
     /// <param name="authority">
     /// The authority: currently UriComponents.UserInfo | UriComponents.Host | UriComponents.Port
@@ -44,6 +46,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
     {
     }
 
+    /// <inheritdoc />
     protected internal override NormalizedPath GetRepositoryPathFromUrl( IActivityMonitor monitor, GitRepositoryKey key )
     {
         Throw.DebugAssert( key.OriginUrl.ToString().StartsWith( BaseUrl, StringComparison.OrdinalIgnoreCase ) );
@@ -52,6 +55,10 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
     }
 
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Sets the "Accept" header to "application/vnd.github+json" to opt in to the latest GitHub API version and avoid compatibility issues.
+    /// </remarks>
     protected override void DefaultConfigure( HttpClient client )
     {
         base.DefaultConfigure( client );

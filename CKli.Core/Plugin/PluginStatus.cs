@@ -73,6 +73,12 @@ public static class PluginStatusExtensions
             return "Disabled by disabled dependencies.";
         return Throw.CKException<string>( "Invalid status." );
     }
+
+    /// <summary>
+    /// Associates a color to this status. 
+    /// </summary>
+    /// <param name="status">This status.</param>
+    /// <returns>The color to use.</returns>
     public static Color GetStatusColor( this PluginStatus status )
     {
         if( status == PluginStatus.MissingImplementation )

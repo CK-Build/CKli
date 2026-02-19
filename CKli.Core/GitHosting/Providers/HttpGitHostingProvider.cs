@@ -76,8 +76,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
     }
 
-    /// <inheritdoc cref="GitHostingProvider.GetRepositoryInfoAsync(IActivityMonitor, NormalizedPath, CancellationToken)"/>
-    /// <param name="client">The HttpClient to use.</param>
+    /// <inheritdoc cref="GitHostingProvider.GetRepositoryInfoAsync"/>
     protected abstract Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                            HttpClient client,
                                                                            NormalizedPath repoPath,
@@ -110,7 +109,6 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     }
 
     /// <inheritdoc cref="GitHostingProvider.CreateRepositoryAsync(IActivityMonitor, NormalizedPath, bool?, CancellationToken)"/>
-    /// <param name="client">The HttpClient to use.</param>
     protected abstract Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                           HttpClient client,
                                                                           NormalizedPath repoPath,
@@ -143,8 +141,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
     }
 
-    /// <inheritdoc cref="GitHostingProvider.ArchiveRepositoryAsync(IActivityMonitor, NormalizedPath, CancellationToken)"/>
-    /// <param name="client">The HttpClient to use.</param>
+    /// <inheritdoc cref="GitHostingProvider.ArchiveRepositoryAsync(IActivityMonitor, NormalizedPath, bool, CancellationToken)"/>
     protected abstract Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
                                                           HttpClient client,
                                                           NormalizedPath repoPath,
@@ -176,7 +173,6 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     }
 
     /// <inheritdoc cref="GitHostingProvider.DeleteRepositoryAsync(IActivityMonitor, NormalizedPath, CancellationToken)"/>
-    /// <param name="client">The HttpClient to use.</param>
     protected abstract Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
                                                          HttpClient client,
                                                          NormalizedPath repoPath,
@@ -362,7 +358,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     /// Called by default <see cref="OnSendHookAsync"/> when a failed response has been received
     /// (according to <see cref="IsSuccessfulResponse(HttpResponseMessage)"/>).
     /// <para>
-    /// By default calls <see cref="LogResponse"/> and doesn't retry (returns a null delay).
+    /// By default calls <see cref="LogResponseAsync"/> and doesn't retry (returns a null delay).
     /// </para>
     /// <para>
     /// Per request state (lke a <see cref="HttpRetryState"/> instance) should have been registered

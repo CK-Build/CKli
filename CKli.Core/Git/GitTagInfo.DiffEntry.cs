@@ -141,6 +141,10 @@ public sealed partial class GitTagInfo
         /// </summary>
         public IReadOnlyList<LocalRemoteTag> Tags => _tags;
 
+        /// <summary>
+        /// Returns the commit identifier and the number of associated local and remote tags.
+        /// </summary>
+        /// <returns>A readable string.</returns>
         public override string ToString() => $"{Commit} - {_tags.Count} local/remote tags.";
     }
 }

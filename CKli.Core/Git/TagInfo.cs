@@ -113,6 +113,10 @@ public sealed partial class TagInfo : IComparable<TagInfo>
                 : StringComparer.Ordinal.Compare( tC.Sha, oC.Sha );
     }
 
+    /// <summary>
+    /// returns a string with the tag name and the target commit (or "&lt;&lt;fetch required&gt;&gt;" if the target commit doesn't exist locally).
+    /// </summary>
+    /// <returns>A readable string.</returns>
     public override string ToString() => $"{ShortName} {_commit?.ToString() ?? "<<fetch required>>"}";
 
 }

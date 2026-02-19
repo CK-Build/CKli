@@ -49,9 +49,9 @@ public readonly struct RandomId : ISpanParsable<RandomId>, IEquatable<RandomId>,
     }
 
     /// <summary>
-    /// Initializes a new repository identifier.
+    /// Initializes a new repository identifier. Throws if the string is a valid Base64Url encoded unsigned long.
     /// </summary>
-    /// <param name="value">The string value.</param>
+    /// <param name="s">The string value.</param>
     public RandomId( string s )
     {
         _s = s;
@@ -166,33 +166,19 @@ public readonly struct RandomId : ISpanParsable<RandomId>, IEquatable<RandomId>,
         return TryParse( s.AsSpan(), out result );
     }
 
-    public static bool operator ==( RandomId left, RandomId right )
-    {
-        return left.Equals( right );
-    }
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
-    public static bool operator !=( RandomId left, RandomId right )
-    {
-        return !(left == right);
-    }
+    public static bool operator ==( RandomId left, RandomId right ) => left.Equals( right );
 
-    public static bool operator <( RandomId left, RandomId right )
-    {
-        return left.CompareTo( right ) < 0;
-    }
+    public static bool operator !=( RandomId left, RandomId right ) => !(left == right);
 
-    public static bool operator <=( RandomId left, RandomId right )
-    {
-        return left.CompareTo( right ) <= 0;
-    }
+    public static bool operator <( RandomId left, RandomId right ) => left.CompareTo( right ) < 0;
 
-    public static bool operator >( RandomId left, RandomId right )
-    {
-        return left.CompareTo( right ) > 0;
-    }
+    public static bool operator <=( RandomId left, RandomId right ) => left.CompareTo( right ) <= 0;
 
-    public static bool operator >=( RandomId left, RandomId right )
-    {
-        return left.CompareTo( right ) >= 0;
-    }
+    public static bool operator >( RandomId left, RandomId right ) => left.CompareTo( right ) > 0;
+
+    public static bool operator >=( RandomId left, RandomId right ) => left.CompareTo( right ) >= 0;
+
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
 }

@@ -2,6 +2,9 @@ using System.Net.Http;
 
 namespace CKli.Core.GitHosting.Providers;
 
+/// <summary>
+/// Models the possible reasons of a request cancellation.
+/// </summary>
 public enum HttpRequestCancellationSource
 {
     /// <summary>

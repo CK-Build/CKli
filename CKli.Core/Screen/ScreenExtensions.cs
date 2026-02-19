@@ -201,6 +201,7 @@ public static class ScreenExtensions
     /// Called after a command execution. Default implementation does nothing on help
     /// and displays a green "❰✓❱" on success and a red "❌ Failed" on error.
     /// </summary>
+    /// <param name="screen">The screen.</param>
     /// <param name="success">Whether the command succeeded or not.</param>
     /// <param name="cmdLine">The command line (with its <see cref="CommandLineArguments.FoundCommand"/>).</param>
     internal static void DisplayCommandSuccessOrFailure( IScreen screen, bool success, CommandLineArguments cmdLine )

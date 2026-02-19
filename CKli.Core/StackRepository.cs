@@ -20,7 +20,7 @@ namespace CKli.Core;
 ///         from any local path.
 ///     </item>
 ///     <item>
-///         Calling <see cref="Clone(IActivityMonitor, ISecretsStore, Uri, bool, in NormalizedPath, bool, string)"/>
+///         Calling <see cref="Clone(IActivityMonitor, CKli.Core.CKliEnv, Uri, bool, bool, bool, string)"/>
 ///         from the remote Uri of the stack.
 ///     </item>
 /// </list>
@@ -127,10 +127,6 @@ public sealed partial class StackRepository : IDisposable
 
     /// <summary>
     /// Gets the default world name (no <see cref="WorldName.LTSName"/>).
-    /// <para>
-    /// This is always available even if it's definition file doesn't exist. Use <see cref="GetDefaultWorldName(IActivityMonitor)"/>
-    /// 
-    /// </para>
     /// </summary>
     public LocalWorldName DefaultWorldName
     {
@@ -187,7 +183,7 @@ public sealed partial class StackRepository : IDisposable
     /// Gets the world from a <paramref name="path"/> that must start with <see cref="StackRoot"/>.
     /// <para>
     /// This tries to find a LTS world if the path is below StackRoot and its first folder starts with '@' and is
-    /// a valid LTS name. When the path is everywhere else, <see cref="GetDefaultWorldName(IActivityMonitor)"/> is used.
+    /// a valid LTS name. When the path is everywhere else, <see cref="DefaultWorldName"/> is used.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>

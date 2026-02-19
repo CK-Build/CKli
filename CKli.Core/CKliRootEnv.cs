@@ -14,7 +14,7 @@ namespace CKli.Core;
 /// It may be extended in the future to handle other basic locally configurable aspect but currently it has all what we need.
 /// This must be initialized before anything can be done with the <see cref="StackRepository"/>.
 /// <para>
-/// This is a static class. Tests use the <see cref="Initialize(string?, CommandLineArguments?, IScreen?)"/> instance name to isolate the
+/// This is a static class. Tests use the <see cref="Initialize"/> instance name to isolate the
 /// test environment ("CKli-Test") from the regular run environment ("CKli").
 /// </para>
 /// <para>

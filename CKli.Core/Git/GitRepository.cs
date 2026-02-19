@@ -86,7 +86,7 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
-    /// Gets a mutable list of ref specs (see <see href="<see href="https://git-scm.com/book/en/v2/Git-Internals-The-Refspec"/>"/>)
+    /// Gets a mutable list of ref specs (see <see href="https://git-scm.com/book/en/v2/Git-Internals-The-Refspec"/>)
     /// that will be implicitly pushed with the next push that will be done (can be <see cref="PushBranch(IActivityMonitor, Branch, bool)"/>,
     /// or <see cref="PushTags(IActivityMonitor, IEnumerable{string}, string)"/>, etc.). Once pushed, this list is cleared.
     /// <para>
@@ -241,7 +241,7 @@ public sealed partial class GitRepository : IDisposable
     /// Ensures that a local branch exists. If a remote branch from the 'origin' remote is known locally
     /// it will be associated.
     /// <para>
-    /// If the branch is created without a remote, it will point at the current <see cref="Head"/>'s commit.
+    /// If the branch is created without a remote, it will point at the current head's commit.
     /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
     /// Use <see cref="Checkout(IActivityMonitor, Branch)"/> to switch the head onto the branch.
     /// </para>

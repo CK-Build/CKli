@@ -49,8 +49,22 @@ public sealed partial class TagInfo
         /// </summary>
         public int TagCount => _tagCount;
 
+        /// <summary>
+        /// Compares the current group instance with another group and returns an integer that indicates their relative
+        /// order based on their commit information.
+        /// </summary>
+        /// <param name="other">
+        /// The group to compare with the current instance. This parameter can be null, in which case the current
+        /// instance is considered greater.
+        /// </param>
+        /// <returns>Standard comparison value.</returns>
         public int CompareTo( Group? other ) => CompareCommit( Commit, other?.Commit );
 
+        /// <summary>
+        /// Returns a string that represents the current object, including commit information and the number of
+        /// associated tags if available.
+        /// </summary>
+        /// <returns>A readable string.</returns>
         public override string ToString() => Commit == null ? Head.ToString() : $"{Commit} - {_tagCount} tags.";
 
         internal IRenderable ToRenderable( ScreenType s, IRenderable? beforeTags = null )

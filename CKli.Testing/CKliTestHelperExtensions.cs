@@ -237,8 +237,9 @@ public static partial class CKliTestHelperExtensions
 
     /// <summary>
     /// Must be called by tests to cleanup their respective "Cloned/&lt;test-name&gt;" where they can clone
-    /// the stacks they want from the "Remotes" thanks to <see cref="RemotesCollection.Clone(NormalizedPath, Action{IActivityMonitor, XElement}?)"/>.
+    /// the stacks they want from the "Remotes" thanks to <see cref="RemotesCollection.Clone"/>.
     /// </summary>
+    /// <param name="helper">This helper.</param>
     /// <param name="methodTestName">The test name.</param>
     /// <param name="clearStackRegistryFile">True to clear the stack registry (<see cref="StackRepository.ClearRegistry"/>).</param>
     /// <returns>The path to the cleaned folder.</returns>
@@ -278,6 +279,7 @@ public static partial class CKliTestHelperExtensions
     /// <summary>
     /// Obtains a clean (unmodified) <see cref="RemotesCollection"/> that must exist.
     /// </summary>
+    /// <param name="helper">This helper.</param>
     /// <param name="fullName">The <see cref="RemotesCollection.FullName"/> to use.</param>
     /// <returns>The remotes collection.</returns>
     public static RemotesCollection OpenRemotes( this IMonitorTestHelper helper, string fullName )
@@ -296,6 +298,7 @@ public static partial class CKliTestHelperExtensions
     /// Create or modify a "CKliTestModification.cs" file in the <paramref name="projectFolder"/> and
     /// creates a new commit on a specified branch or on the currently checked out branch.
     /// </summary>
+    /// <param name="helper">This helper.</param>
     /// <param name="context">The context.</param>
     /// <param name="projectFolder">The project  folder (eg. "CKt.Core") relative to <see cref="CKliEnv.CurrentDirectory"/> (can be absolute).</param>
     /// <param name="branchName">The branch name to update (or null to touch the working folder and commit on the current repository head).</param>
@@ -388,6 +391,7 @@ public static partial class CKliTestHelperExtensions
     ///     <item>The "Remotes/Remotes.zip" must be updated thanks to the "ZipRemotes.ps1" script.</item>
     /// </list>
     /// </summary>
+    /// <param name="helper">This helper.</param>
     /// <param name="builderMethodName">The name of the method that worked on the "Cloned/&lt;builderMethodName&gt;" to setup it. Example: "CKt_init_Async".</param>
     /// <param name="stackName">The stack name to consider. Example: "CKt".</param>
     /// <param name="testStateName">

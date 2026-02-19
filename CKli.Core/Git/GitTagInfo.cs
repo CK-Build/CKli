@@ -17,7 +17,7 @@ public sealed partial class GitTagInfo
     ImmutableArray<TagInfo.Group> _groups;
     int _fetchRequiredCount;
 
-    public GitTagInfo( ImmutableArray<TagInfo>.Builder result, ImmutableArray<TagInfo>.Builder? invalidTags, int fetchRequiredCount )
+    internal GitTagInfo( ImmutableArray<TagInfo>.Builder result, ImmutableArray<TagInfo>.Builder? invalidTags, int fetchRequiredCount )
     {
         _tags = result.DrainToImmutable();
         _invalidTags = invalidTags != null ? invalidTags.DrainToImmutable() : [];

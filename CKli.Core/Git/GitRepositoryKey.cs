@@ -18,7 +18,7 @@ public partial class GitRepositoryKey
     }
 
     /// <summary>
-    /// The <see cref="PrefixPAT"/> used for file system provider.
+    /// The <see cref="IGitRepositoryAccessKey.PrefixPAT"/> used for file system provider.
     /// </summary>
     public const string FileSystemPrefixPAT = "FILESYSTEM_GIT";
 
@@ -181,6 +181,7 @@ public partial class GitRepositoryKey
     /// a non null message.
     /// </summary>
     /// <param name="url">The url to validate (null throws a <see cref="ArgumentNullException"/>).</param>
+    /// <param name="parameterName">The name of the parameter used for the ArgumentException.</param>
     public static void ThrowArgumentExceptionOnInvalidUrl( [NotNull] Uri? url, string parameterName = "url" )
     {
         Throw.CheckNotNullArgument( url, parameterName );

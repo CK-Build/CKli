@@ -133,6 +133,10 @@ public sealed partial class GitTagInfo
             }
         }
 
+        /// <summary>
+        /// Returns the canonical name and the <see cref="TagDiff"/>.
+        /// </summary>
+        /// <returns>A readable string.</returns>
         public override string ToString() => $"{CanonicalName} - Diff: {_diff}.";
     }
 }

@@ -11,6 +11,8 @@ using System.Web;
 
 namespace CKli.Core.GitHosting.Providers;
 
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+
 /// <summary>
 /// GitLab hosting provider implementation.
 /// Supports https://gitlab.com and on-premises instances.

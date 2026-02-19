@@ -128,5 +128,9 @@ public sealed class DebugRenderer : IRenderTarget
         return style;
     }
 
+    /// <summary>
+    /// Gets the text rendered so far, with the style diff and end of line markers.
+    /// </summary>
+    /// <returns>The rendered text.</returns>
     public override string ToString() => _b.ToString();
 }

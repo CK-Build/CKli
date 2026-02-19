@@ -10,7 +10,7 @@ namespace CKli.Core;
 
 /// <summary>
 /// The name of this class is misleading (but easier to understand and remember): what is really cached is a default,
-/// application-wide, <see cref="SocketsHttpHandler"/> (actually 2 of them: see <see cref="DefaultHandlerWithoutServerCertificateValidation").
+/// application-wide, <see cref="SocketsHttpHandler"/> (actually 2 of them: see <see cref="DefaultHandlerWithoutServerCertificateValidation"/>).
 /// <para>
 /// This implementation applies the recommended pattern to manage <see cref="HttpClient"/> outside of a DI world
 /// (see <see href="https://learn.microsoft.com/fr-fr/dotnet/fundamentals/runtime-libraries/system-net-http-httpclient"/>).

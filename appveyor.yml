@@ -3,7 +3,7 @@ version: build{build}
 image: Visual Studio 2022
 init:
 - git config --global core.autocrlf true
-clone_folder: C:\CKli-World\CK-Core-Projects\CK-Core
+clone_folder: C:\CKli
 branches:
   only:
     - main

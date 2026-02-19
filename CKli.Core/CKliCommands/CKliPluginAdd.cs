@@ -26,6 +26,7 @@ public sealed class CKliPluginAdd : Command
     {
     }
 
+    /// <inheritdoc />
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
                                                                     CommandLineArguments cmdLine )

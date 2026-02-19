@@ -25,6 +25,14 @@ public sealed class CKliIssue : Command
     {
     }
 
+    /// <summary>
+    /// Executes the "ckli issue" command: raises the <see cref="WorldEvents.Issue"/> event and displays the issues found.
+    /// If the "--fix" option is specified, it tries to fix all the issues that can be fixed automatically.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="context">The minimal context.</param>
+    /// <param name="cmdLine">The command line.</param>
+    /// <returns>True on success, false on error.</returns>
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
                                                                     CommandLineArguments cmdLine )

@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 
 namespace CKli.Core.GitHosting.Providers;
 
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+
 /// <summary>
 /// Gitea hosting provider implementation.
 /// Gitea is self-hosted only - there is no official cloud instance.
