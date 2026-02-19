@@ -103,7 +103,8 @@ public sealed partial class StackRepository
                                 monitor.Warn( $"Duplicate path '{s.Path}' found. It will be deleted." );
                                 mustSave = true;
                             }
-                            else if( foundPath != null && findOrUpdateStackUri == s.Uri )
+                            else if( foundPath != null
+                                     && GitRepositoryKey.OrdinalIgnoreCaseUrlEqualityComparer.Equals( findOrUpdateStackUri, s.Uri ) )
                             {
                                 foundPath.Add( s.Path );
                             }
@@ -127,7 +128,12 @@ public sealed partial class StackRepository
                     {
                         Throw.InvalidDataException( $"Invalid path: '{gitPath}'. Must end with '{PublicStackName}' or '{PrivateStackName}'." );
                     }
-                    var url = GitRepositoryKey.CheckAndNormalizeRepositoryUrl( new Uri( s[1], UriKind.Absolute ) );
+                    var url = new Uri( s[1], UriKind.Absolute );
+                    var error = GitRepositoryKey.GetRepositoryUrlError( url );
+                    if( error != null )
+                    {
+                        Throw.InvalidDataException( error );
+                    }
                     return (gitPath, url);
                 }
 

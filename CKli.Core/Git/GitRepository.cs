@@ -73,11 +73,6 @@ public sealed partial class GitRepository : IDisposable
     public string CurrentBranchName => _git.Head.FriendlyName;
 
     /// <summary>
-    /// Gets the git provider kind.
-    /// </summary>
-    public KnownCloudGitProvider KnownGitProvider => _repositoryKey.KnownGitProvider;
-
-    /// <summary>
     /// Gets or sets the signature to use when modifying this repository.
     /// </summary>
     public Signature Committer
@@ -305,7 +300,7 @@ public sealed partial class GitRepository : IDisposable
         {
             try
             {
-                if( !_repositoryKey.GetReadCredentials( monitor, out var creds ) ) return false;
+                if( !_repositoryKey.AccessKey.GetReadCredentials( monitor, out var creds ) ) return false;
 
                 foreach( Remote remote in _git.Network.Remotes.Where( r => !originOnly || r.Name == "origin" ) )
                 {
@@ -435,7 +430,7 @@ public sealed partial class GitRepository : IDisposable
             var refSpec = $"+{src}:{dst}";
             try
             {
-                if( !r._repositoryKey.GetReadCredentials( monitor, out var creds ) ) return false;
+                if( !r._repositoryKey.AccessKey.GetReadCredentials( monitor, out var creds ) ) return false;
                 Commands.Fetch( r._git, remoteName, [refSpec], new FetchOptions()
                 {
                     CredentialsProvider = ( url, user, types ) => creds,
@@ -505,8 +500,8 @@ public sealed partial class GitRepository : IDisposable
                            [NotNullWhen( true )] out Remote? remote,
                            out UsernamePasswordCredentials? creds )
     {
-        if( (forWrite && !_repositoryKey.GetWriteCredentials( monitor, out creds ))
-            || !_repositoryKey.GetReadCredentials( monitor, out creds ) )
+        if( (forWrite && !_repositoryKey.AccessKey.GetWriteCredentials( monitor, out creds ))
+            || !_repositoryKey.AccessKey.GetReadCredentials( monitor, out creds ) )
         {
             remote = null;
             return false;
@@ -1073,7 +1068,7 @@ public sealed partial class GitRepository : IDisposable
             return true;
         }
 
-        if( !_repositoryKey.GetReadCredentials( monitor, out var creds ) )
+        if( !_repositoryKey.AccessKey.GetReadCredentials( monitor, out var creds ) )
         {
             return false;
         }
@@ -1256,7 +1251,8 @@ public sealed partial class GitRepository : IDisposable
     {
         using( monitor.OpenInfo( $"Cloning '{workingFolder}' from '{git.OriginUrl}'." ) )
         {
-            if( !git.GetReadCredentials( monitor, out var creds ) ) return null;
+            if( !git.AccessKey.GetReadCredentials( monitor, out var creds ) ) return null;
+            Repository? r = null;
             try
             {
                 Repository.Clone( git.OriginUrl.AbsoluteUri, workingFolder, new CloneOptions()
@@ -1264,20 +1260,14 @@ public sealed partial class GitRepository : IDisposable
                     FetchOptions = { CredentialsProvider = ( url, user, cred ) => creds },
                     Checkout = true
                 } );
-                var r = new Repository( workingFolder );
-                var o = r.Network.Remotes["origin"];
-                if( o == null || !GitRepositoryKey.IsEquivalentRepositoryUri( new Uri( o.Url, UriKind.Absolute ), git.OriginUrl ) )
-                {
-                    monitor.Fatal( $"Existing '{workingFolder}' must have its 'origin' remote set to '{git.OriginUrl}'. This must be fixed manually." );
-                    r.Dispose();
-                    return null;
-                }
+                r = new Repository( workingFolder );
                 EnsureFirstCommit( monitor, r );
                 return r;
             }
             catch( Exception ex )
             {
                 monitor.Error( "Git clone failed. Leaving existing directory as-is.", ex );
+                r?.Dispose();
                 return null;
             }
         }

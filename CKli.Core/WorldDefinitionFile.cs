@@ -337,7 +337,7 @@ public sealed class WorldDefinitionFile
     internal bool AddRepository( IActivityMonitor monitor, NormalizedPath path, IEnumerable<string> folders, Uri uri )
     {
         Throw.DebugAssert( folders.All( IsValidFolderName ) );
-        Throw.DebugAssert( GitRepositoryKey.CheckAndNormalizeRepositoryUrl( uri ) == uri );
+        Throw.DebugAssert( GitRepositoryKey.GetRepositoryUrlError( uri ) == null );
 
         // Normalizing "Repository Proxy" url: The name of the Repo is used (the path.LastPart).
         string urlValue = NormalizeRepositoryProxyUrl( monitor, uri );
@@ -626,14 +626,16 @@ public sealed class WorldDefinitionFile
                         {
                             // This removes any trailing .git, checks that no ?query part exists
                             // and extracts a necessarily valid repoName.
-                            url = GitRepositoryKey.CheckAndNormalizeRepositoryUrl( monitor, url, out var repoName );
-                            if( url == null )
+                            var urlError = GitRepositoryKey.GetRepositoryUrlError( url );
+                            if( urlError != null )
                             {
+                                monitor.Error( urlError );
                                 hasError = true;
                             }
                             else
                             {
-                                list.Add( new World.RepoLayout( url, c, p.AppendPart( repoName ) ) );
+                                var repoName = Path.GetFileName( url.ToString().AsSpan() );
+                                list.Add( new World.RepoLayout( url, c, p.AppendPart( new string( repoName ) ) ) );
                             }
                         }
                     }

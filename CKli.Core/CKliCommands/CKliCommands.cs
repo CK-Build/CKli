@@ -40,10 +40,11 @@ public static class CKliCommands
 
         cmds.Add( "maintenance", null );
         cmds.Add( "maintenance hosting", null );
-        Add( cmds, new CKliMaintenanceHostingInfo() );
         Add( cmds, new CKliMaintenanceHostingCreate() );
-        Add( cmds, new CKliMaintenanceHostingArchive() );
         Add( cmds, new CKliMaintenanceHostingDelete() );
+        //Add( cmds, new CKliMaintenanceHostingArchive() );
+        //Add( cmds, new CKliMaintenanceHostingInfo() );
+
 
         cmds.Add( "remote", null );
         cmds.Add( "remote stack", null );

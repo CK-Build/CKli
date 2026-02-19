@@ -19,7 +19,7 @@ public partial class PullPushTests
         // good to not make an exception for this case.
         ProcessRunner.RunProcess( TestHelper.Monitor,
                                   "dotnet",
-                                  """user-secrets set FILESYSTEM_GIT_WRITE_PAT "don't care" --id CKli-Test""",
+                                  """user-secrets set FILESYSTEM_GIT "don't care" --id CKli-Test""",
                                   Environment.CurrentDirectory )
                      .ShouldBe( 0 );
     }

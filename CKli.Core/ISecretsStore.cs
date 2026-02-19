@@ -12,7 +12,6 @@ namespace CKli.Core;
 /// </summary>
 public interface ISecretsStore
 {
-
     /// <summary>
     /// Provides a secret if it exists or returns null and emits an error that explains
     /// how to register the secret on the system.

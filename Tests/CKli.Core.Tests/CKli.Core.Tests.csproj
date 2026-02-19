@@ -26,8 +26,6 @@
   -->
   <ItemGroup>
     <None Include="$(Content);Remotes\**;Cloned\**;PackagedPlugins\**" />
-  </ItemGroup>
-  <ItemGroup>
     <Compile Remove="Remotes\**;Cloned\**;PackagedPlugins\**" />
   </ItemGroup>
 

@@ -31,16 +31,19 @@ sealed class CKliRemoteStackMigrate : Command
             monitor.Error( "Missing required <newUrl> argument." );
             return ValueTask.FromResult( false );
         }
-
-        bool noPush = cmdLine.EatFlag( "--no-push" );
-        if( !cmdLine.Close( monitor ) )
+        if( !Uri.TryCreate( newUrlString, UriKind.RelativeOrAbsolute, out var newUrl ) )
         {
+            monitor.Error( "Unable to parse <newUrl> argument as a valid url." );
             return ValueTask.FromResult( false );
         }
-
-        // Validate the URL
-        var newUrl = GitRepositoryKey.CheckAndNormalizeRepositoryUrl( monitor, new Uri( newUrlString, UriKind.RelativeOrAbsolute ), out _ );
-        if( newUrl == null )
+        var urlError = GitRepositoryKey.GetRepositoryUrlError( newUrl );
+        if( urlError != null )
+        {
+            monitor.Error( urlError );
+            return ValueTask.FromResult( false );
+        }
+        bool noPush = cmdLine.EatFlag( "--no-push" );
+        if( !cmdLine.Close( monitor ) )
         {
             return ValueTask.FromResult( false );
         }

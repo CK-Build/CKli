@@ -7,6 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="CKliCommands\CKliMaintenanceHostingArchive.cs" />
+    <Compile Remove="CKliCommands\CKliMaintenanceHostingInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="CSemVer" Version="13.0.0" />
     <PackageReference Include="CK.CanaryPackage" Version="1.0.0" />
     <PackageReference Include="CK.Monitoring" Version="25.1.0" />
@@ -14,4 +19,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="CKli.Core.Tests" />
+  </ItemGroup>
 </Project>

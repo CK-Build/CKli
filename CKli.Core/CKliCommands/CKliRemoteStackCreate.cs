@@ -14,7 +14,7 @@ sealed class CKliRemoteStackCreate : Command
                 "remote stack create",
                 "Creates a new Stack in the current directory.",
                 [("stackName", "The name of the stack to create (without '-Stack' suffix).")],
-                [(["--url", "-u"], "Optional remote URL. Sets up origin but does not push.", false)],
+                [(["--url", "-u"], "Optional remote url. Sets up origin but does not push.", false)],
                 [
                     (["--private"], "Use '.PrivateStack' folder instead of '.PublicStack'."),
                 ] )
