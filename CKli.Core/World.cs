@@ -316,13 +316,19 @@ public sealed partial class World
     /// Gets all <see cref="Repo"/> from the provided path (case insensitive) that must be below or equal
     /// to this <see cref="LocalWorldName.WorldRoot"/> (otherwise an <see cref="ArgumentException"/> is thrown).
     /// <para>
-    /// The returned list may be empty if this world is empty.
+    /// The returned list may be empty if this world is empty or if the <paramref name="path"/> is a folder that
+    /// is both not in and not above a Repo. This is the case of the stack folder (the ".PrivateStack" or ".PublicStack"
+    /// or any folder inside it).
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="path">The path that must be below the world root.</param>
+    /// <param name="allowEmpty">
+    /// False to return null and emit an error if no Repo can be found.
+    /// By default, the returned list can be empty.
+    /// </param>
     /// <returns>The repositories or null on error.</returns>
-    public IReadOnlyList<Repo>? GetAllDefinedRepo( IActivityMonitor monitor, NormalizedPath path )
+    public IReadOnlyList<Repo>? GetAllDefinedRepo( IActivityMonitor monitor, NormalizedPath path, bool allowEmpty = true )
     {
         Throw.CheckArgument( IsBelowPathOrEqual( _name.WorldRoot, path ) );
         var worldPath = _name.WorldRoot.Path;
@@ -348,6 +354,11 @@ public sealed partial class World
             {
                 result.Add( repo );
             } 
+        }
+        if( !allowEmpty && result.Count == 0 )
+        {
+            monitor.Error( $"Unable to find any Repo from path '{path}'." );
+            return null;
         }
         return result;
     }

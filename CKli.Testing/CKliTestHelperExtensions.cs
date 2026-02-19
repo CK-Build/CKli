@@ -381,7 +381,7 @@ public static partial class CKliTestHelperExtensions
     /// <summary>
     /// Uses a "Cloned/" folder (that has been handled by another test) to create a new "Remote/" one.
     /// <list type="bullet">
-    ///     <item>The source "Cloned/builderMethodName" must exist and must obviously bet the result of a successful unit test.</item>
+    ///     <item>The source "Cloned/builderMethodName" must exist and must obviously be the result of a successful unit test.</item>
     ///     <item>The target "Remote/stack(testState)" must not already exist.</item>
     ///     <item>This removes the "origin" remote from all the repositories</item>
     ///     <item>The source "Cloned/builderMethodName" is cleared once done.</item>
@@ -397,12 +397,22 @@ public static partial class CKliTestHelperExtensions
     public static void CKliCreateRemoteFolderFromCloned( this IMonitorTestHelper helper, string builderMethodName, string stackName, string testStateName )
     {
         Throw.CheckArgument( !string.IsNullOrEmpty( testStateName ) && testStateName[0] == '(' && testStateName[^1] == ')' );
+        var destination = TestHelper.CKliRemotesPath.AppendPart( stackName + testStateName );
+        if( Directory.Exists( destination ) )
+        {
+            Throw.CKException( $"""
+                Target directory already exists: '{destination}'.
+                It must be explicitly deleted before calling this method:
 
+                FileHelper.DeleteFolder( TestHelper.Monitor, TestHelper.CKliRemotesPath.AppendPart( "{stackName + testStateName}" ) );
+
+                """ );
+        }
         var source = TestHelper.CKliClonedPath.AppendPart( builderMethodName ).AppendPart( stackName );
         var context = new CKliEnv( source );
         if( !StackRepository.OpenWorldFromPath( TestHelper.Monitor, context, out var stack, out var world, skipPullStack: true, withPlugins: false ) )
         {
-            Throw.CKException( $"Unable to open cloned stack from '{context.CurrentDirectory}'." );
+            Throw.CKException( $"Unable to open cloned stack '{stackName}' from '{context.CurrentDirectory}'." );
         }
 
         var copyRoadmap = new List<(NormalizedPath, string)>() { (stack.StackWorkingFolder, stack.StackName + "-Stack") };
@@ -429,11 +439,6 @@ public static partial class CKliTestHelperExtensions
             stack.Dispose();
         }
 
-        var destination = TestHelper.CKliRemotesPath.AppendPart( "CKt" + testStateName );
-        if( Directory.Exists( destination ) )
-        {
-            Throw.CKException( $"Target directory already exists: '{destination}'." );
-        }
         foreach( var (path, name) in copyRoadmap )
         {
             var target = destination.AppendPart( name );

@@ -46,6 +46,18 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
     public static void Initialize( AssemblyLoadContext? supplementary = null )
     {
         Throw.CheckState( "Must be called only once.", _assemblies == null );
+
+        //
+        // Preserves the assembly reference to CKli.Plugins.Core.
+        // Without this it is trimmed and the CKli.Plugins.Core is loaded in the plugins context.
+        //
+        // And the "funny" thing is that CKli.Testing must do the same. Without it, CKli.Testing
+        // references CKli.Loader and CKli.Core but not CKli.Plugins.Core and, again, when loaded
+        // from CKli.Testing (directly from the World host's run folder), CKli.Plugins.Core is loaded
+        // in the plugin context (and this triggers a MissingMethodException).
+        //
+        GC.KeepAlive( typeof( CKli.Plugins.PluginCollector ) );
+
         _assemblies = new Dictionary<string, Assembly>( 100 );
         // With NUnit contexts, there are assemblies that are in both contexts...
         // It appears that the "right" one must be the one of the NUnit context,
@@ -75,15 +87,6 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
     PluginLoadContext( WorldName worldName, string runFolder )
         : base( worldName.FullName, isCollectible: true )
     {
-        // Preserves the assembly reference to CKli.Plugins.Core.
-        // Without this it is trimmed and the CKli.Plugins.Core is loaded in the plugins context.
-        //
-        // And the "funny" thing is that CKli.Testing must do the same. Without it, CKli.Testing
-        // references CKli.Loader and CKli.Core but not CKli.Plugins.Core and, again, when loaded
-        // from CKli.Testing (directly from the World host's run folder), CKli.Plugins.Core is loaded
-        // in the plugin context (and this triggers a MissingMethodException).
-        //
-        GC.KeepAlive( typeof( CKli.Plugins.PluginCollector ) );
         _runFolder = runFolder;
     }
 
