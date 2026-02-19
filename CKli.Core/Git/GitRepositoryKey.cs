@@ -90,7 +90,29 @@ public partial class GitRepositoryKey
     /// <summary>
     /// Gets the access key for this repository.
     /// </summary>
-    public IGitRepositoryAccessKey AccessKey => _accessKey ??= GitRepositoryAccessKey.Get( _secretsStore, _originUrl, _isPublic ); 
+    public IGitRepositoryAccessKey AccessKey => _accessKey ??= GitRepositoryAccessKey.Get( _secretsStore, _originUrl, _isPublic );
+
+    /// <summary>
+    /// Attempts to retrieve the Git hosting provider and normalized repository path for this <see cref="OriginUrl"/>.
+    /// <para>
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="hostingProvider">Outputs the Git hosting provider on success.</param>
+    /// <param name="repoPath">Outputs the normalized repository path on success.</param>
+    /// <returns>true if the hosting provider and repository path were successfully retrieved; otherwise, false.</returns>
+    public bool TryGetHostingInfo( IActivityMonitor monitor, [NotNullWhen(true)]out GitHostingProvider? hostingProvider, out NormalizedPath repoPath )
+    {
+        hostingProvider = AccessKey.HostingProvider;
+        if( hostingProvider == null )
+        {
+            monitor.Error( $"Could not determine hosting provider for url: '{_originUrl}'." );
+            repoPath = default;
+            return false;
+        }
+        repoPath = hostingProvider.GetRepositoryPathFromUrl( monitor, this );
+        return !repoPath.IsEmptyPath;
+    }
 
     /// <summary>
     /// Gets the valid repository name.
@@ -168,4 +190,25 @@ public partial class GitRepositoryKey
             Throw.ArgumentException( nameof( url ), error );
         }
     }
+
+    /// <summary>
+    /// Extension point to be used by external "Core plugins" to support specific url formats and hosting providers.
+    /// If the <paramref name="hostingProviderFactory"/> is null, the created access key will have no hosting provider. 
+    /// </summary>
+    /// <param name="prefixPAT">The <see cref="IGitRepositoryAccessKey.PrefixPAT"/> that identifies the key.</param>
+    /// <param name="secretsStore">The secret store.</param>
+    /// <param name="isPublic">See <see cref="IGitRepositoryAccessKey.IsPublic"/>.</param>
+    /// <param name="hostingProviderFactory">
+    /// Optional function that can associate the <see cref="IGitRepositoryAccessKey.HostingProvider"/> to the
+    /// newly created key. When not null, this is called immediately.
+    /// </param>
+    /// <returns>The repository key.</returns>
+    public static IGitRepositoryAccessKey CreateAccessKey( string prefixPAT,
+                                                           ISecretsStore secretsStore,
+                                                           bool? isPublic,
+                                                           Func<IGitRepositoryAccessKey, GitHostingProvider?>? hostingProviderFactory )
+    {
+        return new GitRepositoryAccessKey( prefixPAT, secretsStore, isPublic, hostingProviderFactory );
+    }
+
 }

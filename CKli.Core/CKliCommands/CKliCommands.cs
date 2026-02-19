@@ -38,12 +38,13 @@ public static class CKliCommands
         //Add( cmds, new CKliRepoMove() ); => Moves to another stack (target repo may have a boost version).
         //Add( cmds, new CKliRepoMigrate() ); => Moves the remote git => new origin url.
 
-        //cmds.Add( "maintenance", null );
-        //cmds.Add( "maintenance hosting", null );
-        //Add( cmds, new CKliMaintenanceHostingInfo() );
-        //Add( cmds, new CKliMaintenanceHostingCreate() );
+        cmds.Add( "maintenance", null );
+        cmds.Add( "maintenance hosting", null );
+        Add( cmds, new CKliMaintenanceHostingCreate() );
+        Add( cmds, new CKliMaintenanceHostingDelete() );
         //Add( cmds, new CKliMaintenanceHostingArchive() );
-        //Add( cmds, new CKliMaintenanceHostingDelete() );
+        //Add( cmds, new CKliMaintenanceHostingInfo() );
+
 
         cmds.Add( "remote", null );
         cmds.Add( "remote stack", null );

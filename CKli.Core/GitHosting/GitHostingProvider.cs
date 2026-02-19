@@ -64,6 +64,15 @@ public abstract partial class GitHostingProvider
     public IGitRepositoryAccessKey GitKey => _gitKey;
 
     /// <summary>
+    /// Gets the normalized repository path that corresponds to a <see cref="GitRepositoryKey.OriginUrl"/>.
+    /// The key has resolved this provider as its hosting provider.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="key">The repository key.</param>
+    /// <returns>The path to the repository or <see cref="NormalizedPath.IsEmptyPath"/> if it cannot be resolved.</returns>
+    internal protected abstract NormalizedPath GetRepositoryPathFromUrl( IActivityMonitor monitor, GitRepositoryKey key );
+
+    /// <summary>
     /// Gets information about a repository.
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>

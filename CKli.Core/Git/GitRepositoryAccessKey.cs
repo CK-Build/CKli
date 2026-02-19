@@ -8,13 +8,15 @@ using System.Text.RegularExpressions;
 namespace CKli.Core;
 
 /// <summary>
-/// Implements the primary <see cref="IGitRepositoryAccessKey"/>.
-/// This can only be obtained through the <see cref="GitRepositoryKey.AccessKey"/>.
+/// Internal implementation of the primary <see cref="IGitRepositoryAccessKey"/>.
+/// These access keys are shared (indexed by PrefixPAT): <see cref="Get(ISecretsStore, Uri, bool)"/>
+/// finds or creates them. 
 /// <para>
-/// This is publicly exposed in order, one day, to be implemented in external "Core Plugins".
+/// Externally, this can only be obtained through the <see cref="GitRepositoryKey.AccessKey"/> and to support
+/// externally resolved access keys, the static <see cref="GitRepositoryKey.CreateAccessKey"/> method can be used.
 /// </para>
 /// </summary>
-public partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
+sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
 {
     readonly ISecretsStore _secretsStore;
     readonly string _prefixPAT;
@@ -145,7 +147,7 @@ public partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
         //
         // This should look like:
         //
-        // var externallyResolved = CorePlugins.FindOrCreateRepositoryAccessKey( _accessKeys, baseUrl, authority, url );
+        // var externallyResolved = CorePlugins.FindOrCreateRepositoryAccessKey( secretsStore, _accessKeys, baseUrl, authority, url );
         // if( externallyResolved != null )
         // {
         //    return externallyResolved;
@@ -237,10 +239,10 @@ public partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
     }
 
 
-    protected GitRepositoryAccessKey( string prefixPAT,
-                                      ISecretsStore secretsStore,
-                                      bool? isPublic,
-                                      Func<GitRepositoryAccessKey,GitHostingProvider?>? hostingProviderFactory )
+    internal GitRepositoryAccessKey( string prefixPAT,
+                                     ISecretsStore secretsStore,
+                                     bool? isPublic,
+                                     Func<GitRepositoryAccessKey,GitHostingProvider?>? hostingProviderFactory )
     {
         _prefixPAT = prefixPAT;
         _secretsStore = secretsStore;
@@ -307,7 +309,7 @@ public partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
 
     public override string ToString() => _toString ??= AccessKeyToString( PrefixPAT, _isPublic ?? true );
 
-    [GeneratedRegex( "[^A-Z_0-9]" )]
+    [GeneratedRegex( "[^A-Z_0-9]", RegexOptions.CultureInvariant )]
     private static partial Regex BadPATChars();
 
     [GeneratedRegex( @"^/*([^\/]*)", RegexOptions.CultureInvariant )]

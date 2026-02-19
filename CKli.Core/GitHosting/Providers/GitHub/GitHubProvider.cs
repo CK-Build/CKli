@@ -33,7 +33,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
     /// <summary>
     /// Constructor for a GitHub server.
     /// </summary>
-    /// <param name="baseUrl">The <see cref="HttpGitHostingProvider.BaseApiUrl"/>.</param>
+    /// <param name="baseUrl">The <see cref="HttpGitHostingProvider.BaseUrl"/>.</param>
     /// <param name="gitKey">The git key to use.</param>
     /// <param name="authority">
     /// The authority: currently UriComponents.UserInfo | UriComponents.Host | UriComponents.Port
@@ -43,6 +43,14 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         : this( baseUrl, gitKey, new Uri( $"https://{authority}/api/v3" ) )
     {
     }
+
+    protected internal override NormalizedPath GetRepositoryPathFromUrl( IActivityMonitor monitor, GitRepositoryKey key )
+    {
+        Throw.DebugAssert( key.OriginUrl.ToString().StartsWith( BaseUrl, StringComparison.OrdinalIgnoreCase ) );
+        // No intermediate "folder" exist for GitHub: the repository is the last part of the url path.
+        return key.RepositoryName;
+    }
+
 
     protected override void DefaultConfigure( HttpClient client )
     {

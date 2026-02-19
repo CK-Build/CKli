@@ -17,6 +17,12 @@ sealed class FileSystemProvider : GitHostingProvider
 
     public override bool CanArchiveRepository => false;
 
+    protected internal override NormalizedPath GetRepositoryPathFromUrl( IActivityMonitor monitor, GitRepositoryKey key )
+    {
+        Throw.DebugAssert( key.OriginUrl.Scheme == Uri.UriSchemeFile );
+        return key.OriginUrl.LocalPath;
+    }
+
     public override Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                         NormalizedPath repoPath,
                                                                         bool mustExist,
@@ -140,5 +146,4 @@ sealed class FileSystemProvider : GitHostingProvider
     {
         return Task.FromException<bool>( new NotSupportedException( ProviderType ) );
     }
-
 }

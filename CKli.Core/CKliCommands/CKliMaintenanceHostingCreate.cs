@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core.GitHosting;
+using System;
 using System.Collections.Immutable;
 using System.Threading.Tasks;
 
@@ -14,13 +15,11 @@ sealed class CKliMaintenanceHostingCreate : Command
         : base( null,
                 "maintenance hosting create",
                 "Creates a new repository on the hosting provider.",
-                [("url", "Repository URL (HTTPS or SSH format).")],
+                [("url", "Repository url (https:// or file://).")],
+                [],
                 [
-                    (["--description", "-d"], "Repository description.", false)
-                ],
-                [
-                    (["--private", "-p"], "Make the repository private (default: public)."),
-                    (["--init"], "Initialize with a README file.")
+                    (["--private"], "Make the repository private. By default, the access is the same as the current stack."),
+                    (["--public"], "Make the repository public. By default, the access is the same as the current stack.")
                 ] )
     {
     }
@@ -29,69 +28,72 @@ sealed class CKliMaintenanceHostingCreate : Command
                                                                           CKliEnv context,
                                                                           CommandLineArguments cmdLine )
     {
-        string url = cmdLine.EatArgument();
-        string? description = cmdLine.EatSingleOption( "--description", "-d" );
-        bool isPrivate = cmdLine.EatFlag( "--private", "-p" );
-        bool autoInit = cmdLine.EatFlag( "--init" );
+        Uri? url = ReadRepoUrlArgument( monitor, cmdLine );
+        if( url == null )
+        {
+            return false;
+        }
 
+        bool isPrivate = cmdLine.EatFlag( "--private" );
+        bool isPublic = cmdLine.EatFlag( "--public" );
+        if( isPrivate && isPublic )
+        {
+            monitor.Error( "Cannot specify both --private and --public." );
+            return false;
+        }
         if( !cmdLine.Close( monitor ) )
         {
             return false;
         }
-
-        var provider = await GitHostingProviderDetector.ResolveProviderAsync( monitor, context.SecretsStore, url );
-        if( provider == null )
+        // If --private nor --public are specified, lookup the current stack access.
+        // Note that this is the nominal case: this creates, by default, a repository with the same access
+        // as the current stack.
+        if( !isPrivate && !isPublic )
         {
-            return false;
-        }
-
-        var parsed = provider.ParseRemoteUrl( url );
-        if( parsed == null )
-        {
-            monitor.Error( $"Could not parse owner/repository from URL: {url}" );
-            return false;
-        }
-
-        // Generate default description if not provided
-        if( description == null )
-        {
-            string? stackName = null;
-            var stack = StackRepository.TryOpenFromPath( monitor, context, out _, skipPullStack: true );
-            if( stack != null )
+            var currentStack = StackRepository.TryOpenFromPath( monitor, context, out bool error, skipPullStack: true );
+            if( currentStack == null )
             {
-                stackName = stack.StackName;
-                stack.Dispose();
+                if( !error )
+                {
+                    monitor.Error( "The current directory is not in a Stack directory: --public or --private must be specified." );
+                }
+                return false;
             }
-            description = HostedRepositoryCreateOptions.GenerateDefaultDescription( parsed.Value.RepoName, stackName );
+            isPublic = currentStack.IsPublic;
+            isPrivate = !isPublic;
+            currentStack.Dispose();
         }
-
-        var options = new HostedRepositoryCreateOptions
+        var gitKey = new GitRepositoryKey( context.SecretsStore, url, isPublic );
+        if( !gitKey.TryGetHostingInfo( monitor, out var hostingProvider, out var repoPath ) )
         {
-            Owner = parsed.Value.Owner,
-            Name = parsed.Value.RepoName,
-            Description = description,
-            IsPrivate = isPrivate,
-            AutoInit = autoInit
-        };
-
-        monitor.Info( $"Creating repository {parsed.Value.Owner}/{parsed.Value.RepoName} on {provider.HostName}..." );
-
-        var result = await provider.CreateRepositoryAsync( monitor, options );
-        if( !result.Success )
+            return false;
+        }
+        HostedRepositoryInfo? info = await hostingProvider.CreateRepositoryAsync( monitor, repoPath, isPrivate ).ConfigureAwait( false );
+        if( info == null )
         {
-            monitor.Error( result.ErrorMessage ?? "Failed to create repository." );
             return false;
         }
 
-        var info = result.Data!;
         var screenType = context.Screen.ScreenType;
-
-        var display = screenType.SuccessMessage( $"Repository created: {info.Owner}/{info.Name}" )
-            .AddBelow( screenType.UrlField( "HTTPS URL", info.CloneUrlHttps ).Box( marginLeft: 4 ) )
-            .AddBelow( screenType.LabeledField( "SSH URL", info.CloneUrlSsh ).Box( marginLeft: 4 ) )
-            .AddBelow( screenType.UrlField( "Web URL", info.WebUrl ).Box( marginLeft: 4 ) );
-
+        var display = screenType.SuccessMessage( $"Repository '{info.RepoPath}' created in '{hostingProvider.BaseUrl}'." )
+            .AddBelow( screenType.UrlField( "Url", info.WebUrl ).Box( marginLeft: 4 ) );
         context.Screen.Display( display );
+
         return true;
+    }
+
+    internal static Uri? ReadRepoUrlArgument( IActivityMonitor monitor, CommandLineArguments cmdLine )
+    {
+        string sUrl = cmdLine.EatArgument();
+        var errorMessage = Uri.TryCreate( sUrl, UriKind.Absolute, out var url )
+                                ? GitRepositoryKey.GetRepositoryUrlError( url )
+                                : $"Unable to parse url: '{sUrl}'.";
+        if( errorMessage != null )
+        {
+            monitor.Error( errorMessage );
+            return null;
+        }
+
+        return url;
     }
 }

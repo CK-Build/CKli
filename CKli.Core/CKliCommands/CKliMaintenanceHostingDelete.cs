@@ -13,11 +13,11 @@ sealed class CKliMaintenanceHostingDelete : Command
     internal CKliMaintenanceHostingDelete()
         : base( null,
                 "maintenance hosting delete",
-                "Deletes a repository on the hosting provider. Requires --force to confirm.",
-                [("url", "Repository URL (HTTPS or SSH format).")],
+                "Deletes a repository on the hosting provider.",
+                [("url", "Repository url (https:// or file://).")],
                 [],
                 [
-                    (["--force", "-f"], "Confirm deletion. Required to proceed.")
+                    (["--confirm"], "Confirm deletion. Required to proceed.")
                 ] )
     {
     }
@@ -26,49 +26,33 @@ sealed class CKliMaintenanceHostingDelete : Command
                                                                           CKliEnv context,
                                                                           CommandLineArguments cmdLine )
     {
-        string url = cmdLine.EatArgument();
-        bool force = cmdLine.EatFlag( "--force", "-f" );
+        Uri? url = CKliMaintenanceHostingCreate.ReadRepoUrlArgument( monitor, cmdLine );
+        if( url == null )
+        {
+            return false;
+        }
+        bool confirm = cmdLine.EatFlag( "--confirm" );
 
         if( !cmdLine.Close( monitor ) )
         {
             return false;
         }
 
-        if( !force )
-        {
-            var screenType = context.Screen.ScreenType;
-            context.Screen.Display( screenType.WarningMessage( "Deletion requires --force flag to confirm." )
-                .AddBelow( screenType.Text( "This action is irreversible.", ConsoleColor.Yellow ).Box( marginLeft: 4 ) ) );
-            return false;
-        }
-
-        var provider = await GitHostingProviderDetector.ResolveProviderAsync( monitor, context.SecretsStore, url );
-        if( provider == null )
+        var gitKey = new GitRepositoryKey( context.SecretsStore, url, isPublic: false );
+        if( !gitKey.TryGetHostingInfo( monitor, out var hostingProvider, out var repoPath ) )
         {
             return false;
         }
-
-        using( provider )
+        if( !confirm )
         {
-            var parsed = provider.ParseRemoteUrl( url );
-            if( parsed == null )
-            {
-                monitor.Error( $"Could not parse owner/repository from URL: {url}" );
-                return false;
-            }
-
-            monitor.Warn( $"Deleting repository {parsed.Value.Owner}/{parsed.Value.RepoName} on {provider.HostName}..." );
-
-            var result = await provider.DeleteRepositoryAsync( monitor, parsed.Value.Owner, parsed.Value.RepoName );
-            if( !result.Success )
-            {
-                monitor.Error( result.ErrorMessage ?? "Failed to delete repository." );
-                return false;
-            }
-
-            var screenType = context.Screen.ScreenType;
-            context.Screen.Display( screenType.SuccessMessage( $"Repository deleted: {parsed.Value.Owner}/{parsed.Value.RepoName}" ) );
+            monitor.Error( "Deletion requires --confirm flag (this action is irreversible)." );
+            return false;
+        }
+        if( await hostingProvider.DeleteRepositoryAsync( monitor, repoPath ).ConfigureAwait( false ) )
+        {
+            monitor.Info( ScreenType.CKliScreenTag, $"Repository '{url}' deleted successfully." );
             return true;
         }
+        return false;
     }
 }

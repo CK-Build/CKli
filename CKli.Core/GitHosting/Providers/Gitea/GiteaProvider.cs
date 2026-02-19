@@ -24,6 +24,13 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
     {
     }
 
+    protected internal override NormalizedPath GetRepositoryPathFromUrl( IActivityMonitor monitor, GitRepositoryKey key )
+    {
+        Throw.DebugAssert( key.OriginUrl.ToString().StartsWith( BaseUrl, StringComparison.OrdinalIgnoreCase ) );
+        // No intermediate "folder" exist for Gitea: the repository is the last part of the url path.
+        return key.RepositoryName;
+    }
+
     protected override void DefaultConfigure( HttpClient client )
     {
         base.DefaultConfigure( client );
