@@ -124,7 +124,7 @@ public class FileSystemProviderTests
             var info = await p.CreateRepositoryAsync( TestHelper.Monitor, endWithGit );
             info.ShouldBeNull();
             logs.ShouldContain( l => Regex.IsMatch( l.Replace( '\\', '/' ),
-                @"Cannot create a repository inside another one at '.*/Dev/CKli/Tests/CKli\.Core\.Tests/Remotes/SomeNew/\.git'." ) );
+                @"Cannot create a repository inside another one at '.*/CKli/Tests/CKli\.Core\.Tests/Remotes/SomeNew/\.git'." ) );
         }
     }
 

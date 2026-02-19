@@ -20,7 +20,7 @@ public class GitHubProviderTests
             var store = new DotNetUserSecretsStore();
             var gitKey = new GitRepositoryKey( store, new Uri( "https://github.com/CK-Build/CKli" ), isPublic: true );
             gitKey.AccessKey.PrefixPAT.ShouldBe( "GITHUB_CK_BUILD" );
-            Assume.That( gitKey.AccessKey.GetWriteCredentials( TestHelper.Monitor, out var creds ), "The user-secrets store must be configured." );
+            Assume.That( gitKey.AccessKey.GetReadCredentials( TestHelper.Monitor, out var creds ), "The user-secrets store must be configured." );
             _gitHubProvider = new GitHubProvider( gitKey.AccessKey );
         }
         return _gitHubProvider;
