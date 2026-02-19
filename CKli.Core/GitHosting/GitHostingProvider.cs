@@ -46,9 +46,9 @@ public abstract partial class GitHostingProvider
 
     /// <summary>
     /// Gets the base url. For url based providers, this is based on the <see cref="UriPartial.Authority"/>,
-    /// for <see cref="KnownCloudGitProvider.FileSystem"/> this is only the "file://" scheme.
+    /// for file system provider, this is only the "file://" scheme.
     /// <para>
-    /// Examples: "https://github.com" (for <see cref="KnownCloudGitProvider.GitHub"/>),
+    /// Examples: "https://github.com" (for GitHub cloud),
     /// "https://gitea.company.com:3712".
     /// </para>
     /// </summary>
@@ -96,7 +96,7 @@ public abstract partial class GitHostingProvider
 
     /// <summary>
     /// Gets whether this provider is able to archive a repository.
-    /// Not all providers have this capability (<see cref="KnownCloudGitProvider.FileSystem"/> doesn't).
+    /// Not all providers have this capability (file system provider doesn't).
     /// </summary>
     public abstract bool CanArchiveRepository { get; }
 

@@ -88,7 +88,7 @@ public interface IGitRepositoryAccessKey
     bool GetWriteCredentials( IActivityMonitor monitor, [NotNullWhen( true )] out UsernamePasswordCredentials? creds );
 
     /// <summary>
-    /// Gets the hosting provider that can be used to manage hosting of repositories that share this key.
+    /// Gets the hosting provider that can be used to manage hosting of repositories that share this <see cref="PrefixPAT"/> and <see cref="IsPublic"/>.
     /// <para>
     /// When no known provider can be associated to a key, this is null (repositories can only be handled via Git).
     /// </para>

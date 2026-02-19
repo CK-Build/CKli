@@ -18,7 +18,7 @@ public partial class GitRepositoryKey
     }
 
     /// <summary>
-    /// The <see cref="PrefixPAT"/> used for <see cref="KnownCloudGitProvider.FileSystem"/>.
+    /// The <see cref="PrefixPAT"/> used for file system provider.
     /// </summary>
     public const string FileSystemPrefixPAT = "FILESYSTEM_GIT";
 
