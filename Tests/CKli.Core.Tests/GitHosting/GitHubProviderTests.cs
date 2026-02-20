@@ -10,7 +10,7 @@ namespace CKli.Core.Tests.GitHosting;
 [TestFixture]
 public class GitHubProviderTests
 {
-    GitHostingProvider? _gitHubProvider;
+    HttpGitHostingProvider? _gitHubProvider;
 
     GitHostingProvider GetGitHubCKliProvider()
     {
@@ -18,9 +18,18 @@ public class GitHubProviderTests
         {
             // Using the real store here: the PAT must be locally registered for these tests to run.
             var store = new DotNetUserSecretsStore();
+            // The CKli repository is public.
+            // The hosting provider is public (new repositories will be public bu default).
+            // But, to call GitHub, it is better to always use a PAT because anonymous API calls
+            // have a low rate limit: AlwaysUseAuthentication is true for GitHub.
+            // => To challenge the Read credentials, we must actually consider the ToPrivateAccessKey() instance.
             var gitKey = new GitRepositoryKey( store, new Uri( "https://github.com/CK-Build/CKli" ), isPublic: true );
             gitKey.AccessKey.PrefixPAT.ShouldBe( "GITHUB_CK_BUILD" );
-            _gitHubProvider = new GitHubProvider( gitKey.AccessKey );
+            _gitHubProvider = (HttpGitHostingProvider?)gitKey.AccessKey.HostingProvider;
+            _gitHubProvider.ShouldNotBeNull();
+            _gitHubProvider.AlwaysUseAuthentication.ShouldBeTrue();
+            Assume.That( _gitHubProvider.GitKey.ToPrivateAccessKey().GetReadCredentials( TestHelper.Monitor, out var creds ),
+                         "The user-secrets store must be configured." );
         }
         return _gitHubProvider;
     }
@@ -29,8 +38,6 @@ public class GitHubProviderTests
     public async Task get_CKli_info_Async()
     {
         var p = GetGitHubCKliProvider();
-
-        Assume.That( p.GitKey.GetReadCredentials( TestHelper.Monitor, out var creds ), "The user-secrets store must be configured." );
 
         var info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, "CK-Build/CKli", mustExist: true );
         info.ShouldNotBeNull();

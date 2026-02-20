@@ -19,7 +19,4 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.1" />
   </ItemGroup>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="CKli.Core.Tests" />
-  </ItemGroup>
 </Project>

@@ -25,7 +25,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     /// <param name="gitKey">The key that identifies this provider and provides the authorizations.</param>
     /// <param name="baseApiUrl">The <see cref="HttpClient.BaseAddress"/> to use.</param>
     /// <param name="alwaysUseAuthentication">
-    /// On a public repository but we may not want to use public, unauthenticated, API access (because the API
+    /// When on a public repository, we may not want to use public, unauthenticated, API access (because the API
     /// requires authentication or because of rate limits).
     /// <para>
     /// Setting this to true makes <see cref="EnsureReadAccess"/> use the <see cref="IGitRepositoryAccessKey.ToPrivateAccessKey()"/>.
@@ -50,6 +50,15 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     /// Gets the base API url.
     /// </summary>
     protected Uri BaseApiUrl => _baseApiUrl;
+
+    /// <summary>
+    /// Gets whether a read PAT must be used for read-only operation on public repositories.
+    /// <para>
+    /// Unauthenticated API access should not be used (because the API always requires authentication or because of rate limits):
+    /// when true, <see cref="EnsureReadAccess"/> uses the <see cref="IGitRepositoryAccessKey.ToPrivateAccessKey()"/>.
+    /// </para>
+    /// </summary>
+    public bool AlwaysUseAuthentication => _alwaysUseAuthentication;
 
     /// <inheritdoc />
     public sealed override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
