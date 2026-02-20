@@ -12,6 +12,19 @@ namespace CKli.Core.Tests.GitHosting;
 [TestFixture]
 public class CommonProviderTests
 {
+    [SetUp]
+    public void Setup()
+    {
+        // Because we are pushing here, we need the Write PAT for the "FILESYSTEM"
+        // That is useless (credentials are not used on local file system) but it's
+        // good to not make an exception for this case.
+        ProcessRunner.RunProcess( TestHelper.Monitor,
+                                  "dotnet",
+                                  """user-secrets set FILESYSTEM_GIT "don't care" --id CKli-Test""",
+                                  Environment.CurrentDirectory )
+                     .ShouldBe( 0 );
+    }
+
     // Failing test on Archive with a StatusCode: 422, ReasonPhrase: 'Unprocessable Entity'
     // and no errors details. Giving up.
     // 
@@ -29,7 +42,10 @@ public class CommonProviderTests
         var store = new DotNetUserSecretsStore();
         var gitKey = new GitRepositoryKey( store, new Uri( keyRepositoryUrl ), isPublic );
         gitKey.AccessKey.PrefixPAT.ShouldBe( expectedPrefixPAT );
-        Assume.That( gitKey.AccessKey.GetWriteCredentials( TestHelper.Monitor, out var creds ), "The user-secrets store must be configured." );
+
+        Assume.That( gitKey.AccessKey.GetWriteCredentials( TestHelper.Monitor, out var creds ),
+                     "The user-secrets store must be configured." );
+
         var p = gitKey.AccessKey.HostingProvider;
         p.ShouldNotBeNull();
         await GetUnexistingRepoInfoAsync( p, unexistingRepoName ).ConfigureAwait( false );
