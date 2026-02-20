@@ -944,7 +944,7 @@ public sealed partial class GitRepository : IDisposable
         try
         {
             _git.Reset( ResetMode.Hard );
-            var status = _git.RetrieveStatus();
+            var status = _git.RetrieveStatus( new StatusOptions { IncludeIgnored = false } );
             int untrackedCount = status.Untracked.Count();
             if( untrackedCount > 0 )
             {
