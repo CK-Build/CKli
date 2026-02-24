@@ -1,19 +1,12 @@
 using CK.Core;
-using System;
 
 namespace CKli.Core;
 
 /// <summary>
 /// Required base class of information associated to a <see cref="Repo"/>.
-/// <para>
-/// This is used to signal and propagate any error or incapacity to produce an
-/// information accross dependent <see cref="RepoPluginBase{T}"/>.
-/// </para>
 /// </summary>
 public abstract class RepoInfo
 {
-    readonly object? _errorReason;
-    readonly RepoInfoErrorState _errorState;
     readonly Repo _repo;
 
     /// <summary>
@@ -26,42 +19,15 @@ public abstract class RepoInfo
     }
 
     /// <summary>
-    /// Error constructor.
-    /// </summary>
-    /// <param name="repo">The repository.</param>
-    /// <param name="errorState">Must not be <see cref="RepoInfoErrorState.None"/>.</param>
-    /// <param name="reason">
-    /// The reason.
-    /// Must be a string, an exception, a <see cref="CKExceptionData"/> or another RepInfo
-    /// that must be invalid or on error.
-    /// </param>
-    protected RepoInfo( Repo repo, RepoInfoErrorState errorState, object reason )
-    {
-        Throw.CheckNotNullArgument( repo );
-        Throw.CheckArgument( errorState is not RepoInfoErrorState.None );
-        Throw.CheckArgument( (reason is string s && !string.IsNullOrWhiteSpace(s))
-                             || (reason is RepoInfo info && info.ErrorState is RepoInfoErrorState.Error or RepoInfoErrorState.Invalid)
-                             || reason is CKExceptionData
-                             || reason is Exception );
-        _repo = repo;
-        _errorState = errorState;
-        _errorReason = reason is Exception ex ? CKExceptionData.CreateFrom( ex ) : reason;
-    }
-
-    /// <summary>
     /// Gets the repo.
     /// </summary>
     public Repo Repo => _repo;
 
     /// <summary>
-    /// Gets the basic <see cref="RepoInfoErrorState"/>.
+    /// Gets whether one or more issues must be resolved before anything serious can be done with this <see cref="Repo"/>.
+    /// <para>
+    /// This defaults to false.
+    /// </para>
     /// </summary>
-    public RepoInfoErrorState ErrorState => _errorState;
-
-    /// <summary>
-    /// Gets the error reason. It is a non empty string, a <see cref="CKExceptionData"/> or another RepoInfo
-    /// that is invalid or on error.
-    /// </summary>
-    public object? ErrorReason => _errorReason;
-
+    public virtual bool HasIssue => false;
 }

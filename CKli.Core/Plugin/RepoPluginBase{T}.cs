@@ -61,6 +61,27 @@ public abstract class RepoPluginBase<T> : PluginBase
     }
 
     /// <summary>
+    /// Gets the non null info for the repository only if <see cref="RepoInfo.HasIssue"/> is false.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="repo">The repository.</param>
+    /// <param name="before">Expected following operation description. When null, no error is emitted (it must be emitted by the caller).</param>
+    /// <returns>The non null info or null if there are issues.</returns>
+    public T? GetWithoutIssue( IActivityMonitor monitor, Repo repo, string? before = "continuing" )
+    {
+        var versionInfo = Get( monitor, repo );
+        if( versionInfo.HasIssue )
+        {
+            if( before != null )
+            {
+                monitor.Error( $"Please fix any issue before {before}." );
+            }
+            return null;
+        }
+        return versionInfo;
+    }
+
+    /// <summary>
     /// Tries to get the associated information for all the Repos.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -84,6 +105,31 @@ public abstract class RepoPluginBase<T> : PluginBase
             _all = all;
         }
         return true;
+    }
+
+
+    /// <summary>
+    /// Tries to get the associated information for all the Repos if and only if no issue exist for any of them.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="all">All the information on success.</param>
+    /// <param name="before">Expected following operation description. When null, no error is emitted (it must be emitted by the caller).</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool TryGetAllWithoutIssue( IActivityMonitor monitor, out ImmutableArray<T> all, string? before = "continuing" )
+    {
+        if( TryGetAll( monitor, out all ) )
+        {
+            foreach( var info in all )
+            {
+                if( info.HasIssue )
+                {
+                    monitor.Error( $"Please fix any issue before {before}." );
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     /// <summary>
