@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Remove="CKliCommands\CKliMaintenanceHostingArchive.cs" />
+    <Compile Remove="CKliCommands\CKliMaintenanceHostingDelete.cs" />
     <Compile Remove="CKliCommands\CKliMaintenanceHostingInfo.cs" />
   </ItemGroup>
 

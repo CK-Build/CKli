@@ -41,7 +41,7 @@ public static class CKliCommands
         cmds.Add( "maintenance", null );
         cmds.Add( "maintenance hosting", null );
         Add( cmds, new CKliMaintenanceHostingCreate() );
-        Add( cmds, new CKliMaintenanceHostingDelete() );
+        //Add( cmds, new CKliMaintenanceHostingDelete() );
         //Add( cmds, new CKliMaintenanceHostingArchive() );
         //Add( cmds, new CKliMaintenanceHostingInfo() );
 
