@@ -236,7 +236,7 @@ sealed partial class World
             bool success = true;
             foreach( var m in actions.OfType<Move>() )
             {
-                success &= FileHelper.TryMoveFolder( monitor, m.Path, m.NewPath, potentiallyEmptyFolders );
+                success &= FileHelper.MoveFolder( monitor, m.Path, m.NewPath, potentiallyEmptyFolders );
             }
             return success;
         }

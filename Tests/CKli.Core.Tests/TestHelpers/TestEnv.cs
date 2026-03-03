@@ -305,14 +305,14 @@ static partial class TestEnv
     }
 
     /// <summary>
-    /// Ensures that <see cref="FileHelper.TryMoveFolder(IActivityMonitor, NormalizedPath, NormalizedPath, HashSet{NormalizedPath}?)"/>
+    /// Ensures that <see cref="FileHelper.MoveFolder(IActivityMonitor, NormalizedPath, NormalizedPath, HashSet{NormalizedPath}?)"/>
     /// succeeds.
     /// </summary>
     /// <param name="from">The folder path to move.</param>
     /// <param name="to">The renamed or moved destination folder path.</param>
     public static void MoveFolder( NormalizedPath from, NormalizedPath to )
     {
-        FileHelper.TryMoveFolder( TestHelper.Monitor, from, to ).ShouldBeTrue();
+        FileHelper.MoveFolder( TestHelper.Monitor, from, to ).ShouldBeTrue();
     }
 
     /// <summary>

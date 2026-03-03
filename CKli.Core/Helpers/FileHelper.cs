@@ -44,6 +44,11 @@ public sealed class FileHelper
     /// <summary>
     /// Moves/renames a directory. This handles casing correctly (even on case insensitive file systems).
     /// <para>
+    /// This fails if the folder <paramref name="to"/> exists. Note that case support is irrelevant
+    /// inside a git working folder and it doesn't handle case difference in the parent directories:
+    /// only the last directory name is handled. 
+    /// </para>
+    /// <para>
     /// Retries up to 5 times and ultimately gives up with a logged error and returns false.
     /// </para>
     /// </summary>
@@ -52,10 +57,10 @@ public sealed class FileHelper
     /// <param name="to">The target folder.</param>
     /// <param name="potentiallyEmptyFolders">When provided, thi set is filled with folders that may be empty and may need to be suppressed.</param>
     /// <returns>True on success, false on error.</returns>
-    public static bool TryMoveFolder( IActivityMonitor monitor,
-                                      NormalizedPath from,
-                                      NormalizedPath to,
-                                      HashSet<NormalizedPath>? potentiallyEmptyFolders = null )
+    public static bool MoveFolder( IActivityMonitor monitor,
+                                   NormalizedPath from,
+                                   NormalizedPath to,
+                                   HashSet<NormalizedPath>? potentiallyEmptyFolders = null )
     {
         int tryCount = 0;
         for(; ; )
@@ -67,9 +72,14 @@ public sealed class FileHelper
                     // See https://stackoverflow.com/questions/1622597/renaming-directory-with-same-name-different-case
                     if( from.Path.Equals( to.Path, StringComparison.OrdinalIgnoreCase ) )
                     {
-                        var tempName = to + "[__CASING]";
-                        Directory.Move( from, tempName );
-                        Directory.Move( tempName, to );
+                        // If the case difference appears in the path we ignore it. We only handle
+                        // file name case difference.
+                        if( from.LastPart != to.LastPart )
+                        {
+                            var tempName = to + "[__CASING]";
+                            Directory.Move( from, tempName );
+                            Directory.Move( tempName, to );
+                        }
                         return true;
                     }
                     monitor.Error( $"The target folder '{to}' exists. Failed to move '{from}'." );
@@ -86,6 +96,63 @@ public sealed class FileHelper
                 if( ++tryCount > 5 )
                 {
                     monitor.Error( $"While moving folder from '{from}' to '{to}'.", ex );
+                    return false;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Moves/renames a file. This handles casing correctly (even on case insensitive file systems).
+    /// <para>
+    /// This fails if the folder <paramref name="to"/> exists. Note that case support is irrelevant
+    /// inside a git working folder and it doesn't handle case difference in the parent directories:
+    /// only the file name is handled. 
+    /// </para>
+    /// <para>
+    /// Retries up to 5 times and ultimately gives up with a logged error and returns false.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="from">The source file path to move.</param>
+    /// <param name="to">The target path.</param>
+    /// <returns>True on success, false on error.</returns>
+    public static bool MoveFile( IActivityMonitor monitor,
+                                 NormalizedPath from,
+                                 NormalizedPath to )
+    {
+        int tryCount = 0;
+        for(; ; )
+        {
+            try
+            {
+                if( File.Exists( to ) )
+                {
+                    if( from.Path.Equals( to.Path, StringComparison.OrdinalIgnoreCase ) )
+                    {
+                        // If the case difference appears in the path we ignore it. We only handle
+                        // file name case difference.
+                        if( from.LastPart != to.LastPart )
+                        {
+                            var tempName = to + "[__CASING]";
+                            File.Move( from, tempName );
+                            File.Move( tempName, to );
+                        }
+                        return true;
+                    }
+                    monitor.Error( $"The target file '{to}' exists. Failed to move '{from}'." );
+                    return false;
+                }
+                var parent = to.RemoveLastPart();
+                if( !Directory.Exists( parent ) ) Directory.CreateDirectory( parent );
+                File.Move( from, to );
+                return true;
+            }
+            catch( Exception ex )
+            {
+                if( ++tryCount > 5 )
+                {
+                    monitor.Error( $"While moving file from '{from}' to '{to}'.", ex );
                     return false;
                 }
             }

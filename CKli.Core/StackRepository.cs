@@ -627,7 +627,7 @@ public sealed partial class StackRepository : IDisposable
                         var isDuplicate = stackFolderName != stackNameFromUrl;
                         var newStackFolderName = isDuplicate ? DuplicatePrefix + actualStackName : actualStackName;
                         var newStackRoot = stackRoot.RemoveLastPart().AppendPart( newStackFolderName );
-                        if( !FileHelper.TryMoveFolder( monitor, stackRoot, newStackRoot ) )
+                        if( !FileHelper.MoveFolder( monitor, stackRoot, newStackRoot ) )
                         {
                             return null;
                         }
