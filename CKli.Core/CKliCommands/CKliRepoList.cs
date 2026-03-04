@@ -13,8 +13,9 @@ sealed class CKliRepoList : Command
                 "Lists the World's Repos folder, current branch name, remote commit diffs and remote origin url.",
                 [], [],
                 [
-                    (["--by-branch,-b"], "Group by current branch names.")
-                ] )
+                    (["--by-branch,-b"], "Group by current branch names."),
+                    (["--all"], "Lists all the Repos of the current World (even if current path is in a Repo).")
+               ] )
     {
     }
 
@@ -23,11 +24,12 @@ sealed class CKliRepoList : Command
                                                                     CommandLineArguments cmdLine )
     {
         bool byBranch = cmdLine.EatFlag( "--by-branch", "-b" );
+        bool all = cmdLine.EatFlag( "--all" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && DisplayRepos( monitor, this, context, byBranch ) );
+                                     && DisplayRepos( monitor, this, context, byBranch, all ) );
     }
 
-    static bool DisplayRepos( IActivityMonitor monitor, Command command, CKliEnv context, bool byBranch )
+    static bool DisplayRepos( IActivityMonitor monitor, Command command, CKliEnv context, bool byBranch, bool all )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -40,7 +42,9 @@ sealed class CKliRepoList : Command
         try
         {
             world.SetExecutingCommand( command );
-            var repos = world.GetAllDefinedRepo( monitor );
+            var repos = all
+                    ? world.GetAllDefinedRepo( monitor )
+                    : world.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
             if( repos == null ) return false;
 
             IRenderable display = context.RenderableUnit;
