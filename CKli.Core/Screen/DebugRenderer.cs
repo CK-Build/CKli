@@ -17,7 +17,11 @@ public sealed class DebugRenderer : IRenderTarget
 
     readonly StringBuilder _b;
 
-    DebugRenderer( StringBuilder b )
+    /// <summary>
+    /// Initializes a new renderer bound to a target StringBuilder.
+    /// </summary>
+    /// <param name="b">The target.</param>
+    public DebugRenderer( StringBuilder b )
     {
         _b = b;
         _current = TextStyle.Default;

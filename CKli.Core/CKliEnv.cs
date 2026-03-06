@@ -110,6 +110,16 @@ public sealed class CKliEnv
     }
 
     /// <summary>
+    /// Returns a new context with an updated <see cref="Screen"/>.
+    /// </summary>
+    /// <param name="screen">The screen to use.</param>
+    /// <returns>A new context.</returns>
+    public CKliEnv SetScreen( IScreen screen )
+    {
+        return new CKliEnv( screen, _secretsStore, _currentDirectory, _currentStackPath, _startCommandHandlingLocalTime );
+    }
+
+    /// <summary>
     /// Gets the UTC start date and time of the current command handling.
     /// </summary>
     public DateTime StartCommandHandlingUtc => _startCommandHandlingLocalTime.UtcDateTime;

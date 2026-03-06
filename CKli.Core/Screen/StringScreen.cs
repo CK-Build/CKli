@@ -11,15 +11,20 @@ namespace CKli.Core;
 public sealed class StringScreen : IScreen
 {
     readonly StringBuilder _b;
-    readonly RenderTarget _renderer;
+    readonly IRenderTarget _renderer;
 
     /// <summary>
     /// Initializes a new string screen.
     /// </summary>
-    public StringScreen()
+    /// <param name="useDebugRenderer">
+    /// True to use the <see cref="DebugRenderer"/> instead of the text-only default renderer.
+    /// </param>
+    public StringScreen( bool useDebugRenderer = false )
     {
         _b = new StringBuilder();
-        _renderer = new RenderTarget( _b );
+        _renderer = useDebugRenderer
+                        ? new DebugRenderer( _b )
+                        : new RenderTarget( _b );
     }
 
     /// <inheritdoc />
