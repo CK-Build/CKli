@@ -320,11 +320,15 @@ public sealed partial class ContentBox : IRenderable
     /// </summary>
     /// <param name="style">The style.</param>
     /// <returns>A new box or this.</returns>
-    public ContentBox WithStyle( TextStyle style ) => _style == style || style == TextStyle.Default
-                                                        ? this
-                                                        : _origin == null
-                                                            ? new ContentBox( null, _content, _padding, _margin, _align, style )
-                                                            : new ContentBox( _origin.WithStyle( style ), _content, _padding, _margin, _align, style );
+    public ContentBox WithStyle( TextStyle style )
+    {
+        var newS = _style.OverrideWith( style );
+        return _style == newS
+                    ? this
+                    : _origin == null
+                        ? new ContentBox( null, _content, _padding, _margin, _align, style )
+                        : new ContentBox( _origin.WithStyle( style ), _content, _padding, _margin, _align, style );
+    }
 
     /// <summary>
     /// Returns this or a new box with the specified <see cref="Align"/>.
