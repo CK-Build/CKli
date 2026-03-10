@@ -332,7 +332,7 @@ public class ScreenTextTests
 
                 """ );
         }
-        { 
+        {
             var t = ScreenType.Default.Text( "La liberté des uns s'arrête où commence celle des autres." );
             var tMin = t.SetWidth( 15 );
             tMin.Width.ShouldBe( 15 );
@@ -935,4 +935,35 @@ public class ScreenTextTests
 
     }
 
+
+    [Test]
+    public void padding_vs_margin_behavior_test()
+    {
+        var s = ScreenType.Default;
+
+        // The default (above the box) is [GRAY,black].
+
+        // 1 - Padding selects the style of the box's content.
+        var style = new TextStyle( ConsoleColor.DarkGreen, ConsoleColor.Black );
+        var t1 = s.Text( "some" )
+                  .HyperLink( new Uri( "https://ckomposable.org" ) )
+                  .Box( paddingRight: 1, style: style )
+                  .AddRight( s.Text( $" - more", style ) );
+
+        DebugRenderer.Render( t1 ).ShouldBe( """
+            [DARKGREEN]some - more[GRAY]⮐
+
+            """ );
+
+        // 2 - Margin selects the style of the box's parent.
+        var t2 = s.Text( "some" )
+                  .HyperLink( new Uri( "https://ckomposable.org" ) )
+                  .Box( marginRight: 1, style: style )
+                  .AddRight( s.Text( $" - more", style ) );
+
+        DebugRenderer.Render( t2 ).ShouldBe( """
+            [DARKGREEN]some[GRAY] [DARKGREEN]- more[GRAY]⮐
+
+            """ );
+    }
 }
