@@ -34,6 +34,7 @@ public static partial class CKliRootEnv
 
     /// <summary>
     /// Initializes the CKli environment.
+    /// This ensures that the <see cref="GrandOutput.Default"/> is initialized.
     /// </summary>
     /// <param name="instanceName">
     /// Used by tests (with "Test"). Can be used with other suffix if needed. This drives the <see cref="AppLocalDataPath"/>.
@@ -121,7 +122,8 @@ public static partial class CKliRootEnv
         static void InitializeMonitoring( NormalizedPath currentDirectory, NormalizedPath currentStackPath )
         {
             // If the logging is already configured, we do nothing (except logging this first initialization).
-            if( GrandOutput.Default == null )
+            GrandOutput? go = GrandOutput.Default;
+            if( go == null )
             {
                 if( LogFile.RootLogPath == null )
                 {
@@ -130,7 +132,7 @@ public static partial class CKliRootEnv
                                             : currentStackPath.AppendPart( "Logs" );
                 }
                 ActivityMonitor.DefaultFilter = LogFilter.Diagnostic;
-                GrandOutput.EnsureActiveDefault( new GrandOutputConfiguration()
+                go = GrandOutput.EnsureActiveDefault( new GrandOutputConfiguration()
                 {
                     Handlers = { new CK.Monitoring.Handlers.TextFileConfiguration { Path = "Text", MaximumTotalKbToKeep = 2 * 1024 /*2 MBytes */ } }
                 } );

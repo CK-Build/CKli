@@ -28,7 +28,7 @@ if( explicitPath != null )
         return;
     }
 }
-// Since we Console.WriteLine we dont' need the environment to be setup.
+// Since we Console.WriteLine we don't need the environment to be setup.
 if( arguments.HasVersionFlag )
 {
     var info = CSemVer.InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() );
@@ -38,6 +38,7 @@ if( arguments.HasVersionFlag )
 // Initializes the root environment.
 World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
 CKliRootEnv.Initialize( arguments: arguments );
+Throw.DebugAssert( CK.Monitoring.GrandOutput.Default != null );
 CKliRootEnv.GlobalOptions = GetGlobalOptions;
 CKliRootEnv.GlobalFlags = GetGlobalFlags;
 
