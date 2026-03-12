@@ -125,7 +125,7 @@ sealed partial class AnsiScreen
                     var text = _text;
                     if( _lastRendered != text || refresh )
                     {
-                        RenderLine( ref w, depth, width, text.AsSpan() );
+                        RenderLine( ref w, depth, width, text.AsSpan(), '>' );
                         _lastRendered = text;
                     }
                     else
@@ -137,32 +137,33 @@ sealed partial class AnsiScreen
                 ++depth;
                 _next?.Render( ref w, ref depth, width, ref refresh, skipTopLines, ref topLine );
 
-                static void RenderLine( ref FixedBufferWriter w, int depth, int width, ReadOnlySpan<char> t )
+            }
+
+            internal static void RenderLine( ref FixedBufferWriter w, int depth, int width, ReadOnlySpan<char> t, char lineStart )
+            {
+                t = t.Trim();
+                if( depth > 0 )
                 {
-                    t = t.Trim();
-                    if( depth > 0 )
-                    {
-                        w.Append( ' ', depth - 1 );
-                        w.Append( '╰' );
-                    }
-                    w.Append( '>', ' ' );
-                    // Why do we need to substract 1 here (at least on Windows Terminal)?
-                    int maxLen = Math.Min( width - 2 - depth - 1, w.RemainingLength );
-                    int idx = t.IndexOfAny( '\r', '\n' );
-                    if( idx >= 0 ) t = t.Slice( 0, idx ).TrimEnd();
-                    if( t.Length < maxLen )
-                    {
-                        w.Append( t );
-                        // Clears line remainder (previous longer line).
-                        w.EraseLine( CursorRelativeSpan.After );
-                    }
-                    else
-                    {
-                        w.Append( t.Slice( 0, maxLen - 1 ) );
-                        w.Append( '…' );
-                    }
-                    w.Append( '\n' );
+                    w.Append( ' ', depth - 1 );
+                    w.Append( '╰' );
                 }
+                w.Append( lineStart, ' ' );
+                // Why do we need to substract 1 here (at least on Windows Terminal)?
+                int maxLen = Math.Min( width - 2 - depth - 1, w.RemainingLength );
+                int idx = t.IndexOfAny( '\r', '\n' );
+                if( idx >= 0 ) t = t.Slice( 0, idx ).TrimEnd();
+                if( t.Length < maxLen )
+                {
+                    w.Append( t );
+                    // Clears line remainder (previous longer line).
+                    w.EraseLine( CursorRelativeSpan.After );
+                }
+                else
+                {
+                    w.Append( t.Slice( 0, maxLen - 1 ) );
+                    w.Append( '…' );
+                }
+                w.Append( '\n' );
             }
         }
 

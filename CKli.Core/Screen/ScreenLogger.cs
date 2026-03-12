@@ -1,5 +1,8 @@
 using CK.Core;
+using CK.Monitoring;
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace CKli.Core;
 
@@ -12,11 +15,19 @@ public sealed class ScreenLogger : IActivityMonitorClient
 
     /// <summary>
     /// Initializes a new <see cref="ScreenLogger"/> on a screen.
+    /// When a <paramref name="grandOutput"/> is provided, logs emitted by <see cref="IStaticLogger"/>
+    /// or <see cref="IParallelLogger"/> are tracked and provided to the screen.
     /// </summary>
+    /// <param name="monitor">The monitor to which this client is bound.</param>
     /// <param name="screen">The target screen.</param>
-    public ScreenLogger( IScreen screen )
+    /// <param name="grandOutput">The GrandOutput instance from which background logs must be tracked.</param>
+    public ScreenLogger( IActivityMonitor monitor, IScreen screen, GrandOutput? grandOutput )
     {
         _screen = screen;
+        if( grandOutput != null )
+        {
+            grandOutput.Sink.SubmitAddHandler( new ParallelLogTracker( monitor.UniqueId, screen ) );
+        }
     }
 
     void IActivityMonitorClient.OnAutoTagsChanged( CKTrait newTrait )
@@ -49,4 +60,40 @@ public sealed class ScreenLogger : IActivityMonitorClient
         }
         _screen.OnLog( l, data.Text, isOpenGroup );
     }
+
+    sealed class ParallelLogTracker : IGrandOutputHandler
+    {
+        readonly string _monitorId;
+        readonly IScreen _screen;
+        static readonly CKTrait _processRunnerTag = ProcessRunner.StdOutTag | ProcessRunner.StdErrTag;
+
+        public ParallelLogTracker( string monitorId, IScreen screen )
+        {
+            _monitorId = monitorId;
+            _screen = screen;
+        }
+
+        public ValueTask<bool> ActivateAsync( IActivityMonitor monitor ) => ValueTask.FromResult( true );
+
+        public ValueTask<bool> ApplyConfigurationAsync( IActivityMonitor monitor, IHandlerConfiguration c ) => ValueTask.FromResult( false );
+
+        public ValueTask DeactivateAsync( IActivityMonitor monitor ) => default;
+
+        public ValueTask OnTimerAsync( IActivityMonitor monitor, TimeSpan timerSpan ) => default;
+
+        public ValueTask HandleAsync( IActivityMonitor monitor, InputLogEntry logEvent )
+        {
+            Throw.DebugAssert( (logEvent.MonitorId == _monitorId) == ReferenceEquals( logEvent.MonitorId, _monitorId ) );
+            if( !ReferenceEquals( logEvent.MonitorId, _monitorId ) || !(logEvent.Tags & _processRunnerTag).IsEmpty )
+            {
+                var t = logEvent.Text;
+                if( t != null ) _screen.OnParallelText( t );
+            }
+            return default;
+        }
+
+    }
 }
+
+
+

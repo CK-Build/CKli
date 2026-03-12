@@ -38,12 +38,11 @@ if( arguments.HasVersionFlag )
 // Initializes the root environment.
 World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
 CKliRootEnv.Initialize( arguments: arguments );
-Throw.DebugAssert( CK.Monitoring.GrandOutput.Default != null );
 CKliRootEnv.GlobalOptions = GetGlobalOptions;
 CKliRootEnv.GlobalFlags = GetGlobalFlags;
 
 var monitor = new ActivityMonitor();
-monitor.Output.RegisterClient( new ScreenLogger( CKliRootEnv.Screen ) );
+monitor.Output.RegisterClient( new ScreenLogger( monitor, CKliRootEnv.Screen, CK.Monitoring.GrandOutput.Default ) );
 
 CoreApplicationIdentity.Initialize();
 

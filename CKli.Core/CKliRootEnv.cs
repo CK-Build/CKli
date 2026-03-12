@@ -62,7 +62,7 @@ public static partial class CKliRootEnv
         }
         _screen = screen ?? CreateScreen( arguments );
 
-        InitializeMonitoring( _currentDirectory, _currentStackPath );
+        InitializeMonitoring( _screen, _currentDirectory, _currentStackPath );
         NormalizedPath configFilePath = GetConfigPath();
         try
         {
@@ -119,34 +119,6 @@ public static partial class CKliRootEnv
             WriteConfiguration( null );
         }
 
-        static void InitializeMonitoring( NormalizedPath currentDirectory, NormalizedPath currentStackPath )
-        {
-            // If the logging is already configured, we do nothing (except logging this first initialization).
-            GrandOutput? go = GrandOutput.Default;
-            if( go == null )
-            {
-                if( LogFile.RootLogPath == null )
-                {
-                    LogFile.RootLogPath = currentStackPath.IsEmptyPath
-                                            ? CKliRootEnv.AppLocalDataPath.AppendPart( "Out-of-Stack-Logs" )
-                                            : currentStackPath.AppendPart( "Logs" );
-                }
-                ActivityMonitor.DefaultFilter = LogFilter.Diagnostic;
-                go = GrandOutput.EnsureActiveDefault( new GrandOutputConfiguration()
-                {
-                    Handlers = { new CK.Monitoring.Handlers.TextFileConfiguration { Path = "Text", MaximumTotalKbToKeep = 2 * 1024 /*2 MBytes */ } }
-                } );
-            }
-            else
-            {
-                ActivityMonitor.StaticLogger.Info( $"""
-                        Initializing CKliRootEnv:
-                        CurrentDirectory = '{currentDirectory}'
-                        AppLocalDataPath = '{CKliRootEnv.AppLocalDataPath}'
-                        """ );
-            }
-        }
-
         static IScreen CreateScreen( CommandLineArguments? arguments )
         {
             bool forceAnsi = false;
@@ -173,6 +145,34 @@ public static partial class CKliRootEnv
             }
             IScreen s = forceAnsi || ansiConsole ? new AnsiScreen( originalConsoleMode ) : new ConsoleScreen();
             return s;
+        }
+
+        static void InitializeMonitoring( IScreen screen, NormalizedPath currentDirectory, NormalizedPath currentStackPath )
+        {
+            // If the logging is already configured, we do nothing (except logging this first initialization).
+            GrandOutput? go = GrandOutput.Default;
+            if( go == null )
+            {
+                if( LogFile.RootLogPath == null )
+                {
+                    LogFile.RootLogPath = currentStackPath.IsEmptyPath
+                                            ? CKliRootEnv.AppLocalDataPath.AppendPart( "Out-of-Stack-Logs" )
+                                            : currentStackPath.AppendPart( "Logs" );
+                }
+                ActivityMonitor.DefaultFilter = LogFilter.Diagnostic;
+                go = GrandOutput.EnsureActiveDefault( new GrandOutputConfiguration()
+                {
+                    Handlers = { new CK.Monitoring.Handlers.TextFileConfiguration { Path = "Text", MaximumTotalKbToKeep = 2 * 1024 /*2 MBytes */ } }
+                } );
+            }
+            else
+            {
+                ActivityMonitor.StaticLogger.Info( $"""
+                        Initializing CKliRootEnv:
+                        CurrentDirectory = '{currentDirectory}'
+                        AppLocalDataPath = '{CKliRootEnv.AppLocalDataPath}'
+                        """ );
+            }
         }
     }
 

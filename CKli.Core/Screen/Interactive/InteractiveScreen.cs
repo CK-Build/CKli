@@ -142,6 +142,8 @@ public sealed partial class InteractiveScreen : IScreen
 
     void IScreen.OnLog( LogLevel level, string? text, bool isOpenGroup ) => _screen.OnLog( level, text, isOpenGroup );
 
+    void IScreen.OnParallelText( string text ) => _screen.OnParallelText( text );
+
     InteractiveScreen? IScreen.TryCreateInteractive( IActivityMonitor monitor, CKliEnv context ) => throw new System.InvalidOperationException();
 
     void IScreen.OnCommandExecuted( bool success, CommandLineArguments cmdLine )

@@ -64,6 +64,10 @@ sealed class ConsoleScreen : IScreen
     {
     }
 
+    public void OnParallelText( string text )
+    {
+    }
+
     void IScreen.OnCommandExecuted( bool success, CommandLineArguments cmdLine )
     {
         ScreenExtensions.DisplayCommandSuccessOrFailure( this, success, cmdLine );

@@ -34,6 +34,7 @@ sealed partial class AnsiScreen
         int _width;
         DynamicLine? _topLine;
         DynamicLine? _lastRenderedTopLine;
+        string? _parallelText;
         int _lastRenderedLineCount;
         bool _visible;
         bool _finalHidden;
@@ -108,6 +109,8 @@ sealed partial class AnsiScreen
             Show();
         }
 
+        public void OnParallelText( string text ) => Interlocked.Exchange( ref _parallelText, text );
+
         public void Show()
         {
             lock( _lock )
@@ -143,6 +146,7 @@ sealed partial class AnsiScreen
             _workingString.Append( ref w );
             w.Append( '\n' );
 
+            int depth = 0;
             int newLineCount = 0;
             DynamicLine? newTopLine = _lastRenderedTopLine;
             // Capture the topLine.
@@ -150,8 +154,15 @@ sealed partial class AnsiScreen
             if( topLine != null )
             {
                 int skipTopLines = Math.Max( topLine.GetDepth() - _maxDynamicLineCount, 0 );
-                topLine.Render( ref w, ref newLineCount, _width, ref refresh, skipTopLines, ref newTopLine );
-                newLineCount -= skipTopLines;
+                topLine.Render( ref w, ref depth, _width, ref refresh, skipTopLines, ref newTopLine );
+                newLineCount = depth - skipTopLines;
+            }
+            var parallelText = _parallelText;
+            if( parallelText != null )
+            {
+                DynamicLine.RenderLine( ref w, depth, _width, parallelText.AsSpan(), '=' );
+                Interlocked.CompareExchange( ref _parallelText, null, parallelText );
+                ++newLineCount;
             }
             if( !refresh )
             {
@@ -161,8 +172,8 @@ sealed partial class AnsiScreen
                     w.MoveToRelativeLine( toRemove, resetColumn: true );
                     while( --toRemove >= 0 )
                     {
-                        w.EraseLine( CursorRelativeSpan.After );
                         w.MoveToRelativeLine( -1 );
+                        w.EraseLine( CursorRelativeSpan.After );
                     }
                 }
             }

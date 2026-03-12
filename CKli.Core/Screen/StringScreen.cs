@@ -41,6 +41,8 @@ public sealed class StringScreen : IScreen
 
     void IScreen.OnLog( LogLevel level, string? text, bool isOpenGroup ) { }
 
+    void IScreen.OnParallelText( string text ) { }
+
     void IScreen.Close() { }
 
     void IScreen.OnCommandExecuted( bool success, CommandLineArguments cmdLine )

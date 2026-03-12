@@ -54,6 +54,8 @@ public interface IScreen
 
     internal void OnLog( LogLevel level, string? text, bool isOpenGroup );
 
+    internal void OnParallelText( string text );
+
     internal void Close();
 
     internal InteractiveScreen? TryCreateInteractive( IActivityMonitor monitor, CKliEnv context );

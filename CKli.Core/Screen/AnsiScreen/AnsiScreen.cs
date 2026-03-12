@@ -41,6 +41,8 @@ sealed partial class AnsiScreen : IScreen
 
     public void OnLog( LogLevel level, string? text, bool isOpenGroup ) => _animation.OnLog( text, isOpenGroup );
 
+    public void OnParallelText( string text ) => _animation.OnParallelText( text );
+
     void IScreen.OnCommandExecuted( bool success, CommandLineArguments cmdLine )
     {
         _animation.Hide( true );
