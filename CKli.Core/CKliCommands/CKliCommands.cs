@@ -35,7 +35,7 @@ public static class CKliCommands
         Add( cmds, new CKliRepoList() );
         Add( cmds, new CKliRepoAdd() );
         Add( cmds, new CKliRepoRemove() );
-        //Add( cmds, new CKliRepoMove() ); => Moves to another stack (target repo may have a boost version).
+        //Add( cmds, new CKliRepoMove() ); => Moves to another stack.
         //Add( cmds, new CKliRepoMigrate() ); => Moves the remote git => new origin url.
 
         cmds.Add( "maintenance", null );
