@@ -21,8 +21,12 @@ public sealed class LocalWorldName : WorldName
     readonly NormalizedPath _xmlDescriptionFilePath;
     WorldDefinitionFile? _definitionFile;
 
-    internal LocalWorldName( StackRepository stack, string? ltsName, NormalizedPath rootPath, NormalizedPath xmlDescriptionFilePath )
-        : base( stack.StackName, ltsName )
+    internal LocalWorldName( StackRepository stack,
+                             string? ltsName,
+                             NormalizedPath rootPath,
+                             NormalizedPath xmlDescriptionFilePath,
+                             string? fixedStackName = null )
+        : base( fixedStackName ?? stack.StackName, ltsName )
     {
         Throw.CheckArgument( rootPath.Path.StartsWith( stack.StackRoot, StringComparison.OrdinalIgnoreCase ) );
         _stack = stack;
@@ -72,17 +76,31 @@ public sealed class LocalWorldName : WorldName
         {
             var doc = XDocument.Load( _xmlDescriptionFilePath );
             var root = doc.Root;
-            if( root == null || root.Name.LocalName != StackName )
+            Throw.DebugAssert( root != null );
+
+            string stackName = root.Name.LocalName;
+            string? ltsName = root.Attribute( "LTSName" )?.Value;
+            if( !StringComparer.OrdinalIgnoreCase.Equals( root.Name.LocalName, StackName ) )
             {
                 monitor.Error( $"Invalid world definition root element name. Must be '{StackName}'. File: '{_xmlDescriptionFilePath}'." );
                 return null;
             }
-            if( LTSName != null && root.Attribute( "LTSName" )?.Value != LTSName )
+            if( !StringComparer.OrdinalIgnoreCase.Equals( root.Attribute( "LTSName" )?.Value, LTSName ) )
             {
-                monitor.Error( $"Invalid world definition root element. Attribute 'LTSName = \"{LTSName}\" is required. File: '{_xmlDescriptionFilePath}'." );
+                if( LTSName != null )
+                {
+                    monitor.Error( $"Invalid world definition root element. Attribute 'LTSName = \"{LTSName}\" is required. File: '{_xmlDescriptionFilePath}'." );
+                }
+                else
+                {
+                    monitor.Error( $"Invalid world definition root element. Unexpected attribute 'LTSName = \"{ltsName}\". File: '{_xmlDescriptionFilePath}'." );
+                }
                 return null;
             }
-            return WorldDefinitionFile.Create( monitor, this, root );
+            var fixedWorldName = stackName != StackName || ltsName != LTSName
+                                    ? new LocalWorldName( _stack, LTSName, _root, _xmlDescriptionFilePath, stackName )
+                                    : this;
+            return WorldDefinitionFile.Create( monitor, fixedWorldName, root );
         }
         catch( Exception ex )
         {

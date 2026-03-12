@@ -141,6 +141,8 @@ public sealed partial class World
             return null;
         }
         Throw.DebugAssert( worldName != null && definitionFile != null );
+        // References the definition file's LocalWorldName that has the correct casing for StackName and LTSName.
+        worldName = definitionFile.World;
         PluginMachinery? machinery = null;
         if( withPlugins && _directPluginFactory == null )
         {
