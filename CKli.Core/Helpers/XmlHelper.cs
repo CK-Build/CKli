@@ -7,7 +7,7 @@ namespace CKli.Core;
 /// <summary>
 /// System.Xml related helpers.
 /// </summary>
-public static class XmlHelper
+public static partial class XmlHelper
 {
     static readonly UTF8Encoding _uTF8EncodingNoBOM = new UTF8Encoding( false );
 
@@ -30,5 +30,27 @@ public static class XmlHelper
         xws.Encoding = _uTF8EncodingNoBOM;
         using( XmlWriter xw = XmlWriter.Create( path, xws ) )
             doc.Save( xw );
+    }
+
+    /// <summary>
+    /// Ensures that a first element with a <see cref="XElement.Name"/> exists or creates and adds it to this element.
+    /// </summary>
+    /// <param name="e">This element.</param>
+    /// <param name="name">The element name to find or create.</param>
+    /// <param name="addFirst">
+    /// True to add the created element as the first child element (if it has been created).
+    /// By default, the element is added after existing children.
+    /// </param>
+    /// <returns>The found or created element.</returns>
+    public static XElement Ensure( this XElement e, XName name, bool addFirst = false )
+    {
+        var c = e.Element( name );
+        if( c == null )
+        {
+            c = new XElement( name );
+            if( addFirst ) e.AddFirst( c );
+            else e.Add( c );
+        }
+        return c;
     }
 }

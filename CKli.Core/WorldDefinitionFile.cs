@@ -102,7 +102,7 @@ public sealed class WorldDefinitionFile
         {
             if( !_compileMode.HasValue )
             {
-                _compileMode = _plugins.Attribute( _xCompileMode )?.Value switch
+                _compileMode = _plugins.Attribute( XNames.CompileMode )?.Value switch
                 {
                     "Debug" => PluginCompileMode.Debug,
                     "None" => PluginCompileMode.None,
@@ -142,7 +142,7 @@ public sealed class WorldDefinitionFile
             }
             else
             {
-                config.Add( name, (e, (bool?)e.Attribute( _xDisabled ) is true) );
+                config.Add( name, (e, (bool?)e.Attribute( XNames.Disabled ) is true) );
             }
         }
         return success ? config : null;
@@ -169,13 +169,13 @@ public sealed class WorldDefinitionFile
             monitor.Error( $"Unable to find Plugin configuration '{shortPluginName}'." );
             return false;
         }
-        if( (bool?)_plugins.Attribute( _xDisabled ) is true == !enable )
+        if( (bool?)_plugins.Attribute( XNames.Disabled ) is true == !enable )
         {
             return true;
         }
         using( StartEdit() )
         {
-            e.SetAttributeValue( _xDisabled, enable ? null : "true" );
+            e.SetAttributeValue( XNames.Disabled, enable ? null : "true" );
         }
         return SaveFile( monitor )
                && _world.Stack.Commit( monitor, $"{(enable ? "En" : "Dis")}abling '{shortPluginName}' plugin." );
@@ -295,7 +295,7 @@ public sealed class WorldDefinitionFile
     {
         using( StartEdit() )
         {
-            _plugins.SetAttributeValue( _xCompileMode, mode != PluginCompileMode.Release ? mode.ToString() : null );
+            _plugins.SetAttributeValue( XNames.CompileMode, mode != PluginCompileMode.Release ? mode.ToString() : null );
             _compileMode = mode;
         }
     }
@@ -317,7 +317,7 @@ public sealed class WorldDefinitionFile
     {
         // Take no risk, don't use the _pluginsConfiguration: analyze the xml (case insensitively) to find the configurations.
         var filter = (XElement e) => e.Name.LocalName.Equals( shortPluginName, StringComparison.OrdinalIgnoreCase );
-        var allConfigs = _root.Descendants( _xRepository ).SelectMany( r => r.Elements().Where( filter ) )
+        var allConfigs = _root.Descendants( XNames.Repository ).SelectMany( r => r.Elements().Where( filter ) )
                               .Concat( Plugins.Elements().Where( filter ) )
                               .ToList();
 
@@ -345,7 +345,7 @@ public sealed class WorldDefinitionFile
         using( isEditingAbove ? null : StartEdit() )
         {
             XElement folder = EnsureFolder( folders, _root );
-            folder.Add( new XElement( _xRepository, new XAttribute( _xUrl, urlValue ) ) );
+            folder.Add( new XElement( XNames.Repository, new XAttribute( XNames.Url, urlValue ) ) );
         }
         return isEditingAbove || SaveFile( monitor );
 
@@ -356,9 +356,9 @@ public sealed class WorldDefinitionFile
             var e = folders.GetEnumerator();
             while( e.MoveNext() )
             {
-                var f = existing.Elements( _xFolder )
+                var f = existing.Elements( XNames.Folder )
                                 .FirstOrDefault( f => f.Attributes()
-                                                       .Any( a => a.Name == _xName
+                                                       .Any( a => a.Name == XNames.Name
                                                                   && a.Value.Equals( e.Current, StringComparison.OrdinalIgnoreCase ) ) );
                 if( f == null )
                 {
@@ -371,8 +371,8 @@ public sealed class WorldDefinitionFile
             {
                 do
                 {
-                    var newOne = new XElement( _xFolder, new XAttribute( _xName, e.Current ) );
-                    var nextName = existing.Elements( _xFolder ).FirstOrDefault( x => x.Attribute( _xName )!.Value.CompareTo( e.Current ) > 0 );
+                    var newOne = new XElement( XNames.Folder, new XAttribute( XNames.Name, e.Current ) );
+                    var nextName = existing.Elements( XNames.Folder ).FirstOrDefault( x => x.Attribute( XNames.Name )!.Value.CompareTo( e.Current ) > 0 );
                     if( nextName != null )
                     {
                         nextName.AddBeforeSelf( newOne );
@@ -397,8 +397,8 @@ public sealed class WorldDefinitionFile
         Throw.DebugAssert( _layout != null );
 
         string urlValue = NormalizeRepositoryProxyUrl( monitor, uri );
-        var node = _root.Descendants( _xRepository )
-                        .FirstOrDefault( e => e.Attribute( _xUrl )?.Value == urlValue );
+        var node = _root.Descendants( XNames.Repository )
+                        .FirstOrDefault( e => e.Attribute( XNames.Url )?.Value == urlValue );
         if( node == null )
         {
             monitor.Error( $"""
@@ -447,28 +447,15 @@ public sealed class WorldDefinitionFile
     internal void RemoveEmptyFolders()
     {
         Throw.DebugAssert( _allowEdit );
-        _root.Descendants( _xFolder ).Where( e => !e.HasElements ).Remove();
+        _root.Descendants( XNames.Folder ).Where( e => !e.HasElements ).Remove();
     }
-
-    static readonly XName _xPlugins = XNamespace.None + "Plugins";
-    static readonly XName _xDisabled = XNamespace.None + "Disabled";
-    static readonly XName _xCompileMode = XNamespace.None + "CompileMode";
-    static readonly XName _xRepository = XNamespace.None + "Repository";
-    static readonly XName _xFolder = XNamespace.None + "Folder";
-    static readonly XName _xName = XNamespace.None + "Name";
-    static readonly XName _xUrl = XNamespace.None + "Url";
 
     internal static WorldDefinitionFile Create( IActivityMonitor monitor, LocalWorldName world, XElement root )
     {
-        var plugins = root.Element( _xPlugins );
-        if( plugins == null )
-        {
-            plugins = new XElement( _xPlugins );
-            root.AddFirst( plugins );
-        }
+        var plugins = root.Ensure( XNames.Plugins, addFirst: true );
         if( _repositoryUrlHook != null )
         {
-            foreach( var a in root.Descendants( _xRepository ).Attributes( _xUrl ) )
+            foreach( var a in root.Descendants( XNames.Repository ).Attributes( XNames.Url ) )
             {
                 if( a.Value != null ) a.Value = _repositoryUrlHook( monitor, a.Value );
             }
@@ -544,9 +531,9 @@ public sealed class WorldDefinitionFile
             foreach( var c in e.Elements() )
             {
                 var eN = c.Name.LocalName;
-                if( eN == _xFolder.LocalName )
+                if( eN == XNames.Folder.LocalName )
                 {
-                    string? name = c.Attribute( _xName )?.Value;
+                    string? name = c.Attribute( XNames.Name )?.Value;
                     if( !IsValidFolderName( name ) )
                     {
                         monitor.Error( $"""
@@ -569,9 +556,9 @@ public sealed class WorldDefinitionFile
                         Process( monitor, c, world, p.AppendPart( name ), list, ref hasError );
                     }
                 }
-                else if( eN == _xRepository.LocalName )
+                else if( eN == XNames.Repository.LocalName )
                 {
-                    var aUrl = c.Attribute( _xUrl );
+                    var aUrl = c.Attribute( XNames.Url );
                     if( aUrl == null )
                     {
                         monitor.Error( $"""
@@ -640,7 +627,7 @@ public sealed class WorldDefinitionFile
                         }
                     }
                 }
-                else if( eN != _xPlugins.LocalName )
+                else if( eN != XNames.Plugins.LocalName )
                 {
                     monitor.Warn( $"""
                         Unexpected element:
