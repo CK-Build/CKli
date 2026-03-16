@@ -94,12 +94,9 @@ public abstract class RepoPluginBase<T> : PluginBase
         {
             var allRepo = World.GetAllDefinedRepo( monitor );
             if( allRepo == null ) return false;
-            for( int i = 0; i < allRepo.Count; ++i )
+            foreach( var r in allRepo )
             {
-                if( _infos[i] == null )
-                {
-                    _infos[i] = Create( monitor, allRepo[i] );
-                }
+                Get( monitor, r );
             }
             all = ImmutableCollectionsMarshal.AsImmutableArray( _infos )!;
             _all = all;
