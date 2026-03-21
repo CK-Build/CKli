@@ -1,3 +1,4 @@
+using CKli;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -27,20 +28,17 @@ public static class ScreenExtensions
     /// <param name="screen"></param>
     /// <param name="commands"></param>
     /// <param name="cmdLine"></param>
-    /// <param name="globalOptions"></param>
-    /// <param name="globalFlags"></param>
+    /// <param name="globals"></param>
     public static void DisplayHelp( this IScreen screen,
                                     List<CommandHelp> commands,
                                     CommandLineArguments cmdLine,
-                                    ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default,
-                                    ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
+                                    ImmutableArray<CKliCommands.GlobalDef> globals = default )
     {
         var h = CreateDisplayHelp( screen.ScreenType,
                                    screen is InteractiveScreen,
                                    commands,
                                    cmdLine,
-                                   globalOptions,
-                                   globalFlags );
+                                   globals );
         screen.Display( h );
     }
 
@@ -91,14 +89,12 @@ public static class ScreenExtensions
     /// </param>
     /// <param name="commands">The command helps to display.</param>
     /// <param name="cmdLine">The current command line.</param>
-    /// <param name="globalOptions">The global options.</param>
-    /// <param name="globalFlags">The global flags.</param>
+    /// <param name="globals">The global options and flags.</param>
     public static IRenderable CreateDisplayHelp( ScreenType screenType,
                                                  bool isInteractiveScreen,
                                                  List<CommandHelp> commands,
                                                  CommandLineArguments cmdLine,
-                                                 ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions,
-                                                 ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags )
+                                                 ImmutableArray<CKliCommands.GlobalDef> globals = default )
     {
         IRenderable head = commands.Count == 1
                                 ? CreateDisplayHelpHeader( screenType, cmdLine )
@@ -125,18 +121,23 @@ public static class ScreenExtensions
         var helps = screenType.Unit.AddBelow( commands.Select( c => new Collapsable( RenderCommand( c, ref minFirstCol )
                                                                                      .AddBelow( screenType.EmptyString ) )  ) );
 
-        if( !globalOptions.IsDefaultOrEmpty )
+        if( !globals.IsDefaultOrEmpty )
         {
-            helps = helps.AddBelow( screenType.Text( "Global options:" ) )
-                         .AddBelow( CommandHelp.ToRenderableOptions( screenType, globalOptions )
-                                        .Select( o => o.Names.Box( marginLeft: 1 ).AddRight( o.Description ) ) );
-         }
-        if( !globalFlags.IsDefaultOrEmpty )
-        {
-            helps = helps.AddBelow( screenType.Text( "Global flags:" ) )
-                         .AddBelow( CommandHelp.ToRenderableFlags( screenType, globalFlags )
-                                        .Select( f => f.Names.Box( marginLeft: 1 ).AddRight( f.Description ) ) );
+            var globalOptions = globals.Where( g => g.Type == "option" ).ToArray();
+            var globalFlags = globals.Where( g => g.Type == "flag" ).ToArray();
 
+            if( globalOptions.Length > 0 )
+            {
+                helps = helps.AddBelow( screenType.Text( "Global options:" ) )
+                             .AddBelow( globalOptions.Select( o =>
+                                 screenType.Text( string.Join( ", ", o.Names ) ).Box( marginLeft: 1 ).AddRight( screenType.Text( o.Description ) ) ) );
+            }
+            if( globalFlags.Length > 0 )
+            {
+                helps = helps.AddBelow( screenType.Text( "Global flags:" ) )
+                             .AddBelow( globalFlags.Select( f =>
+                                 screenType.Text( string.Join( ", ", f.Names ) ).Box( marginLeft: 1 ).AddRight( screenType.Text( f.Description ) ) ) );
+            }
         }
         helps = TableLayout.Create( helps, new ColumnDefinition( minWidth: 2 + minFirstCol ) );
         return head.AddBelow( helps );
@@ -206,6 +207,8 @@ public static class ScreenExtensions
     /// <param name="cmdLine">The command line (with its <see cref="CommandLineArguments.FoundCommand"/>).</param>
     internal static void DisplayCommandSuccessOrFailure( IScreen screen, bool success, CommandLineArguments cmdLine )
     {
+        // Plumbing commands write raw output to stdout - suppress screen feedback.
+        if( cmdLine.FoundCommand is CKliComplete or CKliCompletionsScript ) return;
         if( !cmdLine.HasHelp )
         {
             if( success )

@@ -2,7 +2,6 @@ using CK.Core;
 using CKli;
 using CKli.Core;
 using System;
-using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
 
@@ -38,8 +37,6 @@ if( arguments.HasVersionFlag )
 // Initializes the root environment.
 World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
 CKliRootEnv.Initialize( arguments: arguments );
-CKliRootEnv.GlobalOptions = GetGlobalOptions;
-CKliRootEnv.GlobalFlags = GetGlobalFlags;
 
 var monitor = new ActivityMonitor();
 monitor.Output.RegisterClient( new ScreenLogger( monitor, CKliRootEnv.Screen, CK.Monitoring.GrandOutput.Default ) );
@@ -51,33 +48,4 @@ Environment.ExitCode = (await CKliCommands.HandleCommandAsync( monitor, CKliRoot
                         : -1;
 
 await CKliRootEnv.CloseAsync( monitor, arguments ).ConfigureAwait( false );
-
-static ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> GetGlobalOptions()
-{
-    return [(["--path", "-p"], """
-        Sets the working path. This overrides the current directory.
-        This must appear at the start of the command.
-        When "--path" or "-p" appears after, it is an option of the command.
-        """, Multiple:false)];
-}
-
-static ImmutableArray<(ImmutableArray<string> Names, string Description)> GetGlobalFlags() => [
-        (["--version, -v"], """
-        Displays this CKli version. 
-        This flag must come first and excludes anything else.
-        """),
-        (["--ckli-screen"], """
-                        Changes the screen display. Can be:
-                        - none: No display at all.
-                        - no-color (or no_color): Basic display, no animation.
-                        - force-ansi: Always consider an Ansi terminal.
-
-                        If a non empty "NO_COLOR" exists in the environment variables, it is honored.
-                        See https://no-color.org/.
-                        Any other values are ignored: the default detection is applied.
-             """),
-        (["--ckli-debug"], "Launches a debugger when starting."),
-        (["--help, -?, -h, ?"], "Displays the help. This must be the last argument.")
-    ];
-
 

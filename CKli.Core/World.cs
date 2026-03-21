@@ -183,7 +183,23 @@ public sealed partial class World
                 f = _pluginMachinery.PluginFactory;
             }
             _plugins = f.Create( monitor, this );
-            return _plugins.CallPluginsInitialization( monitor );
+            if( !_plugins.CallPluginsInitialization( monitor ) ) return false;
+            // Generate completion manifest for shell autocompletion.
+            if( _pluginMachinery != null )
+            {
+                try
+                {
+                    var manifestDir = _pluginMachinery.Root.Combine( "../$Local" ).AppendPart( _pluginMachinery.Name );
+                    Directory.CreateDirectory( manifestDir );
+                    var tsv = Completion.CompletionManifest.Write( _plugins.Commands, CKliCommands.Globals );
+                    File.WriteAllText( manifestDir.AppendPart( "completion.tsv" ), tsv );
+                }
+                catch( Exception ex )
+                {
+                    monitor.Warn( "Failed to write completion manifest.", ex );
+                }
+            }
+            return true;
         }
         catch( Exception ex )
         {

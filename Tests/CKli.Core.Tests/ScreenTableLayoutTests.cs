@@ -342,7 +342,7 @@ public class ScreenTableLayoutTests
         var help = ScreenExtensions.CreateDisplayHelp( ScreenType.Default,
                                                        isInteractiveScreen: false,
                                                        commands,
-                                                       CommandLineArguments.Empty, default, default );
+                                                       CommandLineArguments.Empty, default );
         help.MinWidth.ShouldBe( 39 );
         help = help.SetWidth( 40 );
 
