@@ -87,8 +87,8 @@ public sealed class PackageInstance : IComparable<PackageInstance>, IEquatable<P
     public int CompareTo( PackageInstance? other )
     {
         if( other is null ) return 1;
-        int cmp = StringComparer.OrdinalIgnoreCase.Compare( PackageId, other.PackageId );
-        return cmp == 0 ? Version.CompareTo( other.Version ) : cmp;
+        int cmp = StringComparer.OrdinalIgnoreCase.Compare( _packageId, other._packageId );
+        return cmp == 0 ? _version.CompareTo( other._version ) : cmp;
     }
 
     /// <summary>

@@ -133,9 +133,6 @@ public abstract class RepoPluginBase<T> : PluginBase
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="repo">The Repo.</param>
-    /// <returns>
-    /// The information.
-    /// Errors may not be logged: <see cref="RepoInfo.ErrorReason"/> can capture enough error information.
-    /// </returns>
+    /// <returns>The information.</returns>
     protected abstract T Create( IActivityMonitor monitor, Repo repo );
 }

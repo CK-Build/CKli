@@ -1,7 +1,5 @@
 using CK.Core;
-using CKli.Core.GitHosting;
 using System;
-using System.Collections.Immutable;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
