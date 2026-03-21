@@ -104,7 +104,6 @@ public abstract class RepoPluginBase<T> : PluginBase
         return true;
     }
 
-
     /// <summary>
     /// Tries to get the associated information for all the Repos if and only if no issue exist for any of them.
     /// </summary>
