@@ -1,7 +1,6 @@
 using CK.Core;
 using CK.Monitoring;
 using System;
-using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
@@ -319,18 +318,6 @@ public static partial class CKliRootEnv
             return _defaultCommandContext!;
         }
     }
-
-    /// <summary>
-    /// Gets or sets an optional provider for the "Global options:" help display.
-    /// This is an awful global but we don't care.
-    /// </summary>
-    public static Func<ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)>>? GlobalOptions { get; set; }
-
-    /// <summary>
-    /// Gets or sets an optional provider for the "Global flags:" help display.
-    /// This is an awful global but we don't care.
-    /// </summary>
-    public static Func<ImmutableArray<(ImmutableArray<string> Names, string Description)>>? GlobalFlags { get; set; }
 
     /// <summary>
     /// Acquires an exclusive global system lock for this environment: the key is the <see cref="AppLocalDataPath"/>.

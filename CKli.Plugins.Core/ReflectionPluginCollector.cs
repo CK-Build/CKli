@@ -265,6 +265,16 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                 _commandCollector.Add( result, m, path, attributes );
             }
         }
+        // Discover namespace descriptions from class-level attributes.
+        foreach( var a in type.GetCustomAttributesData() )
+        {
+            if( a.AttributeType == typeof( NamespaceDescriptionAttribute ) )
+            {
+                var nsPath = (string)a.ConstructorArguments[0].Value!;
+                var nsDesc = (string)a.ConstructorArguments[1].Value!;
+                _commandCollector.AddNamespaceDescription( nsPath, nsDesc );
+            }
+        }
 
         plugins[type] = result;
 

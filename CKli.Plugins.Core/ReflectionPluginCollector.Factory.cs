@@ -108,6 +108,7 @@ sealed partial class ReflectionPluginCollector
                     {
                         cmds.Add( c.CommandPath, c );
                     }
+                    var nsDescs = new Dictionary<string, string>();
 
             """ );
 
@@ -116,10 +117,15 @@ sealed partial class ReflectionPluginCollector
                 if( cmd == null )
                 {
                     b.Append( "       cmds.Add( \"" ).Append( path ).Append("\", null );" ).AppendLine();
+                    if( _commands.NamespaceDescriptions.TryGetValue( path, out var desc ) && desc.Length > 0 )
+                    {
+                        b.Append( "       nsDescs[\"" ).Append( path ).Append( "\"] = " );
+                        AppendSourceString( b, desc ).Append( ';' ).AppendLine();
+                    }
                 }
             }
             b.Append( $$"""
-                    return new Generated( infos, pluginCommands, CommandNamespace.UnsafeCreate( cmds ) );
+                    return new Generated( infos, pluginCommands, CommandNamespace.UnsafeCreate( cmds, nsDescs ) );
                 }
             }
 

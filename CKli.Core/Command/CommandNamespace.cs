@@ -14,13 +14,25 @@ public sealed class CommandNamespace
     /// <summary>
     /// An empty command namespace.
     /// </summary>
-    public static readonly CommandNamespace Empty = new CommandNamespace( new Dictionary<string, Command?>() );
+    public static readonly CommandNamespace Empty = new CommandNamespace( new Dictionary<string, Command?>(), new Dictionary<string, string>() );
 
     readonly Dictionary<string, Command?> _commands;
+    readonly Dictionary<string, string> _namespaceDescriptions;
 
-    internal CommandNamespace( Dictionary<string, Command?> commands )
+    /// <summary>
+    /// Gets the descriptions for pure namespace entries.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> NamespaceDescriptions => _namespaceDescriptions;
+
+    internal CommandNamespace( Dictionary<string, Command?> commands, Dictionary<string, string> namespaceDescriptions )
     {
         _commands = commands;
+        _namespaceDescriptions = namespaceDescriptions;
+    }
+
+    internal CommandNamespace( Dictionary<string, Command?> commands )
+        : this( commands, new Dictionary<string, string>() )
+    {
     }
 
     /// <summary>
@@ -29,6 +41,14 @@ public sealed class CommandNamespace
     /// </summary>
     /// <param name="commands">The already built command namespace.</param>
     public static CommandNamespace UnsafeCreate( Dictionary<string, Command?> commands ) => new CommandNamespace( commands );
+
+    /// <summary>
+    /// Initializes a new command namespace without checks, with namespace descriptions.
+    /// </summary>
+    /// <param name="commands">The already built command namespace.</param>
+    /// <param name="namespaceDescriptions">The namespace descriptions.</param>
+    public static CommandNamespace UnsafeCreate( Dictionary<string, Command?> commands, Dictionary<string, string> namespaceDescriptions )
+        => new CommandNamespace( commands, namespaceDescriptions );
 
     /// <summary>
     /// Finds a command from its command path.

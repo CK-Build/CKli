@@ -11,6 +11,7 @@ namespace CKli;
 public sealed class CommandNamespaceBuilder
 {
     readonly Dictionary<string, Command?> _commands;
+    readonly Dictionary<string, string> _namespaceDescriptions = new();
 
     /// <summary>
     /// Initiaizes a new builder.
@@ -24,7 +25,18 @@ public sealed class CommandNamespaceBuilder
     /// Creates a new immutable <see cref="CommandNamespace"/>.
     /// </summary>
     /// <returns>The commands.</returns>
-    public CommandNamespace Build() => new CommandNamespace( _commands );
+    public CommandNamespace Build() => new CommandNamespace( _commands, _namespaceDescriptions );
+
+    /// <summary>
+    /// Adds a description for a namespace path. First-write-wins: if a description
+    /// is already set for <paramref name="path"/>, subsequent calls are silently ignored.
+    /// </summary>
+    /// <param name="path">The namespace path (e.g. "hosting" or "hosting deploy").</param>
+    /// <param name="description">The namespace description.</param>
+    public void AddNamespaceDescription( string path, string description )
+    {
+        _namespaceDescriptions.TryAdd( path, description );
+    }
 
     /// <summary>
     /// Adds or throw on already existing command or if the new command is not below a pure

@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -12,47 +13,69 @@ namespace CKli;
 /// </summary>
 public static class CKliCommands
 {
+    /// <summary>
+    /// Defines a global option or flag for CKli.
+    /// </summary>
+    /// <param name="Names">The option/flag names (e.g. "--help", "-h", "-?").</param>
+    /// <param name="Description">The description displayed in help and completions.</param>
+    /// <param name="Type">Either "option" (takes a value) or "flag" (boolean switch).</param>
+    public readonly record struct GlobalDef( ImmutableArray<string> Names, string Description, string Type );
+
+    /// <summary>
+    /// Gets the canonical global options and flags for CKli.
+    /// This is the single source of truth used by both --help and shell completions.
+    /// </summary>
+    public static ImmutableArray<GlobalDef> Globals { get; } =
+    [
+        new( ["--path", "-p"], "Sets the working path. Must appear at the start of the command.", "option" ),
+        new( ["--version", "-v"], "Displays this CKli version. Must come first.", "flag" ),
+        new( ["--ckli-screen"], "Changes the screen display (none, no-color, force-ansi).", "option" ),
+        new( ["--ckli-debug"], "Launches a debugger when starting.", "flag" ),
+        new( ["--help", "-h", "-?"], "Displays the help. Must be the last argument.", "flag" ),
+    ];
+
     static readonly CommandNamespace _commands;
 
     static CKliCommands()
     {
         var cmds = new Dictionary<string, Command?>();
+        var nsDescs = new Dictionary<string, string>();
         Add( cmds, new CKliClone() );
         Add( cmds, new CKliExec() );
         Add( cmds, new CKliFetch() );
         Add( cmds, new CKliIssue() );
 
-        cmds.Add( "branch", null );
+        AddNs( cmds, nsDescs, "branch", "Branch management commands." );
         Add( cmds, new CKliBranchPush() );
 
-        cmds.Add( "layout", null );
+        AddNs( cmds, nsDescs, "layout", "Layout fix and export commands." );
         Add( cmds, new CKliLayoutFix() );
         Add( cmds, new CKliLayoutXif() );
 
         Add( cmds, new CKliLog() );
 
-        cmds.Add( "repo", null );
+        AddNs( cmds, nsDescs, "repo", "Repository management commands." );
         Add( cmds, new CKliRepoList() );
         Add( cmds, new CKliRepoAdd() );
         Add( cmds, new CKliRepoRemove() );
         //Add( cmds, new CKliRepoMove() ); => Moves to another stack.
         //Add( cmds, new CKliRepoMigrate() ); => Moves the remote git => new origin url.
 
-        cmds.Add( "maintenance", null );
-        cmds.Add( "maintenance hosting", null );
+        AddNs( cmds, nsDescs, "maintenance", "Maintenance commands." );
+        AddNs( cmds, nsDescs, "maintenance hosting", "Hosting maintenance commands." );
         Add( cmds, new CKliMaintenanceHostingCreate() );
         //Add( cmds, new CKliMaintenanceHostingDelete() );
         //Add( cmds, new CKliMaintenanceHostingArchive() );
         //Add( cmds, new CKliMaintenanceHostingInfo() );
 
 
-        cmds.Add( "remote", null );
-        cmds.Add( "remote stack", null );
+        AddNs( cmds, nsDescs, "remote", "Remote management commands." );
+        AddNs( cmds, nsDescs, "remote stack", "Remote stack commands." );
         Add( cmds, new CKliRemoteStackCreate() );
         Add( cmds, new CKliRemoteStackInfo() ); // => Merge with "repo list" ?
         Add( cmds, new CKliRemoteStackMigrate() );
 
-        cmds.Add( "plugin", null );
+        AddNs( cmds, nsDescs, "plugin", "Plugin management commands." );
         Add( cmds, new CKliPluginAdd() );
         Add( cmds, new CKliPluginCreate() );
         Add( cmds, new CKliPluginDisable() );
@@ -63,7 +86,7 @@ public static class CKliCommands
         Add( cmds, new CKliPull() );
         Add( cmds, new CKliPush() );
 
-        cmds.Add( "tag", null );
+        AddNs( cmds, nsDescs, "tag", "Tag management commands." );
         Add( cmds, new CKliTagDelete() );
         Add( cmds, new CKliTagList() );
         Add( cmds, new CKliTagPull() );
@@ -71,9 +94,19 @@ public static class CKliCommands
 
         Add( cmds, new CKliUpdate() );
 
-        static void Add( Dictionary<string, Command?> commands, Command c ) => commands.Add( c.CommandPath, c );
+        Add( cmds, new CKliComplete() );
 
-        _commands = CommandNamespace.UnsafeCreate( cmds );
+        AddNs( cmds, nsDescs, "completions", "Shell completion setup." );
+        Add( cmds, new CKliCompletionsScript() );
+
+        static void Add( Dictionary<string, Command?> commands, Command c ) => commands.Add( c.CommandPath, c );
+        static void AddNs( Dictionary<string, Command?> commands, Dictionary<string, string> descs, string ns, string description )
+        {
+            commands.Add( ns, null );
+            descs.Add( ns, description );
+        }
+
+        _commands = CommandNamespace.UnsafeCreate( cmds, nsDescs );
 
 #if DEBUG
         var c = new CommandNamespaceBuilder();
@@ -142,12 +175,11 @@ public static class CKliCommands
         // also display the help.
 
         if( !_commands.TryFindForExecution( monitor, cmdLine, out var helpPath )
-            || (cmdLine.FoundCommand != null && cmdLine.HasHelp) )
+            || (cmdLine.FoundCommand != null && cmdLine.HasHelp && cmdLine.FoundCommand is not CKliComplete) )
         {
             context.Screen.DisplayHelp( _commands.GetForHelp( context.Screen.ScreenType, helpPath, null ),
                                         cmdLine,
-                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
-                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
+                                        interactiveScreen != null ? default : CKliCommands.Globals );
             return FinalizeCommandExecutionAsync( monitor, context, cmdLine, null, true );
         }
         // If it's a CKli command, we can now execute it.
@@ -172,8 +204,7 @@ public static class CKliCommands
             }
             context.Screen.DisplayHelp( _commands.GetForHelp( context.Screen.ScreenType, helpPath, null ),
                                         cmdLine,
-                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
-                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
+                                        interactiveScreen != null ? default : CKliCommands.Globals );
             return FinalizeCommandExecutionAsync( monitor, context, cmdLine, null, false );
         }
 
@@ -206,8 +237,7 @@ public static class CKliCommands
                     // If a world help path has been found, don't display the Global options & flags helps.
                     context.Screen.DisplayHelp( world.Commands.GetForHelp( context.Screen.ScreenType, worldHelpPath ?? helpPath, _commands ),
                                                 cmdLine,
-                                                (worldHelpPath != null || context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
-                                                (worldHelpPath != null || context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
+                                                worldHelpPath != null || context.Screen is InteractiveScreen ? default : CKliCommands.Globals );
                     return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, stack, cmdLine.HasHelp ).ConfigureAwait( false );
                 }
                 // We have a plugin command (and no --help).
@@ -266,7 +296,7 @@ public static class CKliCommands
                         // Before we must clear any remaining arguments otherwise we may display
                         // a misleading remaining arguments message.
                         cmdLine.CloseAndForgetRemainingArguments();
-                        context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
+                        context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default );
                     }
                 }
                 else if( cmdLine.RemainingCount > 0 )
@@ -283,7 +313,7 @@ public static class CKliCommands
                         success = false;
                     }
                     // This displays the lovely header with remaining arguments.
-                    context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
+                    context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default );
                 }
             }
             catch( Exception ex )

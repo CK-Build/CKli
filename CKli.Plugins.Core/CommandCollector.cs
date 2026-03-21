@@ -25,6 +25,11 @@ sealed partial class CommandCollector
         _commands = new CommandNamespaceBuilder();
     }
 
+    public void AddNamespaceDescription( string path, string description )
+    {
+        _commands.AddNamespaceDescription( path, description );
+    }
+
     public void Add( IPluginTypeInfo typeInfo, MethodInfo method, string commandPath, IList<CustomAttributeData> attributes )
     {
         commandPath = NormalizePath( commandPath );
