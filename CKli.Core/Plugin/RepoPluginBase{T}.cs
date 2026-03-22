@@ -119,7 +119,10 @@ public abstract class RepoPluginBase<T> : PluginBase
             {
                 if( info.HasIssue )
                 {
-                    monitor.Error( $"Please fix any issue before {before}." );
+                    monitor.Error( $"""
+                        At least one issue has been detected in '{info.Repo.DisplayPath}'. Use 'ckli issue' for details.
+                        Please fix any issue before {before}.
+                        """ );
                     return false;
                 }
             }
