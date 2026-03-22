@@ -104,7 +104,6 @@ public abstract class RepoPluginBase<T> : PluginBase
         return true;
     }
 
-
     /// <summary>
     /// Tries to get the associated information for all the Repos if and only if no issue exist for any of them.
     /// </summary>
@@ -120,7 +119,10 @@ public abstract class RepoPluginBase<T> : PluginBase
             {
                 if( info.HasIssue )
                 {
-                    monitor.Error( $"Please fix any issue before {before}." );
+                    monitor.Error( $"""
+                        At least one issue has been detected in '{info.Repo.DisplayPath}'. Use 'ckli issue' for details.
+                        Please fix any issue before {before}.
+                        """ );
                     return false;
                 }
             }
@@ -134,9 +136,6 @@ public abstract class RepoPluginBase<T> : PluginBase
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="repo">The Repo.</param>
-    /// <returns>
-    /// The information.
-    /// Errors may not be logged: <see cref="RepoInfo.ErrorReason"/> can capture enough error information.
-    /// </returns>
+    /// <returns>The information.</returns>
     protected abstract T Create( IActivityMonitor monitor, Repo repo );
 }

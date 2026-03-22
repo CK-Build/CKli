@@ -11,19 +11,38 @@ namespace CKli;
 /// <summary>
 /// Encapsulates a package@version information. Can be used fo other kind of packages than NuGet.
 /// <para>
-/// This is a readonly record struct: value equality is handled by default and we add a comparison
-/// based on <paramref name="PackageId"/> first and then <see cref="Version"/>.
+/// <see name="PackageId"/> uses <see cref="StringComparer.Ordinal"/>.
+/// Equality and comparison is based on <see name="PackageId"/> first and then <see cref="Version"/>.
 /// </para>
 /// </summary>
-/// <param name="PackageId">The package name. Will be null for <c>default</c>.</param>
-/// <param name="Version">The version of this instance. Will be null for <c>default</c>.</param>
-public readonly record struct PackageInstance( string PackageId, SVersion Version ) : IComparable<PackageInstance>
+public sealed class PackageInstance : IComparable<PackageInstance>, IEquatable<PackageInstance>
 {
+    readonly string _packageId;
+    readonly SVersion _version;
+    string? _toString;
+
     /// <summary>
-    /// Gets whether this value is valid (not the <c>default</c>).
+    /// Initializes a new package instance.
     /// </summary>
-    [MemberNotNullWhen(true, nameof(PackageId), nameof(Version))]
-    public bool IsValid => PackageId != null && Version != null;
+    /// <param name="packageId">The package name.</param>
+    /// <param name="version">The version of this instance.</param>
+    public PackageInstance( string packageId, SVersion version )
+    {
+        Throw.CheckNotNullArgument( packageId );
+        Throw.CheckNotNullArgument( version );
+        _packageId = packageId;
+        _version = version;
+    }
+
+    /// <summary>
+    /// Gets the package name.
+    /// </summary>
+    public string PackageId => _packageId;
+
+    /// <summary>
+    /// Gets the version of this instance.
+    /// </summary>
+    public SVersion Version => _version;
 
     /// <summary>
     /// Gets the "package.version.nupkg" file name.
@@ -38,9 +57,9 @@ public readonly record struct PackageInstance( string PackageId, SVersion Versio
     /// <param name="head">The head.</param>
     /// <param name="instance">The instance on success.</param>
     /// <returns>True on success, false otherwise.</returns>
-    public static bool TryMatch( ref ReadOnlySpan<char> head, out PackageInstance instance )
+    public static bool TryMatch( ref ReadOnlySpan<char> head, [NotNullWhen( true )] out PackageInstance? instance )
     {
-        instance = default;
+        instance = null;
         int idx = head.IndexOf( '@' );
         if( idx <= 0 ) return false;
         var rest = head.Slice( idx + 1 );
@@ -58,18 +77,41 @@ public readonly record struct PackageInstance( string PackageId, SVersion Versio
     /// <param name="s">The string to parse.</param>
     /// <param name="instance">The instance on success.</param>
     /// <returns>True on success, false otherwise.</returns>
-    public static bool TryParse( ReadOnlySpan<char> s, out PackageInstance instance ) => TryMatch( ref s, out instance );
+    public static bool TryParse( ReadOnlySpan<char> s, [NotNullWhen( true )] out PackageInstance? instance ) => TryMatch( ref s, out instance );
 
     /// <summary>
-    /// Supports ordering by <see cref="PackageId"/> and <see cref="Version"/>.
+    /// Supports ordering by <see cref="PackageId"/> (case insensitive) and <see cref="Version"/>.
     /// </summary>
     /// <param name="other">The other package.</param>
     /// <returns>Standard comparison value.</returns>
-    public int CompareTo( PackageInstance other )
+    public int CompareTo( PackageInstance? other )
     {
-        int cmp = StringComparer.Ordinal.Compare( PackageId, other.PackageId );
-        return cmp == 0 ? Version.CompareTo( other.Version ) : cmp;
+        if( other is null ) return 1;
+        int cmp = StringComparer.OrdinalIgnoreCase.Compare( _packageId, other._packageId );
+        return cmp == 0 ? _version.CompareTo( other._version ) : cmp;
     }
+
+    /// <summary>
+    /// Overridden to consider case insensitive <see cref="PackageId"/>.
+    /// </summary>
+    /// <param name="other">The other instance.</param>
+    /// <returns>True if this is the package identifier (case insensitive) and version as the other one, false otherwise.</returns>
+    public bool Equals( PackageInstance? other ) => other is not null
+                                                    && StringComparer.OrdinalIgnoreCase.Equals( _packageId, other._packageId )
+                                                    && _version == other._version;
+
+    /// <summary>
+    /// Overridden to call <see cref="Equals(PackageInstance?)"/>.
+    /// </summary>
+    /// <param name="obj">The object to compare with the current object.</param>
+    /// <returns><c>true</c> if the specified object is equal to the current object; otherwise, <c>false</c>.</returns>
+    public override bool Equals( object? obj ) => obj is PackageInstance p && Equals( p );
+
+    /// <summary>
+    /// Overridden to consider a case insensitive <see cref="PackageId"/>.
+    /// </summary>
+    /// <returns>The hash.</returns>
+    public override int GetHashCode() => HashCode.Combine( StringComparer.OrdinalIgnoreCase.GetHashCode( _packageId ), _version.GetHashCode() );
 
     /// <summary>
     /// Parses the result of a "dotnet package list" call.
@@ -194,5 +236,39 @@ public readonly record struct PackageInstance( string PackageId, SVersion Versio
     /// Returns "<see cref="PackageId"/>@<see cref="Version"/>".
     /// </summary>
     /// <returns>The package@version string.</returns>
-    public override string ToString() => $"{PackageId}@{Version}";
+    public override string ToString() => _toString ??= $"{_packageId}@{_version}";
+
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+
+    public static bool operator ==( PackageInstance? left, PackageInstance? right )
+    {
+        return left is null ? right is null : left.Equals( right );
+    }
+
+    public static bool operator !=( PackageInstance? left, PackageInstance? right )
+    {
+        return !(left == right);
+    }
+
+    public static bool operator <( PackageInstance? left, PackageInstance? right )
+    {
+        return left is null ? right is not null : left.CompareTo( right ) < 0;
+    }
+
+    public static bool operator <=( PackageInstance? left, PackageInstance? right )
+    {
+        return left is null || left.CompareTo( right ) <= 0;
+    }
+
+    public static bool operator >( PackageInstance? left, PackageInstance? right )
+    {
+        return left is not null && left.CompareTo( right ) > 0;
+    }
+
+    public static bool operator >=( PackageInstance? left, PackageInstance? right )
+    {
+        return left is null ? right is null : left.CompareTo( right ) >= 0;
+    }
+
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
 }
