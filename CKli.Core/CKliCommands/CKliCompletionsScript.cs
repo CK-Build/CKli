@@ -11,7 +11,7 @@ sealed class CKliCompletionsScript : Command
         : base( null,
                 "completions script",
                 "Outputs a shell completion script. Source the output in your shell profile.",
-                [("shell", "Shell type: bash, zsh, fish, or pwsh.")],
+                [("shell", "Defaults to 'pwsh'. Can be: 'bash', 'zsh' or 'fish'.")],
                 [],
                 [] )
     {
@@ -26,12 +26,7 @@ sealed class CKliCompletionsScript : Command
         var shell = cmdLine.EatArgument();
         if( !cmdLine.Close( monitor ) ) return ValueTask.FromResult( false );
 
-        var script = ShellScripts.Get( shell );
-        if( script == null )
-        {
-            monitor.Error( $"Unknown shell '{shell}'. Supported: bash, zsh, fish, pwsh." );
-            return ValueTask.FromResult( false );
-        }
+        var script = ShellScripts.Get( shell ) ?? "pwsh";
         Console.Out.Write( script );
         return ValueTask.FromResult( true );
     }
