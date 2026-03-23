@@ -12,6 +12,7 @@ namespace CKli.Core;
 /// </summary>
 public sealed class CommandLineArguments
 {
+    const string _ckliDebugFlagName = "--ckli-debug";
     static CommandLineArguments? _empty;
 
     /// <summary>
@@ -24,6 +25,7 @@ public sealed class CommandLineArguments
     readonly bool _hasHelp;
     readonly bool _hasCKliDebug;
     readonly bool _hasVersion;
+    readonly bool _isCompletionRequest;
     readonly string? _explicitPath;
     readonly string? _ckliScreen;
     readonly bool _hasInteractive;
@@ -57,22 +59,36 @@ public sealed class CommandLineArguments
     /// <param name="arguments">The initial arguments.</param>
     public CommandLineArguments( string[] arguments )
     {
-        _initial = [..arguments];
         var args = arguments.AsSpan();
+        if( args.Length > 0 && args[0] == "complete" )
+        {
+            args = args.Slice( 1 );
+            _isCompletionRequest = true;
+        }
+        _initial = [..args];
 
-
-        // If there is no argument at all, help is assumed.
+        // If there is no argument at all, help is assumed (if not in a completion request).
         if( args.Length == 0 )
         {
-            _hasHelp = true;
+            if( !_isCompletionRequest )
+            {
+                _hasHelp = true;
+            }
             _args = [];
         }
         else
         {
             // --help, -?, -h or ? must be the last arguments.
             // Otherwise we consider it to be handled by the command (this enable exec command to use it).
-            _hasHelp = args.IndexOfAny( ["--help", "-?", "-h", "?"] ) == args.Length - 1;
-            if( _hasHelp ) args = args.Slice( 0, args.Length - 1 );
+            // When in a completion request, we don't handle help: we let it appear in the arguments
+            // and don't expose a true HasHelp!
+            if( !_isCompletionRequest )
+            {
+                _hasHelp = args.IndexOfAny( ["--help", "-?", "-h", "?"] ) == args.Length - 1;
+                if( _hasHelp ) args = args.Slice( 0, args.Length - 1 );
+            }
+            // When in a completion request, we handle --version, --path and interactive, but we really
+            // care for the --path argument: if it exists, it must be honored before computing completions.
             if( args.Length > 0 )
             {
                 // If --version or -v is specified, it must comes first.
@@ -103,10 +119,14 @@ public sealed class CommandLineArguments
             _args = [.. args];
         }
 
-        // --ckli-debug and --ckli-screen can appear anywhere: their --ckli prefix should be enough.
-        _hasCKliDebug = EatFlag( "--ckli-debug" );
-        _ckliScreen = EatSingleOption( "--ckli-screen" );
-        _expectCommand = _args.Count > 0;
+        // When in a completion request, ignore these.
+        if( !_isCompletionRequest )
+        {
+            // --ckli-debug and --ckli-screen can appear anywhere: their --ckli prefix should be enough.
+            _hasCKliDebug = EatFlag( _ckliDebugFlagName );
+            _ckliScreen = EatSingleOption( "--ckli-screen" );
+            _expectCommand = _args.Count > 0;
+        }
 
         static string? StartsWithPath( ref Span<string> args )
         {
@@ -131,12 +151,25 @@ public sealed class CommandLineArguments
     }
 
     /// <summary>
+    /// Gets whether "complete" was the very first argument: it has been removed and this command line
+    /// is the reflect of the remaining arguments (even <see cref="InitialArguments"/> doesn't contain
+    /// the "complete" string).
+    /// </summary>
+    public bool IsCompletionRequest => _isCompletionRequest;
+
+    /// <summary>
     /// Gets whether "--help", "-h", "-?" or "?" appeared at the end of the command line.
+    /// <para>
+    /// This is always false when if <see cref="IsCompletionRequest"/> is true.
+    /// </para>
     /// </summary>
     public bool HasHelp => _hasHelp;
 
     /// <summary>
     /// Gets whether debugger must be launched.
+    /// <para>
+    /// This is always false when <see cref="IsCompletionRequest"/> is true.
+    /// </para>
     /// </summary>
     public bool HasCKliDebugFlag => _hasCKliDebug;
 
@@ -164,15 +197,20 @@ public sealed class CommandLineArguments
     public string? ExplicitPathOption => _explicitPath;
 
     /// <summary>
-    /// Gets whether the command line is initially not empty after having handled <see cref="HasHelp"/>,
-    /// <see cref="ExplicitPathOption"/> and <see cref="HasInteractiveArgument"/>.
-    /// </summary>
-    public bool ExpectCommand => _expectCommand;
-
-    /// <summary>
     /// Gets the "--ckli-screen" option if any.
+    /// <para>
+    /// This is always null when <see cref="IsCompletionRequest"/> is true.
+    /// </para>
     /// </summary>
     public string? ScreenOption => _ckliScreen;
+
+    /// <summary>
+    /// Gets whether the command line is initially not empty after having handled intrinsic options and flags.
+    /// <para>
+    /// This is always false when <see cref="IsCompletionRequest"/> is true.
+    /// </para>
+    /// </summary>
+    public bool ExpectCommand => _expectCommand;
 
     /// <summary>
     /// Gets whether all arguments have been eaten.
