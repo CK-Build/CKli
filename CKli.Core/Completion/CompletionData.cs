@@ -2,6 +2,7 @@ using CKli;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static CK.Core.CheckedWriteStream;
 
 namespace CKli.Core.Completion;
 
@@ -76,16 +77,11 @@ public sealed class CompletionData
         }
     }
 
-    public record struct CompletionResult( string Completion, string Description, string Type );
-
-    public List<CompletionResult> GetCompletions( ReadOnlySpan<string> tokens )
+    public IEnumerable<(string Completion, string Description, string Type)> GetCompletions( ReadOnlySpan<string> tokens )
     {
-        var results = new List<CompletionResult>();
         if( tokens.Length == 0 )
         {
-            AddTopLevel( results, "" );
-            SuggestGlobals( results, [], "" );
-            return results;
+            return AddTopLevel( "" ).Concat( SuggestGlobals( [], "" ) );
         }
 
         // Greedy command/namespace match
@@ -118,9 +114,7 @@ public sealed class CompletionData
         // Case 1: Nothing matched - suggest top-level + globals
         if( matchedCommand == null && consumed == 0 )
         {
-            AddTopLevel( results, tokens[0] );
-            SuggestGlobals( results, [], tokens[0] );
-            return results;
+            return AddTopLevel( tokens[0] ).Concat( SuggestGlobals( [], tokens[0] ) );
         }
 
         // Case 2: Namespace matched, no command - suggest children
@@ -128,16 +122,14 @@ public sealed class CompletionData
         {
             var prefix = pathBuilder;
             var partial = remaining.Length > 0 ? remaining[0] : "";
-            AddChildren( results, prefix, partial );
-            return results;
+            return AddChildren( prefix, partial );
         }
 
         // Case 3: Command matched - check cursor context
-        if( remaining.Length > 0 )
+        //         If last token is an option awaiting a value: suppress completions (user needs to type the value).
+        if( remaining.Length > 0 && IsOptionAwaitingValue( matchedCommand, remaining[^1] ) )
         {
-            // Last token is an option awaiting a value: suppress completions (user needs to type the value).
-            if( IsOptionAwaitingValue( matchedCommand, remaining[^1] ) )
-                return results;
+            return [];
         }
 
         // Build set of used tokens, skipping values that follow options.
@@ -169,7 +161,7 @@ public sealed class CompletionData
                 if( lastToken.Length == 0 )
                 {
                     // Empty token means user hasn't typed the value yet - suppress completions.
-                    return results;
+                    return [];
                 }
                 // Non-empty: value has been provided - show remaining options.
                 partial2 = "";
@@ -180,9 +172,7 @@ public sealed class CompletionData
                 partial2 = lastToken;
             }
         }
-        SuggestOptionsAndFlags( results, matchedCommand, usedTokens, partial2 );
-        SuggestGlobals( results, usedTokens, partial2 );
-        return results;
+        return SuggestOptionsAndFlags( matchedCommand, usedTokens, partial2 ).Concat( SuggestGlobals( usedTokens, partial2 ) );
     }
 
     bool IsKnownToken( string commandPath, string token )
@@ -221,7 +211,7 @@ public sealed class CompletionData
         return false;
     }
 
-    void AddTopLevel( List<CompletionResult> results, string partial )
+    IEnumerable<(string Completion, string Description, string Type)> AddTopLevel( string partial )
     {
         var seen = new HashSet<string>();
         // Add namespaces first so they take precedence over sub-command top-words.
@@ -230,18 +220,18 @@ public sealed class CompletionData
             var topWord = ns.Split( ' ' )[0];
             if( _hidden.Contains( topWord ) ) continue;
             if( topWord.StartsWith( partial ) && seen.Add( topWord ) )
-                results.Add( new CompletionResult( topWord, desc, "namespace" ) );
+                yield return (topWord, desc, "namespace");
         }
         foreach( var (path, entry) in _commands )
         {
             var topWord = path.Split( ' ' )[0];
             if( _hidden.Contains( path ) ) continue;
             if( topWord.StartsWith( partial ) && seen.Add( topWord ) )
-                results.Add( new CompletionResult( topWord, entry.Description, "command" ) );
+                yield return (topWord, entry.Description, "command");
         }
     }
 
-    void AddChildren( List<CompletionResult> results, string prefix, string partial )
+    IEnumerable<(string Completion, string Description, string Type)> AddChildren( string prefix, string partial )
     {
         var seen = new HashSet<string>();
         foreach( var (path, entry) in _commands )
@@ -251,7 +241,7 @@ public sealed class CompletionData
             {
                 var firstWord = path[(prefix.Length + 1)..].Split( ' ' )[0];
                 if( firstWord.StartsWith( partial ) && seen.Add( firstWord ) )
-                    results.Add( new CompletionResult( firstWord, entry.Description, "command" ) );
+                    yield return (firstWord, entry.Description, "command");
             }
         }
         foreach( var (ns, desc) in _namespaces )
@@ -261,26 +251,28 @@ public sealed class CompletionData
             {
                 var firstWord = ns[(prefix.Length + 1)..].Split( ' ' )[0];
                 if( firstWord.StartsWith( partial ) && seen.Add( firstWord ) )
-                    results.Add( new CompletionResult( firstWord, desc, "namespace" ) );
+                    yield return (firstWord, desc, "namespace");
             }
         }
     }
 
-    void SuggestOptionsAndFlags( List<CompletionResult> results, string commandPath, HashSet<string> usedTokens, string partial )
+    IEnumerable<(string Completion, string Description, string Type)> SuggestOptionsAndFlags( string commandPath, HashSet<string> usedTokens, string partial )
     {
-        if( !_options.TryGetValue( commandPath, out var opts ) ) return;
-        foreach( var opt in opts )
+        if( _options.TryGetValue( commandPath, out var opts ) )
         {
-            if( opt.Type != "multi" && opt.IsUsedBy( usedTokens ) ) continue;
-            foreach( var name in opt.Names )
+            foreach( var opt in opts )
             {
-                if( name.StartsWith( partial ) )
-                    results.Add( new CompletionResult( name, opt.Description, opt.Type ) );
+                if( opt.Type != "multi" && opt.IsUsedBy( usedTokens ) ) continue;
+                foreach( var name in opt.Names )
+                {
+                    if( name.StartsWith( partial ) )
+                        yield return (name, opt.Description, opt.Type);
+                }
             }
         }
     }
 
-    void SuggestGlobals( List<CompletionResult> results, HashSet<string> usedTokens, string partial )
+    IEnumerable<(string Completion, string Description, string Type)> SuggestGlobals( HashSet<string> usedTokens, string partial )
     {
         foreach( var g in _globals )
         {
@@ -288,7 +280,7 @@ public sealed class CompletionData
             foreach( var name in g.Names )
             {
                 if( name.StartsWith( partial ) )
-                    results.Add( new CompletionResult( name, g.Description, "global" ) );
+                    yield return (name, g.Description, "global");
             }
         }
     }

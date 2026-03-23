@@ -33,7 +33,7 @@ if( explicitPath != null )
 // Now that the --path has been set, we can handle the completion request.
 if( arguments.IsCompletionRequest )
 {
-    CKliCommands.HandleCompletion( arguments.InitialArguments );
+    CKliCommands.HandleCompletion( arguments.InitialArguments.AsSpan() );
     Environment.ExitCode = 0;
     return;
 }

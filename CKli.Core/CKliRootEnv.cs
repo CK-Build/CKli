@@ -32,6 +32,19 @@ public static partial class CKliRootEnv
     static bool? _shouldDeletePureCKliLogFile;
 
     /// <summary>
+    /// Computes the <see cref="AppLocalDataPath"/> (without initializing this environment). 
+    /// </summary>
+    /// <param name="instanceName">
+    /// Used by tests (with "Test"). Can be used with other suffix if needed. This drives the <see cref="AppLocalDataPath"/>.
+    /// </param>
+    /// <returns>See <see cref="AppLocalDataPath"/>.</returns>
+    public static NormalizedPath GetAppLocalDataPath( string? instanceName )
+    {
+        return Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create ),
+                             instanceName == null ? "CKli" : $"CKli-{instanceName}" );
+    }
+
+    /// <summary>
     /// Initializes the CKli environment.
     /// This ensures that the <see cref="GrandOutput.Default"/> is initialized.
     /// </summary>
@@ -50,8 +63,7 @@ public static partial class CKliRootEnv
                                    bool findCurrentStackPath = true )
     {
         Throw.CheckState( "Initialize can be called only once.", _appLocalDataPath.IsEmptyPath );
-        _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create ),
-                                          instanceName == null ? "CKli" : $"CKli-{instanceName}" );
+        _appLocalDataPath = GetAppLocalDataPath( instanceName );
         // To handle logs, we first must determine if we are in a Stack. If this is the case, then the Logs/ folder
         // will be .[Public|PrivateStack]/Logs, else the log will be in _appLocalDataPath/Out-of-Stack-Logs/.
         _currentDirectory = Environment.CurrentDirectory;
