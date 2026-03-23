@@ -15,30 +15,6 @@ static class StringExt
     }
 }
 
-/// <summary>
-/// Parsed completion manifest data.
-/// </summary>
-public sealed class ManifestData
-{
-    public List<OptionEntry> Globals { get; } = new();
-    public Dictionary<string, string> Namespaces { get; } = new();
-    public Dictionary<string, CommandEntry> Commands { get; } = new();
-    readonly Dictionary<string, List<OptionEntry>> _options = new();
-
-    public IReadOnlyList<OptionEntry> GetOptionsAndFlags( string commandPath )
-        => _options.TryGetValue( commandPath, out var list ) ? list : [];
-
-    internal void AddOption( string commandPath, OptionEntry entry )
-    {
-        if( !_options.TryGetValue( commandPath, out var list ) )
-        {
-            list = new List<OptionEntry>();
-            _options[commandPath] = list;
-        }
-        list.Add( entry );
-    }
-}
-
 public readonly record struct CommandEntry( string Description, int ArgCount );
 
 public readonly record struct OptionEntry( string[] Names, string Description, string Type )
@@ -65,7 +41,6 @@ public static class CompletionManifest
     public static string Write( CommandNamespace commands, ImmutableArray<CKliCommands.GlobalDef> globals )
     {
         var sb = new StringBuilder();
-
         // Global section
         sb.AppendLine( "# Global" );
         foreach( var g in globals )
