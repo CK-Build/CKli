@@ -12,16 +12,16 @@ namespace CKli.Core;
 /// </summary>
 public sealed class PluginCollectorContext
 {
-    readonly WorldName _worldName;
+    readonly LocalWorldName _worldName;
     readonly IReadOnlyDictionary<XName, (XElement Config, bool IsDisabled)> _pluginsConfiguration;
     byte[]? _signature;
 
     /// <summary>
     /// Initializes a new <see cref="PluginCollectorContext"/>.
     /// </summary>
-    /// <param name="worldName">The world name.</param>
+    /// <param name="worldName">The local world name.</param>
     /// <param name="pluginsConfiguration">The plugins configuration.</param>
-    public PluginCollectorContext( WorldName worldName,
+    public PluginCollectorContext( LocalWorldName worldName,
                                    IReadOnlyDictionary<XName, (XElement Config, bool IsDisabled)> pluginsConfiguration )
     {
         _worldName = worldName;
@@ -29,9 +29,9 @@ public sealed class PluginCollectorContext
     }
 
     /// <summary>
-    /// Gets the world name.
+    /// Gets the local world name.
     /// </summary>
-    public WorldName WorldName => _worldName;
+    public LocalWorldName WorldName => _worldName;
 
     /// <summary>
     /// Gets the plugin configurations.
