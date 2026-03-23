@@ -1,4 +1,5 @@
 using CKli;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -77,7 +78,7 @@ public sealed class CompletionData
 
     public record struct CompletionResult( string Completion, string Description, string Type );
 
-    public List<CompletionResult> GetCompletions( string[] tokens )
+    public List<CompletionResult> GetCompletions( ReadOnlySpan<string> tokens )
     {
         var results = new List<CompletionResult>();
         if( tokens.Length == 0 )

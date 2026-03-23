@@ -11,7 +11,7 @@ namespace CKli;
 /// <summary>
 /// Shell independent command implementations.
 /// </summary>
-public static class CKliCommands
+public static partial class CKliCommands
 {
     /// <summary>
     /// Defines a global option or flag for CKli.
