@@ -8,6 +8,11 @@ namespace CKli.Core.Completion;
 /// </summary>
 public static class ShellScripts
 {
+    /// <summary>
+    /// Gets the script for the shell.
+    /// </summary>
+    /// <param name="shell">Supported shells are "bash", "zsh", "fish" and "pwsh".</param>
+    /// <returns>The script to register.</returns>
     public static string? Get( string shell ) => shell.ToLowerInvariant() switch
     {
         "bash" => Bash(),
@@ -21,7 +26,7 @@ public static class ShellScripts
     /// Bash: plain text completions only (no description support).
     /// Quotes candidates to handle * prefix commands.
     /// </summary>
-    public static string Bash() => """
+    static string Bash() => """
         _ckli_completions() {
             local IFS=$'\n'
             local words=("${COMP_WORDS[@]:1:COMP_CWORD}")
@@ -40,7 +45,7 @@ public static class ShellScripts
     /// <summary>
     /// Zsh: descriptions + grouping by type (commands, options, flags as separate groups).
     /// </summary>
-    public static string Zsh() => """
+    static string Zsh() => """
         _ckli_completions() {
             local -a matches globals
             local comp desc type
@@ -61,7 +66,7 @@ public static class ShellScripts
     /// <summary>
     /// Fish: tab-separated completion + description (native format). Type column ignored.
     /// </summary>
-    public static string Fish() => """
+    static string Fish() => """
         function __ckli_completions
             set -l tokens (commandline -cop)
             set -e tokens[1]
@@ -78,7 +83,7 @@ public static class ShellScripts
     /// PowerShell: CompletionResult with type mapping and tooltip.
     /// command -> Command, namespace -> Keyword, option/flag/global -> ParameterName.
     /// </summary>
-    public static string Pwsh() => """
+    static string Pwsh() => """
         Register-ArgumentCompleter -Native -CommandName ckli -ScriptBlock {
             param($wordToComplete, $commandAst, $cursorPosition)
             $cmdLine = $commandAst.ToString()
