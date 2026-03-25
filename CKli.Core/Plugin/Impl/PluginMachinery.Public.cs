@@ -28,11 +28,11 @@ public sealed partial class PluginMachinery
     public static string GetPluginSolutionName( WorldName name ) => $"{name.StackName}-Plugins{name.LTSName}";
 
     /// <summary>
-    /// Returns the string "$Local/<see cref="GetPluginSolutionName(WorldName)"/>/bin/CKli.Plugins/run".
+    /// Returns the string "<see cref="GetPluginSolutionName(WorldName)"/>/bin/CKli.Plugins/run".
     /// </summary>
     /// <param name="pluginSolutionName">The plugins solution name.</param>
     /// <returns>The sub folder that contains the compiled plugins.</returns>
-    public static string GetLocalRunFolder( string pluginSolutionName ) => $"$Local/{pluginSolutionName}/bin/CKli.Plugins/run";
+    public static string GetLocalRunFolder( string pluginSolutionName ) => $"{pluginSolutionName}/bin/CKli.Plugins/run";
 
     /// <summary>
     /// Helper that checks and normalizes a plugin name.

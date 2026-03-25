@@ -91,8 +91,8 @@ public sealed partial class PluginMachinery
         _definitionFile = definitionFile;
 
         _name = GetPluginSolutionName( worldName );
-        _runFolder = worldName.Stack.StackWorkingFolder.Combine( GetLocalRunFolder( _name ) );
-        _root = worldName.Stack.StackWorkingFolder.AppendPart( _name );
+        _root = worldName.SharedDataFolder.AppendPart( _name );
+        _runFolder = worldName.LocalDataFolder.Combine( GetLocalRunFolder( _name ) );
         _dllPath = _runFolder.AppendPart( "CKli.Plugins.dll" );
     }
 

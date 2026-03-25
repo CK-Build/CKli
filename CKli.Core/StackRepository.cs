@@ -52,6 +52,7 @@ public sealed partial class StackRepository : IDisposable
     LocalWorldName? _defaultWorldName;
     ImmutableArray<LocalWorldName> _worldNames;
     World? _world;
+    NormalizedPath _localFolderPath;
 
     /// <summary>
     /// Internal access to the CKliEnv: this is only used to obtain the <see cref="CKliEnv.Committer"/> when
@@ -78,6 +79,13 @@ public sealed partial class StackRepository : IDisposable
     /// Gets the path of the ".PrivateStack" or ".PublicStack". 
     /// </summary>
     public NormalizedPath StackWorkingFolder => _git.WorkingFolder;
+
+    /// <summary>
+    /// Gets the git ignored ".PrivateStack/$Local" or ".PublicStack/$Local" folder. 
+    /// </summary>
+    public NormalizedPath LocalFolderPath => _localFolderPath.IsEmptyPath
+                                                ? (_localFolderPath = _git.WorkingFolder.AppendPart( "$Local" ))
+                                                : _localFolderPath;
 
     /// <summary>
     /// Gets the <see cref="StackName"/>/<see cref="PublicStackName"/> (or <see cref="PrivateStackName"/>) path.
@@ -654,25 +662,6 @@ public sealed partial class StackRepository : IDisposable
             return null;
         }
         return null;
-
-        static void SetupNewLocalDirectory( NormalizedPath gitPath )
-        {
-            // Ensures that the $Local directory is created.
-            var localDir = gitPath.AppendPart( "$Local" );
-            if( !Directory.Exists( localDir ) )
-            {
-                // The .gitignore ignores it. It is created only once.
-                Directory.CreateDirectory( localDir );
-                var ignore = gitPath.AppendPart( ".gitignore" );
-                if( !File.Exists( ignore ) ) File.WriteAllText( ignore, """
-                    $Local/
-                    Logs/
-                    .vs/
-                    .idea/
-                    !.gitignore
-                    """ );
-            }
-        }
     }
 
     /// <summary>
@@ -688,9 +677,7 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="stackName">The stack name (without '-Stack' suffix).</param>
     /// <param name="isPublic">Whether this repository is public.</param>
     /// <param name="remoteUrl">Optional remote URL. If provided, sets up the remote but does not push.</param>
-    /// <param name="stackBranchName">
-    /// The branch name of the stack repository. Defaults to "main".
-    /// </param>
+    /// <param name="stackBranchName">The branch name of the stack repository. Defaults to "main".</param>
     /// <returns>The repository or null on error.</returns>
     public static StackRepository? Create( IActivityMonitor monitor,
                                            CKliEnv context,
@@ -738,23 +725,16 @@ public sealed partial class StackRepository : IDisposable
         // Validate remote URL if provided
         if( remoteUrl != null )
         {
-            if( !remoteUrl.IsAbsoluteUri )
+            var error = GitRepositoryKey.GetRepositoryUrlError( remoteUrl );
+            if( error != null )
             {
-                monitor.Error( $"Remote URL '{remoteUrl}' must be an absolute URI." );
+                monitor.Error( error );
                 return null;
             }
-            // Optionally validate it ends with -Stack
-            var repoName = remoteUrl.Segments.LastOrDefault()?.TrimEnd( '/' );
-            if( repoName != null )
+            if( !remoteUrl.ToString().EndsWith("-Stack", StringComparison.Ordinal ) )
             {
-                if( repoName.EndsWith( ".git", StringComparison.OrdinalIgnoreCase ) )
-                {
-                    repoName = repoName[..^4];
-                }
-                if( !repoName.EndsWith( "-Stack", StringComparison.OrdinalIgnoreCase ) )
-                {
-                    monitor.Warn( $"Remote URL repository name '{repoName}' does not end with '-Stack'. Expected '{stackName}-Stack'." );
-                }
+                monitor.Error( $"Remote URL repository name '{remoteUrl}' must end with '-Stack'." );
+                return null;
             }
         }
 
@@ -814,7 +794,7 @@ public sealed partial class StackRepository : IDisposable
         }
 
         // Setup $Local directory and .gitignore
-        SetupNewLocalDirectoryForCreate( gitPath );
+        SetupNewLocalDirectory( gitPath );
 
         // Create initial commit (Commit method already stages all files)
         var commitResult = git.Commit( monitor, "Initial stack creation.", CommitBehavior.CreateNewCommit );
@@ -830,22 +810,23 @@ public sealed partial class StackRepository : IDisposable
         Registry.RegisterNewStack( monitor, gitPath, effectiveUrl );
 
         return new StackRepository( git, stackRoot, context, stackName );
+    }
 
-        static void SetupNewLocalDirectoryForCreate( NormalizedPath gitPath )
+    static void SetupNewLocalDirectory( NormalizedPath gitPath )
+    {
+        var localDir = gitPath.AppendPart( "$Local" );
+        if( !Directory.Exists( localDir ) )
         {
-            var localDir = gitPath.AppendPart( "$Local" );
-            if( !Directory.Exists( localDir ) )
-            {
-                Directory.CreateDirectory( localDir );
-                var ignore = gitPath.AppendPart( ".gitignore" );
-                if( !File.Exists( ignore ) ) File.WriteAllText( ignore, """
-                    $Local/
-                    Logs/
-                    .vs/
-                    .idea/
-                    !.gitignore
-                    """ );
-            }
+            Directory.CreateDirectory( localDir );
+            // The .gitignore ignores it. It is created only once.
+            var ignore = gitPath.AppendPart( ".gitignore" );
+            if( !File.Exists( ignore ) ) File.WriteAllText( ignore, """
+                $Local/
+                Logs/
+                .vs/
+                .idea/
+                !.gitignore
+                """ );
         }
     }
 

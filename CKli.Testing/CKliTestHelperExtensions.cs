@@ -40,12 +40,21 @@ public static partial class CKliTestHelperExtensions
         _barePath = _remotesPath.AppendPart( "bare" );
         _clonedPath = TestHelper.TestProjectFolder.AppendPart( "Cloned" );
 
+        // Deconstructs PluginMachinery.GetPluginSolutionName( worldName );
         var pluginFolderName = TestHelper.TestProjectFolder.Parts[^3];
         Throw.CheckState( pluginFolderName.Contains( "-Plugins" ) );
         int idx = pluginFolderName.IndexOf( "-Plugins" );
         var stackName = pluginFolderName.Substring( 0, idx );
         var ltsName = pluginFolderName.Substring( idx + 8 );
         _defaultWorldName = new WorldName( stackName, ltsName );
+        Throw.DebugAssert( PluginMachinery.GetPluginSolutionName( _defaultWorldName ) == pluginFolderName );
+
+        var sharedDataFolder = ltsName == null
+                                ? TestHelper.SolutionFolder
+                                : TestHelper.SolutionFolder.AppendPart( ltsName );
+
+        var localDataFolder = TestHelper.SolutionFolder.AppendPart( "$Local" );
+        if( ltsName != null ) localDataFolder = localDataFolder.AppendPart( ltsName );
 
         // We must ensure that the CKli.Plugins.CompiledPlugins is available before loading this assembly
         // in the load context because once loaded, we won't be able to "update" it if the compiled plugins
@@ -60,12 +69,12 @@ public static partial class CKliTestHelperExtensions
         //
         _hostPluginsConfiguration = ReadStackPluginConfiguration( TestHelper.Monitor, _defaultWorldName );
 
-        var ckliPluginsCompiledFile = TestHelper.SolutionFolder.AppendPart( pluginFolderName ).AppendPart( "CKli.Plugins" ).AppendPart( "CKli.CompiledPlugins.cs" );
+        var ckliPluginsCompiledFile = sharedDataFolder.AppendPart( pluginFolderName ).AppendPart( "CKli.Plugins" ).AppendPart( "CKli.CompiledPlugins.cs" );
         if( !File.Exists( ckliPluginsCompiledFile ) )
         {
             Throw.InvalidOperationException( $"The compiled plugins source code generated file is missing: '{ckliPluginsCompiledFile}'." );
         }
-        var runFolder = TestHelper.SolutionFolder.Combine( PluginMachinery.GetLocalRunFolder( pluginFolderName ) );
+        var runFolder = localDataFolder.Combine( PluginMachinery.GetLocalRunFolder( pluginFolderName ) );
         var ckliPluginFilePath = runFolder.AppendPart( "CKli.Plugins.dll" );
         if( !File.Exists( ckliPluginFilePath ) )
         {

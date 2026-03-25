@@ -18,8 +18,10 @@ public sealed class LocalWorldName : WorldName
 {
     readonly StackRepository _stack;
     readonly NormalizedPath _root;
-    readonly NormalizedPath _xmlDescriptionFilePath;
+    NormalizedPath _xmlDescriptionFilePath;
     WorldDefinitionFile? _definitionFile;
+    NormalizedPath _sharedDataFolder;
+    NormalizedPath _localDataFolder;
 
     internal LocalWorldName( StackRepository stack,
                              string? ltsName,
@@ -48,6 +50,26 @@ public sealed class LocalWorldName : WorldName
     /// Gets the stack to which this world belong.
     /// </summary>
     public StackRepository Stack => _stack;
+
+    /// <summary>
+    /// Gets the shared folder for this world. It is the <see cref="StackRepository.StackWorkingFolder"/> for the
+    /// default world and its sub folder "/<see cref="WorldName.LTSName"/>" for LTS world.
+    /// </summary>
+    public NormalizedPath SharedDataFolder => _sharedDataFolder.IsEmptyPath
+                                                ? (_sharedDataFolder = LTSName == null
+                                                                        ? _stack.StackWorkingFolder
+                                                                        : _stack.StackWorkingFolder.AppendPart( LTSName ))
+                                                : _sharedDataFolder;
+
+    /// <summary>
+    /// Gets the git ignored local folder for this world. It is the <see cref="StackRepository.LocalFolderPath"/> for the
+    /// default world and its sub folder "/<see cref="WorldName.LTSName"/>" for LTS world.
+    /// </summary>
+    public NormalizedPath LocalDataFolder => _localDataFolder.IsEmptyPath
+                                                ? (_localDataFolder = LTSName == null
+                                                                        ? _stack.LocalFolderPath
+                                                                        : _stack.LocalFolderPath.AppendPart( LTSName ))
+                                                : _localDataFolder;
 
     /// <summary>
     /// Loads the definition file for this world.
