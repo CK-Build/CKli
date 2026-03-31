@@ -116,8 +116,8 @@ public static class NuGetHelper
     /// must be used.
     /// </para>
     /// <para>
-    /// This uses the CK.CanaryPackage that must be available in the global NuGet cache to
-    /// initialize the local feed.
+    /// This uses the CK.CanaryPackage that is available in the global NuGet cache to
+    /// initialize the local feed (because this CKli.Core assembly references it).
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>

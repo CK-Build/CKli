@@ -80,19 +80,23 @@ public static partial class CKliTestHelperExtensions
         /// Returns a <see cref="CKliEnv"/> context for the default World of this RemotesCollection.
         /// </para>
         /// Clones these <see cref="Repositories"/> in the <paramref name="clonedFolder"/>'s <see cref="CKliEnv.CurrentDirectory"/>
-        /// that must be inside the <see cref="_clonedPath"/> and:
+        /// that must be inside the <see cref="CKliClonedPath"/> and:
         /// <list type="bullet">
-        ///     <item>Configures its default World plugins with the host's stack's default World plugins configuration.</item>
+        ///     <item>Copies the host's stack's default World <c>&lt;Plugins&gt;</c> configuration to the default World plugins.</item>
+        ///     <item>Calls the <paramref name="pluginConfigurationEditor"/> if it is provided to alter the <c>&lt;Plugins&gt;</c> configuration.</item>
         ///     <item>Copies the "$Local" from the "Remotes/<see cref="FullName"/>/<see cref="StackName"/>-Stack/$Local".</item>
         /// </list>
         /// </summary>
         /// <param name="clonedFolder">The cloned folder of the unit test.</param>
-        /// <param name="pluginConfigurationEditor">Optional plugin configuration editor.</param>
+        /// <param name="pluginConfigurationEditor">
+        /// Optional plugin configuration editor, the path is the <paramref name="clonedFolder"/> and the XElement
+        /// is the <c>&lt;Plugins&gt;</c> configuration.
+        /// </param>
         /// <param name="privateStack">
         /// Whether to clone the stack as a private stack (in a ".PrivateStack" folder) or a public stack (in a ".PublicStack" folder).
         /// </param>
         /// <returns>The default world cloned context.</returns>
-        public CKliEnv Clone( NormalizedPath clonedFolder, Action<IActivityMonitor, XElement>? pluginConfigurationEditor = null, bool privateStack = false )
+        public CKliEnv Clone( NormalizedPath clonedFolder, Action<IActivityMonitor, NormalizedPath, XElement>? pluginConfigurationEditor = null, bool privateStack = false )
         {
             Throw.CheckArgument( clonedFolder.StartsWith( _clonedPath ) );
 
@@ -116,7 +120,7 @@ public static partial class CKliTestHelperExtensions
                     plugins.RemoveAll();
                     plugins.Add( _hostPluginsConfiguration.Attributes() );
                     plugins.Add( _hostPluginsConfiguration.Nodes() );
-                    pluginConfigurationEditor?.Invoke( monitor, plugins );
+                    pluginConfigurationEditor?.Invoke( monitor, clonedFolder, plugins );
                 } );
                 world.DefinitionFile.SaveFile( TestHelper.Monitor );
                 stack.Commit( TestHelper.Monitor, "Updated <Plugins> configuration." );
