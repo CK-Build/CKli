@@ -26,7 +26,7 @@ public static class NuGetHelper
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( packageId );
         var p = Path.Combine( GlobalCachePath, packageId.ToLowerInvariant() );
-        if( version != null ) p = Path.Combine( version );
+        if( version != null ) p = Path.Combine( p, version );
         if( Directory.Exists( p ) )
         {
             monitor.Trace( version != null
