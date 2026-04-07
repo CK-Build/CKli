@@ -158,16 +158,15 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
     protected override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
                                                                     HttpClient client,
                                                                     NormalizedPath repoPath,
-                                                                    LibGit2Sharp.Tag tag,
+                                                                    string versionedTag,
                                                                     CancellationToken cancellation )
     {
-        var tagName = tag.FriendlyName;
         var request = new GitHubCreateReleaseRequest
         {
-            TagName = tagName,
-            Name = tagName,
+            TagName = versionedTag,
+            Name = versionedTag,
             Draft = true,
-            Prerelease = tagName.Contains( '-' ),
+            Prerelease = versionedTag.Contains( '-' ),
             GenerateReleaseNotes = true
         };
         using var response = await client.PostAsJsonAsync( $"repos/{repoPath}/releases", request, cancellation ).ConfigureAwait( false );

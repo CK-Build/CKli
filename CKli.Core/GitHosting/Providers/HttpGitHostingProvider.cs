@@ -191,7 +191,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     /// <inheritdoc />
     public sealed override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
                                                                         NormalizedPath repoPath,
-                                                                        LibGit2Sharp.Tag tag,
+                                                                        string versionedTag,
                                                                         CancellationToken cancellation = default )
     {
         if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
@@ -200,7 +200,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         try
         {
-            return await CreateDraftReleaseAsync( monitor, client, repoPath, tag, cancellation ).ConfigureAwait( false );
+            return await CreateDraftReleaseAsync( monitor, client, repoPath, versionedTag, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -213,11 +213,11 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
     }
 
-    /// <inheritdoc cref="GitHostingProvider.CreateDraftReleaseAsync(IActivityMonitor, NormalizedPath, LibGit2Sharp.Tag, CancellationToken)"/>
+    /// <inheritdoc cref="GitHostingProvider.CreateDraftReleaseAsync(IActivityMonitor, NormalizedPath, string, CancellationToken)"/>
     protected abstract Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
                                                               HttpClient client,
                                                               NormalizedPath repoPath,
-                                                              LibGit2Sharp.Tag tag,
+                                                              string versionedTag,
                                                               CancellationToken cancellation );
 
     /// <inheritdoc />

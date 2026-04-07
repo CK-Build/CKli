@@ -163,15 +163,14 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
     protected override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
                                                                     HttpClient client,
                                                                     NormalizedPath repoPath,
-                                                                    LibGit2Sharp.Tag tag,
+                                                                    string versionedTag,
                                                                     CancellationToken cancellation )
     {
         // GitLab has no draft release concept: the release is published immediately.
-        var tagName = tag.FriendlyName;
         var request = new GitLabCreateReleaseRequest
         {
-            TagName = tagName,
-            Name = tagName
+            TagName = versionedTag,
+            Name = versionedTag
         };
         var projectPath = HttpUtility.UrlEncode( repoPath );
         using var response = await client.PostAsJsonAsync( $"projects/{projectPath}/releases", request, cancellation ).ConfigureAwait( false );

@@ -148,11 +148,10 @@ sealed class FileSystemProvider : GitHostingProvider
         return Task.FromException<bool>( new NotSupportedException( ProviderType ) );
     }
 
-    public override Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor, NormalizedPath repoPath, Tag tag, CancellationToken cancellation = default )
+    public override Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor, NormalizedPath repoPath, string versionedTag, CancellationToken cancellation = default )
     {
         try
         {
-            var repoFromTag = ((IBelongToARepository)tag).Repository.Info.Path;
             if( !Directory.Exists( repoPath ) )
             {
                 monitor.Error( $"Invalid File System repository path '{repoPath}'." );
@@ -160,13 +159,13 @@ sealed class FileSystemProvider : GitHostingProvider
             }
             var releases = repoPath.AppendPart( "Releases" );
             Directory.CreateDirectory( releases );
-            var releaseFolder = releases.AppendPart( tag.FriendlyName );
+            var releaseFolder = releases.AppendPart( versionedTag );
             Directory.CreateDirectory( releaseFolder );
             return Task.FromResult<string?>( releaseFolder.Path );
         }
         catch( Exception ex )
         {
-            monitor.Error( $"While creating draft in '{repoPath}' for '{tag.CanonicalName}'.", ex );
+            monitor.Error( $"While creating draft in '{repoPath}' for '{versionedTag}'.", ex );
             return Task.FromResult<string?>( null );
         }
     }

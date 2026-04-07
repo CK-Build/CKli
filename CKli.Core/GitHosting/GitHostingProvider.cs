@@ -124,7 +124,7 @@ public abstract partial class GitHostingProvider
                                                        CancellationToken cancellation = default );
 
     /// <summary>
-    /// Creates a release on the specified <paramref name="tag"/> that must exist in remote (the tag must have
+    /// Creates a release on the specified <paramref name="versionedTag"/> that must exist in remote (the tag must have
     /// already been pushed).
     /// <para>
     /// This always considers that the created release is a draft (even if the provider doesn't support this notion): the release
@@ -134,12 +134,12 @@ public abstract partial class GitHostingProvider
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
-    /// <param name="tag">The release tag.</param>
+    /// <param name="versionedTag">The versioned tag. It must exist in the repository (no control is made).</param>
     /// <param name="cancellation">Cancellation token.</param>
     /// <returns>On success, a non null release identifier that must be used to associate asset files to the release. Null on error.</returns>
     public abstract Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
                                                            NormalizedPath repoPath,
-                                                           Tag tag,
+                                                           string versionedTag,
                                                            CancellationToken cancellation = default );
 
     /// <summary>
@@ -189,7 +189,7 @@ public abstract partial class GitHostingProvider
                                                      CancellationToken cancellation = default );
 
     /// <summary>
-    /// Locks a release previously created with <see cref="CreateDraftReleaseAsync(IActivityMonitor, NormalizedPath, Tag, CancellationToken)"/>.
+    /// Locks a release previously created with <see cref="CreateDraftReleaseAsync(IActivityMonitor, NormalizedPath, string, CancellationToken)"/>.
     /// <para>
     /// By default this simply returns true: this is the default implementation when the hosting provider doesn't support draft releases.
     /// </para>
