@@ -1,6 +1,8 @@
 using CK.Core;
+using LibGit2Sharp;
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -24,8 +26,7 @@ public abstract partial class GitHostingProvider
     /// </summary>
     /// <param name="baseUrl">The <see cref="BaseUrl"/>.</param>
     /// <param name="gitKey">The git key.</param>
-    private protected GitHostingProvider( string baseUrl,
-                                          IGitRepositoryAccessKey gitKey )
+    private protected GitHostingProvider( string baseUrl, IGitRepositoryAccessKey gitKey )
     {
         _baseUrl = baseUrl;
         _gitKey = gitKey;
@@ -121,6 +122,90 @@ public abstract partial class GitHostingProvider
                                                        NormalizedPath repoPath,
                                                        bool archive,
                                                        CancellationToken cancellation = default );
+
+    /// <summary>
+    /// Creates a release on the specified <paramref name="tag"/> that must exist in remote (the tag must have
+    /// already been pushed).
+    /// <para>
+    /// This always considers that the created release is a draft (even if the provider doesn't support this notion): the release
+    /// is considered mutable (<see cref="AddReleaseAssetsAsync(IActivityMonitor, NormalizedPath, string, NormalizedPath, CancellationToken)"/>
+    /// can be called on the returned release identifier).
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The activity monitor.</param>
+    /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="tag">The release tag.</param>
+    /// <param name="cancellation">Cancellation token.</param>
+    /// <returns>On success, a non null release identifier that must be used to associate asset files to the release. Null on error.</returns>
+    public abstract Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
+                                                           NormalizedPath repoPath,
+                                                           Tag tag,
+                                                           CancellationToken cancellation = default );
+
+    /// <summary>
+    /// Adds all files in a folder to the assets associated to a release.
+    /// <para>
+    /// This is a default implementation that basically iterates on the files
+    /// and calls <see cref="AddReleaseAssetAsync(IActivityMonitor, NormalizedPath, string, NormalizedPath, string?, CancellationToken)"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The activity monitor.</param>
+    /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="releaseIdentifier">The release identifier returned by <see cref="CreateDraftReleaseAsync"/>.</param>
+    /// <param name="assetsFolder">The local folder with the assets files.</param>
+    /// <param name="cancellation">Cancellation token.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public virtual async Task<bool> AddReleaseAssetsAsync( IActivityMonitor monitor,
+                                                           NormalizedPath repoPath,
+                                                           string releaseIdentifier,
+                                                           NormalizedPath assetsFolder,
+                                                           CancellationToken cancellation = default )
+    {
+        foreach( var f in Directory.GetFiles( assetsFolder ) )
+        {
+            if( !await AddReleaseAssetAsync( monitor, repoPath, releaseIdentifier, f, fileName:null, cancellation  ).ConfigureAwait( false )  )
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Adds a file to the assets associated to a release.
+    /// </summary>
+    /// <param name="monitor">The activity monitor.</param>
+    /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="releaseIdentifier">The release identifier returned by <see cref="CreateDraftReleaseAsync"/>.</param>
+    /// <param name="filePath">The local file path.</param>
+    /// <param name="fileName">The file name defaults to the <see cref="NormalizedPath.LastPart"/> of the <paramref name="filePath"/>.</param>
+    /// <param name="cancellation">Cancellation token.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public abstract Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,
+                                                     NormalizedPath repoPath,
+                                                     string releaseIdentifier,
+                                                     NormalizedPath filePath,
+                                                     string? fileName = null,
+                                                     CancellationToken cancellation = default );
+
+    /// <summary>
+    /// Locks a release previously created with <see cref="CreateDraftReleaseAsync(IActivityMonitor, NormalizedPath, Tag, CancellationToken)"/>.
+    /// <para>
+    /// By default this simply returns true: this is the default implementation when the hosting provider doesn't support draft releases.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The activity monitor.</param>
+    /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="releaseIdentifier">The release identifier returned by <see cref="CreateDraftReleaseAsync"/>.</param>
+    /// <param name="cancellation">Cancellation token.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public virtual Task<bool> FinalizeReleaseAsync( IActivityMonitor monitor,
+                                                    NormalizedPath repoPath,
+                                                    string releaseIdentifier,
+                                                    CancellationToken cancellation = default )
+    {
+        return Task.FromResult( true );
+    }
 
     /// <summary>
     /// Deletes a repository.

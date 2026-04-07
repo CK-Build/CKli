@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -152,6 +153,87 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
     {
         var response = await client.DeleteAsync( $"repos/{repoPath}", cancellation );
         return response.IsSuccessStatusCode;
+    }
+
+    protected override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
+                                                                    HttpClient client,
+                                                                    NormalizedPath repoPath,
+                                                                    LibGit2Sharp.Tag tag,
+                                                                    CancellationToken cancellation )
+    {
+        var tagName = tag.FriendlyName;
+        var request = new GitHubCreateReleaseRequest
+        {
+            TagName = tagName,
+            Name = tagName,
+            Draft = true,
+            Prerelease = tagName.Contains( '-' ),
+            GenerateReleaseNotes = true
+        };
+        using var response = await client.PostAsJsonAsync( $"repos/{repoPath}/releases", request, cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            return null;
+        }
+        var releaseInfo = await response.Content.ReadFromJsonAsync<GitHubReleaseInfo>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
+        if( releaseInfo == null )
+        {
+            monitor.Error( $"Empty response from '{response.RequestMessage?.RequestUri}'." );
+            return null;
+        }
+        // Strip the URI template suffix "{?name,label}" from the upload_url.
+        var uploadUrlBase = releaseInfo.UploadUrl;
+        var templateIdx = uploadUrlBase.IndexOf( '{' );
+        if( templateIdx > 0 ) uploadUrlBase = uploadUrlBase[..templateIdx];
+        // Encode release id and upload URL base together so AddReleaseAssetAsync can use both.
+        return $"{releaseInfo.Id}|{uploadUrlBase}";
+    }
+
+    protected override async Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,
+                                                              HttpClient client,
+                                                              NormalizedPath repoPath,
+                                                              string releaseIdentifier,
+                                                              NormalizedPath filePath,
+                                                              string fileName,
+                                                              CancellationToken cancellation )
+    {
+        var pipeIdx = releaseIdentifier.IndexOf( '|' );
+        if( pipeIdx < 0 )
+        {
+            monitor.Error( $"Invalid release identifier '{releaseIdentifier}': expected '<id>|<uploadUrlBase>'." );
+            return false;
+        }
+        var uploadUrlBase = releaseIdentifier[(pipeIdx + 1)..];
+        var uploadUrl = $"{uploadUrlBase}?name={Uri.EscapeDataString( fileName )}";
+        await using var fileStream = File.OpenRead( filePath );
+        using var content = new StreamContent( fileStream );
+        content.Headers.ContentType = new MediaTypeHeaderValue( "application/octet-stream" );
+        using var response = await client.PostAsync( uploadUrl, content, cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            return false;
+        }
+        return true;
+    }
+
+    protected override async Task<bool> FinalizeReleaseAsync( IActivityMonitor monitor,
+                                                              HttpClient client,
+                                                              NormalizedPath repoPath,
+                                                              string releaseIdentifier,
+                                                              CancellationToken cancellation )
+    {
+        var pipeIdx = releaseIdentifier.IndexOf( '|' );
+        var releaseId = pipeIdx >= 0 ? releaseIdentifier[..pipeIdx] : releaseIdentifier;
+        var update = new GitHubPublishReleaseRequest { Draft = false };
+        using var response = await client.PatchAsJsonAsync( $"repos/{repoPath}/releases/{releaseId}", update, cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            return false;
+        }
+        return true;
     }
 
     static async Task<GitHubRepositoryInfo?> ReadGitHubRepositoryInfoAsync( IActivityMonitor monitor,

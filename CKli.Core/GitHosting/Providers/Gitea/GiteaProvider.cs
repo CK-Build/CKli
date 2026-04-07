@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -69,7 +70,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         }
         if( !response.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error );
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
             return null;
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
@@ -125,6 +126,75 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
     {
         var response = await client.DeleteAsync( $"repos/{repoPath}", cancellation );
         return response.IsSuccessStatusCode;
+    }
+
+    protected override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
+                                                                    HttpClient client,
+                                                                    NormalizedPath repoPath,
+                                                                    LibGit2Sharp.Tag tag,
+                                                                    CancellationToken cancellation )
+    {
+        var tagName = tag.FriendlyName;
+        var request = new GiteaCreateReleaseRequest
+        {
+            TagName = tagName,
+            Name = tagName,
+            Draft = true,
+            Prerelease = tagName.Contains( '-' )
+        };
+        using var response = await client.PostAsJsonAsync( $"repos/{repoPath}/releases", request, cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            return null;
+        }
+        var releaseInfo = await response.Content.ReadFromJsonAsync<GiteaReleaseInfo>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
+        if( releaseInfo == null )
+        {
+            monitor.Error( $"Empty response from '{response.RequestMessage?.RequestUri}'." );
+            return null;
+        }
+        return releaseInfo.Id.ToString();
+    }
+
+    protected override async Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,
+                                                              HttpClient client,
+                                                              NormalizedPath repoPath,
+                                                              string releaseIdentifier,
+                                                              NormalizedPath filePath,
+                                                              string fileName,
+                                                              CancellationToken cancellation )
+    {
+        // Gitea expects multipart/form-data with field "attachment".
+        await using var fileStream = File.OpenRead( filePath );
+        using var formContent = new MultipartFormDataContent();
+        var fileContent = new StreamContent( fileStream );
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue( "application/octet-stream" );
+        formContent.Add( fileContent, "attachment", fileName );
+        var uploadUrl = $"repos/{repoPath}/releases/{releaseIdentifier}/assets?name={Uri.EscapeDataString( fileName )}";
+        using var response = await client.PostAsync( uploadUrl, formContent, cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            return false;
+        }
+        return true;
+    }
+
+    protected override async Task<bool> FinalizeReleaseAsync( IActivityMonitor monitor,
+                                                              HttpClient client,
+                                                              NormalizedPath repoPath,
+                                                              string releaseIdentifier,
+                                                              CancellationToken cancellation )
+    {
+        var update = new GiteaPublishReleaseRequest { Draft = false };
+        using var response = await client.PatchAsJsonAsync( $"repos/{repoPath}/releases/{releaseIdentifier}", update, cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            return false;
+        }
+        return true;
     }
 
     static async Task<GiteaRepositoryInfo?> ReadGiteaRepositoryInfoAsync( IActivityMonitor monitor,

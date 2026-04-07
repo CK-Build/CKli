@@ -1,10 +1,11 @@
+using CK.Core;
+using LibGit2Sharp;
 using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using CK.Core;
-using LibGit2Sharp;
+using static CK.Core.ActivityMonitor;
 
 namespace CKli.Core.GitHosting.Providers;
 
@@ -124,7 +125,7 @@ sealed class FileSystemProvider : GitHostingProvider
                 monitor.Error( $"Cannot delete a repository inside another one at '{repoPath}'." );
                 return Task.FromResult( false );
             }
-            using var repo = new Repository( repoPath );
+            using var repo = new Repository( Path.Combine( repoPath, ".git" ) );
             if( !repo.Info.IsBare )
             {
                 monitor.Error( $"Cannot delete a non bare repository at {repoPath}." );
@@ -145,5 +146,49 @@ sealed class FileSystemProvider : GitHostingProvider
                                                        CancellationToken cancellation = default )
     {
         return Task.FromException<bool>( new NotSupportedException( ProviderType ) );
+    }
+
+    public override Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor, NormalizedPath repoPath, Tag tag, CancellationToken cancellation = default )
+    {
+        try
+        {
+            var repoFromTag = ((IBelongToARepository)tag).Repository.Info.Path;
+            if( !Directory.Exists( repoPath ) )
+            {
+                monitor.Error( $"Invalid File System repository path '{repoPath}'." );
+                return Task.FromResult<string?>( null );
+            }
+            var releases = repoPath.AppendPart( "Releases" );
+            Directory.CreateDirectory( releases );
+            var releaseFolder = releases.AppendPart( tag.FriendlyName );
+            Directory.CreateDirectory( releaseFolder );
+            return Task.FromResult<string?>( releaseFolder.Path );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While creating draft in '{repoPath}' for '{tag.CanonicalName}'.", ex );
+            return Task.FromResult<string?>( null );
+        }
+    }
+
+    public override Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,
+                                                     NormalizedPath repoPath,
+                                                     string releaseIdentifier,
+                                                     NormalizedPath filePath,
+                                                     string? fileName = null,
+                                                     CancellationToken cancellation = default )
+    {
+        try
+        {
+            fileName ??= filePath.LastPart;
+            var target = Path.Combine( releaseIdentifier, fileName );
+            File.Copy( filePath, target );
+            return Task.FromResult( true );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While adding an asset to the draft release in '{releaseIdentifier}'.", ex );
+            return Task.FromResult( false );
+        }
     }
 }

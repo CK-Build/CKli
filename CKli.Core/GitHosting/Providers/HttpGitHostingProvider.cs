@@ -1,6 +1,7 @@
 using CK.Core;
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
@@ -186,6 +187,149 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                          HttpClient client,
                                                          NormalizedPath repoPath,
                                                          CancellationToken cancellation );
+
+    /// <inheritdoc />
+    public sealed override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
+                                                                        NormalizedPath repoPath,
+                                                                        LibGit2Sharp.Tag tag,
+                                                                        CancellationToken cancellation = default )
+    {
+        if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
+        {
+            return null;
+        }
+        try
+        {
+            return await CreateDraftReleaseAsync( monitor, client, repoPath, tag, cancellation ).ConfigureAwait( false );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( ex );
+            return null;
+        }
+        finally
+        {
+            client.Dispose();
+        }
+    }
+
+    /// <inheritdoc cref="GitHostingProvider.CreateDraftReleaseAsync(IActivityMonitor, NormalizedPath, LibGit2Sharp.Tag, CancellationToken)"/>
+    protected abstract Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
+                                                              HttpClient client,
+                                                              NormalizedPath repoPath,
+                                                              LibGit2Sharp.Tag tag,
+                                                              CancellationToken cancellation );
+
+    /// <inheritdoc />
+    public sealed override async Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,
+                                                                  NormalizedPath repoPath,
+                                                                  string releaseIdentifier,
+                                                                  NormalizedPath filePath,
+                                                                  string? fileName = null,
+                                                                  CancellationToken cancellation = default )
+    {
+        if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
+        {
+            return false;
+        }
+        try
+        {
+            fileName ??= filePath.LastPart;
+            return await AddReleaseAssetAsync( monitor, client, repoPath, releaseIdentifier, filePath, fileName, cancellation ).ConfigureAwait( false );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( ex );
+            return false;
+        }
+        finally
+        {
+            client.Dispose();
+        }
+    }
+
+    /// <inheritdoc cref="GitHostingProvider.AddReleaseAssetAsync(IActivityMonitor, NormalizedPath, string, NormalizedPath, string?, CancellationToken)"/>
+    protected abstract Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,
+                                                        HttpClient client,
+                                                        NormalizedPath repoPath,
+                                                        string releaseIdentifier,
+                                                        NormalizedPath filePath,
+                                                        string fileName,
+                                                        CancellationToken cancellation );
+
+    /// <inheritdoc />
+    public sealed override async Task<bool> AddReleaseAssetsAsync( IActivityMonitor monitor,
+                                                                   NormalizedPath repoPath,
+                                                                   string releaseIdentifier,
+                                                                   NormalizedPath assetsFolder,
+                                                                   CancellationToken cancellation = default )
+    {
+        if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
+        {
+            return false;
+        }
+        try
+        {
+            return await AddReleaseAssetsAsync( monitor, client, repoPath, releaseIdentifier, assetsFolder, cancellation ).ConfigureAwait( false );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( ex );
+            return false;
+        }
+        finally
+        {
+            client.Dispose();
+        }
+    }
+
+    /// <inheritdoc cref="GitHostingProvider.AddReleaseAssetsAsync(IActivityMonitor, NormalizedPath, string, NormalizedPath, CancellationToken)"/>
+    protected virtual async Task<bool> AddReleaseAssetsAsync( IActivityMonitor monitor,
+                                                             HttpClient client,
+                                                             NormalizedPath repoPath,
+                                                             string releaseIdentifier,
+                                                             NormalizedPath assetsFolder,
+                                                             CancellationToken cancellation )
+    {
+        foreach( var f in Directory.GetFiles( assetsFolder ) )
+        {
+            NormalizedPath filePath = f;
+            if( !await AddReleaseAssetAsync( monitor, repoPath, releaseIdentifier, filePath, filePath.LastPart, cancellation ).ConfigureAwait( false ) )
+            {
+                return false; 
+            }
+        }
+        return true;
+    }
+
+    /// <inheritdoc />
+    public sealed override async Task<bool> FinalizeReleaseAsync( IActivityMonitor monitor,
+                                                                  NormalizedPath repoPath,
+                                                                  string releaseIdentifier,
+                                                                  CancellationToken cancellation = default )
+    {
+        if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
+        {
+            return false;
+        }
+        try
+        {
+            return await FinalizeReleaseAsync( monitor, client, repoPath, releaseIdentifier, cancellation ).ConfigureAwait( false );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( ex );
+            return false;
+        }
+        finally
+        {
+            client.Dispose();
+        }
+    }
+
+    /// <inheritdoc cref="GitHostingProvider.FinalizeReleaseAsync(IActivityMonitor, NormalizedPath, string, CancellationToken)"/>
+    protected abstract Task<bool> FinalizeReleaseAsync( IActivityMonitor monitor, HttpClient client, NormalizedPath repoPath, string releaseIdentifier, CancellationToken cancellation );
+
 
     bool EnsureReadAccess( IActivityMonitor monitor,
                            ref NormalizedPath repoPath,

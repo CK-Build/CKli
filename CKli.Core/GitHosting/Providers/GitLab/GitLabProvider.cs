@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -157,6 +158,80 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         var projectPath = HttpUtility.UrlEncode( repoPath );
         var response = await client.DeleteAsync( $"projects/{projectPath}", cancellation );
         return response.IsSuccessStatusCode;
+    }
+
+    protected override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
+                                                                    HttpClient client,
+                                                                    NormalizedPath repoPath,
+                                                                    LibGit2Sharp.Tag tag,
+                                                                    CancellationToken cancellation )
+    {
+        // GitLab has no draft release concept: the release is published immediately.
+        var tagName = tag.FriendlyName;
+        var request = new GitLabCreateReleaseRequest
+        {
+            TagName = tagName,
+            Name = tagName
+        };
+        var projectPath = HttpUtility.UrlEncode( repoPath );
+        using var response = await client.PostAsJsonAsync( $"projects/{projectPath}/releases", request, cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            return null;
+        }
+        var releaseInfo = await response.Content.ReadFromJsonAsync<GitLabReleaseInfo>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
+        if( releaseInfo == null || string.IsNullOrEmpty( releaseInfo.TagName ) )
+        {
+            monitor.Error( $"Empty response from '{response.RequestMessage?.RequestUri}'." );
+            return null;
+        }
+        return releaseInfo.TagName;
+    }
+
+    protected override async Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,
+                                                              HttpClient client,
+                                                              NormalizedPath repoPath,
+                                                              string releaseIdentifier,
+                                                              NormalizedPath filePath,
+                                                              string fileName,
+                                                              CancellationToken cancellation )
+    {
+        // Step 1: upload file to the Generic Package Registry.
+        // The package name and version mirror the release tag for discoverability.
+        var projectPath = HttpUtility.UrlEncode( repoPath );
+        var tagName = releaseIdentifier;
+        var packagePath = $"projects/{projectPath}/packages/generic/{Uri.EscapeDataString( tagName )}/{Uri.EscapeDataString( tagName )}/{Uri.EscapeDataString( fileName )}";
+        await using var fileStream = File.OpenRead( filePath );
+        using var fileContent = new StreamContent( fileStream );
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue( "application/octet-stream" );
+        using var uploadResponse = await client.PutAsync( packagePath, fileContent, cancellation ).ConfigureAwait( false );
+        if( !uploadResponse.IsSuccessStatusCode )
+        {
+            await LogResponseAsync( monitor, uploadResponse, LogLevel.Error ).ConfigureAwait( false );
+            return false;
+        }
+        // Step 2: create a release asset link pointing to the uploaded package.
+        var downloadUrl = $"{BaseApiUrl}/{packagePath}";
+        var linkRequest = new GitLabAssetLinkRequest { Name = fileName, Url = downloadUrl };
+        var encodedTag = Uri.EscapeDataString( tagName );
+        using var linkResponse = await client.PostAsJsonAsync( $"projects/{projectPath}/releases/{encodedTag}/assets/links", linkRequest, cancellation ).ConfigureAwait( false );
+        if( !linkResponse.IsSuccessStatusCode )
+        {
+            await LogResponseAsync( monitor, linkResponse, LogLevel.Error ).ConfigureAwait( false );
+            return false;
+        }
+        return true;
+    }
+
+    protected override Task<bool> FinalizeReleaseAsync( IActivityMonitor monitor,
+                                                        HttpClient client,
+                                                        NormalizedPath repoPath,
+                                                        string releaseIdentifier,
+                                                        CancellationToken cancellation )
+    {
+        // GitLab has no draft release concept: the release is already published.
+        return Task.FromResult( true );
     }
 
     static async Task<GitLabProject?> ReadGitLabProjectAsync( IActivityMonitor monitor,
