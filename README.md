@@ -165,12 +165,12 @@ of the last log file.
 The `Log/` folder is `%LocalAppData%/CKli/Out-of-Stack-Logs/` when CKli doesn't start is a Stack folder, otherwise
 each Stack keeps its own logs in their `.PublicStack/Logs` (or `.PrivateStack/Logs`). 
 
-### `pull --all --from-all-remotes --continue-on-error`
+### `pull --all --from-all-remotes --continue-on-error --preserve-local-tags`
 
 Pulls (fetch-merge) the Stack repository and all current Repos' local branches that track a remote branch.
-Note that tags that point to the remote branches will be retrieved and will replace locally defined tags if they point
+By default, tags that point to the remote branches will be retrieved and will replace locally defined tags if they point
 to the same object. If a local tag points to a different object, this will be an error.
-To prevent this, use `ckli tag list` to detect conflicts.
+To prevent this, use `ckli tag list` to detect conflicts or the `--preserve-local-tags` flag.
 
 By default, the current directory selects the Repos unless `--all` is specified.
 
@@ -178,10 +178,10 @@ By default, the current directory selects the Repos unless `--all` is specified.
 
 Any merge conflict is an error. Unless `--continue-on-error` is specified, the first error stops the operation.
 
-A pull is implicitly executed first by `ckli push`. 
+A pull (without tags) is implicitly executed first by `ckli push`. 
 
 ### `fetch --all --with-tags --from-all-remotes`
-Fetches all branches (and optionally tags) of the current Repos.
+Fetches all branches (and optionally tags) in the current Repos.
 
 By default, the current directory selects the Repos unless `--all` is specified.
 
@@ -289,6 +289,20 @@ Local modifications of fetched tags are lost (the remote version replaces them).
 Tag names must contain only ASCII characters with lowercase letters (to avoid case sensitivity issues).
 
 Must be run from within a Repo directory.
+
+### `tag push <tag names>`
+Pushes the specified tags from the current Repo to its remote "origin".
+Modifications of remote tags are lost (the local version replaces them).
+
+Tag names must contain only ASCII characters with lowercase letters (to avoid case sensitivity issues).
+
+Must be run from within a Repo directory.
+
+### `tag fetch --all`
+Safe alternative to `tag pull` as this only pulls the tags that only exist on the remote "origin" side:
+local tags are always preserved.
+
+By default, the current directory selects the Repos unless `--all` is specified.
 
 ### `tag push <tag names>`
 Pushes the specified tags from the current Repo to its remote "origin".

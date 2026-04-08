@@ -228,7 +228,8 @@ public sealed partial class GitRepository
 
     /// <summary>
     /// Pulls any number of tags (empty <paramref name="tagNames"/> is a no-op).
-    /// Local modifications of pulled tags are lost.
+    /// Local modifications of pulled tags are lost: use <see cref="FetchTags(IActivityMonitor, string)"/> to safely 
+    /// fetch remote-only tags.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="tagNames">The tag names. They can be canonic (start with "refs/tags/") or regular.</param>
@@ -307,6 +308,29 @@ public sealed partial class GitRepository
             return false;
         }
         diff = new GitTagInfo.Diff( localTags, remoteTags );
+        return true;
+    }
+
+
+    /// <summary>
+    /// Safely fetches remote only tags from <paramref name="remoteName"/> (this pulls <see cref="GitTagInfo.Diff.RemoteOnlyTags"/>):
+    /// this preserves any local tags.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="remoteName">The remote name to consider.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool FetchTags( IActivityMonitor monitor, string remoteName = "origin" )
+    {
+        if( !GetDiffTags( monitor, out var diff, remoteName ) )
+        {
+            return false;
+        }
+        monitor.Trace( $"RemoteOnlyTags count: {diff.RemoteOnlyCount}." );
+        if( diff.RemoteOnlyCount > 0 )
+        {
+            // This traces the pulled tags.
+            return PullTags( monitor, diff.RemoteOnlyTags.Select( t => t.CanonicalName ), remoteName );
+        }
         return true;
     }
 }

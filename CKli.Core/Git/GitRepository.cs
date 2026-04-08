@@ -986,6 +986,9 @@ public sealed partial class GitRepository : IDisposable
     /// <summary>
     /// Checks out the specified branch, creating it if it doesn't exist and by default fetch-merge from the remote if
     /// it's a tracking branch.
+    /// <para>
+    /// This doesn't pull the remote tags: local tags are preserved.
+    /// </para>
     /// <list type="number">
     ///     <item>
     ///     If the current branch name is <paramref name="branchName"/>, it is fetch-merged from the remote (unless <paramref name="skipFetchMerge"/>

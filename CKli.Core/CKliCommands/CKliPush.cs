@@ -75,7 +75,7 @@ sealed class CKliPush : Command
                     // Instead of working branch per branch, we pull (fetch-merge) all branches
                     // first and then push them (CKliPull.DoPull fetches all remote branches and then
                     // merges them).
-                    if( CKliPull.DoPull( monitor, toAllRemotes, continueOnError, repos, withTags: false ) )
+                    if( CKliPull.DoPull( monitor, toAllRemotes, continueOnError, repos, CKliPull.WithTag.None ) )
                     {
                         foreach( var repo in repos )
                         {

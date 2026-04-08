@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using static CKli.Core.GitTagInfo;
 
 namespace CKli.Core;
 
@@ -75,6 +76,22 @@ public sealed partial class GitTagInfo
                                                                 .Where( lr => (lr.Diff & (TagDiff.LocalOnly | TagDiff.CommitConflict)) == (TagDiff.LocalOnly | TagDiff.CommitConflict));
 
         /// <summary>
+        /// Gets the number of tags that only exist remotely.
+        /// <para>
+        /// This counts <see cref="TagDiff.RemoteOnly"/>: <see cref="TagDiff.CommitConflict"/> are ignored. 
+        /// </para>
+        /// </summary>
+        public int RemoteOnlyCount => _stats._remoteOnlyCount;
+
+        /// <summary>
+        /// Gets the tags that only exist on the remote side.
+        /// <para>
+        /// Tags that are in conflicts don't appear here.
+        /// </para>
+        /// </summary>
+        public IEnumerable<LocalRemoteTag> RemoteOnlyTags => _entries.SelectMany( e => e.Tags ).Where( t => t.Diff == TagDiff.RemoteOnly );
+
+        /// <summary>
         /// Gets the number of tags that only exist locally.
         /// <para>
         /// This counts <see cref="TagDiff.LocalOnly"/>: <see cref="TagDiff.CommitConflict"/> are ignored. 
@@ -83,12 +100,12 @@ public sealed partial class GitTagInfo
         public int LocalOnlyCount => _stats._localOnlyCount;
 
         /// <summary>
-        /// Gets the number of tags that only exist remotely.
+        /// Gets the tags that only exist on the local side.
         /// <para>
-        /// This counts <see cref="TagDiff.RemoteOnly"/>: <see cref="TagDiff.CommitConflict"/> are ignored. 
+        /// Tags that are in conflicts don't appear here.
         /// </para>
         /// </summary>
-        public int RemoteOnlyCount => _stats._remoteOnlyCount;
+        public IEnumerable<LocalRemoteTag> LocalOnlyTags => _entries.SelectMany( e => e.Tags ).Where( t => t.Diff == TagDiff.LocalOnly );
 
         /// <summary>
         /// Gets the number of tags that exist both locally and remotely without conflict (they target the same commit).

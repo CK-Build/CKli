@@ -64,6 +64,7 @@ public static class CKliCommands
         Add( cmds, new CKliPush() );
 
         cmds.Add( "tag", null );
+        Add( cmds, new CKliTagFetch() );
         Add( cmds, new CKliTagDelete() );
         Add( cmds, new CKliTagList() );
         Add( cmds, new CKliTagPull() );
