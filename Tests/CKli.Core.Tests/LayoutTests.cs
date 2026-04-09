@@ -77,8 +77,13 @@ public class LayoutTests
         var xml = XElement.Load( context.CurrentStackPath.AppendPart( "CKt.xml" ) );
         var onlyOneFolder = xml.Elements( "Folder" ).ShouldHaveSingleItem();
         onlyOneFolder.Attribute( "Name" ).ShouldNotBeNull().Value.ShouldBe( "NewCore" );
-        onlyOneFolder.Elements().Elements().ShouldAllBe( e => e.Name.LocalName == "Repository" );
+        onlyOneFolder.Elements().Elements().ShouldAllBe( e => e.Name.LocalName == "Repository" || e.Name.LocalName == "SomePlugin" );
         onlyOneFolder.Elements().Attributes( "Url" ).Select( a => a.Value )
             .ToArray().ShouldBe( [ "CKt-ActivityMonitor", "CKt-Core" ], ignoreOrder: true );
+
+        XElement cktCore = onlyOneFolder.Elements().Single( e => e.Attributes( "Url" ).Single().Value == "CKt-Core" );
+        cktCore.HasElements.ShouldBeTrue();
+        cktCore.Element( "SomePlugin" ).ShouldNotBeNull().ToString().ShouldBe( "<SomePlugin PerRepoPluginConfiguration=\"comes here\" />" );
+
     }
 }

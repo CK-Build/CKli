@@ -334,18 +334,23 @@ public sealed class WorldDefinitionFile
     /// <summary>
     /// Called by <see cref="World.AddRepository"/> and <see cref="World.XifLayout(IActivityMonitor)"/> (StartEdit is already called).
     /// </summary>
-    internal bool AddRepository( IActivityMonitor monitor, NormalizedPath path, IEnumerable<string> folders, Uri uri )
+    internal bool AddRepository( IActivityMonitor monitor, NormalizedPath path, IEnumerable<string> folders, Uri uri, XElement? element )
     {
         Throw.DebugAssert( folders.All( IsValidFolderName ) );
         Throw.DebugAssert( GitRepositoryKey.GetRepositoryUrlError( uri ) == null );
 
-        // Normalizing "Repository Proxy" url: The name of the Repo is used (the path.LastPart).
-        string urlValue = NormalizeRepositoryProxyUrl( monitor, uri );
+        // Element is provided only when called by Xif and the repository must move.
         var isEditingAbove = _allowEdit;
+        Throw.DebugAssert( "element != null ==> StartEdit is already called (Xif is calling us).", element == null || isEditingAbove );
+
+        // When element must be created, it only has a normalized url.
+        // For the "Repository Proxy" url, it is the name of the Repo (the path.LastPart) in the Stack.LocalProxyRepositoriesPath.
+        element ??= new XElement( XNames.Repository, new XAttribute( XNames.Url, NormalizeRepositoryProxyUrl( monitor, uri ) ) );
+
         using( isEditingAbove ? null : StartEdit() )
         {
             XElement folder = EnsureFolder( folders, _root );
-            folder.Add( new XElement( XNames.Repository, new XAttribute( XNames.Url, urlValue ) ) );
+            folder.Add( element );
         }
         return isEditingAbove || SaveFile( monitor );
 

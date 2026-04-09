@@ -134,7 +134,7 @@ sealed partial class World
             // We can dispose the Repository and update the definition file.
         }
         if( !_name.Stack.Commit( monitor, $"Before adding repository '{folderPath.LastPart}' ({repositoryUrl}) in world {_name.FullName}." )
-            || !_definitionFile.AddRepository( monitor, folderPath, subFolderPath.Parts.Skip( _name.WorldRoot.Parts.Count ), repositoryUrl ) )
+            || !_definitionFile.AddRepository( monitor, folderPath, subFolderPath.Parts.Skip( _name.WorldRoot.Parts.Count ), repositoryUrl, null ) )
         {
             return false;
         }
@@ -355,14 +355,11 @@ sealed partial class World
                 switch( a )
                 {
                     case Move m:
-                        if( !_definitionFile.RemoveRepository( monitor, m.Uri, removeEmptyFolder: false ) )
-                        {
-                            return false;
-                        }
-                        _definitionFile.AddRepository( monitor, m.NewPath, m.NewPath.Parts.Skip( _name.WorldRoot.Parts.Count ), m.Uri );
+                        m.Element.Remove();
+                        _definitionFile.AddRepository( monitor, m.NewPath, m.NewPath.Parts.Skip( _name.WorldRoot.Parts.Count ), m.Uri, m.Element );
                         break;
                     case Clone c:
-                        _definitionFile.AddRepository( monitor, c.Path, c.Path.Parts.Skip( _name.WorldRoot.Parts.Count ), c.Uri );
+                        _definitionFile.AddRepository( monitor, c.Path, c.Path.Parts.Skip( _name.WorldRoot.Parts.Count ), c.Uri, null );
                         break;
                     case Suppress s:
                         if( !_definitionFile.RemoveRepository( monitor, s.Uri, removeEmptyFolder: false ) )
@@ -390,7 +387,7 @@ sealed partial class World
     {
         public override string ToString( int skippedPathParts ) => $"Suppressing '{Path.Parts.Skip( skippedPathParts ).Concatenate( '/' )}' ({Uri})";
     }
-    sealed record Move( NormalizedPath Path, Uri Uri, NormalizedPath NewPath, bool FixedCase ) : LayoutAction( Path, Uri )
+    sealed record Move( NormalizedPath Path, Uri Uri, NormalizedPath NewPath, XElement Element, bool FixedCase ) : LayoutAction( Path, Uri )
     {
         public override string ToString( int skippedPathParts ) => $"{(FixedCase ? "Fixing case in" : "Moving")} '{Path.Parts.Skip( skippedPathParts ).Concatenate( '/' )}' to '{NewPath.Parts.Skip( skippedPathParts ).Concatenate( '/' )}'.";
     }
@@ -413,7 +410,7 @@ sealed partial class World
     {
 
         var result = new List<LayoutAction>();
-        foreach( var (url, _, path) in logicalLayout )
+        foreach( var (url, element, path) in logicalLayout )
         {
             if( !physicalLayout.TryGetValue( url, out var exist ) )
             {
@@ -427,9 +424,10 @@ sealed partial class World
                     var to = path;
                     if( !fix )
                     {
+                        // xif: swap the source/target paths.
                         (exist, to) = (to, exist.RemoveLastPart());
                     }
-                    result.Add( new Move( exist, url, to, fixedCase ) );
+                    result.Add( new Move( exist, url, to, element, fixedCase ) );
                 }
                 physicalLayout.Remove( url );
             }
@@ -592,9 +590,7 @@ sealed partial class World
             }
             return url;
         }
-
     }
-
 
     internal World.Issue? CreateLayoutIssue( IActivityMonitor monitor, IScreen screen )
     {

@@ -9,7 +9,7 @@ even if the `Cloned` and `Remotes` folders are excluded from compilation.
 
 Each root folder contains a Stack repository and one or more repositories that are used by unit tests.
 
-The `Remotes.zip` contains non-bare repos. To simulate a "true" remote, one needs bare repositories
+The `Remotes.zip` contains non-bare repos, but to simulate a "true" remote, one needs bare repositories
 as our test remotes. See these references:
 - https://stackoverflow.com/questions/3959924/whats-the-difference-between-git-clone-mirror-and-git-clone-bare
 - https://stackoverflow.com/questions/2199897/how-to-convert-a-normal-git-repository-to-a-bare-one
