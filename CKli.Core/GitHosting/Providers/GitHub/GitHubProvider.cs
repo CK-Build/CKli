@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -47,14 +48,6 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
     {
     }
 
-    /// <inheritdoc />
-    protected internal override NormalizedPath GetRepositoryPathFromUrl( IActivityMonitor monitor, GitRepositoryKey key )
-    {
-        Throw.DebugAssert( key.OriginUrl.ToString().StartsWith( BaseUrl, StringComparison.OrdinalIgnoreCase ) );
-        // No intermediate "folder" exist for GitHub: the repository is the last part of the url path.
-        return key.RepositoryName;
-    }
-
 
     /// <inheritdoc />
     /// <remarks>
@@ -65,6 +58,15 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         base.DefaultConfigure( client );
         client.DefaultRequestHeaders.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/vnd.github+json" ) );
         client.DefaultRequestHeaders.Add( "X-GitHub-Api-Version", "2022-11-28" );
+    }
+
+    /// <inheritdoc />
+    protected internal override NormalizedPath GetRepositoryPathFromUrl( IActivityMonitor monitor, GitRepositoryKey key )
+    {
+        var sUrl = key.OriginUrl.ToString();
+        Throw.DebugAssert( sUrl.StartsWith( BaseUrl + '/', StringComparison.OrdinalIgnoreCase ) );
+        // Returns the "<owner>/<repo>" string.
+        return sUrl.Substring( BaseUrl.Length + 1 );
     }
 
     protected override NormalizedPath ValidateRepoPath( IActivityMonitor monitor, NormalizedPath repoPath )

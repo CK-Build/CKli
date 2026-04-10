@@ -45,19 +45,22 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
     {
     }
 
+    protected override void DefaultConfigure( HttpClient client )
+    {
+        base.DefaultConfigure( client );
+        client.DefaultRequestHeaders.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/json" ) );
+    }
+
     protected internal override NormalizedPath GetRepositoryPathFromUrl( IActivityMonitor monitor, GitRepositoryKey key )
     {
         Throw.DebugAssert( key.OriginUrl.ToString().StartsWith( BaseUrl, StringComparison.OrdinalIgnoreCase ) );
         // GitLab can have group/subgroup/repo structure, so we take the path part of the url and removes
         // the first part that is the "owner" of the repository.
+        //
+        // !! NOT SURE HERE. TO BE TESTED.
+        //
         NormalizedPath path = key.OriginUrl.AbsolutePath;
         return path.RemoveFirstPart();
-    }
-
-    protected override void DefaultConfigure( HttpClient client )
-    {
-        base.DefaultConfigure( client );
-        client.DefaultRequestHeaders.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/json" ) );
     }
 
     protected override NormalizedPath ValidateRepoPath( IActivityMonitor monitor, NormalizedPath repoPath )
