@@ -111,52 +111,14 @@ and is available on the local system. In such case, the Stack's folder name will
 
 `--ignore-parent-stack` allows the cloned Stack to be inside an existing one.
 
-### `stack create <stackName> --url --private`
-Creates a new Stack locally in the current directory. Unlike `clone`, this creates
-a new empty stack rather than cloning from a remote.
+### `stack create <url> --private` (⚠ not implemented yet)
+Creates a new Stack by creating the remote repository (the url must belong to a Git hosting provider
+that CKli can handle), checks out the new stack in the current directory, initializes default files in
+the stack folder and pushes it.
 
-The `<stackName>` should not include the `-Stack` suffix (it will be added automatically
-to the remote URL if provided).
-
-`--url` (or `-u`) optionally specifies a remote URL. This sets up the origin remote
-but does not push. The remote repository must be created separately (e.g., on GitHub)
-before pushing.
+The `<url>` must end with the `-Stack` suffix.
 
 `--private` uses `.PrivateStack/` folder instead of `.PublicStack/`.
-
-Example:
-```bash
-# Create a new stack with a remote URL
-ckli stack create MyProject --url https://github.com/user/MyProject-Stack
-
-# Create a local-only stack
-ckli stack create MyLocalStack
-```
-
-### `stack info`
-Displays information about the current Stack: name, path, remote URL, current branch,
-and whether it's public or private.
-
-Must be run from within a Stack directory.
-
-### `stack set-remote-url <newUrl> --no-push`
-Changes the Stack's remote URL (origin). This updates both the git remote configuration
-and the local Stack registry.
-
-By default, a push is attempted after changing the URL to verify the new remote is
-accessible. Use `--no-push` to skip the push (useful when the remote doesn't exist yet
-or when you want to verify the change before pushing).
-
-The URL is validated and normalized (e.g., `.git` suffix is stripped).
-
-Example:
-```bash
-# Change remote and push to verify
-ckli stack set-remote-url https://github.com/neworg/MyProject-Stack
-
-# Change remote without pushing
-ckli stack set-remote-url https://github.com/neworg/MyProject-Stack --no-push
-```
 
 ### `log --folder`
 Opens the last log file. When `--folder` (or `-f`) is specified, the folder is opened instead
@@ -214,8 +176,11 @@ By default, the current directory selects the Repos unless `--all` is specified.
 Any conflict is an error. Unless `--continue-on-error` is specified, the first error stops
 the push.
 
-### `repo list --by-branch`
-Lists the World's Repos with their folder path, current branch name, remote commit diffs, and remote origin URL.
+### `status --by-branch --all`
+
+When the current directory is in a World, lists the Repos with their folder path, current branch name, remote commit diffs, and remote origin url.
+Otherwise, this lists all the Stacks that are registered on
+
 
 When `--by-branch` (or `-b`) is specified, repositories are grouped by their current branch name
 instead of being listed in definition order.
@@ -269,6 +234,8 @@ by `--ckli-` to avoid a name clash with an existing process argument.)
 
 Example: `ckli exec dotnet build --ckli-all` builds all the Repo of the Stack.
 
+## Tag commands (list, fetch, pull, push, delete) 
+
 ### `tag list --local --remote --all`
 Lists local tags and/or remote tags from the current Repo or all the Repos.
 
@@ -281,6 +248,10 @@ When `--remote` is specified, only remote tags are listed.
 
 When `--all` is specified, lists tags for all the Repos of the current World
 (even if the current path is in a Repo).
+
+### `tag fetch --all`
+Safe alternative to `tag pull` as this only pulls the tags that only exist on the remote "origin" side:
+local tags are always preserved.
 
 ### `tag pull <tag names>`
 Pulls the specified tags from the remote "origin" into the current Repo.
@@ -298,19 +269,7 @@ Tag names must contain only ASCII characters with lowercase letters (to avoid ca
 
 Must be run from within a Repo directory.
 
-### `tag fetch --all`
-Safe alternative to `tag pull` as this only pulls the tags that only exist on the remote "origin" side:
-local tags are always preserved.
-
 By default, the current directory selects the Repos unless `--all` is specified.
-
-### `tag push <tag names>`
-Pushes the specified tags from the current Repo to its remote "origin".
-Modifications of remote tags are lost (the local version replaces them).
-
-Tag names must contain only ASCII characters with lowercase letters (to avoid case sensitivity issues).
-
-Must be run from within a Repo directory.
 
 ### `tag delete <tag names> --with-remote --remote-only --allow-multi-repo`
 Deletes local tags (and/or optionally from the remote "origin").
@@ -325,7 +284,7 @@ By default, only local tags are deleted and the command must be run from within 
 `--allow-multi-repo` allows the command to proceed when the current path is above multiple Repos.
 By default, the current path must be within a single Repo.
 
-## Plugin commands
+## Plugin commands (info, create, add, remove, enable)
 
 The core commands of CKli handles Stack, World and Repo (Git repositories).
 The Repo can contain anything. To handle tasks specific to a technology (.NET, Node, Ruby, etc.)
@@ -378,6 +337,17 @@ The new plugin will be "published" when `push` (typically with `--stack-only`) i
 If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified because
 it is weird to add a new plugin to a Long Term Support World.
 
+### `plugin add <packageId@version> --allow-lts`
+Adds a new packaged plugin in the current World or updates its version.
+
+When added, the plugin is added to the `<Plugins />` element of the world definition file,
+just like in the source based scenario.
+
+If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified because
+it is weird to add a new plugin to a Long Term Support World.
+
+The new plugin will be "published" when `push` (typically with `--stack-only`) is executed.
+
 ### `plugin remove <name> --allow-lts`
 Removes a source based or package plugin from the current World.
 
@@ -389,17 +359,6 @@ The name can be the short name ("MyPlugin") or the full plugin name ("CKli.MyPlu
 
 If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified because
 it is weird to remove a plugin from a Long Term Support World.
-
-### `plugin add <packageId@version> --allow-lts`
-Adds a new packaged plugin in the current World or updates its version.
-
-When added, the plugin is added to the `<Plugins />` element of the world definition file,
-just like in the source based scenario.
-
-If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified because
-it is weird to add a new plugin to a Long Term Support World.
-
-The new plugin will be "published" when `push` (typically with `--stack-only`) is executed.
 
 ### `plugin disable <name>`
 Plugins are enabled by default but can be disabled.
