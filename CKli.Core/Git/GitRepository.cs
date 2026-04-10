@@ -500,11 +500,21 @@ public sealed partial class GitRepository : IDisposable
                            [NotNullWhen( true )] out Remote? remote,
                            out UsernamePasswordCredentials? creds )
     {
-        if( (forWrite && !_repositoryKey.AccessKey.GetWriteCredentials( monitor, out creds ))
-            || !_repositoryKey.AccessKey.GetReadCredentials( monitor, out creds ) )
+        if( forWrite )
         {
-            remote = null;
-            return false;
+            if( !_repositoryKey.AccessKey.GetWriteCredentials( monitor, out creds ) )
+            {
+                remote = null;
+                return false;
+            }
+        }
+        else
+        {
+            if( !_repositoryKey.AccessKey.GetReadCredentials( monitor, out creds ) )
+            {
+                remote = null;
+                return false;
+            }
         }
         remote = _git.Network.Remotes[remoteName];
         if( remote == null )
