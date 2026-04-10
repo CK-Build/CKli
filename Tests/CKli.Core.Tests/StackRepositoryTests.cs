@@ -320,11 +320,11 @@ public class StackRepositoryTests
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "status" )).ShouldBeTrue();
         // The repo URL uses the lowercased stack path (from the clone URL) + the repo name.
         var expectedRepoUrl = new Uri( Path.GetDirectoryName( stackUrl )! + "/CKt-Core" );
-        display.ToString().ShouldBe( $"""
+        display.ToString().Replace( TestHelper.TestProjectFolder.Path, "T", StringComparison.OrdinalIgnoreCase ).ShouldBe( $"""
             > Public stack [WHITE]CKt[GRAY] (1 repositories)⮐
-            │  [DARKGREEN]C:/Dev/CKli/Tests/CKli.Core.Tests/Cloned/Clone_with_diff_casing_Async/CKt/.PublicStack[GRAY]⮐
-            │  [DARKBLUE]file:///c:/dev/ckli/tests/ckli.core.tests/remotes/bare/ckt/ckt-stack[GRAY]⮐
-            [DARKGREEN]  CK-Core-Projects/CKt-Core [GRAY]master ↑0↓0 [DARKBLUE]file:///c:/dev/ckli/tests/ckli.core.tests/remotes/bare/ckt/CKt-Core[GRAY] ⮐
+            │  [DARKGREEN]T/Cloned/Clone_with_diff_casing_Async/CKt/.PublicStack[GRAY]⮐
+            │  [DARKBLUE]file:///T/remotes/bare/ckt/ckt-stack[GRAY]⮐
+            [DARKGREEN]  CK-Core-Projects/CKt-Core [GRAY]master ↑0↓0 [DARKBLUE]file:///T/remotes/bare/ckt/CKt-Core[GRAY] ⮐
             [BLACK,darkgreen]❰✓❱[GRAY,black]⮐
 
             """ );
