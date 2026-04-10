@@ -67,6 +67,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                                      bool mustExist,
                                                                                      CancellationToken cancellation = default )
     {
+        using var _ = monitor.OpenInfo( $"Reading repository information from '{repoPath}' on '{BaseUrl}'." );
         if( !EnsureReadAccess( monitor, ref repoPath, out var client, cancellation ) )
         {
             return null;
@@ -99,13 +100,15 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                                     bool? isPrivate = null,
                                                                                     CancellationToken cancellation = default )
     {
+        bool fPrivate = isPrivate ?? !IsDefaultPublic;
+        using var _ = monitor.OpenInfo( $"Creating {(fPrivate ? "private" : "public")} repository '{repoPath}' on '{BaseUrl}'." );
         if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
         {
             return null;
         }
         try
         {
-            return await CreateRepositoryAsync( monitor, client, repoPath, isPrivate, cancellation ).ConfigureAwait( false );
+            return await CreateRepositoryAsync( monitor, client, repoPath, fPrivate, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -118,11 +121,19 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
     }
 
-    /// <inheritdoc cref="GitHostingProvider.CreateRepositoryAsync(IActivityMonitor, NormalizedPath, bool?, CancellationToken)"/>
+    /// <summary>
+    /// Creates a new repository.
+    /// </summary>
+    /// <param name="monitor">The activity monitor.</param>
+    /// <param name="client">The http client to use.</param>
+    /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="isPrivate">Whether the repository must be private (or public).</param>
+    /// <param name="cancellation">Cancellation token.</param>
+    /// <returns>The created repository info or null on error.</returns>
     protected abstract Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                           HttpClient client,
                                                                           NormalizedPath repoPath,
-                                                                          bool? isPrivate,
+                                                                          bool isPrivate,
                                                                           CancellationToken cancellation );
 
     /// <inheritdoc />
@@ -131,6 +142,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                     bool archive,
                                                                     CancellationToken cancellation = default )
     {
+        using var _ = monitor.OpenInfo( $"{(archive ? "A" : "Una")}rchiving repository '{repoPath}' on '{BaseUrl}'." );
         Throw.CheckState( CanArchiveRepository );
         if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
         {
@@ -163,6 +175,8 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                    NormalizedPath repoPath,
                                                                    CancellationToken cancellation = default )
     {
+        using var _ = monitor.OpenInfo( $"Deleting repository '{repoPath}' on '{BaseUrl}'." );
+
         if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
         {
             return false;
@@ -194,13 +208,16 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                         string versionedTag,
                                                                         CancellationToken cancellation = default )
     {
+        using var _ = monitor.OpenInfo( $"Creating draft release for '{versionedTag}' in repository '{repoPath}' on '{BaseUrl}'." );
         if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
         {
             return null;
         }
         try
         {
-            return await CreateDraftReleaseAsync( monitor, client, repoPath, versionedTag, cancellation ).ConfigureAwait( false );
+            var releaseId = await CreateDraftReleaseAsync( monitor, client, repoPath, versionedTag, cancellation ).ConfigureAwait( false );
+            monitor.CloseGroup( $"ReleaseId = {releaseId}" );
+            return releaseId;
         }
         catch( Exception ex )
         {
@@ -228,13 +245,14 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                   string? fileName = null,
                                                                   CancellationToken cancellation = default )
     {
+        fileName ??= filePath.LastPart;
+        using var _ = monitor.OpenInfo( $"Adding asset '{fileName}' in release '{releaseIdentifier}' of repository '{repoPath}' on '{BaseUrl}'." );
         if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
         {
             return false;
         }
         try
         {
-            fileName ??= filePath.LastPart;
             return await AddReleaseAssetAsync( monitor, client, repoPath, releaseIdentifier, filePath, fileName, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
@@ -264,6 +282,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                    NormalizedPath assetsFolder,
                                                                    CancellationToken cancellation = default )
     {
+        using var _ = monitor.OpenInfo( $"Adding assets files from '{assetsFolder}' in release '{releaseIdentifier}' of repository '{repoPath}' on '{BaseUrl}'." );
         if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
         {
             return false;
@@ -308,6 +327,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                   string releaseIdentifier,
                                                                   CancellationToken cancellation = default )
     {
+        using var _ = monitor.OpenInfo( $"Finalizing draft release '{releaseIdentifier}' of repository '{repoPath}' on '{BaseUrl}'." );
         if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
         {
             return false;

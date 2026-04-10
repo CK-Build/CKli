@@ -80,14 +80,14 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
     protected override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                                 HttpClient client,
                                                                                 NormalizedPath repoPath,
-                                                                                bool? isPrivate = null,
+                                                                                bool isPrivate,
                                                                                 CancellationToken cancellation = default )
     {
         var request = new GiteaCreateRepoRequest
         {
             Name = repoPath.LastPart,
             Description = "Created by CKli.",
-            Private = isPrivate ?? !IsDefaultPublic,
+            Private = isPrivate,
         };
 
         // Determine if we're creating in an org or for the authenticated user

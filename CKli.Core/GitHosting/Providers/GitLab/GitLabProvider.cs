@@ -104,7 +104,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
     protected override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                                 HttpClient client,
                                                                                 NormalizedPath repoPath,
-                                                                                bool? isPrivate = null,
+                                                                                bool isPrivate,
                                                                                 CancellationToken cancellation = default )
     {
 
@@ -116,7 +116,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
             Name = repoPath.LastPart,
             Path = repoPath,
             Description = "Created by CKli.",
-            Visibility = (isPrivate ?? !IsDefaultPublic) ? "private" : "public",
+            Visibility = isPrivate ? "private" : "public",
             NamespaceId = namespaceId
         };
 
