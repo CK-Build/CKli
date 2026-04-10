@@ -146,7 +146,7 @@ public sealed partial class GitRepository
                         }
                         else if( target != null )
                         {
-                            monitor.Trace( $"Ignoring lightweight tag '{r.CanonicalName}' that does't target a commit." );
+                            monitor.Trace( $"Ignoring lightweight tag '{r.CanonicalName}' that doesn't target a commit." );
                         }
                         else
                         {

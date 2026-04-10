@@ -30,27 +30,21 @@ public static class CKliCommands
         Add( cmds, new CKliLayoutXif() );
 
         Add( cmds, new CKliLog() );
+        Add( cmds, new CKliStatus() );
 
         cmds.Add( "repo", null );
-        Add( cmds, new CKliRepoList() );
         Add( cmds, new CKliRepoAdd() );
         Add( cmds, new CKliRepoRemove() );
+        //Add( cmds, new CKliRepoCreate() ); => Creates a new repo.
         //Add( cmds, new CKliRepoMove() ); => Moves to another stack.
         //Add( cmds, new CKliRepoMigrate() ); => Moves the remote git => new origin url.
 
-        cmds.Add( "maintenance", null );
-        cmds.Add( "maintenance hosting", null );
-        Add( cmds, new CKliMaintenanceHostingCreate() );
+        //cmds.Add( "maintenance", null );
+        //cmds.Add( "maintenance hosting", null );
+        //Add( cmds, new CKliMaintenanceHostingCreate() );
         //Add( cmds, new CKliMaintenanceHostingDelete() );
         //Add( cmds, new CKliMaintenanceHostingArchive() );
         //Add( cmds, new CKliMaintenanceHostingInfo() );
-
-
-        cmds.Add( "remote", null );
-        cmds.Add( "remote stack", null );
-        Add( cmds, new CKliRemoteStackCreate() );
-        Add( cmds, new CKliRemoteStackInfo() ); // => Merge with "repo list" ?
-        Add( cmds, new CKliRemoteStackMigrate() );
 
         cmds.Add( "plugin", null );
         Add( cmds, new CKliPluginAdd() );

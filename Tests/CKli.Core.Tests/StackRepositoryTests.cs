@@ -295,8 +295,8 @@ public class StackRepositoryTests
     [Test]
     public async Task Clone_with_diff_casing_Async()
     {
-        var context = TestEnv.EnsureCleanFolder();
-        var display = (StringScreen)context.Screen;
+        var display = new StringScreen( useDebugRenderer: true );
+        var context = TestEnv.EnsureCleanFolder().SetScreen( display );
         var remotes = TestEnv.OpenRemotes( "CKt" );
 
         var stackUrl = remotes.StackUri.LocalPath;
@@ -317,13 +317,16 @@ public class StackRepositoryTests
 
         display.Clear();
         // ckli repo list
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo", "list" )).ShouldBeTrue();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "status" )).ShouldBeTrue();
         // The repo URL uses the lowercased stack path (from the clone URL) + the repo name.
         var expectedRepoUrl = new Uri( Path.GetDirectoryName( stackUrl )! + "/CKt-Core" );
         display.ToString().ShouldBe( $"""
-            ··CK-Core-Projects/CKt-Core·master·↑0↓0·{expectedRepoUrl}·
-            ❰✓❱
+            > Public stack [WHITE]CKt[GRAY] (1 repositories)⮐
+            │  [DARKGREEN]C:/Dev/CKli/Tests/CKli.Core.Tests/Cloned/Clone_with_diff_casing_Async/CKt/.PublicStack[GRAY]⮐
+            │  [DARKBLUE]file:///c:/dev/ckli/tests/ckli.core.tests/remotes/bare/ckt/ckt-stack[GRAY]⮐
+            [DARKGREEN]  CK-Core-Projects/CKt-Core [GRAY]master ↑0↓0 [DARKBLUE]file:///c:/dev/ckli/tests/ckli.core.tests/remotes/bare/ckt/CKt-Core[GRAY] ⮐
+            [BLACK,darkgreen]❰✓❱[GRAY,black]⮐
 
-            """.Replace( '·', ' ' ) );
+            """ );
     }
 }

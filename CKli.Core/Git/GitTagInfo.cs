@@ -31,7 +31,7 @@ public sealed partial class GitTagInfo
     /// regardless of your filesystem.
     /// <para>
     /// CKli considers that tag names MUST only be ascii and letters must be in lower case. Tags that are not compliant with this
-    /// strict rule are simply ignored. The static <see cref="GitRepository.IsCKliValidTagName(System.ReadOnlySpan{char})"/>
+    /// strict rule are simply ignored. The static <see cref="GitRepository.IsCKliValidTagName(ReadOnlySpan{char})"/>
     /// implements the check.
     /// </para>
     /// </summary>

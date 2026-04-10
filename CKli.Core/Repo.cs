@@ -134,12 +134,12 @@ public sealed class Repo
             }
             else
             {
-                folder = folder.AddRight( screenType.Text( "<local>" ).Box( marginRight: 1 ) );
+                folder = folder.AddRight( screenType.Text( "(untracked)", foreColor: ConsoleColor.DarkGray ).Box( marginRight: 1 ) );
             }
         }
         if( withOriginUrl )
         {
-            folder = folder.AddRight( screenType.Text( OriginUrl.ToString() ).HyperLink( OriginUrl ).Box( marginRight: 1 ) );
+            folder = folder.AddRight( screenType.Text( OriginUrl.ToString(), foreColor: ConsoleColor.DarkBlue ).HyperLink( OriginUrl ).Box( marginRight: 1 ) );
         }
         return folder;
 
