@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.PerfectEvent;
 using System;
 
 namespace CKli.Core;
@@ -8,11 +9,21 @@ namespace CKli.Core;
 /// </summary>
 public sealed class WorldEvents
 {
+    internal readonly PerfectEventSender<IssueEvent> IssueEventSender;
+    internal readonly PerfectEventSender<RepoAddedEvent> RepoAddedEventSender;
+
+    internal WorldEvents()
+    {
+        RepoAddedEventSender = new PerfectEventSender<RepoAddedEvent>();
+        IssueEventSender = new PerfectEventSender<IssueEvent>();
+    }
+
     internal void ReleaseEvents()
     {
         PluginInfo = null;
         FixedLayout = null;
-        Issue = null;
+        IssueEventSender.RemoveAll();
+        RepoAddedEventSender.RemoveAll();
     }
 
     static bool Raise<T>( IActivityMonitor monitor, Action<T>? handler, T e ) where T : WorldEvent
@@ -50,8 +61,11 @@ public sealed class WorldEvents
     /// <summary>
     /// Raised by "ckli issue".
     /// </summary>
-    public event Action<IssueEvent>? Issue;
+    public PerfectEvent<IssueEvent> Issue => IssueEventSender.PerfectEvent;
 
-    internal bool SafeRaiseEvent( IActivityMonitor monitor, IssueEvent e ) => Raise( monitor, Issue, e );
+    /// <summary>
+    /// Raised by "ckli repo add" and "ckli repo create" commands.
+    /// </summary>
+    public PerfectEvent<RepoAddedEvent> RepoAdded => RepoAddedEventSender.PerfectEvent;
 
 }

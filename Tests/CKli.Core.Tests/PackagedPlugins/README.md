@@ -21,7 +21,7 @@ public sealed class CommandSamplePlugin : PluginBase
 Both plugins handles commands.
 
 # CKli.VSSolutionSample.Plugin
-This one is a copy of the "real" `CKli.VSSolution.Plugin` that is used to test "ckli issue"
-command and the new (as of 2025) `Microsoft.VisualStudio.SolutionPersistence` package.
-
+This one was a copy of a "real" `CKli.VSSolution.Plugin` that doesn't exist anymore.
+It tests "ckli issue" command and the `Microsoft.VisualStudio.SolutionPersistence` package (we
+don't use this anymore, we always use .slnx and directly works with the xml).
 

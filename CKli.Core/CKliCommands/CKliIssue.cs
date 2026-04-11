@@ -72,7 +72,8 @@ public sealed class CKliIssue : Command
                                           : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
             if( repos == null ) return false;
 
-            if( repos.Count > 0 && !world.Events.SafeRaiseEvent( monitor, new IssueEvent( monitor, world, repos, issues ) ) )
+            if( repos.Count > 0
+                && !await world.Events.IssueEventSender.SafeRaiseAsync( monitor, new IssueEvent( monitor, world, repos, issues ) ).ConfigureAwait( false ) )
             {
                 return false;
             }

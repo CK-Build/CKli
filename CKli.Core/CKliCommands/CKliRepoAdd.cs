@@ -23,24 +23,24 @@ sealed class CKliRepoAdd : Command
                                                                     CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
-        string sUrl = cmdLine.EatArgument();
-        if( !Uri.TryCreate( sUrl, UriKind.Absolute, out var uri ) )
-        {
-            monitor.Error( $"Invalid <repositoryUrl> argument '{sUrl}'. It must be an absolute url." );
-            return ValueTask.FromResult( false );
-        }
-        bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
-        return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && RepositoryAdd( monitor, this, context, uri, allowLTS ) );
+        return RepositoryAddOrCreateAsync( monitor, this, context, cmdLine, create: false );
     }
 
-    static bool RepositoryAdd( IActivityMonitor monitor,
-                               Command command,
-                               CKliEnv context,
-                               Uri repositoryUrl,
-                               bool allowLTS )
+    internal static async ValueTask<bool> RepositoryAddOrCreateAsync( IActivityMonitor monitor,
+                                                                      Command command,
+                                                                      CKliEnv context,
+                                                                      CommandLineArguments cmdLine,
+                                                                      bool create )
     {
-        if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
+        string sUrl = cmdLine.EatArgument();
+        if( !Uri.TryCreate( sUrl, UriKind.Absolute, out var repositoryUrl ) )
+        {
+            monitor.Error( $"Invalid <repositoryUrl> argument '{sUrl}'. It must be an absolute url." );
+            return false;
+        }
+        bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
+        if( !cmdLine.Close( monitor )
+            || !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
             return false;
         }
@@ -51,8 +51,30 @@ sealed class CKliRepoAdd : Command
             {
                 return RequiresAllowLTS( monitor, world.Name );
             }
+            var gitKey = GitRepositoryKey.Create( monitor, context.SecretsStore, repositoryUrl, stack.IsPublic );
+            if( gitKey == null )
+            {
+                return false;
+            }
+            if( gitKey.IsStackRepository )
+            {
+                monitor.Error( $"Cannot add a '-Stack' repository to a World." );
+                return false;
+            }
+            if( create )
+            {
+                if( !gitKey.TryGetHostingInfo( monitor, out var hostingProvider, out var repoPath ) )
+                {
+                    return false;
+                }
+                HostedRepositoryInfo? info = await hostingProvider.CreateRepositoryAsync( monitor, repoPath, !stack.IsPublic ).ConfigureAwait( false );
+                if( info == null )
+                {
+                    return false;
+                }
+            }
             // AddRepository handles the WorldDefinition file save and commit.
-            return world.AddRepository( monitor, repositoryUrl, context.CurrentDirectory );
+            return await world.AddRepositoryAsync( monitor, gitKey, context.CurrentDirectory );
         }
         finally
         {

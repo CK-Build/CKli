@@ -26,7 +26,7 @@ sealed partial class World
     public readonly record struct RepoLayout( Uri Url, XElement XElement, NormalizedPath Path );
 
     /// <summary>
-    /// Gets whether <see cref="AddRepository"/>, <see cref="RemoveRepository"/> or <see cref="XifLayout"/> can be called.
+    /// Gets whether <see cref="AddRepositoryAsync"/>, <see cref="RemoveRepository"/> or <see cref="XifLayout"/> can be called.
     /// </summary>
     public bool CanChangeLayout => _firstRepo == null;
 
@@ -48,20 +48,11 @@ sealed partial class World
     /// <param name="repositoryUrl">The repository url.</param>
     /// <param name="folderPath">The absolute folder path inside <see cref="LocalWorldName.WorldRoot"/>.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool AddRepository( IActivityMonitor monitor, Uri repositoryUrl, NormalizedPath folderPath )
+    public async Task<bool> AddRepositoryAsync( IActivityMonitor monitor, GitRepositoryKey gitKey, NormalizedPath folderPath )
     {
         Throw.CheckState( CanChangeLayout );
-        var gitKey = GitRepositoryKey.Create( monitor, _name.Stack.SecretsStore, repositoryUrl, _name.Stack.IsPublic );
-        if( gitKey == null )
-        {
-            return false;
-        }
-        if( gitKey.IsStackRepository )
-        {
-            monitor.Error( $"Cannot add a '-Stack' repository to a World." );
-            return false;
-        }
-        using var _ = monitor.OpenInfo( $"Adding '{gitKey.RepositoryName}' ({repositoryUrl}) to world '{_name.FullName}'." );
+        Throw.CheckArgument( !gitKey.IsStackRepository );
+        using var _ = monitor.OpenInfo( $"Adding '{gitKey.RepositoryName}' ({gitKey.OriginUrl}) to world '{_name.FullName}'." );
         // Check the folder path.
         if( !folderPath.StartsWith( _name.WorldRoot, strict: false ) )
         {
@@ -110,7 +101,7 @@ sealed partial class World
             if( path.LastPart.Equals( gitKey.RepositoryName, StringComparison.OrdinalIgnoreCase ) )
             {
                 monitor.Error( $"""
-                    Cannot add repository '{repositoryUrl}'.
+                    Cannot add repository '{gitKey.OriginUrl}'.
                     A repository with the same name exists: '{uri}' cloned at '{path}'.
                     """ );
                 return false;
@@ -126,15 +117,25 @@ sealed partial class World
                     """ );
             return false;
         }
+
+        XElement xRepo = _definitionFile.CreateDefaultRepositoryElement( monitor, gitKey.OriginUrl );
         // ...and we must ensure that it can be cloned.
-        using( var libGit = GitRepository.CloneWorkingFolder( monitor, gitKey, folderPath ) )
+        using( var gitRepository = GitRepository.Clone( monitor, gitKey, _stackRepository.Context.Committer, _name.WorldRoot.Combine( folderPath ), folderPath ) )
         {
-            if( libGit == null ) return false;
+            if( gitRepository == null ) return false;
             // The working folder is successfully cloned.
+            // We raise the RepoAdded event here: the plugins can play with the GitRepository.
+            if( _events.RepoAddedEventSender.HasHandlers )
+            {
+                if( !await _events.RepoAddedEventSender.SafeRaiseAsync( monitor, new RepoAddedEvent( monitor, this, gitRepository, xRepo ) ).ConfigureAwait( false ) )
+                {
+                    return false;
+                }
+            }
             // We can dispose the Repository and update the definition file.
         }
-        if( !_name.Stack.Commit( monitor, $"Before adding repository '{folderPath.LastPart}' ({repositoryUrl}) in world {_name.FullName}." )
-            || !_definitionFile.AddRepository( monitor, folderPath, subFolderPath.Parts.Skip( _name.WorldRoot.Parts.Count ), repositoryUrl, null ) )
+        if( !_name.Stack.Commit( monitor, $"Before adding repository '{folderPath.LastPart}' ({gitKey.OriginUrl}) in world {_name.FullName}." )
+            || !_definitionFile.AddRepository( monitor, folderPath, subFolderPath.Parts.Skip( _name.WorldRoot.Parts.Count ), gitKey.OriginUrl, xRepo ) )
         {
             return false;
         }

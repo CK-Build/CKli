@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -332,20 +333,18 @@ public sealed class WorldDefinitionFile
     }
 
     /// <summary>
-    /// Called by <see cref="World.AddRepository"/> and <see cref="World.XifLayout(IActivityMonitor)"/> (StartEdit is already called).
+    /// Called by <see cref="World.AddRepositoryAsync"/> and <see cref="World.XifLayout(IActivityMonitor)"/> (StartEdit is already called).
     /// </summary>
     internal bool AddRepository( IActivityMonitor monitor, NormalizedPath path, IEnumerable<string> folders, Uri uri, XElement? element )
     {
         Throw.DebugAssert( folders.All( IsValidFolderName ) );
         Throw.DebugAssert( GitRepositoryKey.GetRepositoryUrlError( uri ) == null );
 
-        // Element is provided only when called by Xif and the repository must move.
+        // Element is provided when:
+        // - called by Xif and the repository must move.
+        // - AddRepositoryAsync (RepoAddedEvent may have edited it).
         var isEditingAbove = _allowEdit;
-        Throw.DebugAssert( "element != null ==> StartEdit is already called (Xif is calling us).", element == null || isEditingAbove );
-
-        // When element must be created, it only has a normalized url.
-        // For the "Repository Proxy" url, it is the name of the Repo (the path.LastPart) in the Stack.LocalProxyRepositoriesPath.
-        element ??= new XElement( XNames.Repository, new XAttribute( XNames.Url, NormalizeRepositoryProxyUrl( monitor, uri ) ) );
+        element ??= CreateDefaultRepositoryElement( monitor, uri );
 
         using( isEditingAbove ? null : StartEdit() )
         {
@@ -392,6 +391,13 @@ public sealed class WorldDefinitionFile
             }
             return existing;
         }
+    }
+
+    internal XElement CreateDefaultRepositoryElement( IActivityMonitor monitor, Uri uri )
+    {
+        // When element must be created, it only has a normalized url.
+        // For the "Repository Proxy" url, it is the name of the Repo (the path.LastPart) in the Stack.LocalProxyRepositoriesPath.
+        return new XElement( XNames.Repository, new XAttribute( XNames.Url, NormalizeRepositoryProxyUrl( monitor, uri ) ) );
     }
 
     /// <summary>

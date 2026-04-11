@@ -12,9 +12,9 @@ public sealed class IssueEvent : WorldEvent
     readonly List<World.Issue> _issues;
 
     internal IssueEvent( IActivityMonitor monitor,
-                       World world,
-                       IReadOnlyList<Repo> repos,
-                       List<World.Issue> issues )
+                         World world,
+                         IReadOnlyList<Repo> repos,
+                         List<World.Issue> issues )
         : base( monitor, world )
     {
         _repos = repos;

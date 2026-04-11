@@ -218,9 +218,10 @@ public class StackRepositoryTests
             File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No yet." );
             world.Layout.Count.ShouldBe( 1, "Only CKt-Core in the Layout" );
 
-            world.AddRepository( TestHelper.Monitor,
-                                 remotes.GetUriFor( "CKt-ActivityMonitor" ),
-                                 stack.DefaultWorldName.WorldRoot ).ShouldBeTrue();
+            (await world.AddRepositoryAsync( TestHelper.Monitor,
+                                      new GitRepositoryKey( context.SecretsStore, remotes.GetUriFor( "CKt-ActivityMonitor" ), stack.IsPublic ),
+                                      stack.DefaultWorldName.WorldRoot ).ConfigureAwait( false ))
+                    .ShouldBeTrue();
 
             world.Layout.Count.ShouldBe( 2, "The Layout has been updated." );
             File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Here it is." );
