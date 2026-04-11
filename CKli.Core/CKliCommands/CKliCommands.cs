@@ -34,8 +34,8 @@ public static class CKliCommands
 
         cmds.Add( "repo", null );
         Add( cmds, new CKliRepoAdd() );
+        Add( cmds, new CKliRepoCreate() );
         Add( cmds, new CKliRepoRemove() );
-        //Add( cmds, new CKliRepoCreate() ); => Creates a new repo.
         //Add( cmds, new CKliRepoMove() ); => Moves to another stack.
         //Add( cmds, new CKliRepoMigrate() ); => Moves the remote git => new origin url.
 

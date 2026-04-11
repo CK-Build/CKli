@@ -23,7 +23,7 @@ sealed class CKliRepoCreate : Command
                                                                     CKliEnv context,
                                                                     CommandLineArguments cmdLine )
     {
-        return CKliRepoAdd.RepositoryAddOrCreateAsync( monitor, this, context, cmdLine, create: false );
+        return CKliRepoAdd.RepositoryAddOrCreateAsync( monitor, this, context, cmdLine, create: true );
     }
 
 }
