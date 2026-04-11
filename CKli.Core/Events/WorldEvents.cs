@@ -9,20 +9,18 @@ namespace CKli.Core;
 /// </summary>
 public sealed class WorldEvents
 {
-    internal readonly PerfectEventSender<IssueEvent> IssueEventSender;
     internal readonly PerfectEventSender<RepoAddedEvent> RepoAddedEventSender;
 
     internal WorldEvents()
     {
         RepoAddedEventSender = new PerfectEventSender<RepoAddedEvent>();
-        IssueEventSender = new PerfectEventSender<IssueEvent>();
     }
 
     internal void ReleaseEvents()
     {
         PluginInfo = null;
         FixedLayout = null;
-        IssueEventSender.RemoveAll();
+        Issue = null;
         RepoAddedEventSender.RemoveAll();
     }
 
@@ -61,7 +59,9 @@ public sealed class WorldEvents
     /// <summary>
     /// Raised by "ckli issue".
     /// </summary>
-    public PerfectEvent<IssueEvent> Issue => IssueEventSender.PerfectEvent;
+    public event Action<IssueEvent>? Issue;
+
+    internal bool SafeRaiseEvent( IActivityMonitor monitor, IssueEvent e ) => Raise( monitor, Issue, e );
 
     /// <summary>
     /// Raised by "ckli repo add" and "ckli repo create" commands.

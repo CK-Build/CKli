@@ -16,10 +16,10 @@ public sealed partial class VSSolutionSamplePlugin : PrimaryRepoPlugin<VSSolutio
     public VSSolutionSamplePlugin( PrimaryPluginContext context )
         : base( context )
     {
-        World.Events.Issue.Sync += OnIssue;
+        World.Events.Issue += OnIssue;
     }
 
-    void OnIssue( IActivityMonitor monitor, IssueEvent e )
+    void OnIssue( IssueEvent e )
     {
         foreach( var r in e.Repos )
         {
