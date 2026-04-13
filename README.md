@@ -25,33 +25,18 @@ And auto-update it with:
 ```powershell
 ckli update
 ```
-The `update` command is described below.
+The `update` command is described below and should handle switching from production and pre-releases easily.
+Unfortunately, there are some issues with `dotnet tool update` (that `ckli update` runs): to switch to the last
+pre-release of CKli, use:
+
+```powershell
+dotnet tool uninstall CKli -g
+dotnet tool update CKli -g --prerelease --add-source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json --no-http-cache
+```
 
 ### Run CKli
 
 If you installed CKli globally, you can run `ckli` in any command prompt to start it.
-
-## Development & Local Testing
-
-To test your local changes without publishing to NuGet:
-
-```bash
-# 1. Build and pack
-dotnet build CKli.sln -c Debug
-dotnet pack CKli/CKli.csproj -c Debug
-
-# 2. Install as global tool (uninstall first if already installed)
-dotnet tool uninstall -g CKli
-dotnet tool install -g CKli --source ./CKli/bin/Debug --version 0.0.0-0
-
-# 3. Test your changes
-ckli --help
-ckli log
-
-# 4. When done, reinstall from NuGet
-dotnet tool uninstall -g CKli
-dotnet tool install -g CKli
-```
 
 ## The basics: Stack-World-Repo
 
@@ -93,7 +78,7 @@ With `--stable`, stable versions only will be considered even if the current ver
 
 With `--prerelease`, prerelease versions will be considered (including CI builds) even if the current version is stable.
 
-The `--allow-downgrade` flags allows package downgrade. This is Useful to come back to the last stable version when
+The `--allow-downgrade` flags allows package downgrade. This is useful to come back to the last stable version when
 the current version is a pre release.
 
 This command transparently updates the CKli version used by the `CKli.Plugins` solution. If a `Tests/Plugins.Tests` project
@@ -111,7 +96,7 @@ and is available on the local system. In such case, the Stack's folder name will
 
 `--ignore-parent-stack` allows the cloned Stack to be inside an existing one.
 
-### `stack create <url> --private` (⚠ not implemented yet)
+### `create <url> --private`
 Creates a new Stack by creating the remote repository (the url must belong to a Git hosting provider
 that CKli can handle), checks out the new stack in the current directory, initializes default files in
 the stack folder and pushes it.
@@ -384,3 +369,53 @@ Reverts the `plugin disable` command by removing the `IsDisabled="true"` attribu
 
 As usual, this modification will be "published" when `push` (typically with `--stack-only`) is executed.
 
+----
+# Development & Local Testing
+There are 2 possible approaches to develop and test CKli itself.
+
+## Temporarily replaces the currently installed CKli tool.
+```bash
+# 1. Build and pack
+dotnet build CKli.sln -c Debug
+dotnet pack CKli/CKli.csproj -c Debug
+
+# 2. Install as global tool (uninstall first if already installed)
+dotnet tool uninstall -g CKli
+dotnet tool install -g CKli --source ./CKli/bin/Debug --version 0.0.0-0
+
+# 3. Test your changes...
+ckli --help
+ckli log
+# 3bis. ..or enter debug mode before the command handling:
+ckli clone https://github.com/acme-corp/My-Stack --ckli-debug
+
+# 4. When done, reinstall from NuGet
+dotnet tool uninstall -g CKli
+dotnet tool install -g CKli
+```
+
+## Using an independent context (thanks to launchSettings.json).
+This is possible thanks to the [`CKli/Properties/launchSettings.json`](CKli/Properties/launchSettings.json) file.
+```json
+{
+  "profiles": {
+    "C:\\Dev3 (ps)": {
+      "environmentVariables": {
+        "PATH": "$(SolutionDir)CKli/$(OutputPath);%PATH%"
+      },
+      "commandName": "Executable",
+      "executablePath": "powershell",
+      "workingDirectory": "$(SolutionDir)../CKliTestFolder"
+    }
+  }
+}
+```
+
+It launches the compiled CKli instance in a `CKliTestFolder`.
+This trick prepends the build output path to the `$Env:Path` (Linux/Mac: `$Path`): the `ckli.exe` is found here rather than in
+the `%userprofile%\.nuget\packages` (Linux/Mac: `~/.nuget/packages`).
+
+This only requires to manually create (once) the `CKliTestFolder` nearby the `CKli` folder.
+
+In Visual Studio use **"Start Without Debugging (Ctrl+F5)"**: the running terminal can use your already running IDE
+instance as the debugger when using the `ckli .... --ckli-debug` flag.
