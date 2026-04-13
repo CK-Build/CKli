@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -302,17 +303,6 @@ public sealed partial class StackRepository : IDisposable
                 }
                 return false;
             }
-
-            // Push to verify the new remote is valid
-            if( push )
-            {
-                if( !_git.PushBranch( monitor, _git.Repository.Head, autoCreateRemoteBranch: false ) )
-                {
-                    monitor.Error( "Push to new remote failed. The remote url has been changed but the remote may not exist or be accessible." );
-                    return false;
-                }
-                monitor.Info( "Successfully pushed to new remote." );
-            }
         }
         return true;
     }
@@ -371,7 +361,7 @@ public sealed partial class StackRepository : IDisposable
         if( git != null )
         {
             var stackRoot = gitPath.RemoveLastPart();
-            if( CheckOriginUrlStackSuffix( monitor, git.RepositoryKey, out var stackNameFromUrl ) )
+            if( git.RepositoryKey.CheckOriginUrlStackSuffix( monitor, out var stackNameFromUrl ) )
             {
                 if( stackRoot.LastPart.Equals( stackNameFromUrl, StringComparison.OrdinalIgnoreCase ) )
                 {
@@ -562,9 +552,9 @@ public sealed partial class StackRepository : IDisposable
             monitor.Error( $"Invalid path '{parentPath}': it must be rooted and not end with {PublicStackName} or {PrivateStackName}." );
         }
 
-        // This calls GitRepositoryKey.ThrowArgumentExceptionOnInvalidUrl( url );
-        var stackGitKey = new GitRepositoryKey( context.SecretsStore, url, isPublic );
-        if( !CheckOriginUrlStackSuffix( monitor, stackGitKey, out var stackNameFromUrl ) )
+        var stackGitKey = GitRepositoryKey.Create( monitor, context.SecretsStore, url, isPublic );
+        if( stackGitKey == null
+            || !stackGitKey.CheckOriginUrlStackSuffix( monitor, out var stackNameFromUrl ) )
         {
             return null;
         }
@@ -665,151 +655,166 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
-    /// Creates a new Stack locally in the current directory.
-    /// <para>
-    /// Unlike <see cref="Clone"/>, this creates a new empty stack rather than cloning from a remote.
-    /// </para>
+    /// Creates a new empty Stack in the current directory with its new remote repository.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="context">
-    /// The context. <see cref="CKliEnv.CurrentStackPath"/> must be empty.
+    /// <param name="context">The context. <see cref="CKliEnv.CurrentStackPath"/> must be empty.</param>
+    /// <param name="url">Remote url. Must end with "-Stack" and be handled by one of the <see cref="GitHostingProvider"/>.</param>
+    /// <param name="isPublic">Whether the new Stack must be public.</param>
+    /// <param name="ignoreParentStack">
+    /// True to allow a stack to be created in an existing one.
+    /// This should be avoided (but is required in the tests of Stack plugins).
     /// </param>
-    /// <param name="stackName">The stack name (without '-Stack' suffix).</param>
-    /// <param name="isPublic">Whether this repository is public.</param>
-    /// <param name="remoteUrl">Optional remote URL. If provided, sets up the remote but does not push.</param>
-    /// <param name="stackBranchName">The branch name of the stack repository. Defaults to "main".</param>
     /// <returns>The repository or null on error.</returns>
-    public static StackRepository? Create( IActivityMonitor monitor,
-                                           CKliEnv context,
-                                           string stackName,
-                                           bool isPublic,
-                                           Uri? remoteUrl = null,
-                                           string stackBranchName = "main" )
+    public static async Task<StackRepository?> CreateAsync( IActivityMonitor monitor,
+                                                            CKliEnv context,
+                                                            Uri url,
+                                                            bool isPublic,
+                                                            bool ignoreParentStack )
     {
         Throw.CheckNotNullArgument( monitor );
         Throw.CheckNotNullArgument( context );
-        Throw.CheckNotNullOrWhiteSpaceArgument( stackName );
 
-        // Check we're not inside an existing stack
-        if( !context.CurrentStackPath.IsEmptyPath )
+        // First, handles the url.
+        var gitKey = GitRepositoryKey.Create( monitor, context.SecretsStore, url, isPublic );
+        if( gitKey == null
+            || !gitKey.CheckOriginUrlStackSuffix( monitor, out var stackName ) )
         {
-            var existingStackRoot = context.CurrentStackPath.RemoveLastPart();
-            monitor.Error( $"Cannot create stack inside existing stack '{existingStackRoot}'." );
             return null;
         }
-        Throw.CheckNotNullArgument( stackBranchName );
-
-        // Validate stack name: must not contain -Stack suffix or invalid characters
-        if( stackName.EndsWith( "-Stack", StringComparison.OrdinalIgnoreCase ) )
+        var already = Registry.CheckExistingStack( monitor, url );
+        if( already.Count > 0 )
         {
-            monitor.Error( $"Invalid stack name '{stackName}': the '-Stack' suffix should not be included." );
+            monitor.Error(  $"""
+                        The stack '{stackName}' at '{url}' is already available here:
+                        {already.Select( p => p.Path ).Concatenate( Environment.NewLine )}
+                        """ );
             return null;
         }
-        // Use WorldName validation if available, otherwise basic check
-        if( stackName.Contains( ' ' ) || stackName.Contains( '/' ) || stackName.Contains( '\\' ) )
+        if( !gitKey.TryGetHostingInfo( monitor, out var hostingProvider, out var remoteRepoPath ) )
         {
-            monitor.Error( $"Invalid stack name '{stackName}': must not contain spaces or path separators." );
-            return null;
-        }
-
-        var parentPath = context.CurrentDirectory;
-        if( !parentPath.IsRooted
-            || parentPath.Parts.Count < 2
-            || parentPath.LastPart.Equals( PublicStackName, StringComparison.OrdinalIgnoreCase )
-            || parentPath.LastPart.Equals( PrivateStackName, StringComparison.OrdinalIgnoreCase ) )
-        {
-            monitor.Error( $"Invalid path '{parentPath}': it must be rooted and not end with {PublicStackName} or {PrivateStackName}." );
             return null;
         }
 
-        // Validate remote URL if provided
-        if( remoteUrl != null )
-        {
-            var error = GitRepositoryKey.GetRepositoryUrlError( remoteUrl );
-            if( error != null )
-            {
-                monitor.Error( error );
-                return null;
-            }
-            if( !remoteUrl.ToString().EndsWith("-Stack", StringComparison.Ordinal ) )
-            {
-                monitor.Error( $"Remote URL repository name '{remoteUrl}' must end with '-Stack'." );
-                return null;
-            }
-        }
+        // Second, handles the local path.
 
-        var stackRoot = parentPath.AppendPart( stackName );
-
-        // Prevent stack inside stack
-        var parentStack = FindGitStackPath( parentPath );
-        if( !parentStack.IsEmptyPath )
+        var p = context.CurrentDirectory;
+        if( !p.IsRooted
+            || p.Parts.Count < 2
+            || p.LastPart.Equals( PublicStackName, StringComparison.OrdinalIgnoreCase )
+            || p.LastPart.Equals( PrivateStackName, StringComparison.OrdinalIgnoreCase ) )
         {
-            var stackAbove = parentStack.RemoveLastPart();
-            monitor.Error( $"Cannot create stack '{stackRoot}' inside existing stack '{stackAbove}'." );
+            monitor.Error( $"Invalid path '{p}': it must be rooted and not end with {PublicStackName} or {PrivateStackName}." );
             return null;
         }
-
-        // Check path doesn't already exist
+        var stackRoot = p.AppendPart( gitKey.RepositoryName );
         if( Path.Exists( stackRoot ) )
         {
             monitor.Error( $"The path '{stackRoot}' already exists." );
             return null;
         }
+        // Check we're not inside an existing stack. Don't trust the context.CurrentStackPath here (tests skips it).
+        if( !ignoreParentStack )
+        {
+            var parentStack = FindGitStackPath( stackRoot );
+            if( !parentStack.IsEmptyPath )
+            {
+                monitor.Error( $"Cannot create stack inside existing stack '{parentStack.RemoveLastPart()}'." );
+                return null;
+            }
+        }
+        // Everything seems okay. It's time to create the remote before cloning it.
+        var remoteInfo = await hostingProvider.CreateRepositoryAsync( monitor, remoteRepoPath, !isPublic ).ConfigureAwait( false );
+        if( remoteInfo == null )
+        {
+            return null;
+        }
+        // Remote (empty) repository has been created: we can clone, initialize (default world definition file and $Local folder), commit and push it.
+        // Centralized compensation by encapsulating the initialization.
 
-        NormalizedPath gitPath = stackRoot.AppendPart( isPublic ? PublicStackName : PrivateStackName );
-
-        // Compute the effective URL for registry and origin:
-        // For local stacks, use a file:// URL that follows the -Stack naming convention
-        // This ensures TryOpenFromPath validation works correctly
-        var effectiveUrl = remoteUrl ?? new Uri( parentPath.AppendPart( $"{stackName}-Stack" ) );
-
-        // Initialize the git repository with the origin URL
-        var git = GitRepository.Init( monitor,
-                                      context.SecretsStore,
-                                      context.Committer,
-                                      gitPath,
-                                      gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ),
-                                      isPublic,
-                                      effectiveUrl,
-                                      stackBranchName );
-        if( git == null ) return null;
-
-        // Create the initial stack definition XML file
-        var definitionFilePath = gitPath.AppendPart( $"{stackName}.xml" );
-        var initialXml = $"""
-            <{stackName}>
-            </{stackName}>
-            """;
-
+        GitRepository? gitRepository = null;
+        StackRepository? newStack = null;
         try
         {
-            File.WriteAllText( definitionFilePath, initialXml );
+            newStack = Initialize( monitor,
+                                   context,
+                                   stackRoot,
+                                   gitKey,
+                                   isPublic,
+                                   stackName,
+                                   out gitRepository );
         }
         catch( Exception ex )
         {
-            monitor.Error( $"Failed to create definition file '{definitionFilePath}'.", ex );
-            git.Dispose();
-            FileHelper.DeleteFolder( monitor, stackRoot );
-            return null;
+            monitor.Error( "While initializing new stack.", ex );
         }
-
-        // Setup $Local directory and .gitignore
-        SetupNewLocalDirectory( gitPath );
-
-        // Create initial commit (Commit method already stages all files)
-        var commitResult = git.Commit( monitor, "Initial stack creation.", CommitBehavior.CreateNewCommit );
-        if( commitResult == CommitResult.Error || commitResult == CommitResult.NoChanges )
+        if( newStack == null )
         {
-            monitor.Error( "Failed to create initial commit." );
-            git.Dispose();
+            try
+            {
+                gitRepository?.Dispose();
+            }
+            catch( Exception ex )
+            {
+                monitor.Warn( "While disposing git repository.", ex );
+            }
             FileHelper.DeleteFolder( monitor, stackRoot );
-            return null;
+            try
+            {
+                await hostingProvider.DeleteRepositoryAsync( monitor, remoteRepoPath ).ConfigureAwait( false );
+            }
+            catch( Exception ex )
+            {
+                monitor.Warn( "While deleting newly crated repository.", ex );
+            }
         }
+        return newStack;
 
-        // Register in the stack registry (effectiveUrl was computed earlier)
-        Registry.RegisterNewStack( monitor, gitPath, effectiveUrl );
+        static StackRepository? Initialize( IActivityMonitor monitor,
+                                            CKliEnv context,
+                                            NormalizedPath stackRoot,
+                                            GitRepositoryKey gitKey,
+                                            bool isPublic,
+                                            string stackName,
+                                            out GitRepository? gitRepository )
+        {
+            NormalizedPath gitPath = stackRoot.AppendPart( isPublic ? PublicStackName : PrivateStackName );
+            gitRepository = GitRepository.Clone( monitor,
+                                                 gitKey,
+                                                 context.Committer,
+                                                 gitPath,
+                                                 gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ) );
+            if( gitRepository == null
+                || !gitRepository.FullCheckout( monitor, "main", skipFetchMerge: true ) )
+            {
+                return null;
+            }
 
-        return new StackRepository( git, stackRoot, context, stackName );
+            // Create the initial stack definition XML file
+            File.WriteAllText( gitPath.AppendPart( $"{stackName}.xml" ), $"""
+                <{stackName}>
+                </{stackName}>
+                """ );
+
+            // Setup $Local directory and .gitignore
+            SetupNewLocalDirectory( gitPath );
+
+            // Create initial commit (Commit method already stages all files)
+            if( gitRepository.Commit( monitor, "Initial stack creation.", CommitBehavior.CreateNewCommit ) == CommitResult.Error )
+            {
+                monitor.Error( "Failed to create initial commit." );
+                return null;
+            }
+            if( !gitRepository.PushBranch( monitor, gitRepository.Repository.Head, autoCreateRemoteBranch: true ) )
+            {
+                return null;
+            }
+
+            // Register in the stack registry.
+            Registry.RegisterNewStack( monitor, gitPath, gitKey.OriginUrl );
+
+            return new StackRepository( gitRepository, stackRoot, context, stackName );
+        }
     }
 
     static void SetupNewLocalDirectory( NormalizedPath gitPath )
@@ -972,17 +977,4 @@ public sealed partial class StackRepository : IDisposable
         _git.Dispose();
     }
 
-    static bool CheckOriginUrlStackSuffix( IActivityMonitor monitor,
-                                           GitRepositoryKey repoKey,
-                                           [NotNullWhen( true )] out string? stackNameFromUrl )
-    {
-        if( repoKey.IsStackRepository )
-        {
-            stackNameFromUrl = repoKey.RepositoryName[..^6];
-            return true;
-        }
-        stackNameFromUrl = null;
-        monitor.Error( $"The repository Url '{repoKey.OriginUrl}' must have '-Stack' suffix (and the stack name must be at least 2 characters)." );
-        return false;
-    }
 }

@@ -18,6 +18,7 @@ public static class CKliCommands
     {
         var cmds = new Dictionary<string, Command?>();
         Add( cmds, new CKliClone() );
+        Add( cmds, new CKliCreate() );
         Add( cmds, new CKliExec() );
         Add( cmds, new CKliFetch() );
         Add( cmds, new CKliIssue() );

@@ -127,6 +127,24 @@ public partial class GitRepositoryKey
     public bool IsStackRepository => RepositoryName.EndsWith( "-Stack", StringComparison.OrdinalIgnoreCase ) && _repoName.Length >= 8;
 
     /// <summary>
+    /// Checks that <see cref="OriginUrl"/> is a "-Stack" url or emits an error.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="stackNameFromUrl">The stack name is the prefix of the <see cref="RepositoryName"/>.</param>
+    /// <returns>True if this is a Stack repository, false otherwise.</returns>
+    public bool CheckOriginUrlStackSuffix( IActivityMonitor monitor, [NotNullWhen( true )] out string? stackNameFromUrl )
+    {
+        if( IsStackRepository )
+        {
+            stackNameFromUrl = RepositoryName[..^6];
+            return true;
+        }
+        stackNameFromUrl = null;
+        monitor.Error( $"The repository Url '{OriginUrl}' must have '-Stack' suffix (and the stack name must be at least 2 characters)." );
+        return false;
+    }
+
+    /// <summary>
     /// Overridden to return the OriginUrl. 
     /// </summary>
     /// <returns>A readable string.</returns>

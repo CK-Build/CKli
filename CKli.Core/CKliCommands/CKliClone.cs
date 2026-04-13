@@ -35,14 +35,14 @@ sealed class CKliClone : Command
             monitor.Error( $"Invalid <stackUrl> argument '{sUrl}'. It must be an absolute url." );
             return ValueTask.FromResult( false );
         }
-        bool p = cmdLine.EatFlag( "--private" );
-        bool a = cmdLine.EatFlag( "--allow-duplicate" );
-        bool i = cmdLine.EatFlag( "--ignore-parent-stack" );
+        bool isPrivate = cmdLine.EatFlag( "--private" );
+        bool allowDuplicate = cmdLine.EatFlag( "--allow-duplicate" );
+        bool ignoreParentStack = cmdLine.EatFlag( "--ignore-parent-stack" );
         if( !cmdLine.Close( monitor ) )
         {
             return ValueTask.FromResult( false );
         }
-        using( var stack = StackRepository.Clone( monitor, context, uri, !p, a, i ) )
+        using( var stack = StackRepository.Clone( monitor, context, uri, !isPrivate, allowDuplicate, ignoreParentStack ) )
         {
             return ValueTask.FromResult( stack != null );
         }
