@@ -20,9 +20,15 @@ public abstract class PluginBase
 {
     /// <summary>
     /// A list of standard plugin names (co-released with CKli).
-    /// Their versions are automatically updated by "ckli update" followed by "ckli plugin info".
+    /// Their versions are automatically updated when CKli is updated: the <see cref="PluginMachinery"/> checks
+    /// that the CKli.Plugins.Core referenced by the CKli.Plugins project has the same version as CKli.Core itself
+    /// that is <see cref="World.CKliVersion"/>.
+    /// <para>
+    /// When the version differs, the PackageReference of the CKli.Plugins project and all source-based projects are
+    /// updated to use the <see cref="World.CKliVersion"/>. The assemblies listed here are managed identically.
+    /// </para>
     /// </summary>
-    public static readonly IReadOnlyList<string> StandardPluginNames = ["CKli.VSSolution.Plugin"];
+    public static readonly IReadOnlyList<string> StandardPluginNames = ["CKli.ShallowSolution.Plugin"];
 
     readonly World _world;
 
