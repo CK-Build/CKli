@@ -61,20 +61,28 @@ sealed class CKliRepoAdd : Command
                 monitor.Error( $"Cannot add a '-Stack' repository to a World." );
                 return false;
             }
+            GitHostingProvider? hostingProvider = null;
+            NormalizedPath remoteRepoPath = default;
             if( create )
             {
-                if( !gitKey.TryGetHostingInfo( monitor, out var hostingProvider, out var repoPath ) )
+                if( !gitKey.TryGetHostingInfo( monitor, out hostingProvider, out remoteRepoPath ) )
                 {
                     return false;
                 }
-                HostedRepositoryInfo? info = await hostingProvider.CreateRepositoryAsync( monitor, repoPath, !stack.IsPublic ).ConfigureAwait( false );
-                if( info == null )
+                var remoteInfo = await hostingProvider.CreateRepositoryAsync( monitor, remoteRepoPath, !stack.IsPublic ).ConfigureAwait( false );
+                if( remoteInfo == null )
                 {
                     return false;
                 }
             }
             // AddRepository handles the WorldDefinition file save and commit.
-            return await world.AddRepositoryAsync( monitor, gitKey, context.CurrentDirectory );
+            bool success = await world.AddRepositoryAsync( monitor, gitKey, context.CurrentDirectory ).ConfigureAwait( false );
+            // On error, compensate by deleting the new repository.
+            if( !success && hostingProvider != null )
+            {
+                await hostingProvider.DeleteRepositoryAsync( monitor, remoteRepoPath ).ConfigureAwait( false );
+            }
+            return success;
         }
         finally
         {
