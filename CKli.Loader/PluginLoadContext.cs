@@ -59,11 +59,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
         GC.KeepAlive( typeof( CKli.Plugins.PluginCollector ) );
 
         _assemblies = new Dictionary<string, Assembly>( 100 );
-        // With NUnit contexts, there are assemblies that are in both contexts...
-        // It appears that the "right" one must be the one of the NUnit context,
-        // the one loaded in the default context is "hidden".
-        // So we fill the final index with this in mind (but this is ad-hoc and may
-        // require adaptation in the future).
+        // (No more used but this entry point is kept because it may be required again.)
         if( supplementary != null )
         {
             foreach( var a in supplementary.Assemblies )
