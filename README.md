@@ -128,7 +128,7 @@ Any merge conflict is an error. Unless `--continue-on-error` is specified, the f
 A pull (without tags) is implicitly executed first by `ckli push`. 
 
 ### `fetch --all --with-tags --from-all-remotes`
-Fetches all branches (and optionally tags) in the current Repos.
+Fetches all branches (and optionally their tags) in the current Repos.
 
 By default, the current directory selects the Repos unless `--all` is specified.
 
@@ -217,7 +217,10 @@ By default, whenever a process fails on a repository (by returning a non 0 exit 
 The flags `--ckli-continue-on-error` and `--ckli-all` are not submitted to the process command line. (They are prefixed
 by `--ckli-` to avoid a name clash with an existing process argument.)
 
-Example: `ckli exec dotnet build --ckli-all` builds all the Repo of the Stack.
+Examples:
+- `ckli exec dotnet build --ckli-all` builds all the Repo of the Stack (the current state of the working folder).
+- `ckli exec git pull --tags --force` updates all the tags from the remotes, replacing the local ones (kind of `ckli tag pull *` that
+   is not currently supported).
 
 ## Tag commands (list, fetch, pull, push, delete) 
 

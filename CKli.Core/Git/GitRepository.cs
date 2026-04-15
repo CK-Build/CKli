@@ -529,11 +529,10 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
-    /// Calls <see cref="MergeTrackedBranch(IActivityMonitor, ref Branch)"/> for each existing branch that has a remote tracked branch
+    /// Calls <see cref="MergeTrackedBranch(IActivityMonitor, ref Branch, bool)"/> for each existing branch that has a remote tracked branch
     /// on 'origin' (or on any remote if <paramref name="fromAllRemotes"/> is true).
     /// <para>
-    /// This (the <see cref="MergeTrackedBranch(IActivityMonitor, ref Branch)"/> method actually) handles the currently checked
-    /// out branch transparently.
+    /// This (the MergeTrackedBranch method actually) handles the currently checked out branch transparently.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -588,8 +587,9 @@ public sealed partial class GitRepository : IDisposable
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="branch">The local branch. This is updated to the new Branch instance on success.</param>
+    /// <param name="withEmptyCommit">True to create an empty commit even if there is nothing to merge.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool MergeTrackedBranch( IActivityMonitor monitor, ref Branch branch )
+    public bool MergeTrackedBranch( IActivityMonitor monitor, ref Branch branch, bool withEmptyCommit = false )
     {
         Throw.CheckArgument( branch.TrackedBranch != null );
         var tracked = branch.TrackedBranch;
@@ -597,14 +597,20 @@ public sealed partial class GitRepository : IDisposable
         {
             return true;
         }
+        if( !withEmptyCommit && branch.Tip.Tree.Sha == tracked.Tip.Tree.Sha )
+        {
+            // Nothing to merge.
+            // Let the local branch where it is.
+            return true;
+        }
+        var localName = branch.FriendlyName;
+        var trackedName = tracked.FriendlyName;
 
         bool isHead = branch.IsCurrentRepositoryHead;
         if( isHead && !CheckCleanCommit( monitor ) )
         {
             return false;
         }
-        var localName = branch.FriendlyName;
-        var trackedName = tracked.FriendlyName;
         Exception? exception = null;
         try
         {

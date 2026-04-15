@@ -45,7 +45,7 @@ sealed partial class World
     /// </list>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="repositoryUrl">The repository url.</param>
+    /// <param name="gitKey">The repository key.</param>
     /// <param name="folderPath">The absolute folder path inside <see cref="LocalWorldName.WorldRoot"/>.</param>
     /// <returns>True on success, false on error.</returns>
     public async Task<bool> AddRepositoryAsync( IActivityMonitor monitor, GitRepositoryKey gitKey, NormalizedPath folderPath )

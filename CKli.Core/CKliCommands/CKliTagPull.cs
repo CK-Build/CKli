@@ -18,7 +18,12 @@ sealed class CKliTagPull : Command
                 """,
                 [("tag names", "One or more tag names to pull.")],
                 [],
-                [] )
+                [
+                    (["--allow-multi-repo"], """
+                                            Proceed even if the current path is above multiple Repos.
+                                            By default, the current path must be in a Repo.
+                                            """)
+                ] )
     {
     }
 
@@ -35,6 +40,7 @@ sealed class CKliTagPull : Command
                                          CommandLineArguments cmdLine,
                                          bool pull )
     {
+        bool multiRepo = cmdLine.EatFlag( "--allow-multi-repo" );
         IEnumerable<string> tagNames = cmdLine.EatRemainingArgument();
         var invalidNames = tagNames.Where( n => !GitRepository.IsCKliValidTagName( n ) );
         if( invalidNames.Any() )
@@ -51,7 +57,10 @@ sealed class CKliTagPull : Command
             monitor.Error( $"Expecting at least one tag name to {(pull ? "pull" : "push")}." );
             return false;
         }
-
+        if( !cmdLine.Close( monitor ) )
+        {
+            return false;
+        }
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
                                                 out var stack,
@@ -64,11 +73,17 @@ sealed class CKliTagPull : Command
         try
         {
             world.SetExecutingCommand( command );
-            var repo = world.GetDefinedRepo( monitor, context.CurrentDirectory );
-            if( repo == null ) return false;
-            return pull
-                    ? repo.GitRepository.PullTags( monitor, tagNames )
-                    : repo.GitRepository.PushTags( monitor, tagNames );
+            var repos = CKliTagDelete.GetRepos( monitor, context, multiRepo, world );
+            if( repos == null ) return false;
+
+            bool success = true;
+            foreach( var repo in repos )
+            {
+                success &= pull
+                            ? repo.GitRepository.PullTags( monitor, tagNames )
+                            : repo.GitRepository.PushTags( monitor, tagNames );
+            }
+            return success;
         }
         finally
         {

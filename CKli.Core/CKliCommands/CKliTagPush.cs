@@ -15,7 +15,12 @@ sealed class CKliTagPush : Command
                 """,
                 [("tag names", "One or more tag names to push.")],
                 [],
-                [] )
+                [
+                    (["--allow-multi-repo"], """
+                                            Proceed even if the current path is above multiple Repos.
+                                            By default, the current path must be in a Repo.
+                                            """)
+                ] )
     {
     }
 

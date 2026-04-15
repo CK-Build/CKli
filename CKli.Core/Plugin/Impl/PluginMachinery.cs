@@ -20,6 +20,11 @@ namespace CKli.Core;
 /// </summary>
 public sealed partial class PluginMachinery
 {
+    /// <summary>
+    /// Gets the "CKli.Plugins" folder name.
+    /// </summary>
+    public const string CKliPluginsFolderName = "CKli.Plugins";
+
     readonly string _name;
     readonly NormalizedPath _root;
     readonly NormalizedPath _runFolder;
@@ -74,7 +79,7 @@ public sealed partial class PluginMachinery
 
     internal NormalizedPath DirectoryPackageProps => _directoryPackageProps.IsEmptyPath ? (_directoryPackageProps = Root.AppendPart( "Directory.Packages.props" )) : _directoryPackageProps;
 
-    internal NormalizedPath CKliPluginsFolder => _ckliPluginsFolder.IsEmptyPath ? (_ckliPluginsFolder = Root.AppendPart( "CKli.Plugins" )) : _ckliPluginsFolder;
+    internal NormalizedPath CKliPluginsFolder => _ckliPluginsFolder.IsEmptyPath ? (_ckliPluginsFolder = Root.AppendPart( CKliPluginsFolderName )) : _ckliPluginsFolder;
 
     internal NormalizedPath CKliPluginsCSProj => _ckliPluginsCSProj.IsEmptyPath ? (_ckliPluginsCSProj = CKliPluginsFolder.AppendPart( "CKli.Plugins.csproj" )) : _ckliPluginsCSProj;
 

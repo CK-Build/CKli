@@ -10,10 +10,12 @@ namespace CKli.Core;
 public sealed class WorldEvents
 {
     internal readonly PerfectEventSender<RepoAddedEvent> RepoAddedEventSender;
+    internal readonly PerfectEventSender<CreateLTSEvent> CreateLTSEventSender;
 
     internal WorldEvents()
     {
         RepoAddedEventSender = new PerfectEventSender<RepoAddedEvent>();
+        CreateLTSEventSender = new PerfectEventSender<CreateLTSEvent>();
     }
 
     internal void ReleaseEvents()
@@ -22,6 +24,7 @@ public sealed class WorldEvents
         FixedLayout = null;
         Issue = null;
         RepoAddedEventSender.RemoveAll();
+        CreateLTSEventSender.RemoveAll();
     }
 
     static bool Raise<T>( IActivityMonitor monitor, Action<T>? handler, T e ) where T : WorldEvent
@@ -67,5 +70,10 @@ public sealed class WorldEvents
     /// Raised by "ckli repo add" and "ckli repo create" commands.
     /// </summary>
     public PerfectEvent<RepoAddedEvent> RepoAdded => RepoAddedEventSender.PerfectEvent;
+
+    /// <summary>
+    /// Raised by "ckli lts create" command.
+    /// </summary>
+    public PerfectEvent<CreateLTSEvent> CreateLTS => CreateLTSEventSender.PerfectEvent;
 
 }

@@ -3,6 +3,9 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.ShallowSolution.Plugin;
 
+/// <summary>
+/// Extends <see cref="IPackageMapping"/>.
+/// </summary>
 public static class PackageMappingExtensions
 {
     /// <summary>

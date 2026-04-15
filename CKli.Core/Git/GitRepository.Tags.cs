@@ -1,10 +1,12 @@
 using CK.Core;
 using LibGit2Sharp;
+using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Text;
 
 namespace CKli.Core;
 
@@ -226,6 +228,40 @@ public sealed partial class GitRepository
         }
     }
 
+    //// Returns final "refs/tags/" canonical names.
+    //List<string> PreProcessTagNames( IActivityMonitor monitor, IEnumerable<string> tagNames )
+    //{
+    //    var result = new List<string>();
+    //    var finalNames = new StringBuilder();
+    //    var invalidTags = new StringBuilder();
+    //    foreach( var t in tagNames )
+    //    {
+    //        var (refsTagsName, name) = Normalize( t );
+    //        if( !IsCKliValidTagName( name ) )
+    //        {
+    //            if( IsPattern( name ) )
+    //            {
+    //            }
+    //            else
+    //            {
+    //                invalidTags.Append( invalidTags.Length == 0 ? "'" : "', '" );
+    //                invalidTags.Append( name );
+    //            }
+    //            continue;
+    //        }
+    //    }
+    //    if( invalidTags.Length > 0 ) invalidTags.Append( '\'' );
+
+    //    static (string, string) Normalize( string n )
+    //    {
+    //        return n.StartsWith( "refs/tags/", StringComparison.Ordinal )
+    //                ? (n, n.Substring( 10 ))
+    //                : ("refs/tags/" + n, n);
+    //    }
+
+    //    static bool IsPattern( string name ) => name.ContainsAny( '*', '?' );
+    //}
+
     /// <summary>
     /// Pulls any number of tags (empty <paramref name="tagNames"/> is a no-op).
     /// Local modifications of pulled tags are lost: use <see cref="FetchTags(IActivityMonitor, string)"/> to safely 
@@ -268,7 +304,6 @@ public sealed partial class GitRepository
 
     /// <summary>
     /// Pushes any number of tags (empty <paramref name="tagNames"/> is a no-op).
-    /// Modifications of the remote tags are lost: the local replace them.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="tagNames">The tag names. They can be canonic (start with "refs/tags/") or regular.</param>
@@ -285,11 +320,11 @@ public sealed partial class GitRepository
             return false;
         }
         return Push( monitor,
-                             remote,
-                             creds,
-                             tagNames.Select( t => t.StartsWith( "refs/tags/", StringComparison.Ordinal )
-                                                                    ? $"+{t}"
-                                                                    : $"+refs/tags/{t}" ) );
+                     remote,
+                     creds,
+                     tagNames.Select( t => t.StartsWith( "refs/tags/", StringComparison.Ordinal )
+                                                            ? $"+{t}"
+                                                            : $"+refs/tags/{t}" ) );
     }
 
     /// <summary>
@@ -313,7 +348,7 @@ public sealed partial class GitRepository
 
 
     /// <summary>
-    /// Safely fetches remote only tags from <paramref name="remoteName"/> (this pulls <see cref="GitTagInfo.Diff.RemoteOnlyTags"/>):
+    /// Safely fetches remote only tags from <paramref name="remoteName"/> (pulls <see cref="GitTagInfo.Diff.RemoteOnlyTags"/>):
     /// this preserves any local tags.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>

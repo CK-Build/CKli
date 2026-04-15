@@ -8,15 +8,19 @@ using System.Xml.Linq;
 namespace CKli.ShallowSolution.Plugin;
 
 /// <summary>
-/// Provides shallow analysis of the content regarding projects and dependencies in any commit.
+/// Provides shallow analysis of a .Net repository content regarding projects and dependencies in any commit.
 /// <para>
-/// This is simple (rather "brutal") but covers our current needs.
+/// This is simple (even "brutal") but covers our current needs.
 /// </para>
 /// </summary>
 public sealed class ShallowSolutionPlugin : PrimaryPluginBase
 {
     readonly Dictionary<string, TreeFolder> _gitContents;
 
+    /// <summary>
+    /// Initializes a new ShallowSolutionPlugin.
+    /// </summary>
+    /// <param name="primaryContext"></param>
     public ShallowSolutionPlugin( PrimaryPluginContext primaryContext )
         : base( primaryContext )
     {
@@ -33,7 +37,7 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
     /// </summary>
     /// <param name="commit">The commit for which content must be returned.</param>
     /// <param name="useWorkingFolder">
-    /// False to always use the committed content and ignores the current file system (same as calling <see cref="GetFiles(Commit)"/>).
+    /// False to always use the committed content and ignores the current file system.
     /// </param>
     /// <returns>The commit content.</returns>
     public INormalizedFileProvider GetFiles( Commit commit, bool useWorkingFolder = true )

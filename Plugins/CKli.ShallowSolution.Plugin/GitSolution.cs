@@ -218,6 +218,10 @@ public sealed class GitSolution
         }
     }
 
+    /// <summary>
+    /// Overridden to return the repository display name and branch.
+    /// </summary>
+    /// <returns>Repository display name and branch.</returns>
     public override string ToString() => $"{_repo.DisplayPath} ({_branch.FriendlyName})";
 }
 

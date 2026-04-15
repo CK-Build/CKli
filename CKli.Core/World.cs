@@ -3,6 +3,7 @@ using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace CKli.Core;
 
@@ -485,8 +486,8 @@ public sealed partial class World
                 repoId = RandomId.CreateRandom();
             }
             CreateOrUpdateCKliRepoTag( repository, _stackRepository, repoId );
-            repository.DeferredPushRefSpecs.Add( "+refs/tags/ckli-repo" );
         }
+        repository.DeferredPushRefSpecs.Add( "+refs/tags/ckli-repo" );
         Repo? repo = new Repo( this, repository, _layout[index].XElement, index, repoId, _firstRepo );
         _firstRepo = repo;
         _cachedRepositories[repository.WorkingFolder] = repo;
@@ -554,5 +555,4 @@ public sealed partial class World
 
     /// <inheritdoc cref="WorldName.ToString"/>
     public override string ToString() => _name.ToString();
-
 }

@@ -32,7 +32,7 @@ sealed class CKliPull : Command
     {
         bool all = cmdLine.EatFlag( "--all" );
         bool preserveLocalTags = cmdLine.EatFlag( "--preserve-local-tags" );
-        bool fromAllRemotes = cmdLine.EatFlag( "--fromAllRemotes" );
+        bool fromAllRemotes = cmdLine.EatFlag( "--from-all-remotes" );
         bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
                                      && Pull( monitor, this, context, all, preserveLocalTags, fromAllRemotes, continueOnError ) );
@@ -84,11 +84,17 @@ sealed class CKliPull : Command
         {
             foreach( var repo in repos )
             {
+                // withTags = true => This sets TagFetchMode.Auto, only tags that are referenced by the fetched objects: this doesn't
+                // pull all the tags and this is why we pull all tags below...
                 success &= repo.GitRepository.FetchRemoteBranches( monitor, withTags == WithTag.PullAll, !fromAllRemotes );
                 if( !success && !continueOnError ) break;
                 if( withTags == WithTag.RemoteOnly )
                 {
                     success &= repo.GitRepository.FetchTags( monitor );
+                }
+                else if( withTags == WithTag.PullAll )
+                {
+                    monitor.Warn( $"--with-tags is not yet fully implemented, please use now: 'ckli exec git pull --tags --force'." );
                 }
                 if( !success && !continueOnError ) break;
             }

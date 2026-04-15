@@ -816,7 +816,6 @@ public sealed partial class StackRepository : IDisposable
             return new StackRepository( gitRepository, stackRoot, context, stackName );
         }
     }
-
     static void SetupNewLocalDirectory( NormalizedPath gitPath )
     {
         var localDir = gitPath.AppendPart( "$Local" );

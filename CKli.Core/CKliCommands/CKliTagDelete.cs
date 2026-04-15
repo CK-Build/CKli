@@ -65,14 +65,9 @@ sealed class CKliTagDelete : Command
         try
         {
             world.SetExecutingCommand( command );
-            var repos = world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
-            if( repos == null ) return false;
-            if( repos.Count > 1 && !multiRepo )
+            var repos = GetRepos( monitor, context, multiRepo, world );
+            if( repos == null )
             {
-                monitor.Error( $"""
-                    Cannot proceed on '{repos.Select( r => r.DisplayPath.Path ).Concatenate("', '")}' repositories.
-                    Please specify --allow-multi-repo flag to allow deleting tags across more than one Repo at a time.
-                    """ );
                 return false;
             }
             bool success = true;
@@ -94,4 +89,22 @@ sealed class CKliTagDelete : Command
             stack.Dispose();
         }
     }
+
+    internal static IReadOnlyList<Repo>? GetRepos( IActivityMonitor monitor, CKliEnv context, bool multiRepo, World world )
+    {
+        var repos = world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
+        if( repos != null )
+        {
+            if( repos.Count > 1 && !multiRepo )
+            {
+                monitor.Error( $"""
+                    Cannot proceed on '{repos.Select( r => r.DisplayPath.Path ).Concatenate( "', '" )}' repositories.
+                    Please specify --allow-multi-repo flag to allow handling tags across more than one Repo at a time.
+                    """ );
+                return null;
+            }
+        }
+        return repos;
+    }
+
 }

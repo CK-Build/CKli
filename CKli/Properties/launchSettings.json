@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "C:\\Dev3 (ps)": {
+    "PS CKliTestFolder/": {
       "environmentVariables": {
         "PATH": "$(SolutionDir)CKli/$(OutputPath);%PATH%"
       },
