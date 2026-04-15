@@ -23,7 +23,10 @@ public sealed class CKliPluginInfo : Command
                             - None: Plugins are not compiled (uses reflection).
                             """,
                             Multiple: false)],
-                flags: [(["--force", "-f"], "Forces plugin recompilation even if the compile mode hasn't changed.")] )
+                flags: [
+                    (["--force", "-f"], "Forces plugin recompilation even if the compile mode hasn't changed."),
+                    (["--skip-pull-stack"], "Don't update the stack repository.")
+                    ] )
     {
     }
 
@@ -34,6 +37,7 @@ public sealed class CKliPluginInfo : Command
     {
         string? sCompileMode = cmdLine.EatSingleOption( "--compile-mode" );
         bool force = cmdLine.EatFlag( "--force", "-f" );
+        bool skipPullStack = cmdLine.EatFlag( "--skip-pull-stack" );
         PluginCompileMode? compileMode = default;
         if( sCompileMode != null )
         {
@@ -45,16 +49,17 @@ public sealed class CKliPluginInfo : Command
             compileMode = mode;
         }
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && PluginInfo( monitor, this, context, compileMode, force ) );
+                                     && PluginInfo( monitor, this, context, skipPullStack, compileMode, force ) );
     }
 
     static bool PluginInfo( IActivityMonitor monitor,
                             Command command,
                             CKliEnv context,
+                            bool skipPullStack,
                             PluginCompileMode? compileMode,
                             bool force )
     {
-        if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
+        if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack ) )
         {
             return false;
         }

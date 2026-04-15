@@ -19,7 +19,8 @@ sealed class CKliStatus : Command
                 [], [],
                 [
                     (["--by-branch,-b"], "Group by current branch names."),
-                    (["--all"], "Lists all the Repos of the current World (even if current path is in a Repo).")
+                    (["--all"], "Lists all the Repos of the current World (even if current path is in a Repo)."),
+                    (["--skip-pull-stack"], "Don't update the stack repository.")
                ] )
     {
     }
@@ -30,13 +31,14 @@ sealed class CKliStatus : Command
     {
         bool byBranch = cmdLine.EatFlag( "--by-branch", "-b" );
         bool all = cmdLine.EatFlag( "--all" );
+        bool skipPullStack = cmdLine.EatFlag( "--skip-pull-stack" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && DisplayRepos( monitor, this, context, byBranch, all ) );
+                                     && DisplayRepos( monitor, this, context, skipPullStack, byBranch, all ) );
     }
 
-    static bool DisplayRepos( IActivityMonitor monitor, Command command, CKliEnv context, bool byBranch, bool all )
+    static bool DisplayRepos( IActivityMonitor monitor, Command command, CKliEnv context, bool skipPullStack, bool byBranch, bool all )
     {
-        var (stack, world) = StackRepository.TryOpenWorldFromPath( monitor, context, out var error, skipPullStack: true );
+        var (stack, world) = StackRepository.TryOpenWorldFromPath( monitor, context, out var error, skipPullStack );
         if( error )
         {
             return false;
