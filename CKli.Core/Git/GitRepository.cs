@@ -22,6 +22,7 @@ public sealed partial class GitRepository : IDisposable
     readonly NormalizedPath _workingFolder;
     readonly List<string> _deferredPushRefSpecs;
     Signature _committer;
+    Signature? _author;
 
     GitRepository( GitRepositoryKey repositoryKey,
                    Signature committer,
@@ -84,6 +85,12 @@ public sealed partial class GitRepository : IDisposable
             _committer = value;
         }
     }
+
+    /// <summary>
+    /// Gets or sets the author signature to use when modifying this repository: this is the configured signature
+    /// with the current <see cref="Committer"/>'s date. If no author is configured at the git level, the Committer is used.
+    /// </summary>
+    public Signature Author => _author ??= _git.Config.BuildSignature( _committer.When ) ?? _committer;
 
     /// <summary>
     /// Gets a mutable list of ref specs (see <see href="https://git-scm.com/book/en/v2/Git-Internals-The-Refspec"/>)
@@ -617,7 +624,7 @@ public sealed partial class GitRepository : IDisposable
             var result = _git.ObjectDatabase.MergeCommits( branch.Tip, tracked.Tip, new MergeTreeOptions() { SkipReuc = true, FailOnConflict = true } );
             if( result.Tree != null )
             {
-                var c = _git.ObjectDatabase.CreateCommit( _committer,
+                var c = _git.ObjectDatabase.CreateCommit( Author,
                                                           _committer,
                                                           $"Merge branch '{trackedName}'.",
                                                           result.Tree,
@@ -909,13 +916,14 @@ public sealed partial class GitRepository : IDisposable
     {
         try
         {
-            Signature? author = amendPreviousCommit ? _git.Head.Tip.Author : _git.Config.BuildSignature( date );
+            // Here the date is provided, we cannot use the _author.
+            Signature? author = amendPreviousCommit ? _git.Head.Tip.Author : (_git.Config.BuildSignature( date ) ?? _committer);
             // Let AllowEmptyCommit even when amending: this avoids creating an empty commit.
             // If we are not amending, this is an error and we let the EmptyCommitException pops.
             var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
             try
             {
-                Commit commit = _git.Commit( commitMessage, author ?? _committer, _committer, options );
+                Commit commit = _git.Commit( commitMessage, author, _committer, options );
                 monitor.CloseGroup( "Committed changes." );
                 return amendPreviousCommit ? CommitResult.Amended : CommitResult.Commited;
             }
@@ -927,7 +935,7 @@ public sealed partial class GitRepository : IDisposable
                 _git.Reset( ResetMode.Hard, _git.Head.Tip.Parents.Single() );
                 Throw.DebugAssert( options.AmendPreviousCommit = true );
                 string sha = _git.Head.Tip.Sha;
-                _git.Commit( commitMessage, author ?? _committer, _committer, options );
+                _git.Commit( commitMessage, author, _committer, options );
                 return sha == _git.Head.Tip.Sha ? CommitResult.NoChanges : CommitResult.Amended;
             }
         }
