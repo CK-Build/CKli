@@ -526,7 +526,7 @@ sealed partial class World
                     Throw.DebugAssert( remoteOriginSection.Length == 17 );
                     idx += 17;
                     var maxIdx = config.Slice( idx ).IndexOf( '[' );
-                    if( maxIdx < 0 ) maxIdx = config.Length;
+                    if( maxIdx < 0 ) maxIdx = config.Length - idx;
                     var s = config.Slice( idx, maxIdx );
                     idx = s.IndexOf( "url = " );
                     if( idx >= 0 )
