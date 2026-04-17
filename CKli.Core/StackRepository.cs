@@ -375,9 +375,13 @@ public sealed partial class StackRepository : IDisposable
                     monitor.Error( $"Stack folder '{stackRoot.LastPart}' must be '{stackNameFromUrl}' or '{DuplicatePrefix}{stackNameFromUrl}' (case insensitive) since repository Url is '{git.RepositoryKey.OriginUrl}'." );
                     error = true;
                 }
-                if( !error && git.FullCheckout( monitor, stackBranchName, skipPullStack ) )
+                if( !error )
                 {
-                    return new StackRepository( git, stackRoot, context, stackNameFromUrl );
+                    if( git.FullCheckout( monitor, stackBranchName, skipPullStack ) )
+                    {
+                        return new StackRepository( git, stackRoot, context, stackNameFromUrl );
+                    }
+                    error = true;
                 }
             }
             git.Dispose();
