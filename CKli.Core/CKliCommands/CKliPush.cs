@@ -19,7 +19,6 @@ sealed class CKliPush : Command
                 [
                     (["--stack-only"], "Only push the Stack repository, not the Repos."),
                     (["--all"], "Consider all the Repos' of the current World (even if current path is in a Repo)."),
-                    (["--to-all-remotes"], "Consider all available remotes, not only 'origin'."),
                     (["--continue-on-error"], "Continues even on error. By default the first error stops the operation."),
                 ] )
     {
@@ -31,10 +30,9 @@ sealed class CKliPush : Command
     {
         bool stackOnly = cmdLine.EatFlag( "--stack-only" );
         bool all = cmdLine.EatFlag( "--all" );
-        bool toAllRemotes = cmdLine.EatFlag( "--to-all-remotes" );
         bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Push( monitor, this, context, stackOnly, all, toAllRemotes, continueOnError ) );
+                                     && Push( monitor, this, context, stackOnly, all, continueOnError ) );
     }
 
     static bool Push( IActivityMonitor monitor,
@@ -42,7 +40,6 @@ sealed class CKliPush : Command
                       CKliEnv context,
                       bool stackOnly,
                       bool all,
-                      bool toAllRemotes,
                       bool continueOnError )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
@@ -75,7 +72,7 @@ sealed class CKliPush : Command
                     // Instead of working branch per branch, we pull (fetch-merge) all branches
                     // first and then push them (CKliPull.DoPull fetches all remote branches and then
                     // merges them).
-                    if( CKliPull.DoPull( monitor, toAllRemotes, continueOnError, repos, CKliPull.WithTag.None ) )
+                    if( CKliPull.DoPull( monitor, continueOnError, repos, withTags: false ) )
                     {
                         foreach( var repo in repos )
                         {
@@ -84,8 +81,7 @@ sealed class CKliPush : Command
                             {
                                 var tracked = b.TrackedBranch;
                                 if( tracked != null
-                                    && tracked.CanonicalName.StartsWith( "refs/remotes/", StringComparison.Ordinal )
-                                    && (toAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.Ordinal )) )
+                                    && tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.Ordinal ) )
                                 {
                                     success &= repo.GitRepository.PushBranch( monitor, b, autoCreateRemoteBranch: false );
                                     if( !success && !continueOnError ) break;

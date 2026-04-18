@@ -10,7 +10,7 @@ sealed class CKliTagFetch : Command
         : base( null,
                 "tag fetch",
                 """
-                Fetches all tags that are only on the remote "origin": this preserves local tags.
+                Safe "tag pull" that preserves local tags and local tags in conflicts. This creates only new local tags.
                 """,
                 [],
                 [],

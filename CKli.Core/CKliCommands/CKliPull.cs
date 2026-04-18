@@ -7,20 +7,20 @@ namespace CKli;
 
 sealed class CKliPull : Command
 {
+
     internal CKliPull()
         : base( null,
                 "pull",
                 """
                 Pulls the Stack repository and all Repo's local branches that track a remote branch.
-                By default, tags that point to the remote branches will be retrieved and will replace locally defined tags if they point to the same object. If a local tag points to a different object, this will be an error.
-                To prevent this, use 'ckli tag list' to detect conflicts.
+                By default, all remote tags are only "fetched": local tags are preserved. When --with-tags is specified, remote tags overwrite local ones.
+                Use 'ckli tag list' to analyze local/remote and conflicting tags.
                 """,
                 [],
                 [],
                 [
                     (["--all"], "Consider all the Repos' of the current World (even if current path is in a Repo)."),
-                    (["--preserve-local-tags"], "Preserve local tags, fetching remote-only tags."),
-                    (["--from-all-remotes"], "Consider all available remotes, not only 'origin'."),
+                    (["--with-tags"], "Pull tags: remote tags replace local ones with the same name."),
                     (["--continue-on-error"], "Continues even on error. By default the first error stops the operation."),
              ] )
     {
@@ -31,14 +31,13 @@ sealed class CKliPull : Command
                                                                     CommandLineArguments cmdLine )
     {
         bool all = cmdLine.EatFlag( "--all" );
-        bool preserveLocalTags = cmdLine.EatFlag( "--preserve-local-tags" );
-        bool fromAllRemotes = cmdLine.EatFlag( "--from-all-remotes" );
+        bool withTags = cmdLine.EatFlag( "--with-tags" );
         bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Pull( monitor, this, context, all, preserveLocalTags, fromAllRemotes, continueOnError ) );
+                                     && Pull( monitor, this, context, all, withTags, continueOnError ) );
 
 
-        static bool Pull( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool preserveLocalTags, bool fromAllRemotes, bool continueOnError )
+        static bool Pull( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool withTags, bool continueOnError )
         {
             if( !StackRepository.OpenWorldFromPath( monitor,
                                                     context,
@@ -56,7 +55,7 @@ sealed class CKliPull : Command
                             : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
                 if( repos == null ) return false;
 
-                bool success = DoPull( monitor, fromAllRemotes, continueOnError, repos, preserveLocalTags ? WithTag.RemoteOnly : WithTag.PullAll );
+                bool success = DoPull( monitor, continueOnError, repos, withTags );
                 // Save a dirty World's DefinitionFile ony if no unhandled exception is thrown.
                 return stack.Close( monitor ) && success;
             }
@@ -68,33 +67,32 @@ sealed class CKliPull : Command
         }
     }
 
-    internal enum WithTag { None, PullAll, RemoteOnly };
-
     internal static bool DoPull( IActivityMonitor monitor,
-                                 bool fromAllRemotes,
                                  bool continueOnError,
                                  IReadOnlyList<Repo> repos,
-                                 WithTag withTags )
+                                 bool withTags )
     {
         bool success = true;
         // To limit roundtrips to the remotes, we fetch all the remote branches at once
         // and then use MergeTrackedBranches to merge them (MergeTrackedBranches handles the branch
         // that is checked out correctly).
-        using( monitor.OpenInfo( $"Fetching remote branches {(withTags == WithTag.PullAll ? "and tags " : "")}for {repos.Count} repositories." ) )
+        using( monitor.OpenInfo( $"Fetching remote branches {(withTags ? "and tags " : "")}for {repos.Count} repositories." ) )
         {
             foreach( var repo in repos )
             {
-                // withTags = true => This sets TagFetchMode.Auto, only tags that are referenced by the fetched objects: this doesn't
-                // pull all the tags and this is why we pull all tags below...
-                success &= repo.GitRepository.FetchRemoteBranches( monitor, withTags == WithTag.PullAll, !fromAllRemotes );
+                // withTags = true may set TagFetchMode.Auto (tags that are referenced by the fetched objects will be retrieved)
+                // but we want all tags to be updated. So use the "pull tag *".
+                success &= repo.GitRepository.FetchRemoteBranches( monitor, withTags: false );
                 if( !success && !continueOnError ) break;
-                if( withTags == WithTag.RemoteOnly )
+                if( !withTags )
                 {
+                    // "ckli pull" => By default the tags are "safely fetched".
                     success &= repo.GitRepository.FetchTags( monitor );
                 }
-                else if( withTags == WithTag.PullAll )
+                else
                 {
-                    monitor.Warn( $"--with-tags is not yet fully implemented, please use now: 'ckli exec git pull --tags --force'." );
+                    // "ckli pull *" => git pull --tags --force
+                    success &= repo.GitRepository.PullTags( monitor, ["*"] );
                 }
                 if( !success && !continueOnError ) break;
             }
@@ -105,7 +103,8 @@ sealed class CKliPull : Command
             {
                 foreach( var repo in repos )
                 {
-                    success &= repo.GitRepository.MergeTrackedBranches( monitor, continueOnError, fromAllRemotes );
+                    success &= repo.GitRepository.MergeTrackedBranches( monitor, continueOnError, fromAllRemotes: false );
+                    if( !success && !continueOnError ) break;
                 }
             }
         }

@@ -286,13 +286,12 @@ public sealed partial class GitRepository : IDisposable
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="withTags">
-    /// Specify whether tags that point to fetched objects must be fetched from remote.
+    /// Specify whether tags that point to fetched objects must be fetched from remote (uses <see cref="TagFetchMode.Auto"/>).
     /// When true, locally modified tags are lost.
     /// </param>
-    /// <param name="originOnly">False to fetch all the remote branches. By default, only the 'origin' remote is considered.</param>
     /// <param name="branchSpec">Optional branch specification. Example: "fix/v3.*".</param>
     /// <returns>True on success, false on error.</returns>
-    public bool FetchRemoteBranches( IActivityMonitor monitor, bool withTags, bool originOnly, string? branchSpec = null )
+    public bool FetchRemoteBranches( IActivityMonitor monitor, bool withTags, string? branchSpec = null )
     {
         if( string.IsNullOrEmpty( branchSpec ) )
         {
@@ -301,29 +300,28 @@ public sealed partial class GitRepository : IDisposable
         using( monitor.OpenInfo( $"Fetching {(branchSpec == null ? "all ": "")
                                    }branches {(branchSpec != null ? $"like '{branchSpec}' " : "")
                                    }from '{DisplayPath
-                                   }' {(originOnly ? "origin" : "all remotes")
-                                   } with{(withTags ? "" : "out")
-                                   } tags." ) )
+                                   }' origin with{(withTags ? "" : "out")} tags." ) )
         {
             try
             {
                 if( !_repositoryKey.AccessKey.GetReadCredentials( monitor, out var creds ) ) return false;
 
-                foreach( Remote remote in _git.Network.Remotes.Where( r => !originOnly || r.Name == "origin" ) )
+                var remote = _git.Network.Remotes["origin"];
+                if( remote == null )
                 {
-                    var logMsg = $"Fetching remote '{remote.Name}'.";
-                    if( !originOnly ) monitor.Info( logMsg );
-                    IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
-                    if( branchSpec != null )
-                    {
-                        refSpecs = refSpecs.Select( r => r.Replace( "*", branchSpec ) );
-                    }
-                    Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
-                    {
-                        CredentialsProvider = ( url, user, types ) => creds,
-                        TagFetchMode = withTags ? TagFetchMode.Auto : TagFetchMode.None
-                    }, logMsg );
+                    monitor.Error( $"No remote 'origin' for repository '{_displayPath}'." );
+                    return false;
                 }
+                IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
+                if( branchSpec != null )
+                {
+                    refSpecs = refSpecs.Select( r => r.Replace( "*", branchSpec ) );
+                }
+                Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
+                {
+                    CredentialsProvider = ( url, user, types ) => creds,
+                    TagFetchMode = withTags ? TagFetchMode.Auto : TagFetchMode.None
+                }, null );
                 return true;
             }
             catch( Exception ex )
@@ -547,7 +545,7 @@ public sealed partial class GitRepository : IDisposable
     /// <param name="fromAllRemotes">True to consider all remotes, not only 'origin'.</param>
     /// <param name="branchSpec">
     /// Optional branch name filter that applies to the local branch name. Example: "fix/v3.*".
-    /// See <see cref="FetchRemoteBranches(IActivityMonitor, bool, bool, string?)"/>.
+    /// See <see cref="FetchRemoteBranches(IActivityMonitor, bool, string?)"/>.
     /// </param>
     /// <returns>True on success, false otherwise.</returns>
     public bool MergeTrackedBranches( IActivityMonitor monitor, bool continueOnError = false, bool fromAllRemotes = false, string? branchSpec = null )
@@ -1042,7 +1040,7 @@ public sealed partial class GitRepository : IDisposable
                 var b = DoGetBranch( monitor, _git, branchName, LogLevel.None, _displayPath );
                 if( b == null )
                 {
-                    if( !FetchRemoteBranches( monitor, withTags: false, originOnly: true ) )
+                    if( !FetchRemoteBranches( monitor, withTags: false ) )
                     {
                         return false;
                     }

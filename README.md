@@ -112,31 +112,26 @@ of the last log file.
 The `Log/` folder is `%LocalAppData%/CKli/Out-of-Stack-Logs/` when CKli doesn't start is a Stack folder, otherwise
 each Stack keeps its own logs in their `.PublicStack/Logs` (or `.PrivateStack/Logs`). 
 
-### `pull --all --from-all-remotes --continue-on-error --preserve-local-tags`
+### `pull --with-tags --all --continue-on-error`
 
 Pulls (fetch-merge) the Stack repository and all current Repos' local branches that track a remote branch.
-By default, tags that point to the remote branches will be retrieved and will replace locally defined tags if they point
-to the same object. If a local tag points to a different object, this will be an error.
-To prevent this, use `ckli tag list` to detect conflicts or the `--preserve-local-tags` flag.
+By default, remote tags are safely fetched, preserving local tags (see `cki tag fetch`). When `--with-tags`
+is specified, a `ckli tag pull *` is done that blindly replaces local tags.
 
 By default, the current directory selects the Repos unless `--all` is specified.
-
-`--from-all-remotes` fetches from all remotes instead of the 'origin' remote.
 
 Any merge conflict is an error. Unless `--continue-on-error` is specified, the first error stops the operation.
 
 A pull (without tags) is implicitly executed first by `ckli push`. 
 
-### `fetch --all --with-tags --from-all-remotes`
-Fetches all branches (and optionally their tags) in the current Repos.
+### `fetch --all --with-tags`
+Fetches all branches (and optionally the tags that are associated to any fetched objects) in the current Repos.
 
 By default, the current directory selects the Repos unless `--all` is specified.
 
-When `--with-tags` is specified, remote tags will replace locally defined tags if they point
-to the same object. If a local tag points to a different object, this will be an error.
+When `--with-tags` is specified, the fetched remote tags will replace locally defined tags if
+they reference the same object. If a local tag references a different object, this will be an error.
 Use `ckli tag list` to detect conflicts.
-
-`--from-all-remotes` fetches from all remotes instead of the 'origin' remote.
 
 ### `branch push <branch> --all`
 Pushes the specified branch to its remote "origin", creating it if it doesn't exist yet.
@@ -145,7 +140,7 @@ The branch is fetched and must be successfully merged before the push can succee
 By default, the current directory selects the Repos unless `--all` is specified.
 When applied to multiple Repos, a warning is emitted if the branch doesn't exist in a Repo.
 
-### `push --stack-only --all --to-all-remotes --continue-on-error`
+### `push --stack-only --all --continue-on-error`
 Pushes the Stack repository and all Repo's local branches that track a remote branch.
 A pull is done before: it must be successful for the actual push to be done.
 
@@ -155,8 +150,6 @@ of dedicated plugins.
 When `--stack-only` is specified, only the Stack repository is pushed. Repos are ignored.
 
 By default, the current directory selects the Repos unless `--all` is specified.
-
-`--to-all-remotes` considers all remotes instead of only the 'origin' remote.
 
 Any conflict is an error. Unless `--continue-on-error` is specified, the first error stops
 the push.
@@ -238,18 +231,20 @@ When `--all` is specified, lists tags for all the Repos of the current World
 (even if the current path is in a Repo).
 
 ### `tag fetch --all`
-Safe alternative to `tag pull` as this only pulls the tags that only exist on the remote "origin" side:
-local tags are always preserved.
+Safe "tag pull" that preserves local tags and local tags in conflicts. This creates only new local tags.
 
-### `tag pull <tag names>`
+When `--all` is specified, lists tags for all the Repos of the current World
+(even if the current path is in a Repo).
+
+### `tag pull <tag names> --allow-multi-repo`
 Pulls the specified tags from the remote "origin" into the current Repo.
-Local modifications of fetched tags are lost (the remote version replaces them).
+Local modifications of fetched tags are lost, conflicts are solved: remote always wins.
 
 Tag names must contain only ASCII characters with lowercase letters (to avoid case sensitivity issues).
 
-Must be run from within a Repo directory.
+Must be run from within a Repo directory unless `--allow-multi-repo` is specified.
 
-### `tag push <tag names>`
+### `tag push <tag names> --allow-multi-repo`
 Pushes the specified tags from the current Repo to its remote "origin".
 Modifications of remote tags are lost (the local version replaces them).
 
@@ -257,7 +252,7 @@ Tag names must contain only ASCII characters with lowercase letters (to avoid ca
 
 Must be run from within a Repo directory.
 
-By default, the current directory selects the Repos unless `--all` is specified.
+Must be run from within a Repo directory unless `--allow-multi-repo` is specified.
 
 ### `tag delete <tag names> --with-remote --remote-only --allow-multi-repo`
 Deletes local tags (and/or optionally from the remote "origin").

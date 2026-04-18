@@ -290,7 +290,7 @@ public partial class TagTests
         }
 
         // Tim "ckli fetch". It now sees the 2 tags pushed by Bob but t1 tags are "RemoteOnly".
-        tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false, originOnly: true ).ShouldBeTrue();
+        tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
         tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
         diff.FetchRequired.ShouldBeFalse();
         diff.UnavailableRemoteTags.ShouldBeEmpty();
@@ -419,7 +419,7 @@ public partial class TagTests
         // follow the "v4" tag that is a "new" one.
         // ... No change. But we know that is v4 tag is problematic.
         //
-        tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false, originOnly: true ).ShouldBeTrue();
+        tim.FetchRemoteBranches( TestHelper.Monitor, withTags: true ).ShouldBeTrue();
         {
             tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
             RedactCommitId( DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) ) ).ShouldBe( """
@@ -555,6 +555,58 @@ public partial class TagTests
             DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) ).ShouldBe( """
                 t1-annotated, t1-lightweight, v4⮐
 
+                """ );
+        }
+        // Tests the PullTags( monitor, ["*"] ) that implements:
+        //
+        // git pull --tags --force.
+        //
+        {
+            var t4 = tim.Repository.Tags["v4"];
+            tim.Repository.Tags.Add( "v4",
+                         t4.Target,
+                         t4.Annotation!.Tagger,
+                         "Changed again.",
+                         allowOverwrite: true );
+            tim.Repository.Tags.Remove( "t1-lightweight" );
+            tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
+            diff.ToRenderable( ScreenType.Default, orderByTagName: true ).RenderAsString().ShouldBe( """
+                t1-annotated
+                1 remote only:
+                t1-lightweight
+                1 differences:
+                - 'v4' has:
+                │ <local message>
+                │  Changed again.
+                │ <remote message>
+                │  I'm annotated too.
+
+                """ );
+
+            tim.PullTags( TestHelper.Monitor, ["*"] ).ShouldBeTrue();
+
+            tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
+            diff.ToRenderable( ScreenType.Default, orderByTagName: true ).RenderAsString().ShouldBe( """
+                t1-annotated, t1-lightweight, v4
+                
+                """ );
+
+            // Creating a conflict by moving v4 to another commit.
+            tim.Repository.Tags.Add( "v4", "master", allowOverwrite: true );
+            tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
+            RedactCommitId( diff.ToRenderable( ScreenType.Default, orderByTagName: true ).RenderAsString() ).ShouldBe( """
+                ⚠ 1 conflicts:
+                - Tag 'v4' is locally on '[Redacted]' but targets '[Redacted]' on the remote.
+                t1-annotated, t1-lightweight
+                
+                """ );
+
+            // Pulling resets the conflict.
+            tim.PullTags( TestHelper.Monitor, ["*"] ).ShouldBeTrue();
+            tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
+            diff.ToRenderable( ScreenType.Default, orderByTagName: true ).RenderAsString().ShouldBe( """
+                t1-annotated, t1-lightweight, v4
+                
                 """ );
         }
 

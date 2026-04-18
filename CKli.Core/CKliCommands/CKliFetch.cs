@@ -17,8 +17,7 @@ sealed class CKliFetch : Command
                 [],
                 [
                     (["--all"], "Fetch from all the Repos of the current World (even if current path is in a Repo)."),
-                    (["--with-tags"], "Fetch tags: locally modified tags are lost."),
-                    (["--from-all-remotes"], "Fetch from all available remotes, not only from 'origin'.")
+                    (["--with-tags"], "Fetch tags: locally modified tags are lost.")
                 ] )
     {
     }
@@ -29,12 +28,11 @@ sealed class CKliFetch : Command
     {
         bool all = cmdLine.EatFlag( "--all" );
         bool withTags = cmdLine.EatFlag( "--with-tags" );
-        bool fromAllRemotes = cmdLine.EatFlag( "--from-all-remotes" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Fetch( monitor, this, context, all, withTags, fromAllRemotes ) );
+                                     && Fetch( monitor, this, context, all, withTags ) );
     }
 
-    static bool Fetch( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool withTags, bool fromAllRemotes )
+    static bool Fetch( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool withTags )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -54,7 +52,7 @@ sealed class CKliFetch : Command
             bool success = true;
             foreach( var repo in repos )
             {
-                success &= repo.GitRepository.FetchRemoteBranches( monitor, withTags, originOnly: !fromAllRemotes );
+                success &= repo.GitRepository.FetchRemoteBranches( monitor, withTags );
             }
             return stack.Close( monitor ) && success;
         }

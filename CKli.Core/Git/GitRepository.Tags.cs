@@ -14,10 +14,10 @@ public sealed partial class GitRepository
 {
     /// <summary>
     /// Checks that a tag name is valid for CKli: it must obviously be non empty and contains
-    /// only ascii characters and letters must be lowercase.
+    /// only ascii characters and letters must be lowercase. 
     /// <para>
-    /// This handles regular tag name and canonical tag names (start with "refs/tags/"): the standard
-    /// Git tag prefix is compatible with this rule.
+    /// Special characters like * or ? and / are allowed: this handles regular tag name and canonical tag
+    /// names (start with "refs/tags/"): the standard Git tag prefix is compatible with this rule.
     /// </para>
     /// <para>
     /// See <see cref="GitTagInfo.InvalidTags"/>.
@@ -228,40 +228,6 @@ public sealed partial class GitRepository
         }
     }
 
-    //// Returns final "refs/tags/" canonical names.
-    //List<string> PreProcessTagNames( IActivityMonitor monitor, IEnumerable<string> tagNames )
-    //{
-    //    var result = new List<string>();
-    //    var finalNames = new StringBuilder();
-    //    var invalidTags = new StringBuilder();
-    //    foreach( var t in tagNames )
-    //    {
-    //        var (refsTagsName, name) = Normalize( t );
-    //        if( !IsCKliValidTagName( name ) )
-    //        {
-    //            if( IsPattern( name ) )
-    //            {
-    //            }
-    //            else
-    //            {
-    //                invalidTags.Append( invalidTags.Length == 0 ? "'" : "', '" );
-    //                invalidTags.Append( name );
-    //            }
-    //            continue;
-    //        }
-    //    }
-    //    if( invalidTags.Length > 0 ) invalidTags.Append( '\'' );
-
-    //    static (string, string) Normalize( string n )
-    //    {
-    //        return n.StartsWith( "refs/tags/", StringComparison.Ordinal )
-    //                ? (n, n.Substring( 10 ))
-    //                : ("refs/tags/" + n, n);
-    //    }
-
-    //    static bool IsPattern( string name ) => name.ContainsAny( '*', '?' );
-    //}
-
     /// <summary>
     /// Pulls any number of tags (empty <paramref name="tagNames"/> is a no-op).
     /// Local modifications of pulled tags are lost: use <see cref="FetchTags(IActivityMonitor, string)"/> to safely 
@@ -360,7 +326,7 @@ public sealed partial class GitRepository
         {
             return false;
         }
-        monitor.Trace( $"RemoteOnlyTags count: {diff.RemoteOnlyCount}." );
+        monitor.Trace( $"RemoteOnlyTags count: {diff.RemoteOnlyCount} (remote: '{remoteName}')." );
         if( diff.RemoteOnlyCount > 0 )
         {
             // This traces the pulled tags.

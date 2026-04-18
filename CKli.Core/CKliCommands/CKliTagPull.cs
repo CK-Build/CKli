@@ -14,9 +14,9 @@ sealed class CKliTagPull : Command
                 "tag pull",
                 """
                 Pulls the specified tags from the remote "origin" in the current Repo.
-                Local modifications of fetched tags are lost. 
+                Local modifications of fetched tags are lost, conflicts are solved: remote always wins. Use "ckli tag list" to analyze tags.  
                 """,
-                [("tag names", "One or more tag names to pull.")],
+                [("tag names", """One or more tag names to pull. * wildcard can be used to pull all the tags.""")],
                 [],
                 [
                     (["--allow-multi-repo"], """
