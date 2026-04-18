@@ -241,6 +241,9 @@ Pulls the specified tags from the remote "origin" into the current Repo.
 Local modifications of fetched tags are lost, conflicts are solved: remote always wins.
 
 Tag names must contain only ASCII characters with lowercase letters (to avoid case sensitivity issues).
+They can be the "canonical names" that starts with "refs/tags/" or simple names (like "v4.0").
+The very basic glob capabilities of https://git-scm.com/docs/git-fetch are supported: `ckli tag pull *`
+pulls all the remote tags (this is equivalent to `git pull --tags --force`).
 
 Must be run from within a Repo directory unless `--allow-multi-repo` is specified.
 
