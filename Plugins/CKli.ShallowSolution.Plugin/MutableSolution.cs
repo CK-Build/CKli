@@ -216,7 +216,7 @@ public sealed class MutableSolution
                 using( monitor.OpenInfo( $"Migrating '{path.LastPart}'." ) )
                 {
                     Throw.DebugAssert( mustRenameFile );
-                    var args = $"""sln migrate "{path.LastPart}" """;
+                    var args = $"""sln "{path.LastPart}" migrate""";
                     var e = ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", args, repo.WorkingFolder );
                     if( e != 0 )
                     {
