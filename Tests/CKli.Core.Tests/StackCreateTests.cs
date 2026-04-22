@@ -12,24 +12,27 @@ namespace CKli.Core.Tests;
 [TestFixture]
 public class StackCreateTests
 {
-    readonly static Uri _demoGitHubUrl = new Uri( "https://github.com/ck-build/Demo-Stack" );
-
     [Explicit]
-    [TestCase( "Public" )]
-    [TestCase( "Private" )]
-    public async Task Create_Demo_on_GitHub_Async( string mode )
+    [TestCase( "Public", "https://github.com/", "ck-build/Demo-Stack" )]
+    [TestCase( "Private", "https://github.com/", "ck-build/Demo-Stack" )]
+    [TestCase( "Private", "https://gitlab.com/", "olivier-spinelli/Demo-Stack" )]
+    [TestCase( "Public", "https://gitlab.com/", "olivier-spinelli/Demo-Stack" )]
+    [TestCase( "Private", "https://gitlab.com/", "signature-code/Test/Demo-Stack" )]
+    [TestCase( "Public", "https://gitlab.com/", "signature-code/Test/Demo-Stack" )]
+    public async Task Create_Demo_Async( string mode, string rootUrl, string repositoryPath )
     {
         bool isPublic = mode == "Public";
+        var url = new Uri( rootUrl + repositoryPath );
 
         var context = TestEnv.EnsureCleanFolder();
 
         // Removes previous Demo-Stack. 
-        var gitKey = new GitRepositoryKey( context.SecretsStore, _demoGitHubUrl, isPublic );
+        var gitKey = new GitRepositoryKey( context.SecretsStore, url, isPublic );
         gitKey.TryGetHostingInfo( TestHelper.Monitor, out var gitHubHosting, out var repoPath ).ShouldBeTrue();
-        repoPath.ShouldBe( "ck-build/Demo-Stack" );
+        repoPath.ShouldBe( repositoryPath );
         await gitHubHosting.DeleteRepositoryAsync( TestHelper.Monitor, repoPath ).ConfigureAwait( false );
 
-        using var stack = await StackRepository.CreateAsync( TestHelper.Monitor, context, _demoGitHubUrl, isPublic, ignoreParentStack: true );
+        using var stack = await StackRepository.CreateAsync( TestHelper.Monitor, context, url, isPublic, ignoreParentStack: true );
         stack.ShouldNotBeNull();
         stack.StackName.ShouldBe( "Demo" );
         stack.IsPublic.ShouldBe( isPublic );

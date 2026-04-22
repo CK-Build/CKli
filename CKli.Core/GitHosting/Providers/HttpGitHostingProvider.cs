@@ -40,6 +40,8 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                               bool skipRemoteServerCertificateValidation = false )
         : base( baseUrl, gitKey )
     {
+        Throw.CheckArgument( "Must be 'https://xxx.com' or 'https://xxx.com/api/'.",
+                             baseApiUrl.IsAbsoluteUri && (baseApiUrl.AbsolutePath.Length == 0 || baseApiUrl.AbsolutePath[^1] == '/') );
         _handler = skipRemoteServerCertificateValidation
                     ? SharedHttpClient.DefaultHandlerWithoutServerCertificateValidation
                     : SharedHttpClient.DefaultHandler;
@@ -187,7 +189,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         catch( Exception ex )
         {
-            monitor.Error( ex );
+            monitor.Error( $"Error while deleting repository '{repoPath}' on '{BaseUrl}'.", ex );
             return false;
         }
         finally

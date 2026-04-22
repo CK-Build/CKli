@@ -30,7 +30,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
     /// </summary>
     /// <param name="gitKey">The git key to use.</param>
     internal GitLabProvider( IGitRepositoryAccessKey gitKey )
-        : this( "https://gitlab.com", gitKey, new Uri( "https://gitlab.com/api/v4" ) )
+        : this( "https://gitlab.com", gitKey, new Uri( "https://gitlab.com/api/v4/" ) )
     {
     }
 
@@ -51,23 +51,33 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         client.DefaultRequestHeaders.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/json" ) );
     }
 
+    /// <summary>
+    /// Overridden to replace the standard "Authorization: Bearer ..." header with the recommended header:
+    /// https://docs.gitlab.com/api/rest/authentication/#personal-project-and-group-access-tokens
+    /// </summary>
+    /// <param name="headers">The headers to configure.</param>
+    /// <param name="secret">The API key.</param>
+    protected override void SetAuthorizationHeader( HttpRequestHeaders headers, string? secret )
+    {
+        if( secret != null )
+        {
+            headers.Add( "PRIVATE-TOKEN", secret );
+        }
+    }
+
     protected internal override NormalizedPath GetRepositoryPathFromUrl( IActivityMonitor monitor, GitRepositoryKey key )
     {
-        Throw.DebugAssert( key.OriginUrl.ToString().StartsWith( BaseUrl, StringComparison.OrdinalIgnoreCase ) );
-        // GitLab can have group/subgroup/repo structure, so we take the path part of the url and removes
-        // the first part that is the "owner" of the repository.
-        //
-        // !! NOT SURE HERE. TO BE TESTED.
-        //
-        NormalizedPath path = key.OriginUrl.AbsolutePath;
-        return path.RemoveFirstPart();
+        var sUrl = key.OriginUrl.ToString();
+        Throw.DebugAssert( sUrl.StartsWith( BaseUrl + '/', StringComparison.OrdinalIgnoreCase ) );
+        // Returns the "<owner>/<path>/<repo>" string.
+        return sUrl.Substring( BaseUrl.Length + 1 );
     }
 
     protected override NormalizedPath ValidateRepoPath( IActivityMonitor monitor, NormalizedPath repoPath )
     {
         if( repoPath.Parts.Count < 2 )
         {
-            monitor.Error( $"Invalid GitHub repository path '{repoPath}'. Must be '<owner>/../<name>'." );
+            monitor.Error( $"Invalid GitLab repository path '{repoPath}'. Must be '<owner>/.../<name>'." );
             return default;
         }
         return repoPath;
@@ -95,7 +105,6 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         }
         if( !response.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error );
             return null;
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
@@ -107,28 +116,38 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
                                                                                 bool isPrivate,
                                                                                 CancellationToken cancellation = default )
     {
-
-        // First, try to get the namespace ID for the owner.
-        long? namespaceId = await GetNamespaceIdAsync( client, repoPath, cancellation );
-
+        // First, try to get the namespace ID for the parent path.
+        var folder = repoPath.RemoveLastPart();
+        long? namespaceId = await GetNamespaceIdAsync( monitor, client, folder, cancellation );
+        if( !namespaceId.HasValue )
+        {
+            return null;
+        }
         var request = new GitLabCreateProjectRequest
         {
             Name = repoPath.LastPart,
-            Path = repoPath,
+            Path = repoPath.LastPart,
             Description = "Created by CKli.",
             Visibility = isPrivate ? "private" : "public",
             NamespaceId = namespaceId
         };
-
         var response = await client.PostAsJsonAsync( "projects", request, cancellation );
-
+        if( !response.IsSuccessStatusCode )
+        {
+            // Here, a 404 is an error.
+            if( response.StatusCode == HttpStatusCode.NotFound )
+            {
+                monitor.Error( $"GitLab namespace or project '{folder}' doesn't exist. It must be created before '{repoPath.LastPart}' can be created inside." );
+            }
+            return null;
+        }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
     }
 
     /// <summary>
     /// Gets the namespace ID for a group or user path.
     /// </summary>
-    async Task<long?> GetNamespaceIdAsync( HttpClient client, NormalizedPath namespacePath, CancellationToken cancellation )
+    async Task<long?> GetNamespaceIdAsync( IActivityMonitor monitor, HttpClient client, NormalizedPath namespacePath, CancellationToken cancellation )
     {
         var encodedPath = HttpUtility.UrlEncode( namespacePath );
         var response = await client.GetAsync( $"namespaces/{encodedPath}", cancellation );
@@ -136,6 +155,11 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         {
             var ns = await response.Content.ReadFromJsonAsync<GitLabNamespace>( cancellation );
             return ns?.Id;
+        }
+        // Here, a 404 is an error.
+        if( response.StatusCode == HttpStatusCode.NotFound )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
         }
         return null;
     }
@@ -160,7 +184,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
     {
         var projectPath = HttpUtility.UrlEncode( repoPath );
         var response = await client.DeleteAsync( $"projects/{projectPath}", cancellation );
-        return response.IsSuccessStatusCode;
+        return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
     }
 
     protected override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
@@ -237,8 +261,8 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
     }
 
     static async Task<GitLabProject?> ReadGitLabProjectAsync( IActivityMonitor monitor,
-                                                                     HttpResponseMessage response,
-                                                                     CancellationToken cancellation )
+                                                              HttpResponseMessage response,
+                                                              CancellationToken cancellation )
     {
         Throw.DebugAssert( response.IsSuccessStatusCode );
         var r = await response.Content.ReadFromJsonAsync<GitLabProject>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );

@@ -99,7 +99,6 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         }
         if( !response.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error );
             return null;
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
@@ -118,19 +117,23 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
             Private = isPrivate,
         };
 
-        // Determine if we're creating in an org or for the authenticated user
+        // Determine if we're creating inside an organization or for the authenticated user
         // If owner matches authenticated user, use user/repos
         // Otherwise, use /orgs/{org}/repos
         var url = $"orgs/{repoPath.FirstPart}/repos";
         var response = await client.PostAsJsonAsync( url, request, cancellation );
 
-        // If 404 on org endpoint, the owner might be a user - try user repos endpoint.
+        // If 404 on organization endpoint, the owner might be a user - try user repos endpoint.
         if( response.StatusCode == System.Net.HttpStatusCode.NotFound )
         {
             // For user repos, we use user/repos endpoint
             // This requires the owner to be the authenticated user
             url = "user/repos";
             response = await client.PostAsJsonAsync( url, request, cancellation );
+        }
+        if( !response.IsSuccessStatusCode )
+        {
+            return null;
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
     }
@@ -154,7 +157,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                CancellationToken cancellation = default )
     {
         var response = await client.DeleteAsync( $"repos/{repoPath}", cancellation );
-        return response.IsSuccessStatusCode;
+        return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
     }
 
     protected override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
@@ -174,7 +177,10 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         using var response = await client.PostAsJsonAsync( $"repos/{repoPath}/releases", request, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            if( response.StatusCode == HttpStatusCode.NotFound )
+            {
+                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            }
             return null;
         }
         var releaseInfo = await response.Content.ReadFromJsonAsync<GitHubReleaseInfo>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
@@ -213,7 +219,10 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         using var response = await client.PostAsync( uploadUrl, content, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            if( response.StatusCode == HttpStatusCode.NotFound )
+            {
+                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            }
             return false;
         }
         return true;
@@ -231,7 +240,10 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         using var response = await client.PatchAsJsonAsync( $"repos/{repoPath}/releases/{releaseId}", update, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            if( response.StatusCode == HttpStatusCode.NotFound )
+            {
+                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            }
             return false;
         }
         return true;

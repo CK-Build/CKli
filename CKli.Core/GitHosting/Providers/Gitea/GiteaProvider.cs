@@ -23,7 +23,7 @@ namespace CKli.Core.GitHosting.Providers;
 public sealed partial class GiteaProvider : HttpGitHostingProvider
 {
     public GiteaProvider( string baseUrl, IGitRepositoryAccessKey gitKey, string authority )
-        : base( baseUrl, gitKey, new Uri( $"https://{authority}/api/v3" ), alwaysUseAuthentication: false )
+        : base( baseUrl, gitKey, new Uri( $"https://{authority}/api/v3/" ), alwaysUseAuthentication: false )
     {
     }
 
@@ -53,7 +53,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
 
     protected override bool IsSuccessfulResponse( HttpResponseMessage response )
     {
-        return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
+        return response.IsSuccessStatusCode || (response.StatusCode == HttpStatusCode.NotFound && response.RequestMessage?.Method == HttpMethod.Delete);
     }
 
     protected override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
@@ -71,7 +71,6 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         }
         if( !response.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
             return null;
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
@@ -145,7 +144,10 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         using var response = await client.PostAsJsonAsync( $"repos/{repoPath}/releases", request, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            if( response.StatusCode == HttpStatusCode.NotFound )
+            {
+                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            }
             return null;
         }
         var releaseInfo = await response.Content.ReadFromJsonAsync<GiteaReleaseInfo>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
@@ -175,7 +177,10 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         using var response = await client.PostAsync( uploadUrl, formContent, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            if( response.StatusCode == HttpStatusCode.NotFound )
+            {
+                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            }
             return false;
         }
         return true;
@@ -191,7 +196,10 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         using var response = await client.PatchAsJsonAsync( $"repos/{repoPath}/releases/{releaseIdentifier}", update, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            if( response.StatusCode == HttpStatusCode.NotFound )
+            {
+                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            }
             return false;
         }
         return true;
