@@ -1,6 +1,8 @@
+using CK.Core;
 using NUnit.Framework;
 using Shouldly;
 using System.IO;
+using System.Linq;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
@@ -29,5 +31,20 @@ public class NuGetHelperTests
         {
             TestHelper.CleanupFolder( tempFolder, ensureFolderAvailable: false );
         }
+    }
+
+
+    [Test]
+    public void NuGetDependencyCache_tests()
+    {
+        var last = NuGetHelper.Cache.GetAvailableVersions( "ck.TESTING.nunit" ).Max();
+        last.ShouldNotBeNull();
+
+        var cache = new NuGetDependencyCache();
+        cache.GetRequired( TestHelper.Monitor, "ck.TESTING.nunit", last, out var package ).ShouldBeTrue();
+
+        package.PackageId.ShouldBe( "CK.Testing.NUnit" );
+        package.Version.ShouldBe( last );
+        package.Dependencies.Select( p => p.PackageId ).ShouldBe( ["CK.Testing.Monitoring", "NUnit"], ignoreOrder: true );
     }
 }

@@ -15,7 +15,7 @@ namespace CKli;
 /// Equality and comparison is based on <see name="PackageId"/> first and then <see cref="Version"/>.
 /// </para>
 /// </summary>
-public sealed class PackageInstance : IComparable<PackageInstance>, IEquatable<PackageInstance>
+public partial class PackageInstance : IComparable<PackageInstance>, IEquatable<PackageInstance>
 {
     readonly string _packageId;
     readonly SVersion _version;
@@ -237,7 +237,6 @@ public sealed class PackageInstance : IComparable<PackageInstance>, IEquatable<P
     /// </summary>
     /// <returns>The package@version string.</returns>
     public override string ToString() => _toString ??= $"{_packageId}@{_version}";
-
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
     public static bool operator ==( PackageInstance? left, PackageInstance? right )

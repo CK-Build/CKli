@@ -67,8 +67,8 @@ static partial class TestEnv
         var currentVersionString = pluginsPath.LastPart["CKli.Plugins.Core.".Length..^".nupkg".Length];
         _cKliPluginsCoreVersion = SVersion.Parse( currentVersionString );
 
-        NuGetHelper.ClearGlobalCache( TestHelper.Monitor, "CKli.Core", currentVersionString );
-        NuGetHelper.ClearGlobalCache( TestHelper.Monitor, "CKli.Plugins.Core", currentVersionString );
+        NuGetHelper.Cache.RemovePackage( TestHelper.Monitor, "CKli.Core", _cKliPluginsCoreVersion );
+        NuGetHelper.Cache.RemovePackage( TestHelper.Monitor, "CKli.Plugins.Core", _cKliPluginsCoreVersion );
 
         foreach( var nuget in Directory.EnumerateFiles( _nugetSourcePath ) )
         {
@@ -286,7 +286,7 @@ static partial class TestEnv
         }
 
         // Clear any cached version of the new package.
-        NuGetHelper.ClearGlobalCache( TestHelper.Monitor, projectName, null );
+        NuGetHelper.Cache.RemovePackage( TestHelper.Monitor, projectName, null );
 
 
         var path = _packagedPluginsPath.AppendPart( projectName );
