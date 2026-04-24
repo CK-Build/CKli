@@ -748,7 +748,6 @@ public sealed partial class GitRepository : IDisposable
     /// <returns>True on success, false on error.</returns>
     public bool DeleteBranch( IActivityMonitor monitor, Branch local, DeleteGitBranchMode mode )
     {
-        Throw.CheckArgument( local.IsTracking );
         try
         {
             bool success = true;
