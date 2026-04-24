@@ -706,34 +706,35 @@ public sealed partial class GitRepository : IDisposable
 
         static Commit? CreateMergeCommit( GitRepository git,
                                           Branch branch,
-                                          Branch tracked,
+                                          Branch other,
                                           string trackedName,
                                           bool withEmptyCommit )
         {
-            if( branch.TrackingDetails?.BehindBy is 0 )
-            {
-                // No-op.
-                return branch.Tip;
-            }
-            if( branch.TrackingDetails?.AheadBy is 0 )
-            {
-                // Move "local" on "origin/local".
-                return tracked.Tip;
-            }
-            bool mustMerge = branch.Tip.Tree.Sha != tracked.Tip.Tree.Sha;
+            bool mustMerge = branch.Tip.Tree.Sha != other.Tip.Tree.Sha;
             if( !mustMerge && !withEmptyCommit )
             {
                 // No-op.
                 return branch.Tip;
             }
-            var result = git.Repository.ObjectDatabase.MergeCommits( branch.Tip, tracked.Tip, new MergeTreeOptions() { SkipReuc = true, FailOnConflict = true } );
+            var div = git.Repository.ObjectDatabase.CalculateHistoryDivergence( branch.Tip, other.Tip );
+            if( div?.BehindBy is 0 )
+            {
+                // No-op.
+                return branch.Tip;
+            }
+            if( div?.AheadBy is 0 )
+            {
+                // Move "branch" to "tracked".
+                return other.Tip;
+            }
+            var result = git.Repository.ObjectDatabase.MergeCommits( branch.Tip, other.Tip, new MergeTreeOptions() { SkipReuc = true, FailOnConflict = true } );
             return result.Tree == null
                     ? null
                     : git.Repository.ObjectDatabase.CreateCommit( git.Author,
                                                                     git.Committer,
                                                                     $"Merge branch '{trackedName}'.",
                                                                     result.Tree,
-                                                                    [branch.Tip, tracked.Tip],
+                                                                    [branch.Tip, other.Tip],
                                                                     prettifyMessage: true );
         }
 
