@@ -764,13 +764,16 @@ public sealed partial class GitRepository : IDisposable
                 monitor.Error( $"Branch '{branchName}' tracks branch '{tracked.CanonicalName}' that is not a remote branch." );
                 return false;
             }
+            // Skip push? Not a brilliant idea when using short-lived branches: the remote may have lost it
+            // and it should be resurected.
+            //
             // When the branch has been "autoCreateRemoteBranch", then this is null: the branch will be pushed.
-            int? aheadBy = localBranch.TrackingDetails.AheadBy;
-            if( aheadBy.HasValue && aheadBy.Value == 0 )
-            {
-                monitor.CloseGroup( "Tracked branch is on the same commit. Push skipped." );
-                return true;
-            }
+            //   int? aheadBy = localBranch.TrackingDetails.AheadBy;
+            //   if( aheadBy.HasValue && aheadBy.Value == 0 )
+            //   {
+            //       monitor.CloseGroup( "Tracked branch is on the same commit. Push skipped." );
+            //       return true;
+            //   }
             if( !GetRemote( monitor, remoteName, forWrite: true, out var remote, out var creds ) )
             {
                 return false;
