@@ -652,9 +652,19 @@ public sealed partial class GitRepository : IDisposable
             return true;
         }
         bool isHead = branch.IsCurrentRepositoryHead;
-        if( isHead && !CheckCleanCommit( monitor ) )
+        if( isHead )
         {
-            return false;
+            if( !CheckCleanCommit( monitor ) )
+            {
+                return false;
+            }
+        }
+        else if( other.IsCurrentRepositoryHead )
+        {
+            if( !CheckCleanCommit( monitor ) )
+            {
+                return false;
+            }
         }
 
         var localName = branch.FriendlyName;
