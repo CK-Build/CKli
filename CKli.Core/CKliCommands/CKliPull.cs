@@ -86,12 +86,12 @@ sealed class CKliPull : Command
                 if( !success && !continueOnError ) break;
                 if( !withTags )
                 {
-                    // "ckli pull" => By default the tags are "safely fetched".
+                    // "ckli pull" => "ckli tag fetch" => By default the tags are "safely fetched".
                     success &= repo.GitRepository.FetchTags( monitor );
                 }
                 else
                 {
-                    // "ckli pull *" => git pull --tags --force
+                    // "ckli pull --with-tags" => "ckli tag pull *" => git pull --tags --force
                     success &= repo.GitRepository.PullTags( monitor, ["*"] );
                 }
                 if( !success && !continueOnError ) break;
@@ -103,12 +103,11 @@ sealed class CKliPull : Command
             {
                 foreach( var repo in repos )
                 {
-                    success &= repo.GitRepository.MergeTrackedBranches( monitor, continueOnError, fromAllRemotes: false );
+                    success &= repo.GitRepository.MergeRemoteBranches( monitor, continueOnError, fromAllRemotes: false );
                     if( !success && !continueOnError ) break;
                 }
             }
         }
-
         return success;
     }
 }

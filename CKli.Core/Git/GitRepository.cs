@@ -87,14 +87,14 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
-    /// Gets or sets the author signature to use when modifying this repository: this is the configured signature
+    /// Gets the author signature to use when modifying this repository: this is the configured signature
     /// with the current <see cref="Committer"/>'s date. If no author is configured at the git level, the Committer is used.
     /// </summary>
     public Signature Author => _author ??= _git.Config.BuildSignature( _committer.When ) ?? _committer;
 
     /// <summary>
     /// Gets a mutable list of ref specs (see <see href="https://git-scm.com/book/en/v2/Git-Internals-The-Refspec"/>)
-    /// that will be implicitly pushed with the next push that will be done (can be <see cref="PushBranch(IActivityMonitor, Branch, bool)"/>,
+    /// that will be implicitly pushed with the next push (can be <see cref="PushBranch(IActivityMonitor, Branch, bool)"/>,
     /// or <see cref="PushTags(IActivityMonitor, IEnumerable{string}, string)"/>, etc.). Once pushed, this list is cleared.
     /// <para>
     /// This has been designed to handle the update of the "ckli-repo" tag: instead of requiring each Repo initialization to
@@ -183,6 +183,8 @@ public sealed partial class GitRepository : IDisposable
     /// doesn't exist locally and in the "origin" remote.
     /// <para>
     /// If the remote "origin" exists, it is created locally and tracks the origin remote branch.
+    /// This supports the "Automatic Remote Origin Branch Association Strategy": any existing local branch (refs/heads/XXX) that is currently not tracking
+    /// and for which a "origin" branch ("refs/remotes/origin/XXX") exists is automatically configured to track it.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -246,7 +248,7 @@ public sealed partial class GitRepository : IDisposable
 
     /// <summary>
     /// Ensures that a local branch exists. If a remote branch from the 'origin' remote is known locally
-    /// it will be associated.
+    /// it will be associated as the tracked branch.
     /// <para>
     /// If the branch is created without a remote, it will point at the current head's commit.
     /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
@@ -537,6 +539,10 @@ public sealed partial class GitRepository : IDisposable
     /// Calls <see cref="MergeTrackedBranch(IActivityMonitor, ref Branch, bool)"/> for each existing branch that has a remote tracked branch
     /// on 'origin' (or on any remote if <paramref name="fromAllRemotes"/> is true).
     /// <para>
+    /// This supports the "Automatic Remote Origin Branch Association Strategy" (AROBAS): any existing local branch (refs/heads/XXX) that
+    /// is currently not tracking and for which a "origin" branch ("refs/remotes/origin/XXX") is automatically configured to track it.
+    /// </para>
+    /// <para>
     /// This (the MergeTrackedBranch method actually) handles the currently checked out branch transparently.
     /// </para>
     /// </summary>
@@ -548,31 +554,61 @@ public sealed partial class GitRepository : IDisposable
     /// See <see cref="FetchRemoteBranches(IActivityMonitor, bool, string?)"/>.
     /// </param>
     /// <returns>True on success, false otherwise.</returns>
-    public bool MergeTrackedBranches( IActivityMonitor monitor, bool continueOnError = false, bool fromAllRemotes = false, string? branchSpec = null )
+    public bool MergeRemoteBranches( IActivityMonitor monitor, bool continueOnError = false, bool fromAllRemotes = false, string? branchSpec = null )
     {
         if( string.IsNullOrEmpty( branchSpec ) )
         {
             branchSpec = null;
         }
         bool success = true;
-        foreach( var b in _git.Branches )
+
+        var snapshot = _git.Branches.ToDictionary( b => b.CanonicalName );
+        // First pass on all the branches that have an associated tracked branch:
+        // - The ones that are tracking a "refs/remote/" branch (that satisfies the optional branchSpec) => MergeTrackedBranch
+        // - The local and tracked branches are removed from the dictionary (they have been handled).
+        foreach( var b in snapshot.Values.ToArray() )
         {
             var tracked = b.TrackedBranch;
-            if( tracked != null
-                && tracked.CanonicalName.StartsWith( "refs/remotes/", StringComparison.Ordinal )
-                && (fromAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.Ordinal ))
-                && (branchSpec == null || FilterBranchSpec( branchSpec, b )) )
+            if( tracked != null )
             {
-                var refB = b;
-                success &= MergeTrackedBranch( monitor, ref refB );
-                if( !success && !continueOnError ) break;
+                snapshot.Remove( b.CanonicalName );
+                snapshot.Remove( tracked.CanonicalName );
+                if( tracked.CanonicalName.StartsWith( "refs/remotes/", StringComparison.Ordinal )
+                    && (fromAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.Ordinal ))
+                    && (branchSpec == null || FilterBranchSpec( branchSpec, b.CanonicalName )) )
+                {
+                    var refB = b;
+                    success &= MergeTrackedBranch( monitor, ref refB );
+                    if( !success && !continueOnError ) break;
+                }
             }
+        }
+        // Handles "Automatic Remote Origin Branch Association Strategy" in unhandled branches.
+        foreach( var (name,branch) in snapshot )
+        {
+            var n = name.AsSpan();
+            if( n.StartsWith( "refs/remotes/origin/", StringComparison.Ordinal ) )
+            {
+                Throw.DebugAssert( "refs/remotes/origin/".Length == 20 );
+                var localName = $"refs/heads/{n.Slice(20)}";
+                if( snapshot.TryGetValue( localName, out var b ) )
+                {
+                    Throw.DebugAssert( b.TrackedBranch == null );
+                    if( branchSpec == null || FilterBranchSpec( branchSpec, b.CanonicalName ) )
+                    {
+                        b = _git.Branches.Update( b, u => u.TrackedBranch = name );
+                        monitor.Info( $"Creating local branch on remote 'origin/{n.Slice( 20 )}' in repository '{_displayPath}'." );
+                        success &= MergeTrackedBranch( monitor, ref b );
+                        if( !success && !continueOnError ) break;
+                    }
+                }
+            }
+
         }
         return success;
 
-        static bool FilterBranchSpec( ReadOnlySpan<char> branchSpec, Branch b )
+        static bool FilterBranchSpec( ReadOnlySpan<char> branchSpec, ReadOnlySpan<char> n )
         {
-            var n = b.CanonicalName.AsSpan();
             Throw.DebugAssert( n.StartsWith( "refs/heads/" ) );
             n = n.Slice( 11 );
             if( branchSpec[^1] == '*' )
@@ -597,8 +633,21 @@ public sealed partial class GitRepository : IDisposable
     public bool MergeTrackedBranch( IActivityMonitor monitor, ref Branch branch, bool withEmptyCommit = false )
     {
         Throw.CheckArgument( branch.TrackedBranch != null );
-        var tracked = branch.TrackedBranch;
-        if( branch.Tip.Sha == tracked.Tip.Sha )
+        return MergeBranch( monitor, ref branch, branch.TrackedBranch, withEmptyCommit );
+    }
+
+    /// <summary>
+    /// Tries to merge <paramref name="other"/> into <paramref name="branch"/>. There must be no conflict.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="branch">The target branch (that will be moved on success).</param>
+    /// <param name="other">The branch to merge.</param>
+    /// <param name="withEmptyCommit">True to create an empty commit even if there is nothing to merge.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool MergeBranch( IActivityMonitor monitor, ref Branch branch, Branch other, bool withEmptyCommit = false )
+    {
+        Throw.CheckNotNullArgument( other );
+        if( branch.Tip.Sha == other.Tip.Sha )
         {
             return true;
         }
@@ -609,11 +658,11 @@ public sealed partial class GitRepository : IDisposable
         }
 
         var localName = branch.FriendlyName;
-        var trackedName = tracked.FriendlyName;
+        var trackedName = other.FriendlyName;
         Exception? exception = null;
         try
         {
-            var c = CreateMergeCommit( this, branch, tracked, trackedName, withEmptyCommit );
+            var c = CreateMergeCommit( this, branch, other, trackedName, withEmptyCommit );
             if( c != null )
             {
                 if( isHead )
@@ -623,7 +672,7 @@ public sealed partial class GitRepository : IDisposable
                     Commands.Checkout( _git, branch.Tip );
                 }
                 branch = _git.Branches.Add( localName, c, allowOverwrite: true );
-                if( c != tracked.Tip )
+                if( c != other.Tip )
                 {
                     monitor.Trace( $"Branch '{trackedName}' has been merged into '{localName}' in '{DisplayPath}'." );
                 }
@@ -651,20 +700,31 @@ public sealed partial class GitRepository : IDisposable
                                           string trackedName,
                                           bool withEmptyCommit )
         {
-            bool mustMerge = branch.Tip.Tree.Sha != tracked.Tip.Tree.Sha;
-            if( mustMerge || withEmptyCommit )
+            if( branch.TrackingDetails?.BehindBy is 0 )
             {
-                var result = git.Repository.ObjectDatabase.MergeCommits( branch.Tip, tracked.Tip, new MergeTreeOptions() { SkipReuc = true, FailOnConflict = true } );
-                return result.Tree == null
-                        ? null
-                        : git.Repository.ObjectDatabase.CreateCommit( git.Author,
-                                                                        git.Committer,
-                                                                        $"Merge branch '{trackedName}'.",
-                                                                        result.Tree,
-                                                                        [branch.Tip, tracked.Tip],
-                                                                        prettifyMessage: true );
+                // No-op.
+                return branch.Tip;
             }
-            return tracked.Tip;
+            if( branch.TrackingDetails?.AheadBy is 0 )
+            {
+                // Move "local" on "origin/local".
+                return tracked.Tip;
+            }
+            bool mustMerge = branch.Tip.Tree.Sha != tracked.Tip.Tree.Sha;
+            if( !mustMerge && !withEmptyCommit )
+            {
+                // No-op.
+                return branch.Tip;
+            }
+            var result = git.Repository.ObjectDatabase.MergeCommits( branch.Tip, tracked.Tip, new MergeTreeOptions() { SkipReuc = true, FailOnConflict = true } );
+            return result.Tree == null
+                    ? null
+                    : git.Repository.ObjectDatabase.CreateCommit( git.Author,
+                                                                    git.Committer,
+                                                                    $"Merge branch '{trackedName}'.",
+                                                                    result.Tree,
+                                                                    [branch.Tip, tracked.Tip],
+                                                                    prettifyMessage: true );
         }
 
     }
@@ -1198,3 +1258,4 @@ public sealed partial class GitRepository : IDisposable
         }
     }
 }
+

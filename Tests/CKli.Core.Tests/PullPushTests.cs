@@ -25,7 +25,7 @@ public partial class PullPushTests
     }
 
     [Test]
-    public async Task fetch_merge_push_and_pull_Async()
+    public void fetch_merge_push_and_pull()
     {
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.OpenRemotes( "One" );
@@ -141,8 +141,8 @@ public partial class PullPushTests
             File.WriteAllText( bob.WorkingFolder.AppendPart( "Dirty.txt" ), "Dirty!!!" );
             bob.Repository.RetrieveStatus().IsDirty.ShouldBeTrue();
 
-            // The remote branch is fetched: "test-2" is now tracking the 'origin' remote.
-            // The "test-2" local branch has not moved, it doesn't contain the "Some2.txt" file.
+            // The remote branch is fetched: "test-3" is now tracking the 'origin' remote.
+            // The "test-3" local branch has not moved, it doesn't contain the "Some3.txt" file.
             bob.FetchRemoteBranch( TestHelper.Monitor, "test-3", withTags: false, out var afterFetch ).ShouldBeTrue();
             afterFetch.ShouldNotBeNull();
             afterFetch.Tip.Sha.ShouldBe( initial.Tip.Sha );
@@ -172,17 +172,89 @@ public partial class PullPushTests
             File.Exists( bob.WorkingFolder.AppendPart( "Some3.txt" ) ).ShouldBeTrue();
             bob.Repository.Head.Tip.Sha.ShouldBe( afterMerge.Tip.Sha );
         }
+    }
 
-        static void CreateBranchAndPush( GitRepository r, int i )
-        {
-            var bName = $"test-{i}";
-            var b = r.EnsureBranch( TestHelper.Monitor, bName ).ShouldNotBeNull();
-            r.Checkout( TestHelper.Monitor, b ).ShouldBeTrue();
-            r.CurrentBranchName.ShouldBe( bName );
-            File.WriteAllText( r.WorkingFolder.AppendPart( $"Some{i}.txt" ), "Hello World!" );
-            r.Commit( TestHelper.Monitor, $"Commit n°{i}." ).ShouldBe( CommitResult.Commited );
-            r.PushBranch( TestHelper.Monitor, b, autoCreateRemoteBranch: true ).ShouldBeTrue();
-        }
+
+    [Test]
+    public void delete_branch_and_AROBAS()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var remotes = TestEnv.OpenRemotes( "One" );
+        var remoteUrl = remotes.GetUriFor( "OneRepo" );
+
+        var timPath = context.CurrentDirectory.AppendPart( "Tim" );
+        using var tim = GitRepository.Clone( TestHelper.Monitor,
+                                             new GitRepositoryKey( context.SecretsStore, remoteUrl, true ),
+                                             context.Committer,
+                                             timPath,
+                                             timPath.LastPart ).ShouldNotBeNull();
+
+        var bobPath = context.CurrentDirectory.AppendPart( "Bob" );
+        using var bob = GitRepository.Clone( TestHelper.Monitor,
+                                             new GitRepositoryKey( context.SecretsStore, remoteUrl, true ),
+                                             context.Committer,
+                                             bobPath,
+                                             bobPath.LastPart ).ShouldNotBeNull();
+
+        // Tim creates branch "test-1" with a commit and pushes it.
+        CreateBranchAndPush( tim, 1 );
+
+        // Bob hasn't fetched the remote. For him, the "test-1" branch doesn't exist.
+        bob.GetBranch( TestHelper.Monitor, "test-1" ).ShouldBeNull();
+        // Fetching the remotes: now bob has the branch.
+        bob.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
+        var bobBranch = bob.GetBranch( TestHelper.Monitor, "test-1" ).ShouldNotBeNull();
+        // Now bob deletes it.
+        bob.DeleteBranch( TestHelper.Monitor, bobBranch, DeleteGitBranchMode.WithTrackedAndRemoteBranch ).ShouldBeTrue();
+
+        // On Tim side, the branch is here (and tracked).
+        var timBranch = tim.GetBranch( TestHelper.Monitor, "test-1" ).ShouldNotBeNull();
+        timBranch.IsTracking.ShouldBeTrue();
+        tim.Checkout( TestHelper.Monitor, timBranch ).ShouldBeTrue();
+        File.WriteAllText( tim.WorkingFolder.AppendPart( "SomeWork.txt" ), "Hop!" );
+        tim.Commit( TestHelper.Monitor, "For me, test-1 exists." ).ShouldBe( CommitResult.Commited );
+        // Tim fetches the remotes. Nothing can remove the defunct remote branch.
+        tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
+        tim.Repository.Branches["refs/remotes/origin/test-1"].ShouldNotBeNull();
+        tim.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeTrue();
+        // Tim pushes the branch.
+        tim.PushBranch( TestHelper.Monitor, timBranch, autoCreateRemoteBranch : true ).ShouldBeTrue();
+
+        // Bob decides to resurect the "test-1" branch and work on it (this branch is not a tracking branch).
+        bobBranch = bob.EnsureBranch( TestHelper.Monitor, "test-1" ).ShouldNotBeNull();
+        bobBranch.IsTracking.ShouldBeFalse();
+        bob.Checkout( TestHelper.Monitor, bobBranch ).ShouldBeTrue();
+        File.WriteAllText( bob.WorkingFolder.AppendPart( "BobWork.txt" ), "Hop!" );
+        bob.Commit( TestHelper.Monitor, "Bob's working." ).ShouldBe( CommitResult.Commited );
+        bobBranch.IsTracking.ShouldBeFalse();
+
+        // Bob "ckli pull": there's no conflict here but a merged commit is created.
+        bob.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
+        bob.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeTrue();
+        // ==> AROBAS here:
+        bobBranch = bob.Repository.Branches["test-1"];
+        bobBranch.IsTracking.ShouldBeTrue();
+        bobBranch.Tip.Sha.ShouldNotBe( bob.Repository.Branches["origin/test-1"].Tip.Sha );
+
+        // Bob pushes test-1.
+        bob.PushBranch( TestHelper.Monitor, bobBranch, autoCreateRemoteBranch: true ).ShouldBeTrue();
+
+        // Tim "ckli pull": there's no conflict and the "test-1" local branch is simply moved to the "origin/test-1".
+        tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
+        tim.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeTrue();
+        bob.Repository.Branches["test-1"].Tip.Sha.ShouldBe( bob.Repository.Branches["origin/test-1"].Tip.Sha );
+
+    }
+
+    static void CreateBranchAndPush( GitRepository r, int i )
+    {
+        var bName = $"test-{i}";
+        var b = r.EnsureBranch( TestHelper.Monitor, bName ).ShouldNotBeNull();
+        r.Checkout( TestHelper.Monitor, b ).ShouldBeTrue();
+        r.CurrentBranchName.ShouldBe( bName );
+        File.WriteAllText( r.WorkingFolder.AppendPart( $"Some{i}.txt" ), "Hello World!" );
+        r.Commit( TestHelper.Monitor, $"Commit n°{i}." ).ShouldBe( CommitResult.Commited );
+        r.PushBranch( TestHelper.Monitor, b, autoCreateRemoteBranch: true ).ShouldBeTrue();
     }
 }
 
