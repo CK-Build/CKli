@@ -71,29 +71,29 @@ sealed class CKliUpdate : Command
             {updateCmd}
             """ );
 
-        if( RuntimeInformation.IsOSPlatform( OSPlatform.Windows ) )
-        {
-            // This uses windows PowerShell (based on NetFramework 4, the legacy one) should always be available.
-            // The new PowerShell Core (based on .Net) is an opt-in.
-            // FYI, the cmd approach is insane (and not portable anyway).
-            // See https://stackoverflow.com/questions/22558869/wait-for-process-to-end-in-windows-batch-file
-            var cmd = $@"Wait-Process -Id {Environment.ProcessId} -Timeout 20 -ErrorAction SilentlyContinue; {updateCmd};echo ''";
-            Process.Start( new ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = $"-NoProfile -NoLogo -NonInteractive -ExecutionPolicy unrestricted -command {cmd}",
-                UseShellExecute = false
-            } );
-        }
-        else if( RuntimeInformation.IsOSPlatform( OSPlatform.Linux ) || RuntimeInformation.IsOSPlatform( OSPlatform.OSX ) )
-        {
-            // On Unix platforms, use a shell script that waits for the current process to exit.
-            // kill -0 checks if process exists (POSIX standard, works on Linux and macOS).
-            // The wait loop checks every 0.5 seconds with a natural ~20 second timeout.
-            var shellCmd = $"while kill -0 {Environment.ProcessId} 2>/dev/null; do sleep 0.5; done; exec {updateCmd}";
 
-            try
+        try
+        {
+            if( RuntimeInformation.IsOSPlatform( OSPlatform.Windows ) )
             {
+                // This uses windows PowerShell (based on NetFramework 4, the legacy one) should always be available.
+                // The new PowerShell Core (based on .Net) is an opt-in.
+                // FYI, the cmd approach is insane (and not portable anyway).
+                // See https://stackoverflow.com/questions/22558869/wait-for-process-to-end-in-windows-batch-file
+                var cmd = $@"Wait-Process -Id {Environment.ProcessId} -Timeout 20 -ErrorAction SilentlyContinue; {updateCmd};echo ''";
+                Process.Start( new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -NoLogo -NonInteractive -ExecutionPolicy unrestricted -command {cmd}",
+                    UseShellExecute = false
+                } );
+            }
+            else if( RuntimeInformation.IsOSPlatform( OSPlatform.Linux ) || RuntimeInformation.IsOSPlatform( OSPlatform.OSX ) )
+            {
+                // On Unix platforms, use a shell script that waits for the current process to exit.
+                // kill -0 checks if process exists (POSIX standard, works on Linux and macOS).
+                // The wait loop checks every 0.5 seconds with a natural ~20 second timeout.
+                var shellCmd = $"while kill -0 {Environment.ProcessId} 2>/dev/null; do sleep 0.5; done; exec {updateCmd}";
                 var psi = new ProcessStartInfo
                 {
                     FileName = "/bin/sh",
@@ -105,15 +105,15 @@ sealed class CKliUpdate : Command
                 psi.ArgumentList.Add( shellCmd );
                 Process.Start( psi );
             }
-            catch( Exception ex )
+            else
             {
-                monitor.Error( "Unable to start update process.", ex );
-                return ValueTask.FromResult( false );
+                monitor.Warn( $"Auto-update is not supported on this platform. Please run manually:\n{updateCmd}" );
             }
         }
-        else
+        catch( Exception ex )
         {
-            monitor.Warn( $"Auto-update is not supported on this platform. Please run manually:\n{updateCmd}" );
+            monitor.Error( "Unable to start update process.", ex );
+            return ValueTask.FromResult( false );
         }
         return ValueTask.FromResult( true );
     }
