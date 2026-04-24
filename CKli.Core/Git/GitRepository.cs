@@ -670,6 +670,54 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
+    /// Deletes a branch, including its <see cref="Branch.TrackedBranch"/> and/or its remote counterpart (see <see cref="DeleteGitBranchMode"/>).
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="local">The branch to delete.</param>
+    /// <param name="mode">Delete the <see cref="Branch.TrackedBranch"/> and/or the remote branch on the tracked's <see cref="Branch.RemoteName"/>.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool DeleteBranch( IActivityMonitor monitor, Branch local, DeleteGitBranchMode mode )
+    {
+        Throw.CheckArgument( local.IsTracking );
+        try
+        {
+            bool success = true;
+            if( mode != DeleteGitBranchMode.LocalOnly )
+            {
+                var t = local.TrackedBranch;
+                if( t != null )
+                {
+                    bool remoteRemoved = false;
+                    if( mode == DeleteGitBranchMode.WithTrackedAndRemoteBranch )
+                    {
+                        var remoteName = t.RemoteName;
+                        if( remoteName != null )
+                        {
+                            if( !GetRemote( monitor, remoteName, forWrite: true, out var remote, out var creds )
+                                || !Push( monitor, remote, creds, [$":{t.UpstreamBranchCanonicalName}"] ) )
+                            {
+                                return false;
+                            }
+                            remoteRemoved = true;
+                        }
+                    }
+                    if( !remoteRemoved )
+                    {
+                        _git.Branches.Remove( t );
+                    }
+                }
+            }
+            _git.Branches.Remove( local );
+            return success;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While deleting branch '{local.FriendlyName}' in '{DisplayPath}'.", ex );
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Pushes the local's <see cref="Branch.TrackedBranch"/> to its remote.
     /// <para>
     /// if the <see cref="Branch.TrackedBranch"/> exists, its <see cref="Branch.RemoteName"/> must not be null
