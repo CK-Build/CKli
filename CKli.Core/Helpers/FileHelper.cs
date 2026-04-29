@@ -253,7 +253,7 @@ public sealed class FileHelper
     /// <param name="path">The root path to consider. May not exist: nothing is done.</param>
     /// <param name="errorLogLevel">Log level to emit for non removable folders.</param>
     /// <param name="stopOnFirstError">True to stop as soon as an empty folder cannot be deleted.</param>
-    /// <returns>True on success, false is an error occurred.</returns>
+    /// <returns>True on success, false if an error occurred.</returns>
     public static bool DeleteEmptyFoldersBelow( IActivityMonitor monitor,
                                                 string path,
                                                 LogLevel errorLogLevel = LogLevel.Error,

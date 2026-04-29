@@ -457,17 +457,35 @@ public sealed partial class GitRepository : IDisposable
     /// <summary>
     /// Checks out the specified local branch.
     /// If the current head has the same <see cref="Reference.CanonicalName"/>, nothing is done.
-    /// Otherwise, the working folder must be clean (<see cref="CheckCleanCommit(IActivityMonitor)"/>)
-    /// and the branch is checked out.
     /// <para>
     /// If the <paramref name="localBranch"/> is a remote branch this throws an <see cref="ArgumentException"/>:
     /// we should never check out a remote branch, only a local branch (that may track a remote one).
     /// </para>
+    /// <para>
+    /// By default (<paramref name="force"/> is false), the working folder must be clean:
+    /// <see cref="CheckCleanCommit(IActivityMonitor)"/> is called.
+    /// </para>
+    /// <para>
+    /// By default (<paramref name="resetWorkingFolder"/> is true), the working folder is reset, any
+    /// untracked or ignored files are removed.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="localBranch">The local branch to check out.</param>
+    /// <param name="force">True to allow the working folder to initially be dirty (local modifications will be lost).</param>
+    /// <param name="deleteUntracked">False to keep the untracked files.</param>
+    /// <param name="deleteIgnored">
+    /// True to delete the ignored files. This defaults to false for 2 reasons:
+    /// <list type="number">
+    ///     <item>Enumerating the ignored entries can be costly (think to an ignored node_modules).</item>
+    ///     <item>This is useful to obtain a pristine working folder. Usually, ignored files don't harm.</item>
+    /// </list>
     /// <returns>True on success, false on error.</returns>
-    public bool Checkout( IActivityMonitor monitor, Branch localBranch )
+    public bool Checkout( IActivityMonitor monitor,
+                          Branch localBranch,
+                          bool force = false,
+                          bool deleteUntracked = true,
+                          bool deleteIgnored = false )
     {
         Throw.CheckArgument( !localBranch.Reference.IsRemoteTrackingBranch );
 
@@ -475,18 +493,69 @@ public sealed partial class GitRepository : IDisposable
         {
             return true;
         }
-        if( !CheckCleanCommit( monitor ) )
+        return DoCheckout( monitor, force, deleteUntracked, deleteIgnored, localBranch.FriendlyName, ( r, o ) => Commands.Checkout( r, localBranch, o ) );
+    }
+
+    /// <summary>
+    /// Checks out the specified commit: the repository is in a "detached head" state.
+    /// If the current head is already detached on the <paramref name="commit"/> (and not on a branch), nothing is done.
+    /// <para>
+    /// By default (<paramref name="force"/> is false), the working folder must be clean:
+    /// <see cref="CheckCleanCommit(IActivityMonitor)"/> is called.
+    /// </para>
+    /// <para>
+    /// By default (<paramref name="resetWorkingFolder"/> is true), the working folder is reset, any
+    /// untracked or ignored files are removed.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="localBranch">The local branch to check out.</param>
+    /// <param name="force">True to allow the working folder to initially be dirty (local modifications will be lost).</param>
+    /// <param name="deleteUntracked">False to keep the untracked files.</param>
+    /// <param name="deleteIgnored">
+    /// True to delete the ignored files. This defaults to false for 2 reasons:
+    /// <list type="number">
+    ///     <item>Enumerating the ignored entries can be costly (think to an ignored node_modules).</item>
+    ///     <item>This is useful to obtain a pristine working folder. Usually, ignored files don't harm.</item>
+    /// </list>
+    /// <returns>True on success, false on error.</returns>
+    public bool Checkout( IActivityMonitor monitor,
+                          Commit commit,
+                          bool force = false,
+                          bool deleteUntracked = true,
+                          bool deleteIgnored = false )
+    {
+        var head = _git.Head;
+        if( head.Reference.CanonicalName == "HEAD" && head.Tip.Sha == commit.Sha  )
+        {
+            return true;
+        }
+        return DoCheckout( monitor, force, deleteUntracked, deleteIgnored, commit.Sha, ( r, o ) => Commands.Checkout( r, commit, o ) );
+    }
+
+    bool DoCheckout( IActivityMonitor monitor,
+                     bool force,
+                     bool deleteUntracked,
+                     bool deleteIgnored,
+                     string name,
+                     Action<Repository, CheckoutOptions> checkout )
+    {
+        if( !force && !CheckCleanCommit( monitor ) )
         {
             return false;
         }
         try
         {
-            Commands.Checkout( _git, localBranch );
+            checkout( _git, new CheckoutOptions { CheckoutModifiers = force ? CheckoutModifiers.Force : CheckoutModifiers.None } );
+            if( deleteUntracked || deleteIgnored )
+            {
+                ResetHard( monitor, out _, deleteUntracked, deleteIgnored );
+            }
             return true;
         }
         catch( Exception ex )
         {
-            monitor.Error( $"Checking out '{DisplayPath}/{localBranch.FriendlyName}' failed.", ex );
+            monitor.Error( $"Checking out '{DisplayPath}/{name}' failed.", ex );
             return false;
         }
     }
@@ -1081,55 +1150,62 @@ public sealed partial class GitRepository : IDisposable
 
     /// <summary>
     /// Resets the index to the tree recorded by the commit, updates the working directory to
-    /// match the content of the index and by default tries to removes untracked files.
+    /// match the content of the index and by default tries to removes untracked (but not ignored) files and folders.
     /// <para>
-    /// When removing of an untracked file fails, this returns true, warnings are emitted and
-    /// <paramref name="remainingUntrackedFiles"/> is not null and contains the paths relative to
+    /// When removing of an untracked or ignored file fails, this returns true, warnings are emitted and
+    /// <paramref name="failedDelete"/> is not null and contains the paths relative to
     /// the <see cref="WorkingFolder"/> that failed to be deleted.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="remainingUntrackedFiles">Outputs the untracked files that remains on the file system.</param>
-    /// <param name="tryDeleteUntrackedFiles">False to not try to delete untracked files.</param>
+    /// <param name="failedDelete">Outputs the untracked files or folders that remains on the file system.</param>
+    /// <param name="deleteUntracked">False to keep the untracked files.</param>
+    /// <param name="deleteIgnored">
+    /// True to delete the ignored files. This defaults to false for 2 reasons:
+    /// <list type="number">
+    ///     <item>Enumerating the ignored entries can be costly (think to an ignored node_modules).</item>
+    ///     <item>This is useful to obtain a pristine working folder. Usually, ignored files don't harm.</item>
+    /// </list>
+    /// </param>
     /// <returns>True on success, false on error.</returns>
     public bool ResetHard( IActivityMonitor monitor,
-                           out List<string>? remainingUntrackedFiles,
-                           bool tryDeleteUntrackedFiles = true )
+                           out List<string>? failedDelete,
+                           bool deleteUntracked = true,
+                           bool deleteIgnored = false )
     {
         using var _ = monitor.OpenInfo( $"Hard reset of '{DisplayPath}'." );
-        remainingUntrackedFiles = null;
+        failedDelete = null;
         try
         {
             _git.Reset( ResetMode.Hard );
-            var status = _git.RetrieveStatus( new StatusOptions { IncludeIgnored = false } );
-            int untrackedCount = status.Untracked.Count();
-            if( untrackedCount > 0 )
+            if( deleteUntracked || deleteIgnored )
             {
-                if( tryDeleteUntrackedFiles )
+                var status = _git.RetrieveStatus( new StatusOptions
                 {
-                    using( monitor.OpenTrace( $"Attempting to delete {untrackedCount} untracked files." ) )
+                    IncludeUntracked = deleteUntracked,
+                    DetectRenamesInIndex = false,
+                    IncludeIgnored = deleteIgnored
+                } );
+                foreach( var e in status.Ignored.Concat( status.Untracked ) )
+                {
+                    var eName = e.FilePath;
+                    var fullPath = Path.Combine( _workingFolder, eName );
+                    if( !(eName[^1] == '/'
+                            ? FileHelper.DeleteFolder( monitor, fullPath )
+                            : FileHelper.DeleteFile( monitor, fullPath )) )
                     {
-                        foreach( var e in status.Untracked )
-                        {
-                            if( !FileHelper.DeleteFile( monitor, Path.Combine( _workingFolder, e.FilePath ) ) )
-                            {
-                                remainingUntrackedFiles ??= new List<string>();
-                                remainingUntrackedFiles.Add( e.FilePath );
-                            }
-                        }
-                        if( remainingUntrackedFiles != null )
-                        {
-                            monitor.Warn( $"""
-                            Failed to delete untracked files:
-                            {remainingUntrackedFiles.Concatenate( Environment.NewLine )}
-                            """ );
-                        }
+                        failedDelete ??= new List<string>();
+                        failedDelete.Add( eName );
                     }
                 }
-                else
+                if( failedDelete != null )
                 {
-                    remainingUntrackedFiles = status.Untracked.Select( e => e.FilePath ).ToList();
+                    monitor.Warn( $"""
+                        Failed to delete untracked or ignored files or folders:
+                        {failedDelete.Concatenate( Environment.NewLine )}
+                        """ );
                 }
+                FileHelper.DeleteEmptyFoldersBelow( monitor, _workingFolder, LogLevel.Warn );
             }
             return true;
         }
