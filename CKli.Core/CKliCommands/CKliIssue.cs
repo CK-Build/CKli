@@ -107,14 +107,19 @@ public sealed class CKliIssue : Command
                                     {
                                         try
                                         {
-                                            if( !i.ManualFix && !await i.ExecuteAsync( monitor, context, world ).ConfigureAwait( false ) )
+                                            if( !i.ManualFix )
                                             {
-                                                return false;
+                                                if( !await i.ExecuteAsync( monitor, context, world ).ConfigureAwait( false ) )
+                                                {
+                                                    monitor.CloseGroup( $"Fixing '{i.Title}' failed." );
+                                                    return false;
+                                                }
                                             }
+                                            monitor.Info( $"Fixed '{i.Title}'." );
                                         }
                                         catch( Exception ex )
                                         {
-                                            monitor.Error( ex );
+                                            monitor.Error( $"While fixing '{i.Title}'.", ex );
                                             return false;
                                         }
                                     }
