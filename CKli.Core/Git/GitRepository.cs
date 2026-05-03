@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using static Microsoft.IO.RecyclableMemoryStreamManager;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core;
@@ -976,41 +977,43 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
-    /// Commits any pending changes.
+    /// Commits any pending changes. By default, no commit is created if there's nothing to commit.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="commitMessage">
     /// Required commit message.
-    /// This is ignored when <see cref="CommitBehavior.AmendIfPossibleAndKeepPreviousMessage"/> is used and <see cref="CanAmendCommit"/> is true.
+    /// This is ignored when the <see cref="CommitBehavior.AmendIfPossibleAndKeepPreviousMessage"/> value is used and <see cref="CanAmendCommit"/> is true.
     /// </param>
     /// <param name="commitBehavior">
-    /// True to call <see cref="AmendCommit"/> if <see cref="CanAmendCommit"/>. is true.
+    /// Whether <see cref="AmendCommit"/> must be called or a empty commit must be created when there's nothing to commit.
     /// </param>
     /// <returns>True on success, false on error.</returns>
     public CommitResult Commit( IActivityMonitor monitor, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit )
     {
-        if( commitBehavior != CommitBehavior.CreateNewCommit && CanAmendCommit )
+        if( commitBehavior != CommitBehavior.CreateNewCommit
+            && commitBehavior != CommitBehavior.CreateEmptyCommit
+            && CanAmendCommit )
         {
             Func<string, string>? modified = null;
             switch( commitBehavior )
             {
-                case CommitBehavior.CreateNewCommit:
-                    Throw.InvalidOperationException();
-                    break;
                 case CommitBehavior.AmendIfPossibleAndKeepPreviousMessage:
                     modified = p => p;
                     break;
                 case CommitBehavior.AmendIfPossibleAndAppendPreviousMessage:
                     Throw.CheckNotNullOrWhiteSpaceArgument( commitMessage );
-                    modified = p => $"{commitMessage}(...)\r\n{p}";
+                    modified = p => $"{commitMessage}{Environment.NewLine}(...){Environment.NewLine}{p}";
                     break;
                 case CommitBehavior.AmendIfPossibleAndPrependPreviousMessage:
                     Throw.CheckNotNullOrWhiteSpaceArgument( commitMessage );
-                    modified = p => $"{p} (...)\r\n{commitMessage}";
+                    modified = p => $"{p}{Environment.NewLine}(...){Environment.NewLine}{commitMessage}";
                     break;
                 case CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage:
                     Throw.CheckNotNullOrWhiteSpaceArgument( commitMessage );
                     modified = p => commitMessage;
+                    break;
+                default:
+                    Throw.NotSupportedException();
                     break;
             }
             return AmendCommit( monitor, modified );
@@ -1022,10 +1025,18 @@ public sealed partial class GitRepository : IDisposable
             var s = _git.RetrieveStatus( _checkDirtyOptions );
             if( !s.IsDirty )
             {
-                monitor.CloseGroup( "Working folder is up-to-date." );
-                return CommitResult.NoChanges;
+                if( commitBehavior == CommitBehavior.CreateNewCommit )
+                {
+                    monitor.CloseGroup( "Working folder is up-to-date." );
+                    return CommitResult.NoChanges;
+                }
+                Throw.DebugAssert( commitBehavior == CommitBehavior.CreateEmptyCommit );
+                _git.Commit( commitMessage, _author, _committer, new CommitOptions { AllowEmptyCommit = true } );
+                monitor.CloseGroup( "Empty commit created." );
+                return CommitResult.Commited;
             }
-            return DoCommit( monitor, commitMessage, _committer.When, false );
+            _git.Commit( commitMessage, Author, _committer );
+            return CommitResult.Commited;
         }
     }
 
@@ -1037,18 +1048,14 @@ public sealed partial class GitRepository : IDisposable
     /// <param name="editMessage">
     /// Optional message transformer. By returning null, the operation is canceled and false is returned.
     /// </param>
-    /// <param name="editDate">
-    /// Optional date transformer. By returning null, the operation is canceled and false is returned.
-    /// </param>
-    /// <param name="skipIfNothingToCommit">
-    /// By default, no amend is done if working folder is up to date.
-    /// False will force the amend to be done if the date or message changed even if the working folder is clean.
+    /// <param name="allowEmptyCommit">
+    /// By default, nothing is done if working folder is up to date.
+    /// True will force an amended commit with the changed message even if the working folder is clean.
     /// </param>
     /// <returns>True on success, false on error.</returns>
     public CommitResult AmendCommit( IActivityMonitor monitor,
                                      Func<string, string>? editMessage = null,
-                                     Func<DateTimeOffset, DateTimeOffset?>? editDate = null,
-                                     bool skipIfNothingToCommit = true )
+                                     bool allowEmptyCommit = false )
     {
         if( !CanAmendCommit ) throw new InvalidOperationException( nameof( CanAmendCommit ) );
         using( monitor.OpenInfo( $"Amending Commit in '{DisplayPath}' (branch '{CurrentBranchName}')." ) )
@@ -1060,91 +1067,29 @@ public sealed partial class GitRepository : IDisposable
                 monitor.CloseGroup( "Canceled by empty message." );
                 return CommitResult.Error;
             }
-            DateTimeOffset initialDate = _git.Head.Tip.Committer.When;
-            DateTimeOffset? date = initialDate;
-            if( editDate != null ) date = editDate( date.Value );
-            if( date == null )
-            {
-                monitor.CloseGroup( "Canceled by null date." );
-                return CommitResult.Error;
-            }
             Commands.Stage( _git, "*" );
             var s = _git.RetrieveStatus( _checkDirtyOptions );
             bool hasChange = s.IsDirty;
-            if( hasChange )
+            if( !s.IsDirty )
             {
-                if( editDate == null )
-                {
-                    var minDate = initialDate.AddSeconds( 1 );
-                    date = DateTimeOffset.Now;
-                    if( date < minDate )
-                    {
-                        monitor.Trace( "Adjusted commit date to the next second." );
-                        date = minDate;
-                    }
-                }
-            }
-            else
-            {
-                if( !skipIfNothingToCommit )
+                if( allowEmptyCommit )
                 {
                     bool messageUpdate = message != _git.Head.Tip.Message;
-                    bool dateUpdate = date.Value != _git.Head.Tip.Committer.When;
-                    if( messageUpdate && dateUpdate )
-                    {
-                        monitor.Info( "Updating message and date." );
-                    }
-                    else if( dateUpdate )
-                    {
-                        monitor.Info( "Updating commit date." );
-                    }
-                    else if( messageUpdate )
+                    if( messageUpdate )
                     {
                         monitor.Info( "Only updating message." );
                     }
-                    else skipIfNothingToCommit = true;
+                    else allowEmptyCommit = false;
                 }
-                if( skipIfNothingToCommit )
+                if( !allowEmptyCommit )
                 {
                     monitor.CloseGroup( "Working folder is up-to-date." );
                     return CommitResult.NoChanges;
                 }
             }
-            return DoCommit( monitor, message, date.Value, true );
-        }
-    }
-
-    CommitResult DoCommit( IActivityMonitor monitor, string commitMessage, DateTimeOffset date, bool amendPreviousCommit )
-    {
-        try
-        {
-            // Here the date is provided, we cannot use the _author.
-            Signature? author = amendPreviousCommit ? _git.Head.Tip.Author : (_git.Config.BuildSignature( date ) ?? _committer);
-            // Let AllowEmptyCommit even when amending: this avoids creating an empty commit.
-            // If we are not amending, this is an error and we let the EmptyCommitException pops.
-            var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
-            try
-            {
-                Commit commit = _git.Commit( commitMessage, author, _committer, options );
-                monitor.CloseGroup( "Committed changes." );
-                return amendPreviousCommit ? CommitResult.Amended : CommitResult.Commited;
-            }
-            catch( EmptyCommitException )
-            {
-                if( !amendPreviousCommit ) throw;
-                Throw.DebugAssert( "This check on merge commit is already done by LibGit2Sharp.", _git.Head.Tip.Parents.Count() == 1 );
-                monitor.Trace( "No actual changes. Resetting branch to parent commit." );
-                _git.Reset( ResetMode.Hard, _git.Head.Tip.Parents.Single() );
-                Throw.DebugAssert( options.AmendPreviousCommit = true );
-                string sha = _git.Head.Tip.Sha;
-                _git.Commit( commitMessage, author, _committer, options );
-                return sha == _git.Head.Tip.Sha ? CommitResult.NoChanges : CommitResult.Amended;
-            }
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( ex );
-            return CommitResult.Error;
+            var options = new CommitOptions { AmendPreviousCommit = true, AllowEmptyCommit = true };
+            _git.Commit( message, _author, _committer, options );
+            return CommitResult.Amended;
         }
     }
 

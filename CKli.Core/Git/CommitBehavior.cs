@@ -6,9 +6,15 @@ namespace CKli.Core;
 public enum CommitBehavior
 {
     /// <summary>
-    /// Always create a new commit.
+    /// Don't try to amend the current commit.
+    /// Creates a new commit if there's something to commit or does nothing if there's nothing to commit.
     /// </summary>
     CreateNewCommit,
+
+    /// <summary>
+    /// Don't try to amend the current commit and always create a new commit even if there's something to commit.
+    /// </summary>
+    CreateEmptyCommit,
 
     /// <summary>
     /// Amends the commit if possible, keeping the previous message.

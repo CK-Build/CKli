@@ -175,6 +175,7 @@ public partial class PullPushTests
     }
 
 
+    // AROBAS: "Automatic Remote Origin Branch Association Strategy".
     [Test]
     public void delete_branch_and_AROBAS()
     {
