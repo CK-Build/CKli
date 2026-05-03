@@ -31,6 +31,7 @@ public sealed partial class GitRepository : IDisposable
                    in NormalizedPath fullPath,
                    in NormalizedPath displayPath )
     {
+        Throw.CheckNotNullArgument( committer );
         Throw.CheckNotNullArgument( repositoryKey );
         Throw.CheckNotNullArgument( libRepository );
 
@@ -1031,7 +1032,7 @@ public sealed partial class GitRepository : IDisposable
                     return CommitResult.NoChanges;
                 }
                 Throw.DebugAssert( commitBehavior == CommitBehavior.CreateEmptyCommit );
-                _git.Commit( commitMessage, _author, _committer, new CommitOptions { AllowEmptyCommit = true } );
+                _git.Commit( commitMessage, Author, _committer, new CommitOptions { AllowEmptyCommit = true } );
                 monitor.CloseGroup( "Empty commit created." );
                 return CommitResult.Commited;
             }
@@ -1088,7 +1089,7 @@ public sealed partial class GitRepository : IDisposable
                 }
             }
             var options = new CommitOptions { AmendPreviousCommit = true, AllowEmptyCommit = true };
-            _git.Commit( message, _author, _committer, options );
+            _git.Commit( message, Author, _committer, options );
             return CommitResult.Amended;
         }
     }
