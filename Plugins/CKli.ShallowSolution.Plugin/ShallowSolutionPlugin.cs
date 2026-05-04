@@ -64,6 +64,30 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
     }
 
     /// <summary>
+    /// Same as <see cref="GetShallowSolution(IActivityMonitor, Repo, Branch)"/> except that the ".slnx" file may not exist.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="repo">The repository.</param>
+    /// <param name="branch">The branch from which the solution must be read.</param>
+    /// <param name="solution">Outputs the loaded solution if the ".slnx" file exists and no error occurred.</param>
+    /// <returns>True on success (the <paramref name="solution"/> may be null), false on error.</returns>
+    public bool TryGetShallowSolution( IActivityMonitor monitor, Repo repo, Branch branch, out GitSolution? solution )
+    {
+        var (files, doc) = GetSolutionXDocument( monitor, repo, branch, required: false );
+        if( doc == null )
+        {
+            solution = null;
+            return files != null;
+        }
+        using( monitor.OpenInfo( $"Loading shallow solution from '{repo.DisplayPath}' branch '{branch.FriendlyName}'." ) )
+        {
+            Throw.DebugAssert( files != null );
+            solution = DoLoadSolution( monitor, repo, branch, files, doc );
+            return solution != null;
+        }
+    }
+
+    /// <summary>
     /// Creates a <see cref="GitSolution"/> from a root ".slnx" file that must be conventionally named
     /// with the current repository name: this is used in the "Hot Zone", we don't handles renaming or
     /// legacy .sln format here as the "Hot Zone" is up-to-date by design.
@@ -77,25 +101,31 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
         Throw.CheckArgument( !branch.IsRemote );
         using( monitor.OpenInfo( $"Loading shallow solution from '{repo.DisplayPath}' branch '{branch.FriendlyName}'." ) )
         {
-            var (files, doc) = GetSolutionXDocument( monitor, repo, branch );
+            var (files, doc) = GetSolutionXDocument( monitor, repo, branch, required: true );
             if( doc == null )
             {
                 return null;
             }
-            var s = new GitSolution( repo, branch );
-            if( !CommonSolution.LoadAllProjectFiles( monitor,
-                                                     files,
-                                                     doc.Root!,
-                                                     LoadOptions.PreserveWhitespace,
-                                                     s.AddProjectFile ) )
-            {
-                return null;
-            }
-            return s;
+            Throw.DebugAssert( files != null );
+            return DoLoadSolution( monitor, repo, branch, files, doc );
         }
     }
 
-    (INormalizedFileProvider, XDocument?) GetSolutionXDocument( IActivityMonitor monitor, Repo repo, Branch branch )
+    static GitSolution? DoLoadSolution( IActivityMonitor monitor, Repo repo, Branch branch, INormalizedFileProvider files, XDocument doc )
+    {
+        var s = new GitSolution( repo, branch );
+        if( !CommonSolution.LoadAllProjectFiles( monitor,
+                                                 files,
+                                                 doc.Root!,
+                                                 LoadOptions.PreserveWhitespace,
+                                                 s.AddProjectFile ) )
+        {
+            return null;
+        }
+        return s;
+    }
+
+    (INormalizedFileProvider?, XDocument?) GetSolutionXDocument( IActivityMonitor monitor, Repo repo, Branch branch, bool required )
     {
         var gitFromBranch = ((IBelongToARepository)branch).Repository;
         Throw.CheckArgument( repo.GitRepository.Repository == gitFromBranch );
@@ -105,7 +135,10 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
         var solutionInfo = root.GetFileInfo( expectedName );
         if( solutionInfo == null )
         {
-            monitor.Error( $"Expecting file '{expectedName}' in '{repo.DisplayPath}', branch '{branch.FriendlyName}'." );
+            if( required )
+            {
+                monitor.Error( $"Expecting file '{expectedName}' in '{repo.DisplayPath}', branch '{branch.FriendlyName}'." );
+            }
             return (root, null);
         }
         try
@@ -118,8 +151,8 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
         catch( Exception ex )
         {
             monitor.Error( $"While loading '{repo.DisplayPath}/{expectedName}' solution in branch '{branch.FriendlyName}'.", ex );
+            return (null, null);
         }
-        return (root, null);
     }
 
     /// <summary>
