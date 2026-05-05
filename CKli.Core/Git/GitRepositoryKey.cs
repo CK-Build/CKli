@@ -23,6 +23,16 @@ public partial class GitRepositoryKey
     public const string FileSystemPrefixPAT = "FILESYSTEM_GIT";
 
     /// <summary>
+    /// The fake remote url used by bare repositories.
+    /// </summary>
+    public const string BareRepositoryFakeUrl = "file://Bare-Fake-Remote/";
+
+    /// <summary>
+    /// The fake remote url used by orphan repositories.
+    /// </summary>
+    public const string OrphanRepositoryFakeUrl = "file://Orphan-Fake-Remote/";
+
+    /// <summary>
     /// An equality comparer for Url that uses <see cref="StringComparer.OrdinalIgnoreCase"/>.
     /// </summary>
     public static readonly IEqualityComparer<Uri> OrdinalIgnoreCaseUrlEqualityComparer = new UriComparer();
@@ -32,6 +42,9 @@ public partial class GitRepositoryKey
     IGitRepositoryAccessKey? _accessKey;
     string? _repoName;
     bool _isPublic;
+
+    static Uri? _bareFakeUrl;
+    static Uri? _orphanFakeUrl;
 
     /// <summary>
     /// Initializes a new <see cref="GitRepositoryKey"/>.
@@ -75,6 +88,30 @@ public partial class GitRepositoryKey
     }
 
     /// <summary>
+    /// Creates a <see cref="GitRepositoryKey"/> for a bare repository without remote origin: <see cref="OriginUrl"/> is <see cref="BareRepositoryFakeUrl"/>.
+    /// </summary>
+    /// <param name="secretsStore">The secrets store to use.</param>
+    /// <param name="isPublic">Whether this repository is public.</param>
+    /// <returns>The repository key on success, null on error.</returns>
+    public static GitRepositoryKey CreateBareRepositoryKey( ISecretsStore secretsStore, bool isPublic )
+    {
+        _bareFakeUrl ??= new Uri( BareRepositoryFakeUrl );
+        return new GitRepositoryKey( _bareFakeUrl, isPublic, secretsStore );
+    }
+
+    /// <summary>
+    /// Creates a <see cref="GitRepositoryKey"/> for an orphan repository that has no remote origin: <see cref="OriginUrl"/> is <see cref="OrphanRepositoryFakeUrl"/>.
+    /// </summary>
+    /// <param name="secretsStore">The secrets store to use.</param>
+    /// <param name="isPublic">Whether this repository is public.</param>
+    /// <returns>The repository key on success, null on error.</returns>
+    public static GitRepositoryKey CreateOrphanRepositoryKey( ISecretsStore secretsStore, bool isPublic )
+    {
+        _orphanFakeUrl ??= new Uri( OrphanRepositoryFakeUrl );
+        return new GitRepositoryKey( _orphanFakeUrl, isPublic, secretsStore );
+    }
+
+    /// <summary>
     /// Gets whether the Git repository is public.
     /// </summary>
     public bool IsPublic => _isPublic;
@@ -90,7 +127,9 @@ public partial class GitRepositoryKey
     /// <summary>
     /// Gets the access key for this repository.
     /// </summary>
-    public IGitRepositoryAccessKey AccessKey => _accessKey ??= GitRepositoryAccessKey.Get( _secretsStore, _originUrl, _isPublic );
+    public IGitRepositoryAccessKey AccessKey => _accessKey ??= IsBareRepository || IsOrphanRepository
+                                                                ? GitRepositoryAccessKey.GetFileSystemAccessKey( _secretsStore )
+                                                                : GitRepositoryAccessKey.Get( _secretsStore, _originUrl, _isPublic );
 
     /// <summary>
     /// Attempts to retrieve the Git hosting provider and normalized repository path for this <see cref="OriginUrl"/>.
@@ -119,6 +158,16 @@ public partial class GitRepositoryKey
     /// </summary>
     [MemberNotNull( nameof( _repoName ) )]
     public string RepositoryName => _repoName ??= new string( System.IO.Path.GetFileName( _originUrl.ToString().AsSpan() ) );
+
+    /// <summary>
+    /// Gets whether this key is for a bare repository: the <see cref="OriginUrl"/> is <see cref="BareRepositoryFakeUrl"/>.
+    /// </summary>
+    public bool IsBareRepository => ReferenceEquals( _originUrl.OriginalString, BareRepositoryFakeUrl );
+
+    /// <summary>
+    /// Gets whether this key is for an orphan repository: the <see cref="OriginUrl"/> is <see cref="OrphanRepositoryFakeUrl"/>.
+    /// </summary>
+    public bool IsOrphanRepository => ReferenceEquals( _originUrl.OriginalString, OrphanRepositoryFakeUrl );
 
     /// <summary>
     /// Gets whether this <see cref="RepositoryName"/> ends with "-Stack" (case insensitive) and the prefix, the stack name,
@@ -211,8 +260,11 @@ public partial class GitRepositoryKey
     }
 
     /// <summary>
-    /// Extension point to be used by external "Core plugins" to support specific url formats and hosting providers.
+    /// Extension point (factory method for <see cref="IGitRepositoryAccessKey"/>) to be used by external "Core plugins"
+    /// in order to support specific url formats and hosting providers.
+    /// <para>
     /// If the <paramref name="hostingProviderFactory"/> is null, the created access key will have no hosting provider. 
+    /// </para>
     /// </summary>
     /// <param name="prefixPAT">The <see cref="IGitRepositoryAccessKey.PrefixPAT"/> that identifies the key.</param>
     /// <param name="secretsStore">The secret store.</param>

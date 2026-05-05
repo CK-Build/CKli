@@ -108,13 +108,15 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                                 HttpClient client,
                                                                                 NormalizedPath repoPath,
                                                                                 bool isPrivate,
-                                                                                CancellationToken cancellation = default )
+                                                                                string defaultBranchName,
+                                                                                CancellationToken cancellation )
     {
         var request = new GitHubCreateRepoRequest
         {
             Name = repoPath.LastPart,
             Description = "Created by CKli.",
             Private = isPrivate,
+            DefaultBranch = defaultBranchName,
         };
 
         // Determine if we're creating inside an organization or for the authenticated user

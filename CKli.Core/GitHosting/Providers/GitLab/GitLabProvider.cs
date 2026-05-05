@@ -114,6 +114,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
                                                                                 HttpClient client,
                                                                                 NormalizedPath repoPath,
                                                                                 bool isPrivate,
+                                                                                string defaultBranchName,
                                                                                 CancellationToken cancellation = default )
     {
         // First, try to get the namespace ID for the parent path.
@@ -129,7 +130,8 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
             Path = repoPath.LastPart,
             Description = "Created by CKli.",
             Visibility = isPrivate ? "private" : "public",
-            NamespaceId = namespaceId
+            NamespaceId = namespaceId,
+            DefaultBranch = defaultBranchName
         };
         var response = await client.PostAsJsonAsync( "projects", request, cancellation );
         if( !response.IsSuccessStatusCode )

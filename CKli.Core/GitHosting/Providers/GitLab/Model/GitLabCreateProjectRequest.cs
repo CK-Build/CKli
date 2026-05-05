@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 namespace CKli.Core.GitHosting.Providers;
 
@@ -25,7 +25,14 @@ internal sealed class GitLabCreateProjectRequest
     [JsonIgnore( Condition = JsonIgnoreCondition.WhenWritingNull )]
     public long? NamespaceId { get; set; }
 
+    [JsonPropertyName( "default_branch" )]
+    public string? DefaultBranch { get; set; }
+
+    /// <summary>
+    /// Always true to be able to specify the default branch.
+    /// See https://docs.gitlab.com/api/projects/#create-a-project.
+    /// </summary>
     [JsonPropertyName( "initialize_with_readme" )]
-    public bool InitializeWithReadme { get; set; }
+    public bool InitializeWithReadme { get; } = true;
 }
 

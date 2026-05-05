@@ -129,7 +129,7 @@ public class FileSystemProviderTests
     }
 
     [Test]
-    public async Task creating_repo_without_options_Async()
+    public async Task creating_repo_Async()
     {
         var secretsStore = new RecordingSecretsStore();
         var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
@@ -141,7 +141,7 @@ public class FileSystemProviderTests
         try
         {
             var repoPath = new NormalizedPath( tempPath ).AppendPart( "Repo1" );
-            var info = await p.CreateRepositoryAsync( TestHelper.Monitor, repoPath );
+            var info = await p.CreateRepositoryAsync( TestHelper.Monitor, repoPath, defaultBranchName: "some-default" );
             info.ShouldNotBeNull();
             info.CloneUrl.ShouldNotBeNull().ShouldBe( "file://" + repoPath );
 
@@ -150,41 +150,12 @@ public class FileSystemProviderTests
 
             using var cloned = new Repository( Repository.Clone( uri.LocalPath, clonePath ) );
             cloned.ShouldNotBeNull();
-            cloned.Head.FriendlyName.ShouldBe( "master" );
+            // The default branch name is honored.
+            cloned.Head.FriendlyName.ShouldBe( "some-default" );
         }
         finally
         {
-            TestHelper.CleanupFolder( tempPath, ensureFolderAvailable: false );
-        }
-    }
-    [Test]
-    public async Task creating_repo_with_options_are_ignored_Async()
-    {
-        var secretsStore = new RecordingSecretsStore();
-        var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p = key.AccessKey.HostingProvider;
-        p.ShouldNotBeNull();
-
-        // The parent of the .git folder must not exist.
-        var tempPath = FileUtil.CreateUniqueTimedFolder( Path.GetTempPath(), "CKli-repo-tests", DateTime.UtcNow );
-        try
-        {
-            var repoPath = new NormalizedPath( tempPath ).AppendPart( "Repo1" );
-            var info = await p.CreateRepositoryAsync( TestHelper.Monitor, repoPath );
-            info.ShouldNotBeNull();
-            info.CloneUrl.ShouldNotBeNull().ShouldBe( "file://" + repoPath );
-
-            var clonePath = new NormalizedPath( tempPath ).AppendPart( "Cloned" );
-            var uri = new Uri( info.CloneUrl );
-
-            using var cloned = new Repository( Repository.Clone( uri.LocalPath, clonePath ) );
-            cloned.ShouldNotBeNull();
-            // Unfortunately...
-            cloned.Head.FriendlyName.ShouldBe( "master" );
-        }
-        finally
-        {
-            TestHelper.CleanupFolder( tempPath, ensureFolderAvailable: false );
+            FileHelper.DeleteFolder( TestHelper.Monitor, tempPath );
         }
     }
 }

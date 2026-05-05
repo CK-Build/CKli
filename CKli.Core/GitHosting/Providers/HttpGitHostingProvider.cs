@@ -100,6 +100,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     public sealed override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                                     NormalizedPath repoPath,
                                                                                     bool? isPrivate = null,
+                                                                                    string defaultBranchName = "main",
                                                                                     CancellationToken cancellation = default )
     {
         bool fPrivate = isPrivate ?? !IsDefaultPublic;
@@ -110,7 +111,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         try
         {
-            return await CreateRepositoryAsync( monitor, client, repoPath, fPrivate, cancellation ).ConfigureAwait( false );
+            return await CreateRepositoryAsync( monitor, client, repoPath, fPrivate, defaultBranchName, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -130,12 +131,14 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     /// <param name="client">The http client to use.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
     /// <param name="isPrivate">Whether the repository must be private (or public).</param>
+    /// <param name="defaultBranchName">The default branch name to initialize.</param>
     /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The created repository info or null on error.</returns>
     protected abstract Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                           HttpClient client,
                                                                           NormalizedPath repoPath,
                                                                           bool isPrivate,
+                                                                          string defaultBranchName,
                                                                           CancellationToken cancellation );
 
     /// <inheritdoc />

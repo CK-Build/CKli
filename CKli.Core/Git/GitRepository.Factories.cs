@@ -1,8 +1,10 @@
 using CK.Core;
 using LibGit2Sharp;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core;
@@ -36,65 +38,123 @@ public sealed partial class GitRepository
     }
 
     /// <summary>
-    /// Initializes a new Git repository in the specified working folder.
+    /// Initializes a new bare repository in the specified working folder.
+    /// The <see cref="GitRepositoryKey.OriginUrl"/> is <see cref="GitRepositoryKey.BareRepositoryFakeUrl"/>: a
+    /// bare repository has no associated remote origin.
     /// <para>
-    /// Unlike <see cref="Clone"/>, this creates a new repository locally rather than cloning from a remote.
-    /// An "origin" remote is set to the specified URL (can be a file:// URL for local-only stacks).
+    /// No commit can be done directly in a bare repository but the repository is initialized with an initial empty commit
+    /// and its default branch and head is the provided <paramref name="branchName"/>.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="secretsStore">The secrets store for credentials.</param>
-    /// <param name="committer">The signature to use when modifying the repository.</param>
     /// <param name="workingFolder">The local working folder to initialize.</param>
-    /// <param name="displayPath">
-    /// The short path to display, relative to a well known root. It must not be empty.
-    /// </param>
+    /// <param name="displayPath">The short path to display, relative to a well known root. It must not be empty.</param>
     /// <param name="isPublic">Whether this repository is public or private.</param>
-    /// <param name="originUrl">The URL to set as the "origin" remote. Can be a file:// URL for local-only stacks.</param>
+    /// <param name="committer">The signature to use for the initial empty commit. "CKli (none)" is used by default.</param>
     /// <param name="branchName">The initial branch name. Defaults to "main".</param>
     /// <returns>The GitRepository object or null on error.</returns>
-    public static GitRepository? Init( IActivityMonitor monitor,
-                                       ISecretsStore secretsStore,
-                                       Signature committer,
-                                       NormalizedPath workingFolder,
-                                       NormalizedPath displayPath,
-                                       bool isPublic,
-                                       Uri originUrl,
-                                       string branchName = "main" )
+    public static GitRepository? InitBareRepository( IActivityMonitor monitor,
+                                                     ISecretsStore secretsStore,
+                                                     NormalizedPath workingFolder,
+                                                     NormalizedPath displayPath,
+                                                     bool isPublic,
+                                                     Signature? committer = null,
+                                                     string branchName = "main" )
+    {
+        var key = GitRepositoryKey.CreateBareRepositoryKey( secretsStore, isPublic );
+        return InitOrphanOrBare( monitor, key, workingFolder, displayPath, branchName, committer );
+    }
+
+    /// <summary>
+    /// Initializes a new bare repository in the specified working folder.
+    /// The <see cref="GitRepositoryKey.OriginUrl"/> is <see cref="GitRepositoryKey.OrphanRepositoryFakeUrl"/>: an
+    /// orphan repository has no associated remote origin.
+    /// <para>
+    /// The repository is initialized with an initial empty commit and its default branch and head is
+    /// the provided <paramref name="branchName"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store for credentials.</param>
+    /// <param name="workingFolder">The local working folder to initialize.</param>
+    /// <param name="displayPath">The short path to display, relative to a well known root. It must not be empty.</param>
+    /// <param name="isPublic">Whether this repository is public or private.</param>
+    /// <param name="committer">The signature to use for the initial empty commit. "CKli (none)" is used by default.</param>
+    /// <param name="branchName">The initial branch name. Defaults to "main".</param>
+    /// <returns>The GitRepository object or null on error.</returns>
+    public static GitRepository? InitOrphanRepository( IActivityMonitor monitor,
+                                                       ISecretsStore secretsStore,
+                                                       NormalizedPath workingFolder,
+                                                       NormalizedPath displayPath,
+                                                       bool isPublic,
+                                                       Signature? committer = null,
+                                                       string branchName = "main" )
+    {
+        var key = GitRepositoryKey.CreateOrphanRepositoryKey( secretsStore, isPublic );
+        return InitOrphanOrBare( monitor, key, workingFolder, displayPath, branchName, committer );
+    }
+
+    static GitRepository? InitOrphanOrBare( IActivityMonitor monitor,
+                                            GitRepositoryKey key,
+                                            NormalizedPath workingFolder,
+                                            NormalizedPath displayPath,
+                                            string branchName,
+                                            Signature? committer )
     {
         Throw.CheckNotNullArgument( monitor );
         Throw.CheckArgument( !workingFolder.IsEmptyPath );
         Throw.CheckArgument( !displayPath.IsEmptyPath );
-        Throw.CheckNotNullArgument( originUrl );
         Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
 
-        using( monitor.OpenInfo( $"Initializing new repository at '{workingFolder}'." ) )
+        Throw.DebugAssert( key.IsOrphanRepository || key.IsBareRepository );
+
+        var r = InitOrphanOrBareRepository( monitor, workingFolder, branchName, ref committer, key.IsBareRepository );
+        return r != null
+                ? new GitRepository( key, committer, r, workingFolder, displayPath )
+                : null;
+    }
+
+    /// <summary>
+    /// Initializes a local repository without remote origin. Can be a bare or a regular repository.
+    /// <para>
+    /// The repository is initialized with an initial empty commit and its default branch and head is
+    /// the provided <paramref name="branchName"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="workingFolder">The repository (working) folder. For bare, a ".git/" subfolder is also created.</param>
+    /// <param name="branchName">The default branch name.</param>
+    /// <param name="committer">Committer of the initial empty commit. When null, a "CKli (none)" default signature is returned.</param>
+    /// <param name="isBare">True for a bare repository, false for an orphan one.</param>
+    /// <returns>The LibGit repository or null on error.</returns>
+    public static Repository? InitOrphanOrBareRepository( IActivityMonitor monitor,
+                                                          NormalizedPath workingFolder,
+                                                          string branchName,
+                                                          [NotNull] ref Signature? committer,
+                                                          bool isBare )
+    {
+        using( monitor.OpenInfo( $"Initializing new {(isBare ? "bare" : "orphan")} repository at '{workingFolder}'." ) )
         {
+            committer ??= new Signature( "CKli", "none", DateTimeOffset.Now );
             try
             {
-                // Create the directory
+                // Create the directory that corresponds to the working folder even for bare (they also are in a .git subfolder).
                 Directory.CreateDirectory( workingFolder );
-
-                // Initialize the repository with the specified initial branch
-                Repository.Init( workingFolder, isBare: false );
-
-                var r = new Repository( workingFolder );
-
-                // Set the default branch to the specified branchName (instead of "master")
-                // For an unborn branch, we need to set HEAD as a symbolic reference
+                var r = new Repository( Repository.Init( isBare ? workingFolder.AppendPart( ".git" ) : workingFolder, isBare ) );
+                Throw.DebugAssert( "The repo is empty. The head is 'unborn'.", r.Head.Tip == null );
+                // This simply rewrites the HEAD file.
                 r.Refs.Add( "HEAD", $"refs/heads/{branchName}", allowOverwrite: true );
-
-                // Add origin remote
-                r.Network.Remotes.Add( "origin", originUrl.AbsoluteUri );
-                monitor.Info( $"Added 'origin' remote: {originUrl}" );
-
-                var gitKey = new GitRepositoryKey( secretsStore, originUrl, isPublic );
-
-                return new GitRepository( gitKey, committer, r, workingFolder, displayPath );
+                // Not sure this a posteriori configuration is useful...
+                r.Config.Set( "init.defaultBranch", branchName );
+                // To create the branch, we need a commit.
+                var tree = r.ObjectDatabase.CreateTree( new TreeDefinition() );
+                var commit = r.ObjectDatabase.CreateCommit( committer, committer, "Empty initial commit.", tree, [], false );
+                r.Branches.Add( branchName, commit );
+                return r;
             }
             catch( Exception ex )
             {
-                monitor.Error( $"Failed to initialize repository at '{workingFolder}'.", ex );
+                monitor.Error( $"Failed to initialize {(isBare ? "bare" : "orphan")} repository at '{workingFolder}'.", ex );
                 return null;
             }
         }

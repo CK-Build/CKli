@@ -42,7 +42,9 @@ public sealed partial class GitRepository : IDisposable
         _displayPath = displayPath;
         _deferredPushRefSpecs = new List<string>();
 
-        Throw.CheckArgument( _workingFolder.Path.Equals( new NormalizedPath( libRepository.Info.WorkingDirectory ), StringComparison.OrdinalIgnoreCase ) );
+        // Bare repository has a null libRepository.Info.WorkingDirectory.
+        Throw.CheckArgument( repositoryKey.IsBareRepository
+                             || _workingFolder.Path.Equals( new NormalizedPath( libRepository.Info.WorkingDirectory ), StringComparison.OrdinalIgnoreCase ) );
         Throw.CheckArgument( _workingFolder.Path.EndsWith( _displayPath, StringComparison.OrdinalIgnoreCase ) );
     }
 

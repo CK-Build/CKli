@@ -31,6 +31,19 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
 
     static readonly Dictionary<string, GitRepositoryAccessKey> _accessKeys = [];
 
+    internal static GitRepositoryAccessKey GetFileSystemAccessKey( ISecretsStore secretsStore )
+    {
+        if( !_accessKeys.TryGetValue( GitRepositoryKey.FileSystemPrefixPAT, out var exists ) )
+        {
+            exists = new GitRepositoryAccessKey( GitRepositoryKey.FileSystemPrefixPAT,
+                                                 secretsStore,
+                                                 isPublic: null,
+                                                 key => new GitHosting.Providers.FileSystemProvider( key ) );
+            _accessKeys.Add( GitRepositoryKey.FileSystemPrefixPAT, exists );
+        }
+        return exists;
+    }
+
     internal static IGitRepositoryAccessKey Get( ISecretsStore secretsStore, Uri url, bool isPublic )
     {
         Throw.DebugAssert( GitRepositoryKey.GetRepositoryUrlError( url ) == null );
@@ -43,15 +56,7 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
         // Exit early for file://.
         if( url.Scheme == Uri.UriSchemeFile )
         {
-            if( !_accessKeys.TryGetValue( GitRepositoryKey.FileSystemPrefixPAT, out var exists ) )
-            {
-                exists = new GitRepositoryAccessKey( GitRepositoryKey.FileSystemPrefixPAT,
-                                                     secretsStore,
-                                                     isPublic: null,
-                                                     key => new GitHosting.Providers.FileSystemProvider( key ) );
-                _accessKeys.Add( GitRepositoryKey.FileSystemPrefixPAT, exists );
-            }
-            return exists;
+            return GetFileSystemAccessKey( secretsStore );
         }
         // General https:// case.
         //
@@ -237,7 +242,6 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
         }
 
     }
-
 
     internal GitRepositoryAccessKey( string prefixPAT,
                                      ISecretsStore secretsStore,

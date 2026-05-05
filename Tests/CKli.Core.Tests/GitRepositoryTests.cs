@@ -1,15 +1,15 @@
+using CK.Core;
 using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;
 using System;
 using System.IO;
-using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
 
 [TestFixture]
-public partial class PullPushTests
+public partial class GitRepositoryTests
 {
     [SetUp]
     public void Setup()
@@ -257,6 +257,62 @@ public partial class PullPushTests
         r.Commit( TestHelper.Monitor, $"Commit n°{i}." ).ShouldBe( CommitResult.Commited );
         r.PushBranch( TestHelper.Monitor, b, autoCreateRemoteBranch: true ).ShouldBeTrue();
     }
+
+    [Test]
+    public void testing_bare_repository()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+
+        using var remote = CreateBareRepository( context.CurrentDirectory, "Remote", out var remoteUrl );
+        using var local = CloneGitRepository( context.CurrentDirectory, "Local", remoteUrl );
+
+        remote.RepositoryKey.IsBareRepository.ShouldBeTrue();
+        local.RepositoryKey.IsBareRepository.ShouldBeFalse();
+
+        remote.RepositoryKey.AccessKey.ReadPATKeyName.ShouldBe( GitRepositoryKey.FileSystemPrefixPAT );
+        remote.RepositoryKey.AccessKey.WritePATKeyName.ShouldBe( GitRepositoryKey.FileSystemPrefixPAT );
+        local.RepositoryKey.AccessKey.ReadPATKeyName.ShouldBe( GitRepositoryKey.FileSystemPrefixPAT );
+        local.RepositoryKey.AccessKey.WritePATKeyName.ShouldBe( GitRepositoryKey.FileSystemPrefixPAT );
+
+        var initialRemoteTip = remote.Repository.Head.Tip.ShouldNotBeNull();
+
+        local.CurrentBranchName.ShouldBe( "main" );
+        local.Repository.Head.Tip.Sha.ShouldBe( initialRemoteTip.Sha );
+        local.Commit( TestHelper.Monitor, "Just for fun.", CommitBehavior.CreateEmptyCommit ).ShouldBe( CommitResult.Commited );
+        local.PushBranch( TestHelper.Monitor, local.Repository.Head, autoCreateRemoteBranch: false );
+
+        remote.Repository.Head.Tip.Sha.ShouldNotBe( initialRemoteTip.Sha );
+
+
+        static GitRepository CreateBareRepository( NormalizedPath folder, string repositoryName, out Uri repositoryUrl )
+        {
+            var gitPath = folder.AppendPart( repositoryName );
+            Directory.Exists( gitPath ).ShouldBeFalse();
+
+            Directory.CreateDirectory( gitPath );
+            var committer = CKliRootEnv.DefaultCKliEnv.Committer;
+
+            var git = GitRepository.InitBareRepository( TestHelper.Monitor,
+                                                        CKliRootEnv.SecretsStore,
+                                                        gitPath,
+                                                        gitPath.LastPart,
+                                                        isPublic: true,
+                                                        committer ).ShouldNotBeNull();
+            repositoryUrl = new Uri( gitPath );
+            return git;
+        }
+
+        static GitRepository CloneGitRepository( NormalizedPath folder, string name, Uri remoteUrl )
+        {
+            var gitPath = folder.AppendPart( name );
+            Directory.Exists( gitPath ).ShouldBeFalse();
+            Directory.CreateDirectory( gitPath );
+            var key = new GitRepositoryKey( CKliRootEnv.SecretsStore, remoteUrl, isPublic: true );
+            return GitRepository.Clone( TestHelper.Monitor, key, CKliRootEnv.DefaultCKliEnv.Committer, gitPath, name ).ShouldNotBeNull();
+        }
+
+
+}
 }
 
 

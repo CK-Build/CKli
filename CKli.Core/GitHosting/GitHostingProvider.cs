@@ -90,18 +90,20 @@ public abstract partial class GitHostingProvider
                                                                         CancellationToken cancellation = default );
 
     /// <summary>
-    /// Creates a new repository.
+    /// Creates a new repository. Whether an initial empty commit is created or not depends on the implementation.
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
     /// <param name="isPrivate">Whether the repository must be private.
     /// When let to null, defaults to the (opposite of) <see cref="IsDefaultPublic"/>.
     /// </param>
+    /// <param name="defaultBranchName">Default branch name to consider.</param>
     /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The created repository info or null on error.</returns>
     public abstract Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                        NormalizedPath repoPath,
                                                                        bool? isPrivate = null,
+                                                                       string defaultBranchName = "main",
                                                                        CancellationToken cancellation = default );
 
     /// <summary>

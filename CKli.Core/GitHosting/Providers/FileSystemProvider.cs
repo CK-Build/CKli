@@ -71,44 +71,40 @@ sealed class FileSystemProvider : GitHostingProvider
 
     public override Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                        NormalizedPath repoPath,
-                                                                       bool? isPrivate = null,
+                                                                       bool? isPrivate,
+                                                                       string defaultBranchName,
                                                                        CancellationToken cancellation = default )
     {
-        return Task.FromResult<HostedRepositoryInfo?>( CreateRepository( monitor, repoPath ) );
+        return Task.FromResult<HostedRepositoryInfo?>( CreateRepository( monitor, repoPath, defaultBranchName ) );
     }
 
-    HostedRepositoryInfo? CreateRepository( IActivityMonitor monitor, NormalizedPath repoPath )
+    HostedRepositoryInfo? CreateRepository( IActivityMonitor monitor, NormalizedPath repoPath, string defaultBranchName )
     {
-        try
+        if( repoPath.Parts.Any( s => StringComparer.OrdinalIgnoreCase.Equals( s, ".git" ) ) )
         {
-            if( repoPath.Parts.Any( s => StringComparer.OrdinalIgnoreCase.Equals( s, ".git" ) ) )
-            {
-                monitor.Error( $"Cannot create a repository inside another one at '{repoPath}'." );
-                return null;
-            }
-            var folder = Path.GetFullPath( repoPath );
-            if( Directory.Exists( folder ) )
-            {
-                monitor.Error( $"Directory already exists at '{repoPath}'." );
-                return null;
-            }
-            var pGit = Path.Combine( folder, ".git" );
-            using var repo = new Repository( Repository.Init( pGit, isBare: true ) );
-            Throw.DebugAssert( "The repo is empty. The head is 'unborn'.", repo.Head.Tip == null );
-            return new HostedRepositoryInfo
-            {
-                RepoPath = repoPath,
-                CloneUrl = "file://" + repoPath,
-                CreatedAt = Directory.GetCreationTimeUtc( pGit ),
-                IsPrivate = !IsDefaultPublic,
-                UpdatedAt = Directory.GetLastWriteTimeUtc( pGit ),
-            };
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( $"While creating repository '{repoPath}'.", ex );
+            monitor.Error( $"Cannot create a repository inside another one at '{repoPath}'." );
             return null;
         }
+        if( Directory.Exists( repoPath ) )
+        {
+            monitor.Error( $"Directory already exists at '{repoPath}'." );
+            return null;
+        }
+        Signature? committer = null; 
+        using Repository? r = GitRepository.InitOrphanOrBareRepository( monitor, repoPath, defaultBranchName, ref committer, isBare: true );
+        if( r == null )
+        {
+            return null;
+        }
+        var createdAt = Directory.GetCreationTimeUtc( r.Info.Path );
+        return new HostedRepositoryInfo
+        {
+            RepoPath = repoPath,
+            CloneUrl = "file://" + repoPath,
+            CreatedAt = createdAt,
+            IsPrivate = !IsDefaultPublic,
+            UpdatedAt = createdAt,
+        };
     }
 
     public override Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor, NormalizedPath repoPath, CancellationToken cancellation = default )

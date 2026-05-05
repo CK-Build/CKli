@@ -96,11 +96,11 @@ public static partial class CKliTestHelperExtensions
         /// Whether to clone the stack as a private stack (in a ".PrivateStack" folder) or a public stack (in a ".PublicStack" folder).
         /// </param>
         /// <returns>The default world cloned context.</returns>
-        public CKliEnv Clone( NormalizedPath clonedFolder, Action<IActivityMonitor, NormalizedPath, XElement>? pluginConfigurationEditor = null, bool privateStack = false )
+        public CKliEnv Clone( ClonedFolder clonedFolder, Action<IActivityMonitor, NormalizedPath, XElement>? pluginConfigurationEditor = null, bool privateStack = false )
         {
-            Throw.CheckArgument( clonedFolder.StartsWith( _clonedPath ) );
+            Throw.DebugAssert( clonedFolder.Path.StartsWith( _clonedPath ) );
 
-            var context = new CKliEnv( clonedFolder, screen: new StringScreen(), findCurrentStackPath: false );
+            var context = new CKliEnv( clonedFolder.Path, screen: new StringScreen(), findCurrentStackPath: false );
             CloneOrThrow( context, _stackUri, _stackName, privateStack );
             context = context.ChangeDirectory( _stackName );
             if( !StackRepository.OpenWorldFromPath( TestHelper.Monitor,
@@ -120,7 +120,7 @@ public static partial class CKliTestHelperExtensions
                     plugins.RemoveAll();
                     plugins.Add( _hostPluginsConfiguration.Attributes() );
                     plugins.Add( _hostPluginsConfiguration.Nodes() );
-                    pluginConfigurationEditor?.Invoke( monitor, clonedFolder, plugins );
+                    pluginConfigurationEditor?.Invoke( monitor, clonedFolder.Path, plugins );
                 } );
                 world.DefinitionFile.SaveFile( TestHelper.Monitor );
                 stack.Commit( TestHelper.Monitor, "Updated <Plugins> configuration." );

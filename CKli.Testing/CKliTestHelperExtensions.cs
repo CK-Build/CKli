@@ -251,8 +251,8 @@ public static partial class CKliTestHelperExtensions
     /// <param name="helper">This helper.</param>
     /// <param name="methodTestName">The test name.</param>
     /// <param name="clearStackRegistryFile">True to clear the stack registry (<see cref="StackRepository.ClearRegistry"/>).</param>
-    /// <returns>The path to the cleaned folder.</returns>
-    public static NormalizedPath InitializeClonedFolder( this IMonitorTestHelper helper, [CallerMemberName] string? methodTestName = null, bool clearStackRegistryFile = true )
+    /// <returns>The <see cref="ClonedFolder"/> with the path to the cleaned folder.</returns>
+    public static ClonedFolder InitializeClonedFolder( this IMonitorTestHelper helper, [CallerMemberName] string? methodTestName = null, bool clearStackRegistryFile = true )
     {
         var path = _clonedPath.AppendPart( methodTestName );
         if( Directory.Exists( path ) )
@@ -268,7 +268,7 @@ public static partial class CKliTestHelperExtensions
         {
             Throw.CheckState( StackRepository.ClearRegistry( TestHelper.Monitor ) );
         }
-        return path;
+        return new ClonedFolder( path );
 
         static void RemoveAllReadOnlyAttribute( string folder )
         {

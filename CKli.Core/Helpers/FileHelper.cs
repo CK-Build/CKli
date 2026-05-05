@@ -164,10 +164,6 @@ public sealed class FileHelper
     /// before attempting to delete the folder. Only ".git/objects/" files are handled: if the folder contains other read-only files,
     /// this fails.
     /// <para>
-    /// This doesn't recurse blindly on folders: only the top folder ".git" is handled if it exists. If it contains subordinated
-    /// git folders, this fails.
-    /// </para>
-    /// <para>
     /// Retries up to 5 times and ultimately gives up with a logged error and returns false.
     /// </para>
     /// </summary>

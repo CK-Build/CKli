@@ -17,6 +17,9 @@ internal sealed class GiteaCreateRepoRequest
     [JsonPropertyName( "private" )]
     public bool Private { get; set; }
 
+    [JsonPropertyName( "default_branch" )]
+    public string? DefaultBranch { get; set; }
+
     [JsonPropertyName( "auto_init" )]
     public bool AutoInit { get; set; }
 
