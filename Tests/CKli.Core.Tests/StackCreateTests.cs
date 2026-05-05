@@ -38,11 +38,11 @@ public class StackCreateTests
         stack.IsPublic.ShouldBe( isPublic );
         stack.StackWorkingFolder.LastPart.ShouldBe( isPublic ? StackRepository.PublicStackName : StackRepository.PrivateStackName );
 
-        // Verify definition file exists
+        // Verify definition file exists.
         var defFile = stack.StackWorkingFolder.AppendPart( "Demo.xml" );
         File.Exists( defFile ).ShouldBeTrue();
 
-        // Verify git repository initialized
+        // Verify git repository is initialized.
         Directory.Exists( stack.StackWorkingFolder.AppendPart( ".git" ) ).ShouldBeTrue();
 
         // Verify $Local and .gitignore created

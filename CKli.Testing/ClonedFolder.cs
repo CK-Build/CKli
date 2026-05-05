@@ -37,7 +37,7 @@ public sealed class ClonedFolder
     /// <param name="repositoryName">The repository name (the folder name).</param>
     /// <param name="repositoryUrl">The remote url from which this bare repository can be cloned.</param>
     /// <returns>The repository.</returns>
-    public GitRepository CreateBareRepository( out Uri repositoryUrl, string repositoryName = "Remote" ) => CreateBareRepository( _path, repositoryName, out repositoryUrl );
+    public GitRepository CreateBareRepository( string repositoryName, out Uri repositoryUrl ) => CreateBareRepository( _path, repositoryName, out repositoryUrl );
 
     /// <summary>
     /// Clones a repository from its remote origin url.
