@@ -96,41 +96,43 @@ public static partial class CKliTestHelperExtensions
         /// </param>
         /// <returns>The default world cloned context.</returns>
         public CKliEnv Clone( ClonedFolder clonedFolder, Action<IActivityMonitor, NormalizedPath, XElement>? pluginConfigurationEditor = null, bool privateStack = false )
-            => Clone( clonedFolder.Path, pluginConfigurationEditor, privateStack );
+            => Clone( clonedFolder.Path, false, pluginConfigurationEditor, privateStack );
 
         /// <summary>
-        /// Returns a <see cref="CKliEnv"/> context for the default World of this RemotesCollection.
-        /// <para>
-        /// Clones these <see cref="Repositories"/> in the <paramref name="folder"/> that must be below the <see cref="CKliClonedPath"/> and:
-        /// <list type="bullet">
-        ///     <item>Copies the host's stack's default World <c>&lt;Plugins&gt;</c> configuration to the default World plugins.</item>
-        ///     <item>Calls the <paramref name="pluginConfigurationEditor"/> if it is provided to alter the <c>&lt;Plugins&gt;</c> configuration.</item>
-        ///     <item>Copies the "$Local" from the "Remotes/<see cref="FullName"/>/<see cref="StackName"/>-Stack/$Local".</item>
-        /// </list>
-        /// </para>
+        /// Implementation of <see cref="Clone(ClonedFolder, Action{IActivityMonitor, NormalizedPath, XElement}?, bool)"/> that can be used in
+        /// sub folders of the <see cref="ClonedFolder"/> to work with multiple clones of the same remote.
         /// </summary>
+        /// <param name="allowDuplicateStack">
+        /// First cloned repo can use false, but subsequent ones must specify true otherwise the duplicate is detected and an exception is thrown.
+        /// </param>
         /// <param name="folder">The cloned folder of the unit test or a subfolder of it.</param>
         /// <param name="pluginConfigurationEditor">
-        /// Optional plugin configuration editor, the path is the <paramref name="folder"/> and the XElement
+        /// Optional plugin configuration editor, the path is the cloned <see cref="StackRepository.StackRoot"/> and the XElement
         /// is the <c>&lt;Plugins&gt;</c> configuration.
+        /// <para>
+        /// The last part of the StackRoot is the <see cref="StackRepository.DuplicatePrefix"/> with the stack name when the cloned stack
+        /// is a duplicate.
+        /// </para>
         /// </param>
         /// <param name="privateStack">
         /// Whether to clone the stack as a private stack (in a ".PrivateStack" folder) or a public stack (in a ".PublicStack" folder).
         /// </param>
         /// <returns>The default world cloned context.</returns>
-        public CKliEnv Clone( NormalizedPath folder, Action<IActivityMonitor, NormalizedPath, XElement>? pluginConfigurationEditor = null, bool privateStack = false )
+        public CKliEnv Clone( NormalizedPath folder,
+                              bool allowDuplicateStack,
+                              Action<IActivityMonitor, NormalizedPath, XElement>? pluginConfigurationEditor = null,
+                              bool privateStack = false )
         {
             Throw.CheckArgument( folder.StartsWith( _clonedPath ) );
 
             var context = new CKliEnv( folder, screen: new StringScreen(), findCurrentStackPath: false );
-            CloneOrThrow( context, _stackUri, _stackName, privateStack );
-            context = context.ChangeDirectory( _stackName );
+            CloneOrThrow( ref context, _stackUri, _stackName, allowDuplicateStack, privateStack );
             if( !StackRepository.OpenWorldFromPath( TestHelper.Monitor,
-                                        context,
-                                        out var stack,
-                                        out var world,
-                                        skipPullStack: true,
-                                        withPlugins: false ) )
+                                                    context,
+                                                    out var stack,
+                                                    out var world,
+                                                    skipPullStack: true,
+                                                    withPlugins: false ) )
             {
                 Throw.CKException( $"Unable to open default World of cloned test Stack from '{context.CurrentDirectory}'." );
             }
@@ -142,7 +144,7 @@ public static partial class CKliTestHelperExtensions
                     plugins.RemoveAll();
                     plugins.Add( _hostPluginsConfiguration.Attributes() );
                     plugins.Add( _hostPluginsConfiguration.Nodes() );
-                    pluginConfigurationEditor?.Invoke( monitor, folder, plugins );
+                    pluginConfigurationEditor?.Invoke( monitor, stack.StackRoot, plugins );
                 } );
                 world.DefinitionFile.SaveFile( TestHelper.Monitor );
                 stack.Commit( TestHelper.Monitor, "Updated <Plugins> configuration." );
@@ -162,19 +164,20 @@ public static partial class CKliTestHelperExtensions
             }
             return context;
 
-            static void CloneOrThrow( CKliEnv context, Uri stackUri, string stackName, bool privateStack )
+            static void CloneOrThrow( ref CKliEnv context, Uri stackUri, string stackName, bool allowDuplicateStack, bool privateStack )
             {
                 using( var stack = StackRepository.Clone( TestHelper.Monitor,
                                                           context,
                                                           stackUri,
                                                           !privateStack,
-                                                          allowDuplicateStack: false,
+                                                          allowDuplicateStack,
                                                           ignoreParentStack: true ) )
                 {
                     if( stack == null )
                     {
                         Throw.CKException( $"Unable to open test stack '{stackName}' from '{stackUri}'." );
                     }
+                    context = context.ChangeDirectory( stack.StackRoot );
                 }
             }
         }
