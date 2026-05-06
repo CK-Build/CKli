@@ -74,8 +74,8 @@ sealed class CKliPull : Command
     {
         bool success = true;
         // To limit roundtrips to the remotes, we fetch all the remote branches at once
-        // and then use MergeTrackedBranches to merge them (MergeTrackedBranches handles the branch
-        // that is checked out correctly).
+        // and then use MergeTrackedBranches to merge them (MergeTrackedBranches correctly handles the branch
+        // that may be checked out).
         using( monitor.OpenInfo( $"Fetching remote branches {(withTags ? "and tags " : "")}for {repos.Count} repositories." ) )
         {
             foreach( var repo in repos )

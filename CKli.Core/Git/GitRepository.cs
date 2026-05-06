@@ -256,7 +256,7 @@ public sealed partial class GitRepository : IDisposable
     /// <para>
     /// If the branch is created without a remote, it will point at the current head's commit.
     /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
-    /// Use <see cref="Checkout(IActivityMonitor, Branch)"/> to switch the head onto the branch.
+    /// Use <see cref="Checkout"/> to switch the head onto the branch.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -296,8 +296,17 @@ public sealed partial class GitRepository : IDisposable
     /// When true, locally modified tags are lost.
     /// </param>
     /// <param name="branchSpec">Optional branch specification. Example: "fix/v3.*".</param>
+    /// <param name="prune">
+    /// By default, remote tracking branches are deleted when they disappeared from the remote. This doesn't delete the
+    /// local branch that may track it: "refs/remotes/origin/XXX" is deleted, but if the local "refs/heads/XXX" has been
+    /// created, it still exists (but is no more tracking the remote branch).
+    /// <para>
+    /// There's little to no reason to not use this default: the Automatic Remote Origin Branch Association Strategy (AROBAS)
+    /// relies on this behavior.
+    /// </para>
+    /// </param>
     /// <returns>True on success, false on error.</returns>
-    public bool FetchRemoteBranches( IActivityMonitor monitor, bool withTags, string? branchSpec = null )
+    public bool FetchRemoteBranches( IActivityMonitor monitor, bool withTags, string? branchSpec = null, bool prune = true )
     {
         if( string.IsNullOrEmpty( branchSpec ) )
         {
@@ -326,8 +335,25 @@ public sealed partial class GitRepository : IDisposable
                 Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                 {
                     CredentialsProvider = ( url, user, types ) => creds,
+                    Prune = prune,
                     TagFetchMode = withTags ? TagFetchMode.Auto : TagFetchMode.None
                 }, null );
+                if( prune )
+                {
+                    // AROBAS here, the .git/config file still declares the association:
+                    // [branch "test"]
+	                //    remote = origin
+	                //    merge = refs/heads/test
+                    foreach( var b in _git.Branches )
+                    {
+                        var tracked = b.TrackedBranch;
+                        if( tracked != null && tracked.Reference.TargetIdentifier == null )
+                        {
+                            // Doomed association: suppress it.
+                            _git.Branches.Update( b, u => u.TrackedBranch = null );
+                        }
+                    }
+                }
                 return true;
             }
             catch( Exception ex )
@@ -613,7 +639,8 @@ public sealed partial class GitRepository : IDisposable
     /// on 'origin' (or on any remote if <paramref name="fromAllRemotes"/> is true).
     /// <para>
     /// This supports the "Automatic Remote Origin Branch Association Strategy" (AROBAS): any existing local branch (refs/heads/XXX) that
-    /// is currently not tracking and for which a "origin" branch ("refs/remotes/origin/XXX") is automatically configured to track it.
+    /// is currently not tracking and for which a "origin" branch ("refs/remotes/origin/XXX") exists is automatically configured to track it
+    /// (and the remote is merged into the local branch).
     /// </para>
     /// <para>
     /// This (the MergeTrackedBranch method actually) handles the currently checked out branch transparently.
@@ -872,13 +899,17 @@ public sealed partial class GitRepository : IDisposable
     /// <para>
     /// Whenever possible, a branch should always been fetched and merged before being pushed.
     /// </para>
+    /// <para>
+    /// If <paramref name="autoCreateRemoteBranch"/> is true and the association has been created, the <paramref name="localBranch"/>
+    /// is not updated (it is not a by-ref parameter): the Branch instance is dirty and should be refreshed.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="localBranch">The local branch to push.</param>
     /// <param name="autoCreateRemoteBranch">
     /// True create the 'origin' remote branch if the branch has no tracked branch.
     /// <para>
-    /// Caution: Before using this, the branch (or branches) must have been fetched.
+    /// Caution: Before using this, the branch (or branches) should have been fetched to avoid merge conflicts.
     /// </para>
     /// </param>
     /// <returns>True on success, false on error.</returns>
@@ -921,7 +952,7 @@ public sealed partial class GitRepository : IDisposable
             {
                 return false;
             }
-            return Push( monitor, remote, creds, [$"{localBranch.CanonicalName}:{localBranch.UpstreamBranchCanonicalName}"] );
+            return Push( monitor, remote, creds, [$"{localBranch.CanonicalName}:{localBranch.CanonicalName}"] );
         }
     }
 

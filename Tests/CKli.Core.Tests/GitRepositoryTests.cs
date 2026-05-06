@@ -176,12 +176,19 @@ public partial class GitRepositoryTests
 
 
     // AROBAS: "Automatic Remote Origin Branch Association Strategy".
-    [Test]
-    public void delete_branch_and_AROBAS()
+    [TestCase( "fetch first, prune" )]
+    [TestCase( "fetch first, no-prune" )]
+    [TestCase( "fetch after, prune" )]
+    [TestCase( "fetch after, no-prune" )]
+    public void delete_branch_and_AROBAS( string mode )
     {
+        // Same Cloned/ folder for the 4 modes.
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.OpenRemotes( "One" );
         var remoteUrl = remotes.GetUriFor( "OneRepo" );
+
+        bool fetchFirst = mode.Contains( "first" );
+        bool noFetchPrune = mode.Contains( "no-prune" );
 
         var timPath = context.CurrentDirectory.AppendPart( "Tim" );
         using var tim = GitRepository.Clone( TestHelper.Monitor,
@@ -202,26 +209,57 @@ public partial class GitRepositoryTests
 
         // Bob hasn't fetched the remote. For him, the "test-1" branch doesn't exist.
         bob.GetBranch( TestHelper.Monitor, "test-1" ).ShouldBeNull();
-        // Fetching the remotes: now bob has the branch.
+        // Fetching the remotes: now bob has the "refs/remotes/origin/test-1" branch.
         bob.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
+        // ...and GetBranch applies the AROBAS: wherever the head is, the new local branch is on the remote.
         var bobBranch = bob.GetBranch( TestHelper.Monitor, "test-1" ).ShouldNotBeNull();
-        // Now bob deletes it.
+        // Now bob deletes it and pushes this deletion to the remote.
         bob.DeleteBranch( TestHelper.Monitor, bobBranch, DeleteGitBranchMode.WithTrackedAndRemoteBranch ).ShouldBeTrue();
 
-        // On Tim side, the branch is here (and tracked).
+        if( fetchFirst )
+        {
+            // Tim fetches the remotes.
+            tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false, prune: !noFetchPrune ).ShouldBeTrue();
+
+            // If no pruning has been done, the "refs/remotes/origin/test-1" is still here.
+            if( noFetchPrune )
+                tim.Repository.Branches["refs/remotes/origin/test-1"].ShouldNotBeNull();
+            else tim.Repository.Branches["refs/remotes/origin/test-1"].ShouldBeNull();
+
+            // Whether the branch is tracking or not doesn't change anything here (when it has not been pruned,
+            // it hasn't changed).
+            tim.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeTrue();
+        }
+        // On Tim side, the branch is here (and tracked or not but Tim's doesn't care).
         var timBranch = tim.GetBranch( TestHelper.Monitor, "test-1" ).ShouldNotBeNull();
-        timBranch.IsTracking.ShouldBeTrue();
+        timBranch.IsTracking.ShouldBe( !fetchFirst || noFetchPrune, "prune => no more tracking (and of course we should have fetched above)." );
         tim.Checkout( TestHelper.Monitor, timBranch ).ShouldBeTrue();
         File.WriteAllText( tim.WorkingFolder.AppendPart( "SomeWork.txt" ), "Hop!" );
         tim.Commit( TestHelper.Monitor, "For me, test-1 exists." ).ShouldBe( CommitResult.Commited );
-        // Tim fetches the remotes. Nothing can remove the defunct remote branch.
-        tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
-        tim.Repository.Branches["refs/remotes/origin/test-1"].ShouldNotBeNull();
-        tim.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeTrue();
-        // Tim pushes the branch.
+
+        if( !fetchFirst )
+        {
+            // Tim fetches the remotes.
+            tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false, prune: !noFetchPrune ).ShouldBeTrue();
+            // If no pruning has been done, the "refs/remotes/origin/test-1" is still here.
+            if( noFetchPrune )
+                tim.Repository.Branches["refs/remotes/origin/test-1"].ShouldNotBeNull();
+            else tim.Repository.Branches["refs/remotes/origin/test-1"].ShouldBeNull();
+
+            // The Branch is no more synchronized :-(. Refreshes it.
+            timBranch = tim.Repository.Branches["test-1"];
+
+            // Whether the branch is tracking or not doesn't change anything here (when it has not been pruned,
+            // it hasn't changed).
+            tim.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeTrue();
+        }
+
+        // Tim pushes the branch. The autoCreateRemoteBranch enforces the AROBAS approach:
+        // whether timBranch is tracking or not, it will be tracked and pushed.
+        // Note that the pushed Branch is no more synchronized.
         tim.PushBranch( TestHelper.Monitor, timBranch, autoCreateRemoteBranch : true ).ShouldBeTrue();
 
-        // Bob decides to resurect the "test-1" branch and work on it (this branch is not a tracking branch).
+        // Bob decides to resurect the "test-1" branch and work on it (this branch is not a tracking branch: it has deleted here initially).
         bobBranch = bob.EnsureBranch( TestHelper.Monitor, "test-1" ).ShouldNotBeNull();
         bobBranch.IsTracking.ShouldBeFalse();
         bob.Checkout( TestHelper.Monitor, bobBranch ).ShouldBeTrue();
@@ -237,8 +275,8 @@ public partial class GitRepositoryTests
         bobBranch.IsTracking.ShouldBeTrue();
         bobBranch.Tip.Sha.ShouldNotBe( bob.Repository.Branches["origin/test-1"].Tip.Sha );
 
-        // Bob pushes test-1.
-        bob.PushBranch( TestHelper.Monitor, bobBranch, autoCreateRemoteBranch: true ).ShouldBeTrue();
+        // Bob pushes test-1 (autoCreateRemoteBranch can be true or false because the branch is tracking).
+        bob.PushBranch( TestHelper.Monitor, bobBranch, autoCreateRemoteBranch: false ).ShouldBeTrue();
 
         // Tim "ckli pull": there's no conflict and the "test-1" local branch is simply moved to the "origin/test-1".
         tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
