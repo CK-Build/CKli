@@ -304,36 +304,31 @@ public static partial class CKliTestHelperExtensions
     }
 
     /// <summary>
-    /// Create or modify a "CKliTestModification.cs" file in the <paramref name="projectFolder"/> and
+    /// Create or modify a "CKliTouchAndCommit.txt" file in the <paramref name="folder"/> and
     /// creates a new commit on a specified branch or on the currently checked out branch.
+    /// <para>
+    /// The commit uses a constant Author and Committer "CKli.Testing", "none", "2000-1-1".
+    /// </para>
     /// </summary>
     /// <param name="helper">This helper.</param>
-    /// <param name="context">The context.</param>
-    /// <param name="projectFolder">The project  folder (eg. "CKt.Core") relative to <see cref="CKliEnv.CurrentDirectory"/> (can be absolute).</param>
+    /// <param name="folder">The absolute folder (must be in a Git working folder).</param>
     /// <param name="branchName">The branch name to update (or null to touch the working folder and commit on the current repository head).</param>
     /// <param name="commitMessage">Optional commit message.</param>
-    public static void ModifyAndCreateCommit( this IMonitorTestHelper helper, CKliEnv context, NormalizedPath projectFolder, string? branchName, string? commitMessage = null )
+    public static void TouchAndCommit( this IMonitorTestHelper helper, NormalizedPath folder, string? branchName, string? commitMessage = null )
     {
-        var projectPath = context.CurrentDirectory.Combine( projectFolder ).ResolveDots();
-
+        var committer = new Signature( "CKli.Testing", "none", new DateTimeOffset( 2000, 1, 1, 0, 0, 0, TimeSpan.Zero ) );
         if( string.IsNullOrEmpty( commitMessage ) )
         {
-            commitMessage = $"// Touching {projectFolder.LastPart}.";
+            commitMessage = $"// Touching {folder.LastPart}.";
         }
-
-        NormalizedPath gitPath = Repository.Discover( projectPath );
+        NormalizedPath gitPath = Repository.Discover( folder );
         if( gitPath.IsEmptyPath )
         {
-            if( !Directory.Exists( projectPath ) )
+            if( !Directory.Exists( folder ) )
             {
-                Throw.ArgumentException( nameof( projectFolder ), $"""
-                    Path '{projectPath}' doesn't exist. It has been combined from:
-                    context.CurrentDirectory = '{context.CurrentDirectory}'
-                    and:
-                    projectFolder: '{projectFolder}'
-                    """ );
+                Throw.ArgumentException( nameof( folder ), $"Path '{folder}' doesn't exist." );
             }
-            Throw.ArgumentException( nameof( projectFolder ), $"Unable to find the .git folder from '{projectPath}'." );
+            Throw.ArgumentException( nameof( folder ), $"Unable to find the .git folder from '{folder}'." );
         }
         gitPath = gitPath.RemoveLastPart();
         using( var git = new Repository( gitPath ) )
@@ -348,13 +343,12 @@ public static partial class CKliTestHelperExtensions
                 if( !b.IsCurrentRepositoryHead )
                 {
                     TreeDefinition tDef = TreeDefinition.From( b.Tip.Tree );
-                    gitPath.TryGetRelativePathTo( projectPath, out var relativeProjectPath ).ShouldBeTrue();
-                    if( tDef[relativeProjectPath] == null )
+                    gitPath.TryGetRelativePathTo( folder, out var relativeGitPath ).ShouldBeTrue();
+                    if( tDef[relativeGitPath] == null )
                     {
-                        Throw.ArgumentException( $"Unable to find '{relativeProjectPath}' in branch '{branchName}'." );
+                        Throw.ArgumentException( $"Unable to find '{relativeGitPath}' in branch '{branchName}'." );
                     }
-                    var filePath = relativeProjectPath.AppendPart( "CKliTestModification.cs" );
-
+                    var filePath = relativeGitPath.AppendPart( "CKliTouchAndCommit.txt" );
                     string text = "// Created";
                     TreeEntryDefinition? fileDef = tDef[filePath];
                     if( fileDef != null )
@@ -364,19 +358,19 @@ public static partial class CKliTestHelperExtensions
                             Throw.InvalidOperationException( $"Entry '{filePath}' in branch '{branchName}' is not a non executable Blob." );
                         }
                         var blob = git.Lookup<Blob>( fileDef.TargetId );
-                        text = blob.GetContentText() + $"{Environment.NewLine}{DateTime.UtcNow}";
+                        text = $"{blob.GetContentText()}{Environment.NewLine}{DateTime.UtcNow}";
                     }
                     ObjectId textId = git.ObjectDatabase.Write<Blob>( Encoding.UTF8.GetBytes( text ) );
                     tDef.Add( filePath, textId, Mode.NonExecutableFile );
                     var newTree = git.ObjectDatabase.CreateTree( tDef );
-                    var newCommit = git.ObjectDatabase.CreateCommit( context.Committer, context.Committer, commitMessage, newTree, [b.Tip], prettifyMessage: true );
+                    var newCommit = git.ObjectDatabase.CreateCommit( committer, committer, commitMessage, newTree, [b.Tip], prettifyMessage: true );
                     git.Refs.UpdateTarget( b.Reference, newCommit.Id, null );
                     return;
                 }
             }
             // Either the branchName is null (the user wants to work in the head) or the
             // branch is the one currently checked out: use the working folder.
-            var sourceFilePath = projectPath.AppendPart( "CKliTestModification.cs" );
+            var sourceFilePath = folder.AppendPart( "CKliTouchAndCommit.txt" );
             if( !File.Exists( sourceFilePath ) )
             {
                 File.WriteAllText( sourceFilePath, "// Created" );
@@ -386,7 +380,7 @@ public static partial class CKliTestHelperExtensions
                 File.WriteAllText( sourceFilePath, File.ReadAllText( sourceFilePath ) + $"{Environment.NewLine}{DateTime.UtcNow}" );
             }
             Commands.Stage( git, "*" );
-            git.Commit( commitMessage, context.Committer, context.Committer );
+            git.Commit( commitMessage, committer, committer );
         }
     }
 
