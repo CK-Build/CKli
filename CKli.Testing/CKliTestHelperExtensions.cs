@@ -354,18 +354,24 @@ public static partial class CKliTestHelperExtensions
                         Throw.ArgumentException( $"Unable to find '{relativeGitPath}' in branch '{branchName}'." );
                     }
                     var filePath = relativeGitPath.AppendPart( "CKliTouchAndCommit.txt" );
-                    string text = "";
-                    TreeEntryDefinition? fileDef = tDef[filePath];
-                    if( fileDef != null )
+                    string? text = fileContent;
+                    if( text == null )
                     {
-                        if( fileDef.TargetType != TreeEntryTargetType.Blob || fileDef.Mode != Mode.NonExecutableFile )
+                        TreeEntryDefinition? fileDef = tDef[filePath];
+                        if( fileDef != null )
                         {
-                            Throw.InvalidOperationException( $"Entry '{filePath}' in branch '{branchName}' is not a non executable Blob." );
+                            if( fileDef.TargetType != TreeEntryTargetType.Blob || fileDef.Mode != Mode.NonExecutableFile )
+                            {
+                                Throw.InvalidOperationException( $"Entry '{filePath}' in branch '{branchName}' is not a non executable Blob." );
+                            }
+                            var blob = git.Lookup<Blob>( fileDef.TargetId );
+                            text = $"{blob.GetContentText()}{Environment.NewLine}{Environment.TickCount64}";
                         }
-                        var blob = git.Lookup<Blob>( fileDef.TargetId );
-                        text = blob.GetContentText();
+                        else
+                        {
+                            text = Environment.TickCount64.ToString();
+                        }
                     }
-                    text = $"{text}{Environment.NewLine}{Environment.TickCount64}";
                     ObjectId textId = git.ObjectDatabase.Write<Blob>( Encoding.UTF8.GetBytes( text ) );
                     tDef.Add( filePath, textId, Mode.NonExecutableFile );
                     var newTree = git.ObjectDatabase.CreateTree( tDef );
@@ -377,14 +383,11 @@ public static partial class CKliTestHelperExtensions
             // Either the branchName is null (the user wants to work in the head) or the
             // branch is the one currently checked out: use the working folder.
             var sourceFilePath = folder.AppendPart( "CKliTouchAndCommit.txt" );
-            if( !File.Exists( sourceFilePath ) )
-            {
-                File.WriteAllText( sourceFilePath, Environment.TickCount64.ToString() );
-            }
-            else
-            {
-                File.WriteAllText( sourceFilePath, File.ReadAllText( sourceFilePath ) + $"{Environment.NewLine}{Environment.TickCount64}" );
-            }
+            var text = fileContent
+                        ?? (File.Exists( sourceFilePath )
+                            ? File.ReadAllText( sourceFilePath ) + $"{Environment.NewLine}{Environment.TickCount64}"
+                            : Environment.TickCount64.ToString());
+            File.WriteAllText( sourceFilePath, text );
             Commands.Stage( git, "*" );
             git.Commit( commitMessage, committer, committer );
         }
