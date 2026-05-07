@@ -379,11 +379,11 @@ public static partial class CKliTestHelperExtensions
             var sourceFilePath = folder.AppendPart( "CKliTouchAndCommit.txt" );
             if( !File.Exists( sourceFilePath ) )
             {
-                File.WriteAllText( sourceFilePath, "// Created" );
+                File.WriteAllText( sourceFilePath, Environment.TickCount64.ToString() );
             }
             else
             {
-                File.WriteAllText( sourceFilePath, File.ReadAllText( sourceFilePath ) + $"{Environment.NewLine}{DateTime.UtcNow}" );
+                File.WriteAllText( sourceFilePath, File.ReadAllText( sourceFilePath ) + $"{Environment.NewLine}{Environment.TickCount64}" );
             }
             Commands.Stage( git, "*" );
             git.Commit( commitMessage, committer, committer );
