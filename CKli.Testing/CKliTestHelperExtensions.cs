@@ -313,13 +313,18 @@ public static partial class CKliTestHelperExtensions
     /// <param name="helper">This helper.</param>
     /// <param name="folder">The absolute folder (must be in a Git working folder).</param>
     /// <param name="branchName">The branch name to update (or null to touch the working folder and commit on the current repository head).</param>
-    /// <param name="commitMessage">Optional commit message.</param>
-    public static void TouchAndCommit( this IMonitorTestHelper helper, NormalizedPath folder, string? branchName, string? commitMessage = null )
+    /// <param name="commitMessage">Optional commit message. Defaults to "Touching '{<paramref name="folder"/>.LastPart}'.".</param>
+    /// <param name="fileContent">Optional file content. Defaults to the current content with a new line and the <see cref="Environment.TickCount64"/>.</param>
+    public static void TouchAndCommit( this IMonitorTestHelper helper,
+                                       NormalizedPath folder,
+                                       string? branchName,
+                                       string? commitMessage = null,
+                                       string? fileContent = null )
     {
         var committer = new Signature( "CKli.Testing", "none", new DateTimeOffset( 2000, 1, 1, 0, 0, 0, TimeSpan.Zero ) );
         if( string.IsNullOrEmpty( commitMessage ) )
         {
-            commitMessage = $"// Touching {folder.LastPart}.";
+            commitMessage = $"Touching '{folder.LastPart}'.";
         }
         NormalizedPath gitPath = Repository.Discover( folder );
         if( gitPath.IsEmptyPath )
@@ -349,7 +354,7 @@ public static partial class CKliTestHelperExtensions
                         Throw.ArgumentException( $"Unable to find '{relativeGitPath}' in branch '{branchName}'." );
                     }
                     var filePath = relativeGitPath.AppendPart( "CKliTouchAndCommit.txt" );
-                    string text = "// Created";
+                    string text = "";
                     TreeEntryDefinition? fileDef = tDef[filePath];
                     if( fileDef != null )
                     {
@@ -358,8 +363,9 @@ public static partial class CKliTestHelperExtensions
                             Throw.InvalidOperationException( $"Entry '{filePath}' in branch '{branchName}' is not a non executable Blob." );
                         }
                         var blob = git.Lookup<Blob>( fileDef.TargetId );
-                        text = $"{blob.GetContentText()}{Environment.NewLine}{DateTime.UtcNow}";
+                        text = blob.GetContentText();
                     }
+                    text = $"{text}{Environment.NewLine}{Environment.TickCount64}";
                     ObjectId textId = git.ObjectDatabase.Write<Blob>( Encoding.UTF8.GetBytes( text ) );
                     tDef.Add( filePath, textId, Mode.NonExecutableFile );
                     var newTree = git.ObjectDatabase.CreateTree( tDef );
