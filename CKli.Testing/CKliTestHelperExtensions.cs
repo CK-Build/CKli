@@ -354,8 +354,7 @@ public static partial class CKliTestHelperExtensions
                         Throw.ArgumentException( $"Unable to find '{relativeGitPath}' in branch '{branchName}'." );
                     }
                     var filePath = relativeGitPath.AppendPart( "CKliTouchAndCommit.txt" );
-                    string? text = fileContent;
-                    if( text == null )
+                    if( fileContent == null )
                     {
                         TreeEntryDefinition? fileDef = tDef[filePath];
                         if( fileDef != null )
@@ -365,14 +364,14 @@ public static partial class CKliTestHelperExtensions
                                 Throw.InvalidOperationException( $"Entry '{filePath}' in branch '{branchName}' is not a non executable Blob." );
                             }
                             var blob = git.Lookup<Blob>( fileDef.TargetId );
-                            text = $"{blob.GetContentText()}{Environment.NewLine}{Environment.TickCount64}";
+                            fileContent = $"{blob.GetContentText()}{Environment.NewLine}{Environment.TickCount64}";
                         }
                         else
                         {
-                            text = Environment.TickCount64.ToString();
+                            fileContent = Environment.TickCount64.ToString();
                         }
                     }
-                    ObjectId textId = git.ObjectDatabase.Write<Blob>( Encoding.UTF8.GetBytes( text ) );
+                    ObjectId textId = git.ObjectDatabase.Write<Blob>( Encoding.UTF8.GetBytes( fileContent ) );
                     tDef.Add( filePath, textId, Mode.NonExecutableFile );
                     var newTree = git.ObjectDatabase.CreateTree( tDef );
                     var newCommit = git.ObjectDatabase.CreateCommit( committer, committer, commitMessage, newTree, [b.Tip], prettifyMessage: true );
@@ -383,11 +382,10 @@ public static partial class CKliTestHelperExtensions
             // Either the branchName is null (the user wants to work in the head) or the
             // branch is the one currently checked out: use the working folder.
             var sourceFilePath = folder.AppendPart( "CKliTouchAndCommit.txt" );
-            var text = fileContent
-                        ?? (File.Exists( sourceFilePath )
-                            ? File.ReadAllText( sourceFilePath ) + $"{Environment.NewLine}{Environment.TickCount64}"
-                            : Environment.TickCount64.ToString());
-            File.WriteAllText( sourceFilePath, text );
+            fileContent ??= File.Exists( sourceFilePath )
+                                    ? File.ReadAllText( sourceFilePath ) + $"{Environment.NewLine}{Environment.TickCount64}"
+                                    : Environment.TickCount64.ToString();
+            File.WriteAllText( sourceFilePath, fileContent );
             Commands.Stage( git, "*" );
             git.Commit( commitMessage, committer, committer );
         }
