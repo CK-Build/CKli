@@ -304,7 +304,7 @@ public static partial class CKliTestHelperExtensions
     }
 
     /// <summary>
-    /// Create or modify a "CKliTouchAndCommit.txt" file in the <paramref name="folder"/> and
+    /// Create or modify a "CKliTouchAndCommit.txt" file (by default) in the <paramref name="folder"/> and
     /// creates a new commit on a specified branch or on the currently checked out branch.
     /// <para>
     /// The commit uses a constant Author and Committer "CKli.Testing", "none", "2000-1-1".
@@ -315,11 +315,13 @@ public static partial class CKliTestHelperExtensions
     /// <param name="branchName">The branch name to update (or null to touch the working folder and commit on the current repository head).</param>
     /// <param name="commitMessage">Optional commit message. Defaults to "Touching '{<paramref name="folder"/>.LastPart}'.".</param>
     /// <param name="fileContent">Optional file content. Defaults to the current content with a new line and the <see cref="Environment.TickCount64"/>.</param>
+    /// <param name="fileName">File name to create or alter in the <paramref name="folder"/>.</param>
     public static void TouchAndCommit( this IMonitorTestHelper helper,
                                        NormalizedPath folder,
                                        string? branchName,
                                        string? commitMessage = null,
-                                       string? fileContent = null )
+                                       string? fileContent = null,
+                                       string fileName = "CKliTouchAndCommit.txt" )
     {
         var committer = new Signature( "CKli.Testing", "none", new DateTimeOffset( 2000, 1, 1, 0, 0, 0, TimeSpan.Zero ) );
         if( string.IsNullOrEmpty( commitMessage ) )
@@ -353,7 +355,7 @@ public static partial class CKliTestHelperExtensions
                     {
                         Throw.ArgumentException( $"Unable to find '{relativeGitPath}' in branch '{branchName}'." );
                     }
-                    var filePath = relativeGitPath.AppendPart( "CKliTouchAndCommit.txt" );
+                    var filePath = relativeGitPath.AppendPart( fileName );
                     if( fileContent == null )
                     {
                         TreeEntryDefinition? fileDef = tDef[filePath];
@@ -361,7 +363,7 @@ public static partial class CKliTestHelperExtensions
                         {
                             if( fileDef.TargetType != TreeEntryTargetType.Blob || fileDef.Mode != Mode.NonExecutableFile )
                             {
-                                Throw.InvalidOperationException( $"Entry '{filePath}' in branch '{branchName}' is not a non executable Blob." );
+                                Throw.InvalidOperationException( $"Entry '{filePath}' in branch '{branchName}' must be a non executable Blob." );
                             }
                             var blob = git.Lookup<Blob>( fileDef.TargetId );
                             fileContent = $"{blob.GetContentText()}{Environment.NewLine}{Environment.TickCount64}";
@@ -381,7 +383,7 @@ public static partial class CKliTestHelperExtensions
             }
             // Either the branchName is null (the user wants to work in the head) or the
             // branch is the one currently checked out: use the working folder.
-            var sourceFilePath = folder.AppendPart( "CKliTouchAndCommit.txt" );
+            var sourceFilePath = folder.AppendPart( fileName );
             fileContent ??= File.Exists( sourceFilePath )
                                     ? File.ReadAllText( sourceFilePath ) + $"{Environment.NewLine}{Environment.TickCount64}"
                                     : Environment.TickCount64.ToString();
