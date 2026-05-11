@@ -543,9 +543,12 @@ public sealed partial class StackRepository : IDisposable
                                           bool ignoreParentStack = false,
                                           string stackBranchName = "main" )
     {
+        bool isCKliTestRunning = CKliRootEnv.InstanceName == "CKli-Test";
         Throw.CheckNotNullArgument( monitor );
         Throw.CheckNotNullArgument( context );
-        Throw.CheckArgument( context.CurrentStackPath.IsEmptyPath );
+        // The nominal case is that we cannot clone a stack inside another stack. But when ignoreParentStack
+        // is specified or we are running the CKli.Core.Tests, we allow this.
+        Throw.CheckArgument( (ignoreParentStack || isCKliTestRunning) || context.CurrentStackPath.IsEmptyPath );
         Throw.CheckNotNullArgument( stackBranchName );
         var parentPath = context.CurrentDirectory;
         if( !parentPath.IsRooted
@@ -580,8 +583,10 @@ public sealed partial class StackRepository : IDisposable
         // Secure Stack inside Stack scenario.
         if( !ignoreParentStack )
         {
+            // We cheat here: we allow cloning into the CKli-Stack itself if we are in the "CKli-Test" instance.
             var parentStack = FindGitStackPath( parentPath );
-            if( !parentStack.IsEmptyPath )
+            if( !parentStack.IsEmptyPath
+                && !(isCKliTestRunning && parentStack.Path.EndsWith("/CKli/.PublicStack", StringComparison.Ordinal )) )
             {
                 var stackAbove = parentStack.RemoveLastPart();
                 var safeRoot = stackAbove.RemoveLastPart().AppendPart( stackFolderName );
