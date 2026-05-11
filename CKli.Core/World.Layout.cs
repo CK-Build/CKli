@@ -60,9 +60,11 @@ sealed partial class World
             return false;
         }
         // And normalize it: it now ends with the repository name from the Uri.
-        // The sub folders path without the trailing repository name.
+        // This supports the scenario where the user pre-created the "MyRepo" folder: instead of
+        // having "MyRepo/MyRepo", we kindly remote the leaf.
+        // But we avoid to do this on the world root (so we support a XXX repository in a XXX-Stack).
         NormalizedPath subFolderPath;
-        if( folderPath.LastPart.Equals( gitKey.RepositoryName, StringComparison.OrdinalIgnoreCase ) )
+        if( folderPath.LastPart.Equals( gitKey.RepositoryName, StringComparison.OrdinalIgnoreCase ) && folderPath != _name.WorldRoot )
         {
             // Normalize case and obtains the sub folder path.
             subFolderPath = folderPath.RemoveLastPart();
