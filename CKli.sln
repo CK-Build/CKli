@@ -35,6 +35,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugins", "Plugins", "{DAC3
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CKli.ShallowSolution.Plugin", "Plugins\CKli.ShallowSolution.Plugin\CKli.ShallowSolution.Plugin.csproj", "{817AD143-477F-1A81-1849-410650DC03B3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CKli.BranchModel.Plugin", "Plugins\CKli.BranchModel.Plugin\CKli.BranchModel.Plugin.csproj", "{4C0D07D9-4A60-C4AC-6F15-B7B9B870B397}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -73,6 +75,10 @@ Global
 		{817AD143-477F-1A81-1849-410650DC03B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{817AD143-477F-1A81-1849-410650DC03B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{817AD143-477F-1A81-1849-410650DC03B3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4C0D07D9-4A60-C4AC-6F15-B7B9B870B397}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4C0D07D9-4A60-C4AC-6F15-B7B9B870B397}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4C0D07D9-4A60-C4AC-6F15-B7B9B870B397}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4C0D07D9-4A60-C4AC-6F15-B7B9B870B397}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -80,6 +86,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{78ADE056-4EAB-449F-81AF-C440A43AC66B} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{817AD143-477F-1A81-1849-410650DC03B3} = {DAC3C784-9086-4F8E-BEFD-E96900201754}
+		{4C0D07D9-4A60-C4AC-6F15-B7B9B870B397} = {DAC3C784-9086-4F8E-BEFD-E96900201754}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {44AF4FE0-7386-4FB4-B966-0107DAE25DC4}

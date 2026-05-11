@@ -28,7 +28,7 @@ public abstract class PluginBase
     /// updated to use the <see cref="World.CKliVersion"/>. The assemblies listed here are managed identically.
     /// </para>
     /// </summary>
-    public static readonly IReadOnlyList<string> StandardPluginNames = ["CKli.ShallowSolution.Plugin"];
+    public static readonly IReadOnlyList<string> StandardPluginNames = ["CKli.ShallowSolution.Plugin", "CKli.BranchModel.Plugin"];
 
     readonly World _world;
 
