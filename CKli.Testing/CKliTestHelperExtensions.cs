@@ -86,7 +86,7 @@ public static partial class CKliTestHelperExtensions
             Throw.InvalidOperationException( "Unable to get the plugin factory from the compiled plugins." );
         }
         World.DirectPluginFactory = f;
-        CKliRootEnv.Initialize( _defaultWorldName.FullName, screen: new StringScreen(), findCurrentStackPath: false );
+        CKliRootEnv.Initialize( $"{_defaultWorldName.FullName}-Test", screen: new StringScreen(), findCurrentStackPath: false );
 
         _remoteRepositories = InitializeRemotes();
 

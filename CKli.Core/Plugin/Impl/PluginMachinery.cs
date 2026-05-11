@@ -376,6 +376,7 @@ public sealed partial class PluginMachinery
                     }
                 }
             }
+
             if( mustRecompile )
             {
                 monitor.Trace( $"Deleting '{CKliCompiledPluginsFile.LastPart}'." );
