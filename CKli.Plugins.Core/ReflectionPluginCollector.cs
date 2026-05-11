@@ -37,6 +37,10 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
 
     public IPluginFactory BuildPluginFactory( ReadOnlySpan<Type> defaultPrimaryPlugins )
     {
+        // When we are inside CKli (in .PublicStack/CKli-Plugins solution), we consider all
+        // plugins to be "Source based": the CKli-Plugins solution uses project references to the StandardPlugins"
+        // instead of package references.
+        bool isCKliPlugins = _context.WorldName.StackName == "CKli";
         foreach( var primaryPlugin in defaultPrimaryPlugins )
         {
             var a = primaryPlugin.Assembly;
@@ -55,9 +59,12 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
             // (source packages use the default .Net 1.0.0+<commit-sha>).
             // This is not ideal but this is simple and efficient and avoid tracking assembly
             // origin to detect source packages vs. packaged ones.
-            var informationalVersion = InformationalVersion.ReadFromAssembly( a );
-            string? version = informationalVersion.IsValidSyntax ? informationalVersion.OriginalInformationalVersion : null;
-
+            string? version = null;
+            if( !isCKliPlugins )
+            {
+                var informationalVersion = InformationalVersion.ReadFromAssembly( a );
+                if( informationalVersion.IsValidSyntax ) version = informationalVersion.OriginalInformationalVersion;
+            }
             var status = PluginStatus.Available;
             XElement? configuration = null;
             if( _context.PluginsConfiguration.TryGetValue( shortPluginName, out var config ) )
