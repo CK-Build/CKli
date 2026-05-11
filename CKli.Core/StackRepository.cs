@@ -711,7 +711,7 @@ public sealed partial class StackRepository : IDisposable
             monitor.Error( $"Invalid path '{p}': it must be rooted and not end with {PublicStackName} or {PrivateStackName}." );
             return null;
         }
-        var stackRoot = p.AppendPart( gitKey.RepositoryName );
+        var stackRoot = p.AppendPart( stackName );
         if( Path.Exists( stackRoot ) )
         {
             monitor.Error( $"The path '{stackRoot}' already exists." );
