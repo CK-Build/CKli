@@ -129,7 +129,10 @@ public sealed partial class PluginMachinery
         }
         else
         {
-            if( _versionChecked == null || !_versionChecked.Contains( Root ) )
+            // When in CKli itself, the CKli-Plugins solution uses project instead of package references:
+            // there is no Directory.Package.props, no version to upgrade, so we skip this step.
+            if( _definitionFile.World.StackName != "CKli"
+                && (_versionChecked == null || !_versionChecked.Contains( Root )) )
             {
                 if( !CheckCKliPluginsCoreVersion( monitor, out preCompile ) )
                 {
