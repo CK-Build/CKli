@@ -62,12 +62,16 @@ public static partial class CKliTestHelperExtensions
         // We may use a ReflectionOnly context or use the Meta API but this costs. We simply consider that
         // if the CKli.CompiledPlugins.cs file is present, then it's fine: we are in a test project that
         // depends on the CKli.Plugins project, so when it is compiled, the CKli.Plugins is also compiled.
-        //
-        // We check that CompileMode is not None and that no plugins are disabled before.
+
+        // ReadStackPluginConfiguration checks that no plugins are disabled.
         // If the user deleted the CKli.CompiledPlugins.cs, he must run "ckli plugin info" to restore the
         // compiled plugins.
         //
         _hostPluginsConfiguration = ReadStackPluginConfiguration( TestHelper.Monitor, _defaultWorldName );
+
+        // We initialize the root environment (no need to wait): any participant can now use the instance name
+        // if needed. 
+        CKliRootEnv.Initialize( $"{_defaultWorldName.FullName}-Test", screen: new StringScreen(), findCurrentStackPath: false );
 
         var ckliPluginsCompiledFile = sharedDataFolder.AppendPart( pluginFolderName ).AppendPart( "CKli.Plugins" ).AppendPart( "CKli.CompiledPlugins.cs" );
         if( !File.Exists( ckliPluginsCompiledFile ) )
@@ -86,7 +90,6 @@ public static partial class CKliTestHelperExtensions
             Throw.InvalidOperationException( "Unable to get the plugin factory from the compiled plugins." );
         }
         World.DirectPluginFactory = f;
-        CKliRootEnv.Initialize( $"{_defaultWorldName.FullName}-Test", screen: new StringScreen(), findCurrentStackPath: false );
 
         _remoteRepositories = InitializeRemotes();
 
