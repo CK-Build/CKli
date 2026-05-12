@@ -4,7 +4,6 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core;

@@ -1,7 +1,3 @@
-using CK.Core;
-using System;
-using System.Threading.Tasks;
-
 namespace CKli.Core;
 
 // Setting the stack's remote url is not enough.

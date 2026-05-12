@@ -1,12 +1,10 @@
 using CK.Core;
 using LibGit2Sharp;
-using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Text;
 
 namespace CKli.Core;
 

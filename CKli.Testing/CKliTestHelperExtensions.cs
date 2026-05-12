@@ -354,7 +354,7 @@ public static partial class CKliTestHelperExtensions
                 {
                     TreeDefinition tDef = TreeDefinition.From( b.Tip.Tree );
                     gitPath.TryGetRelativePathTo( folder, out var relativeGitPath ).ShouldBeTrue();
-                    if( tDef[relativeGitPath] == null )
+                    if( !relativeGitPath.IsEmptyPath && tDef[relativeGitPath] == null )
                     {
                         Throw.ArgumentException( $"Unable to find '{relativeGitPath}' in branch '{branchName}'." );
                     }

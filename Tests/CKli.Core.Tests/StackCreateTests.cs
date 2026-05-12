@@ -1,8 +1,6 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
-using CK.Core;
 using NUnit.Framework;
 using Shouldly;
 using static CK.Testing.MonitorTestHelper;

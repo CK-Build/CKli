@@ -1,6 +1,4 @@
 using CK.Core;
-using System;
-using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using System.Xml.Linq;

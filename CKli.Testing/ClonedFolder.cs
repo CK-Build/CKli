@@ -2,7 +2,6 @@
 using CK.Core;
 using CK.Testing;
 using CKli.Core;
-using LibGit2Sharp;
 using Shouldly;
 using System;
 using System.IO;

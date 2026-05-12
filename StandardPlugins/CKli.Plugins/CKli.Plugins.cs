@@ -1,0 +1,24 @@
+using CKli.Core;
+
+namespace CKli.Plugins;
+
+public static class Plugins
+{
+    public static IPluginFactory Register( PluginCollectorContext ctx )
+    {
+        return PluginCollector.Create( ctx ).BuildPluginFactory( [
+            // <AutoSection>
+            typeof( BranchModel.Plugin.BranchModelPlugin ),
+            typeof( VersionTag.Plugin.VersionTagPlugin ),
+             typeof( Build.Plugin.BuildPlugin ),
+               typeof( ReleaseDatabase.Plugin.ReleaseDatabasePlugin ),
+                typeof( ArtifactHandler.Plugin.ArtifactHandlerPlugin ),
+                 typeof( Net8Migration.Plugin.Net8MigrationPlugin ),
+                  typeof( ShallowSolution.Plugin.ShallowSolutionPlugin ),
+                    typeof( CommonFiles.Plugin.CommonFilesPlugin ),
+                     typeof( Publish.Plugin.PublishPlugin ),
+                      typeof( HotZone.Plugin.HotZonePlugin ),
+                       // </AutoSection>
+        ] );
+    }
+}                

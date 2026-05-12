@@ -1,4 +1,3 @@
-using CK.Core;
 using NUnit.Framework;
 using Shouldly;
 using System.IO;

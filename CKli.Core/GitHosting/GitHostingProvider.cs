@@ -1,5 +1,4 @@
 using CK.Core;
-using LibGit2Sharp;
 using System;
 using System.Diagnostics;
 using System.IO;
