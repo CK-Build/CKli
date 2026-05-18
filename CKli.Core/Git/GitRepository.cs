@@ -495,8 +495,8 @@ public sealed partial class GitRepository : IDisposable
     /// <see cref="CheckCleanCommit(IActivityMonitor)"/> is called.
     /// </para>
     /// <para>
-    /// By default (<paramref name="resetWorkingFolder"/> is true), the working folder is reset, any
-    /// untracked or ignored files are removed.
+    /// By default (<paramref name="deleteUntracked"/> is true), untracked files are deleted from the working folder
+    /// but ignored files are kept (<paramref name="deleteIgnored"/> is false).
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
@@ -509,6 +509,7 @@ public sealed partial class GitRepository : IDisposable
     ///     <item>Enumerating the ignored entries can be costly (think to an ignored node_modules).</item>
     ///     <item>This is useful to obtain a pristine working folder. Usually, ignored files don't harm.</item>
     /// </list>
+    /// </param>
     /// <returns>True on success, false on error.</returns>
     public bool Checkout( IActivityMonitor monitor,
                           Branch localBranch,
