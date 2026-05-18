@@ -1010,8 +1010,13 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         if( lastStables.Count > 0 )
         {
             lastStable = lastStables[0];
+
             // Handle obsolete CI builds (do nothing if the lastStable is deprecated).
-            if( lowestCI != null && !lastStable.IsDeprecatedVersion && lowestCI.Version < lastStable.Version )
+
+            // Removed for the moment.
+            // (Temporary 2 cents workaround: only remove obsolete when publishing.)
+            var isPublishing = false; // PrimaryPluginContext.Command?.CommandPath.Contains( "publish" ) ?? false;
+            if( isPublishing && lowestCI != null && !lastStable.IsDeprecatedVersion && lowestCI.Version < lastStable.Version )
             {
                 // Deleting immediately ci builds of a release may not be a good idea.
                 // We consider take a step backward here. This may be an option/flag...
@@ -1037,6 +1042,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     AutoDeleteObsoleteCIReleases( monitor, repo, removableTags, v2c, supremum, lowestCI );
                 }
             }
+
             if( !(lastStable.IsDeprecatedVersion && lastStable.DeprecatedInfo.HasExpired)
                 && lastStable.BuildContentInfo != null )
             {
