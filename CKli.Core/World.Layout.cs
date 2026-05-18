@@ -137,7 +137,7 @@ sealed partial class World
             // We can dispose the Repository and update the definition file.
         }
         if( !_name.Stack.Commit( monitor, $"Before adding repository '{folderPath.LastPart}' ({gitKey.OriginUrl}) in world {_name.FullName}." )
-            || !_definitionFile.AddRepository( monitor, folderPath, subFolderPath.Parts.Skip( _name.WorldRoot.Parts.Count ), gitKey.OriginUrl, xRepo ) )
+            || !_definitionFile.AddRepository( monitor, subFolderPath.Parts.Skip( _name.WorldRoot.Parts.Count ), gitKey.OriginUrl, xRepo ) )
         {
             return false;
         }
@@ -359,10 +359,12 @@ sealed partial class World
                 {
                     case Move m:
                         m.Element.Remove();
-                        _definitionFile.AddRepository( monitor, m.NewPath, m.NewPath.Parts.Skip( _name.WorldRoot.Parts.Count ), m.Uri, m.Element );
+                        _definitionFile.AddRepository( monitor, m.NewPath.Parts.Skip( _name.WorldRoot.Parts.Count ), m.Uri, m.Element );
                         break;
                     case Clone c:
-                        _definitionFile.AddRepository( monitor, c.Path, c.Path.Parts.Skip( _name.WorldRoot.Parts.Count ), c.Uri, null );
+                        // The clone path contains the Solution name.
+                        var folders = c.Path.Parts.Skip( _name.WorldRoot.Parts.Count ).SkipLast( 1 );
+                        _definitionFile.AddRepository( monitor, folders, c.Uri, null );
                         break;
                     case Suppress s:
                         if( !_definitionFile.RemoveRepository( monitor, s.Uri, removeEmptyFolder: false ) )
@@ -534,7 +536,7 @@ sealed partial class World
                     if( idx >= 0 )
                     {
                         s = s.Slice( idx + 6 );
-                        maxIdx = s.IndexOfAny( "\r\n\t " );
+                        maxIdx = s.IndexOfAny( "\r\n\t" );
                         if( maxIdx < 0 ) maxIdx = s.Length;
                         var sUri = new string( s.Slice( 0, maxIdx ) );
                         if( Uri.TryCreate( sUri, UriKind.Absolute, out var uri ) )

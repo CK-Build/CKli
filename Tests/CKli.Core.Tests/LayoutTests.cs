@@ -1,5 +1,8 @@
+using CK.Core;
+using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -84,6 +87,63 @@ public class LayoutTests
         XElement cktCore = onlyOneFolder.Elements().Single( e => e.Attributes( "Url" ).Single().Value == "CKt-Core" );
         cktCore.HasElements.ShouldBeTrue();
         cktCore.Element( "SomePlugin" ).ShouldNotBeNull().ToString().ShouldBe( "<SomePlugin PerRepoPluginConfiguration=\"comes here\" />" );
+
+    }
+
+    [Test]
+    public async Task layout_xif_new_project_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var remotes = TestEnv.OpenRemotes( "CKt" );
+        var display = (StringScreen)context.Screen;
+
+        // ckli clone file:///.../CKt-Stack
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
+        // cd CKt
+        context = context.ChangeDirectory( "CKt" );
+
+        string tempPath = FileUtil.CreateUniqueTimedFolder( Path.GetTempPath(), "xif-layout", DateTime.UtcNow );
+        try
+        {
+            var hostingProvider = GitHosting.FileSystemProviderTests.GetFileHostingProvider();
+            var remotePath = new NormalizedPath( tempPath ).AppendPart( "Remote" ).AppendPart( "CK-H3" );
+            var info = await hostingProvider.CreateRepositoryAsync( TestHelper.Monitor, remotePath, defaultBranchName: "stable" );
+            info.ShouldNotBeNull();
+            info.CloneUrl.ShouldNotBeNull().ShouldBe( "file://" + remotePath );
+
+            // We clone the new repo with a "CK-H3/.git" remote url. The Xif layout will "correct" this by removing the ".git" extension.
+            var uri = new Uri( info.CloneUrl /*+ "/.git"*/ );
+            var clonedPath = new NormalizedPath( tempPath ).AppendPart( "Cloned" ).AppendPart( "CK-H3" );
+            using( var cloned = new Repository( Repository.Clone( uri.ToString(), clonedPath ) ) )
+            {
+                File.WriteAllText( clonedPath.AppendPart( "CK-H3.slnx" ), "<Solution></Solution>" );
+                Commands.Stage( cloned, "*" );
+                var signature = new Signature( "test", "(none)", DateTimeOffset.Now );
+                cloned.Commit( "Initialization.", signature, signature );
+                cloned.Network.Push( cloned.Branches["stable"] );
+            }
+            // Moves the cloned folder in Misc/ folder.
+            var misc = context.CurrentDirectory.AppendPart( "Misc" );
+            FileHelper.MoveFolder( TestHelper.Monitor, clonedPath, misc.AppendPart( "CK-H3" ) ).ShouldBeTrue();
+
+            // ckli layout xif
+            display.Clear();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "layout", "xif" )).ShouldBeTrue();
+            display.ToString().ShouldBe( """
+            ❰✓❱
+
+            """ );
+
+            XElement.Load( context.CurrentDirectory.AppendPart( ".PublicStack" ).AppendPart( "CKt.xml" ) )
+                .Element("CKt")?
+                    .Elements("Folder").Single( f => f.Attribute("Name")?.Value == "Misc" )
+                        .Elements().Single()
+                        .ShouldMatch( r => r.Name.LocalName == "Repository" );
+        }
+        finally
+        {
+            FileHelper.DeleteFolder( TestHelper.Monitor, tempPath );
+        }
 
     }
 }

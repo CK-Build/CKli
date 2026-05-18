@@ -334,7 +334,7 @@ public sealed class WorldDefinitionFile
     /// <summary>
     /// Called by <see cref="World.AddRepositoryAsync"/> and <see cref="World.XifLayout(IActivityMonitor)"/> (StartEdit is already called).
     /// </summary>
-    internal bool AddRepository( IActivityMonitor monitor, NormalizedPath path, IEnumerable<string> folders, Uri uri, XElement? element )
+    internal bool AddRepository( IActivityMonitor monitor, IEnumerable<string> folders, Uri uri, XElement? element )
     {
         Throw.DebugAssert( folders.All( IsValidFolderName ) );
         Throw.DebugAssert( GitRepositoryKey.GetRepositoryUrlError( uri ) == null );
