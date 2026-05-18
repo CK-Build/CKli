@@ -172,19 +172,32 @@ public partial class PackageInstance : IComparable<PackageInstance>, IEquatable<
         static ImmutableArray<PackageInstance> ReadPackages( JsonDocument d )
         {
             var result = new SortedSet<PackageInstance>();
-            foreach( var p in d.RootElement.GetProperty( "projects"u8 ).EnumerateArray() )
+            if( d.RootElement.TryGetProperty( "projects"u8, out var projects ) )
             {
-                foreach( var f in p.GetProperty( "frameworks"u8 ).EnumerateArray() )
+                foreach( var p in projects.EnumerateArray() )
                 {
-                    foreach( var package in f.GetProperty( "topLevelPackages"u8 ).EnumerateArray() )
+                    if( p.TryGetProperty( "frameworks"u8, out var frameworks ) )
                     {
-                        string? packageId = package.GetProperty( "id"u8 ).GetString();
-                        if( string.IsNullOrWhiteSpace( packageId ) )
+                        foreach( var f in frameworks.EnumerateArray() )
                         {
-                            Throw.InvalidDataException( $"Null or empty 'topLevelPackages.id' property." );
+                            if( f.TryGetProperty( "topLevelPackages"u8, out var topLevelPackages ) )
+                            {
+                                foreach( var package in topLevelPackages.EnumerateArray() )
+                                {
+                                    string? packageId;
+                                    if( !package.TryGetProperty( "id"u8, out var eId )
+                                        || string.IsNullOrWhiteSpace( packageId = eId.GetString() ) )
+                                    {
+                                        Throw.InvalidDataException( $"Missing, null or empty 'topLevelPackages.id' property." );
+                                    }
+                                    else
+                                    {
+                                        result.Add( new PackageInstance( packageId,
+                                                                         SVersion.Parse( package.GetProperty( "resolvedVersion"u8 ).GetString() ) ) );
+                                    }
+                                }
+                            }
                         }
-                        result.Add( new PackageInstance( packageId,
-                                                              SVersion.Parse( package.GetProperty( "resolvedVersion"u8 ).GetString() ) ) );
                     }
                 }
             }
