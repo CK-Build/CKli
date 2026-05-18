@@ -377,7 +377,9 @@ public sealed partial class StackRepository : IDisposable
                 }
                 if( !error )
                 {
-                    if( git.FullCheckout( monitor, stackBranchName, skipPullStack ) )
+                    var b = git.EnsureBranch( monitor, stackBranchName );
+                    if( git.Checkout( monitor, b )
+                        && (skipPullStack || git.FetchMergeHead( monitor, LibGit2Sharp.MergeFileFavor.Theirs )) )
                     {
                         return new StackRepository( git, stackRoot, context, stackNameFromUrl );
                     }
