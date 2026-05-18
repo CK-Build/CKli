@@ -82,7 +82,7 @@ sealed class WorldReleaseInfo
             }
         }
         Throw.DebugAssert( i == repoInfos.Length );
-        return new WorldReleaseInfo( buildDate.ToString( "yyyy.M.d+HH.mm" ),
+        return new WorldReleaseInfo( buildDate.ToString( "yyyy.MM.dd+HH.mm" ),
                                      buildDate,
                                      ImmutableCollectionsMarshal.AsImmutableArray( repoInfos ),
                                      publishedLength,
