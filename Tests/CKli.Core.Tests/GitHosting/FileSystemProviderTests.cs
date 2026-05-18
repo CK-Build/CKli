@@ -13,14 +13,22 @@ namespace CKli.Core.Tests.GitHosting;
 [TestFixture]
 public class FileSystemProviderTests
 {
+
+    public static GitHostingProvider GetFileHostingProvider()
+    {
+        var secretsStore = new RecordingSecretsStore();
+        var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
+        var p = key.AccessKey.HostingProvider;
+        return p.ShouldNotBeNull();
+    }
+
     [Test]
     public async Task one_instance_for_public_or_private_from_any_file_scheme_Async()
     {
         var secretsStore = new RecordingSecretsStore();
 
-        var gitKey1 = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p1 = gitKey1.AccessKey.HostingProvider;
-        p1.ShouldNotBeNull().ProviderType.ShouldBe( "FileSystemProvider" );
+        var p1 = GetFileHostingProvider();
+        p1.ProviderType.ShouldBe( "FileSystemProvider" );
 
         var gitKey2 = new GitRepositoryKey( secretsStore, new Uri( "//Some/path" ), isPublic: true );
         var p2 = gitKey2.AccessKey.HostingProvider;
@@ -47,10 +55,7 @@ public class FileSystemProviderTests
     [Test]
     public async Task info_on_non_existing_git_or_non_bare_repo_is_an_error_Async()
     {
-        var secretsStore = new RecordingSecretsStore();
-        var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p = key.AccessKey.HostingProvider;
-        p.ShouldNotBeNull();
+        var p = GetFileHostingProvider();
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
@@ -75,10 +80,7 @@ public class FileSystemProviderTests
     [Test]
     public async Task info_on_existing_bare_git_repo_Async()
     {
-        var secretsStore = new RecordingSecretsStore();
-        var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p = key.AccessKey.HostingProvider;
-        p.ShouldNotBeNull();
+        var p = GetFileHostingProvider();
 
         var bareCKtStack = TestHelper.TestProjectFolder.Combine( "Remotes/bare/CKt/CKt-Stack" );
         var info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, bareCKtStack, mustExist: true );
@@ -94,11 +96,8 @@ public class FileSystemProviderTests
     [Test]
     public async Task creating_repo_folder_must_not_exist_Async()
     {
-        var secretsStore = new RecordingSecretsStore();
-        var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p = key.AccessKey.HostingProvider;
-        p.ShouldNotBeNull();
-
+        var p = GetFileHostingProvider();
+ 
         // The parent of the .git folder must not exist.
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
@@ -131,10 +130,7 @@ public class FileSystemProviderTests
     [Test]
     public async Task creating_repo_Async()
     {
-        var secretsStore = new RecordingSecretsStore();
-        var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
-        var p = key.AccessKey.HostingProvider;
-        p.ShouldNotBeNull();
+        var p = GetFileHostingProvider();
 
         // The parent of the .git folder must not exist.
         var tempPath = FileUtil.CreateUniqueTimedFolder( Path.GetTempPath(), "CKli-repo-tests", DateTime.UtcNow );
