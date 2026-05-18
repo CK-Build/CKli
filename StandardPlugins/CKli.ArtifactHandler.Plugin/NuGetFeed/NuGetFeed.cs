@@ -92,9 +92,9 @@ public sealed class NuGetFeed
     /// to push to a local git repository (that is "FILESYSTEM_GIT") and register
     /// a "don't care" value in the secret store:
     /// <code>
-    /// dotnet user-secrets set FILESYSTEM_GIT "don't care" --id CKli-Test
+    /// dotnet user-secrets set FILESYSTEM_GIT "don't care" --id CKli-CKli-Test
     /// </code>
-    /// Note: the name use here (<c>CKli-Test</c>) depends on the test host that is running.
+    /// Note: the name use here (<c>CKli-CKli-Test</c>) depends on the test host that is running.
     /// </para>
     /// </summary>
     public NuGetFeedCredentials? PushCredentials => _pushCredentials;
