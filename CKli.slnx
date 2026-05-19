@@ -1,0 +1,31 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="appveyor.yml" />
+    <File Path="Common/PackageIcon.png" />
+    <File Path="Directory.Build.props" />
+    <File Path="nuget.config" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/StandardPlugins/">
+    <Project Path="StandardPlugins/CKli.ArtifactHandler.Plugin/CKli.ArtifactHandler.Plugin.csproj" />
+    <Project Path="StandardPlugins/CKli.BranchModel.Plugin/CKli.BranchModel.Plugin.csproj" />
+    <Project Path="StandardPlugins/CKli.Build.Plugin/CKli.Build.Plugin.csproj" />
+    <Project Path="StandardPlugins/CKli.CommonFiles.Plugin/CKli.CommonFiles.Plugin.csproj" />
+    <Project Path="StandardPlugins/CKli.HotZone.Plugin/CKli.HotZone.Plugin.csproj" />
+    <Project Path="StandardPlugins/CKli.Migration.Plugin/CKli.Migration.Plugin.csproj" />
+    <Project Path="StandardPlugins/CKli.Publish.Plugin/CKli.Publish.Plugin.csproj" />
+    <Project Path="StandardPlugins/CKli.ReleaseDatabase.Plugin/CKli.ReleaseDatabase.Plugin.csproj" />
+    <Project Path="StandardPlugins/CKli.ShallowSolution.Plugin/CKli.ShallowSolution.Plugin.csproj" />
+    <Project Path="StandardPlugins/CKli.VersionTag.Plugin/CKli.VersionTag.Plugin.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/CKli.Core.Tests/CKli.Core.Tests.csproj" />
+  </Folder>
+  <Project Path="CKli.Core/CKli.Core.csproj" />
+  <Project Path="CKli.Loader/CKli.Loader.csproj" />
+  <Project Path="CKli.Plugins.Core/CKli.Plugins.Core.csproj" />
+  <Project Path="CKli.Testing/CKli.Testing.csproj" />
+  <Project Path="CKli/CKli.csproj" />
+</Solution>
