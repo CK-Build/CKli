@@ -1,4 +1,5 @@
 using CK.Core;
+using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
@@ -74,9 +75,17 @@ public sealed partial class HotGraph
 
             /// <summary>
             /// Gets whether a build is required because <see cref="TagCommit"/>'s content is not the same as
-            /// the <see cref="GitSolution"/>'s git branch's tip content.
+            /// the dev's git branch's tip content if it exists (otherwise, the <see cref="HotBranch.GitBranch"/> is used).
             /// </summary>
-            public bool HasCodeChange => _tagCommit.Commit.Tree.Sha != _info._solution.GitSolution.GitBranch.Tip.Tree.Sha;
+            public bool HasCodeChange
+            {
+                get
+                {
+                    HotBranch hotBranch = _info._solution.Branch;
+                    Throw.DebugAssert( hotBranch.IsActive );
+                    return _tagCommit.Commit.Tree.Sha != (hotBranch.GitDevBranch ?? hotBranch.GitBranch).Tip.Tree.Sha;
+                }
+            }
 
             /// <summary>
             /// Gets whether this solution has already been built: both <see cref="VersionMustBuild"/> and <see cref="HasCodeChange"/> are false.

@@ -85,7 +85,7 @@ public sealed partial class HotGraph
 
         /// <summary>
         /// Gets the branch name from which this <see cref="GitSolution"/> has been read: it is the closest
-        /// active branch from the <see cref="HotGraph.BranchName"/>.
+        /// active branch from the <see cref="HotGraph.BranchName"/>: its <see cref="HotBranch.GitBranch"/> is necessarily not null.
         /// </summary>
         public HotBranch Branch => _actual;
 
