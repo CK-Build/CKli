@@ -36,17 +36,33 @@ public sealed partial class Roadmap
         }
 
         #region Initialize
+
+        /// <summary>
+        /// Captures 3 different package mappers.
+        /// </summary>
         sealed class PackagesUpdateDetails
         {
-            public PackageMapper? WorldRef;
+            /// <summary>
+            /// The reference to [U]pdate from the World itself (these are necessarily packages that are
+            /// emitted from upstream repositories).
+            /// </summary>
+            public PackageMapper? Updates;
+
+            /// <summary>
+            /// The references [C]onfigured in the World (<see cref="VersionTagPlugin.GetPackagesConfiguration(IActivityMonitor)"/>).
+            /// </summary>
             public PackageMapper? Configuration;
+
+            /// <summary>
+            /// The references that are [D]iscrepancies (other repositories use greater versions).
+            /// </summary>
             public PackageMapper? Discrepancies;
 
             public void Add( (PackageInstance Ref, SVersion To, int MappingIndex) update )
             {
                 var m = update.MappingIndex switch
                 {
-                    0 => WorldRef ??= new PackageMapper(),
+                    0 => Updates ??= new PackageMapper(),
                     1 => Configuration ??= new PackageMapper(),
                     _ => Discrepancies ??= new PackageMapper()
                 };
@@ -83,11 +99,15 @@ public sealed partial class Roadmap
             var alreadyBuiltMapping = _roadmap._packageUpdater.GetAlreadyBuiltMapping( _roadmap._isCIBuild );
             var packageUpdates = new PackagesUpdateDetails();
             if( _solution.GitSolution.HasUpdates( packageUpdates.Add,
-                                                  mustBuildFromUpstreams ? null : alreadyBuiltMapping,
-                                                  _roadmap._packageUpdater.WorldConfiguredMapping,
-                                                  _roadmap._packageUpdater.DiscrepanciesMapping ) )
+                                                  mustBuildFromUpstreams ? null : alreadyBuiltMapping, // U
+                                                  _roadmap._packageUpdater.WorldConfiguredMapping,     // C
+                                                  _roadmap._packageUpdater.DiscrepanciesMapping ) )    // D
             {
-                buildReason |= MustBuildReason.DependencyUpdate;
+                // Only consider 'C' and 'D' here: 'U' is considered "skippable".
+                if( packageUpdates.Configuration != null || packageUpdates.Discrepancies != null )
+                {
+                    buildReason |= MustBuildReason.DependencyUpdate;
+                }
             }
             Throw.DebugAssert( buildReason == MustBuildReason.None || (buildReason & (MustBuildReason.UpstreamBuild | MustBuildReason.DependencyUpdate)) != 0 );
 
@@ -134,6 +154,10 @@ public sealed partial class Roadmap
                     {
                         buildReason |= MustBuildReason.CodeChange;
                     }
+                    if( packageUpdates.Updates != null )
+                    {
+                        buildReason |= MustBuildReason.DependencyUpdate;
+                    }
                 }
                 if( buildReason == MustBuildReason.None )
                 {
@@ -145,7 +169,7 @@ public sealed partial class Roadmap
                                                 vChange,
                                                 _lastBuild.TagCommit.Version,
                                                 directRequirements,
-                                                packageUpdates.WorldRef,
+                                                packageUpdates.Updates,
                                                 packageUpdates.Configuration,
                                                 packageUpdates.Discrepancies );
                     return true;
@@ -156,6 +180,10 @@ public sealed partial class Roadmap
             if( _lastBuild.HasCodeChange )
             {
                 buildReason |= MustBuildReason.CodeChange;
+            }
+            if( packageUpdates.Updates != null )
+            {
+                buildReason |= MustBuildReason.DependencyUpdate;
             }
 
             // If the upstream doesn't force a Major, we must compute the change from the code in this repository
@@ -171,7 +199,7 @@ public sealed partial class Roadmap
                                         vChange,
                                         targetVersion,
                                         directRequirements,
-                                        packageUpdates.WorldRef,
+                                        packageUpdates.Updates,
                                         packageUpdates.Configuration,
                                         packageUpdates.Discrepancies );
             _roadmap._buildSolutionCount++;
