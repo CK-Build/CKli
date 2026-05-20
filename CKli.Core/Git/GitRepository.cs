@@ -20,7 +20,7 @@ public sealed partial class GitRepository : IDisposable
     readonly Repository _git;
     readonly NormalizedPath _displayPath;
     readonly NormalizedPath _workingFolder;
-    readonly List<string> _deferredPushRefSpecs;
+    readonly HashSet<string> _deferredPushRefSpecs;
     Signature _committer;
     Signature? _author;
 
@@ -39,7 +39,7 @@ public sealed partial class GitRepository : IDisposable
         _git = libRepository;
         _workingFolder = fullPath;
         _displayPath = displayPath;
-        _deferredPushRefSpecs = new List<string>();
+        _deferredPushRefSpecs = new HashSet<string>();
 
         // Bare repository has a null libRepository.Info.WorkingDirectory.
         Throw.CheckArgument( repositoryKey.IsBareRepository
@@ -96,7 +96,7 @@ public sealed partial class GitRepository : IDisposable
     public Signature Author => _author ??= _git.Config.BuildSignature( _committer.When ) ?? _committer;
 
     /// <summary>
-    /// Gets a mutable list of ref specs (see <see href="https://git-scm.com/book/en/v2/Git-Internals-The-Refspec"/>)
+    /// Gets a mutable set of ref specs (see <see href="https://git-scm.com/book/en/v2/Git-Internals-The-Refspec"/>)
     /// that will be implicitly pushed with the next push (can be <see cref="PushBranch(IActivityMonitor, Branch, bool)"/>,
     /// or <see cref="PushTags(IActivityMonitor, IEnumerable{string}, string)"/>, etc.). Once pushed, this list is cleared.
     /// <para>
@@ -110,7 +110,7 @@ public sealed partial class GitRepository : IDisposable
     /// any "ckli aware repository".
     /// </para>
     /// </summary>
-    public List<string> DeferredPushRefSpecs => _deferredPushRefSpecs;
+    public HashSet<string> DeferredPushRefSpecs => _deferredPushRefSpecs;
 
     /// <summary>
     /// Gets the LibGit2Sharp <see cref="Repository"/>.
