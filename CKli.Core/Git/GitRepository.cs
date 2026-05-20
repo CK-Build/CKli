@@ -966,11 +966,8 @@ public sealed partial class GitRepository : IDisposable
     /// <returns>True on success, false on error.</returns>
     public bool Push( IActivityMonitor monitor, Remote remote, UsernamePasswordCredentials? creds, IEnumerable<string> pushRefSpecs )
     {
-        if( _deferredPushRefSpecs.Count > 0 )
-        {
-            pushRefSpecs = pushRefSpecs.Concat( _deferredPushRefSpecs );
-        }
-        var commonLogMsg = $"'{DisplayPath}' references '{pushRefSpecs.Concatenate( "', '" )}'";
+        _deferredPushRefSpecs.AddRange( pushRefSpecs );
+        var commonLogMsg = $"'{DisplayPath}' references '{_deferredPushRefSpecs.Concatenate( "', '" )}'";
         using( monitor.OpenTrace( $"Pushing {commonLogMsg}." ) )
         {
             try
@@ -989,7 +986,7 @@ public sealed partial class GitRepository : IDisposable
                             """ );
                     }
                 };
-                _git.Network.Push( remote, pushRefSpecs, options );
+                _git.Network.Push( remote, _deferredPushRefSpecs, options );
                 if( !errors.IsEmpty )
                 {
                     monitor.Error( $"""
