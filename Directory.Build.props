@@ -17,7 +17,17 @@
   <ItemGroup>
     <SourceRoot Include="$(SolutionDir)" />
   </ItemGroup>
+
   <!--</BasicDefinitions>-->
+
+  <!--</Doc>-->
+  <PropertyGroup>
+    <PackageReadmeFile>Package.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="Doc\Package.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <!--</Doc>-->
 
   <!--<ReproducibleBuilds>:Ehttps://github.com/dotnet/reproducible-builds. SourceLink is automatically managed by this package.-->
   <Sdk Name="DotNet.ReproducibleBuilds.Isolated" Version="1.2.39" />
