@@ -33,6 +33,8 @@ public sealed partial class Roadmap
                 {
                     return b.BuildInfo.TargetVersion;
                 }
+                // Ouch... Skippable "+fake" version complicates this!
+                // Because we may reach this point with last.TagCommit.Version that is a +fake version. 
                 var last = b.VersionInfo.GetLastBuild( _ciBuild );
                 return last.VersionMustBuild
                         ? null

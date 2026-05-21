@@ -30,9 +30,9 @@ public sealed partial class Roadmap
         readonly MustBuildReason _buildReason;
         readonly VersionChange _versionChange;
         readonly SVersion _targetVersion;
-        readonly PackageMapper? _worldReferences;
-        readonly PackageMapper? _versionConfigurations;
-        readonly PackageMapper? _discrepancies;
+        readonly PackageMapper? _uUpdates;
+        readonly PackageMapper? _cUpdates;
+        readonly PackageMapper? _dUpdates;
         readonly ImmutableArray<BuildSolution> _directRequirements;
 
         readonly Lock _buildTaskLock;
@@ -44,23 +44,29 @@ public sealed partial class Roadmap
                             VersionChange versionChange,
                             SVersion targetVersion,
                             BuildSolution[]? directRequirements,
-                            PackageMapper? worldReferences,
-                            PackageMapper? versionConfigurations,
-                            PackageMapper? discrepancies )
+                            PackageMapper? uUpdates,
+                            PackageMapper? cUpdates,
+                            PackageMapper? dUpdates )
         {
             _solution = solution;
             _buildReason = buildReason;
             _versionChange = versionChange;
             _targetVersion = targetVersion;
-            _worldReferences = worldReferences;
-            _versionConfigurations = versionConfigurations;
-            _discrepancies = discrepancies;
+            _uUpdates = uUpdates;
+            _cUpdates = cUpdates;
+            _dUpdates = dUpdates;
             _directRequirements = directRequirements != null
                                     ? ImmutableCollectionsMarshal.AsImmutableArray( directRequirements )
                                     : [];
             _buildTaskLock = new Lock();
-            Throw.DebugAssert( "mustBuild => at least Patch", buildReason == MustBuildReason.None || versionChange >= VersionChange.Patch );
-            Throw.DebugAssert( (worldReferences != null || versionConfigurations != null || discrepancies != null) == ((_buildReason & MustBuildReason.DependencyUpdate) != 0) );
+
+            Throw.DebugAssert( "When we must build then version change s at least Patch.",
+                               buildReason == MustBuildReason.None || versionChange >= VersionChange.Patch );
+
+            Throw.DebugAssert( "Currently the version can never be a +fake (the +fake is not skippable).", !_targetVersion.IsFake() );
+
+            Throw.DebugAssert( "Any dependency updates appear in the BuildReason.",
+                                (uUpdates != null || cUpdates != null || dUpdates != null) == ((_buildReason & MustBuildReason.DependencyUpdate) != 0) );
         }
 
         public BuildSolution Solution => _solution;
@@ -94,17 +100,17 @@ public sealed partial class Roadmap
         /// <summary>
         /// Gets the intra World reference package updates if any.
         /// </summary>
-        public PackageMapper? WorldReferencesUpdates => _worldReferences;
+        public PackageMapper? UUpdates => _uUpdates;
 
         /// <summary>
         /// Gets the package updates from <see cref="BranchModel.Plugin.HotGraph.PackageUpdater.WorldConfiguredMapping"/> if any.
         /// </summary>
-        public PackageMapper? VersionConfigurationUpdates => _versionConfigurations;
+        public PackageMapper? CUpdates => _cUpdates;
 
         /// <summary>
         /// Gets the package updates from <see cref="BranchModel.Plugin.HotGraph.PackageUpdater.DiscrepanciesMapping"/> if any.
         /// </summary>
-        public PackageMapper? DiscrepanciesUpdates => _discrepancies;
+        public PackageMapper? DUpdates => _dUpdates;
 
         /// <summary>
         /// Gets the build result. Not null when <see cref="MustBuild"/> is true and build succeeded.
@@ -149,22 +155,22 @@ public sealed partial class Roadmap
         internal IRenderable RenderBuildReason( ScreenType screen, ref RStats stats )
         {
             IRenderable r = screen.Text( $"({_buildReason})", TextStyle.Default.With( TextEffect.Italic ) );
-            if( _worldReferences != null )
+            if( _uUpdates != null )
             {
                 // This is used only when building the upstreams is skipped, the updates here are existing upstreams
                 // so we use 'U'.
-                r = r.AddBelow( stats.GetUDepHead( screen ).AddRight( screen.Text( _worldReferences.ToString(), ConsoleColor.DarkGray ) ) );
-                stats.UDepUpdates += _worldReferences.Count;
+                r = r.AddBelow( stats.GetUDepHead( screen ).AddRight( screen.Text( _uUpdates.ToString(), ConsoleColor.DarkGray ) ) );
+                stats.UDepUpdates += _uUpdates.Count;
             }
-            if( _versionConfigurations != null )
+            if( _cUpdates != null )
             {
-                r = r.AddBelow( stats.GetCDepHead( screen ).AddRight( screen.Text( _versionConfigurations.ToString(), ConsoleColor.DarkGray ) ) );
-                stats.CDepUpdates += _versionConfigurations.Count;
+                r = r.AddBelow( stats.GetCDepHead( screen ).AddRight( screen.Text( _cUpdates.ToString(), ConsoleColor.DarkGray ) ) );
+                stats.CDepUpdates += _cUpdates.Count;
             }
-            if( _discrepancies != null )
+            if( _dUpdates != null )
             {
-                r = r.AddBelow( stats.GetDDepHead( screen ).AddRight( screen.Text( _discrepancies.ToString(), ConsoleColor.DarkGray ) ) );
-                stats.DDepUpdates += _discrepancies.Count;
+                r = r.AddBelow( stats.GetDDepHead( screen ).AddRight( screen.Text( _dUpdates.ToString(), ConsoleColor.DarkGray ) ) );
+                stats.DDepUpdates += _dUpdates.Count;
             }
             return r;
         }

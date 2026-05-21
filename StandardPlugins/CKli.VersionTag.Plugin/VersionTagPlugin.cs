@@ -867,10 +867,10 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             //
             // As opposed to +invalid tags, +deprecated tags must never be deleted. They memorize the
             // existence of a version and contain the BuildContentInfo of the deprecated version: if they
-            // cannot br parsed (reason, expiration, build content), we catch them here (these are issues) to
+            // cannot be parsed (reason, expiration, build content), we catch them here (these are issues) to
             // avoid complex error handling.
             //
-            bool isFakeVersion = v.BuildMetaData.Equals( "fake", StringComparison.Ordinal );
+            bool isFakeVersion = v.IsFake();
             bool isDeprecatedVersion = !isFakeVersion && v.BuildMetaData.Contains( "deprecated", StringComparison.Ordinal );
             DeprecatedTagInfo? deprecatedInfo = null;
             if( isDeprecatedVersion && !DeprecatedTagInfo.TryParse( t.Annotation?.Message, out deprecatedInfo ) )

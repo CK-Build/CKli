@@ -126,10 +126,12 @@ public sealed partial class Roadmap
                 monitor.Trace( $"MustBuildReason.{buildReason} for '{_solution}'." );
             }
 
-            // When the last build consumes packages in the alreadyBuiltMapping, it means that we are a solution
-            // that is impacted by the upstreams but none of our upstreams must be built AND our *.csproj are
-            // up to date. This happens when a our upstreams have been built, our *.csproj have been updated but
-            // our build failed miserably: the last build tag has not been updated with the upstreams versions.
+            // Still none? Save the "last build failed" case.
+            // When the last build consumes packages in the alreadyBuiltMapping in a different version, it means that
+            // we are a solution that is impacted by the upstreams but none of our upstreams must be built (not UpstreamBuild) AND our *.csproj are
+            // up to date (not CodeChange). This happens when a our upstreams have been built, our *.csproj have been updated but last build failed
+            // miserably: the last build tag has not been updated with the upstreams versions.
+            // Here, when _lastBuild.TagCommit.BuildContentInfo is null, it is because the last build is a +fake: we ignore this here (we are not
             if( buildReason == MustBuildReason.None )
             {
                 Throw.DebugAssert( _lastBuild.TagCommit.BuildContentInfo != null );

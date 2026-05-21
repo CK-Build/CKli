@@ -7,6 +7,8 @@ public static class SVersionExtensions
 {
     public static bool IsLocalFix( this SVersion version ) => version.IsPrerelease && version.Prerelease.StartsWith( "local.fix.", StringComparison.Ordinal );
 
+    public static bool IsFake( this SVersion version ) => version.BuildMetaData.Equals( "fake", StringComparison.Ordinal );
+
     public static bool IsCI( this SVersion version )
     {
         var r = version.Prerelease.AsSpan();
