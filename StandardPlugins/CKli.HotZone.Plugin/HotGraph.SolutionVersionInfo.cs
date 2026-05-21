@@ -71,7 +71,17 @@ public sealed partial class HotGraph
             /// a "+fake" or a "+deprecated" version and should not be used to reference any package
             /// produced by this solution.
             /// </summary>
-            public bool VersionMustBuild => _tagCommit.BuildContentInfo == null;
+            /// <remarks>
+            /// We explored the approach in which "+deprecated" on the last build tag necessarily triggers a build but a "+fake"
+            /// is "skippable" (ie. depends on the selected pivots). We rejected this because such skipped solution may need their
+            /// version to be updated in downstream repositories and the version to "last good version" to apply doesn't exist
+            /// when the fake version appears alone (no other version tags exist or, for any reasons, the other version tags have
+            /// been deprecated or invalidated).
+            /// <para>
+            /// This MAY be handled one day but this has been considered too fragile: a "+fake" version is currently not skippable.
+            /// </para>
+            /// </remarks>
+            public bool VersionMustBuild => !_tagCommit.IsRegularVersion;
 
             /// <summary>
             /// Gets whether a build is required because <see cref="TagCommit"/>'s content is not the same as
