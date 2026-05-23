@@ -184,7 +184,7 @@ public sealed partial class HotGraph
                 {
                     IncludeReachableFrom = currentTip,
                     ExcludeReachableFrom = baseTagCommit.Commit,
-                    SortBy = CommitSortStrategies.Time | CommitSortStrategies.Reverse
+                    SortBy = CommitSortStrategies.Time
                 } );
                 var commitsFromBaseBuild = commitsLog.ToList();
 
@@ -195,7 +195,7 @@ public sealed partial class HotGraph
                     if( tc != null )
                     {
                         var v = tc.Version;
-                        if( v < baseTagCommit.Version )
+                        if( !baseTagCommit.IsFakeVersion && v < baseTagCommit.Version )
                         {
                             monitor.Warn( $"Ignoring {tc} in '{_solution}' as it is lower than the last version '{baseTagCommit.Version.ParsedText}'." );
                         }

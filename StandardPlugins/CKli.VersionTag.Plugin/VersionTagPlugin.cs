@@ -40,20 +40,25 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     }
 
     /// <summary>
-    /// Sets <see cref="XNames.MinVersion"/> for a Repo.
+    /// Sets <see cref="XNames.InfVersion"/> for a Repo.
     /// This must be called before the <see cref="VersionTagInfo"/> for the Repo is obtained.
     /// This is required for .Net 8 migration. This can be removed one day. 
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="repo">The repository.</param>
-    /// <param name="min">The new MinVersion.</param>
+    /// <param name="inf">The new InfVersion (or null to remove it).</param>
     /// <returns>True on success, false on error.</returns>
-    public bool SetMinVersion( IActivityMonitor monitor, Repo repo, SVersion min )
+    public bool SetInfVersion( IActivityMonitor monitor, Repo repo, SVersion? inf )
     {
-        Throw.CheckArgument( min != null && min.IsValid && !min.IsPrerelease );
+        Throw.CheckArgument( inf == null || inf.IsValid );
         Throw.CheckState( !HasRepoInfoBeenCreated( repo ) );
         return PrimaryPluginContext.GetConfigurationFor( repo )
-                                   .Edit( monitor, ( monitor, e ) => e.SetAttributeValue( XNames.MinVersion, min.ToString() ) );
+                                   .Edit( monitor, ( monitor, e ) =>
+                                   {
+                                       e.SetAttributeValue( XNames.InfVersion, inf?.ToString() );
+                                       // Initially this was a MinVersion: removes it if any.
+                                       e.SetAttributeValue( "MinVersion", null );
+                                   } );
     }
 
     /// <summary>
@@ -729,86 +734,60 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         }
     }
 
-    (SVersion Min, SVersion? Max) ReadRepoConfiguration( IActivityMonitor monitor, Repo repo )
+    (SVersion? Inf, SVersion? Sup) ReadRepoConfiguration( IActivityMonitor monitor, Repo repo )
     {
         var config = PrimaryPluginContext.GetConfigurationFor( repo );
-        // Non existing or invalid MinVersion fallbacks to v0.0.0.
-        SVersion min = ReadVersionAttribute( monitor, config, XNames.MinVersion, SVersion.Create( 0, 0, 0 ) );
+        SVersion? inf = ReadVersionAttribute( monitor, config, XNames.InfVersion );
 
-        SVersion? max = null;
-        var maxAttr = config.XElement.Attribute( XNames.MaxVersion );
+        SVersion? sup = ReadVersionAttribute( monitor, config, XNames.SupVersion );
         if( World.Name.IsDefaultWorld )
         {
-            if( maxAttr != null )
+            if( sup != null )
             {
                 monitor.Warn( $"""
-                    In a default World (not a LTS one), there must be no MaxVersion.
-                    Removing VersionTagPlugin.MaxVersion = "{maxAttr.Value}" for '{repo}'.
+                    In a default World (not a LTS one), there must be no SupVersion.
+                    Removing VersionTagPlugin.SupVersion = "{sup}" for '{repo}'.
                     """ );
-                config.Edit( monitor, ( monitor, e ) => maxAttr.Remove() );
+                config.Edit( monitor, ( monitor, e ) => e.Attribute( XNames.SupVersion )!.Remove() );
             }
         }
         else
         {
-            // LTS world: the max version must exist.
-            // We read it and use the min version as the fallback: this gives an invalid range
-            // that should be fixed by the user.
-            min = ReadVersionAttribute( monitor, config, XNames.MaxVersion, min );
-            if( min >= max )
+            // LTS world: the sup version must exist. That should be fixed by the user.
+            sup = ReadVersionAttribute( monitor, config, XNames.SupVersion );
+            if( inf >= sup )
             {
-                monitor.Warn( $"Invalid Min/MaxVersion range in '{repo}'. This must be fixed." );
+                monitor.Warn( $"Invalid Inf/SupVersion range in '{repo}'. In a LTS World, the SupVersion must exist and be greater than InfVersion. This must be manually fixed." );
             }
         }
-        return (min, max);
+        return (inf, sup);
 
-        static SVersion ReadVersionAttribute( IActivityMonitor monitor,
-                                              PluginConfiguration config,
-                                              XName name,
-                                              SVersion defaultValue )
+        static SVersion? ReadVersionAttribute( IActivityMonitor monitor,
+                                               PluginConfiguration config,
+                                               XName name )
         {
             Throw.DebugAssert( config.Repo != null );
             var text = config.XElement.Attribute( name )?.Value;
-            SVersion parsedV = SVersion.TryParse( text );
-            SVersion v;
-            if( !parsedV.IsValid )
+            if( string.IsNullOrWhiteSpace( text ) )
             {
-                v = defaultValue;
-                if( text == null )
-                {
-                    monitor.Trace( $"Initializing '{config.Repo.DisplayPath}' VersionTagPlugin.{name.LocalName} to '{v}'." );
-                }
-                else
-                {
-                    monitor.Warn( $"""
-                        Invalid '{config.Repo.DisplayPath}' VersionTagPlugin.{name.LocalName}: '{text}'.
-                        Reinitializing to '{v}'.
-                        """ );
-                }
+                return null;
             }
-            else
+            SVersion v = SVersion.TryParse( text );
+            if( !v.IsValid )
             {
-                v = parsedV;
-                if( v.IsPrerelease )
-                {
-                    v = SVersion.Create( v.Major, v.Minor, v.Patch );
-                    monitor.Warn( $"""
-                        Invalid '{config.Repo.DisplayPath}' VersionTagPlugin.{name.LocalName}: '{text}' must be a stable version.
-                        Reinitializing to '{v}'.
-                        """ );
-                }
-            }
-            if( v != parsedV )
-            {
-                config.Edit( monitor, ( monitor, e ) => e.SetAttributeValue( name, v ) );
+                monitor.Warn( $"""
+                    Invalid '{config.Repo.DisplayPath}' VersionTagPlugin.{name.LocalName}: '{text}'.
+                    Considering it missing.
+                    """ );
+                return null;
             }
             return v;
         }
-
     }
 
     protected override VersionTagInfo Create( IActivityMonitor monitor, Repo repo )
     {
-        var (minVersion, maxVersion) = ReadRepoConfiguration( monitor, repo );
+        var (infVersion, supVersion) = ReadRepoConfiguration( monitor, repo );
 
         var isExecutingIssue = PrimaryPluginContext.Command is CKliIssue;
 
@@ -838,8 +817,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             {
                 continue;
             }
-            // Above MaxVersion or below MinVersion: ignore.
-            if( (maxVersion != null && v > maxVersion) || v < minVersion ) continue;
+            // Above or equal to SupVersion or below or equal to InfVersion: ignore.
+            if( (supVersion != null && v >= supVersion) || v <= infVersion ) continue;
 
             // A +invalid tag totally cancels an existing version tag. We collect them
             // and apply them once all the valid tags have been collected.
@@ -865,13 +844,24 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             // A +deprecated was an actual version. They appear in the VersionTagInfo.TagCommits (like a +fake).
             // This is required, for instance, to be able to produce a 4.0.1 fix after the deprecated 4.0.0 version.
             //
-            // As opposed to +invalid tags, +deprecated tags must never be deleted. They memorize the
+            // As opposed to +invalid tags, +deprecated tags should never be deleted. They memorize the
             // existence of a version and contain the BuildContentInfo of the deprecated version: if they
-            // cannot be parsed (reason, expiration, build content), we catch them here (these are issues) to
-            // avoid complex error handling.
+            // cannot be parsed (reason, expiration, build content), we catch them here (these are
+            // issues: currently exposed as "RemovableTag" issues) to avoid too complex error handling.
             //
-            bool isFakeVersion = v.IsFake();
-            bool isDeprecatedVersion = !isFakeVersion && v.BuildMetaData.Contains( "deprecated", StringComparison.Ordinal );
+            bool isFakeVersion;
+            bool isDeprecatedVersion;
+            if( v.IsFake( out var vFake ) )
+            {
+                isFakeVersion = true;
+                isDeprecatedVersion = false;
+                v = vFake;
+            }
+            else
+            {
+                isFakeVersion = false;
+                isDeprecatedVersion = v.BuildMetaData.Contains( "deprecated", StringComparison.Ordinal );
+            }
             DeprecatedTagInfo? deprecatedInfo = null;
             if( isDeprecatedVersion && !DeprecatedTagInfo.TryParse( t.Annotation?.Message, out deprecatedInfo ) )
             {
@@ -906,10 +896,45 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 }
                 continue;
             }
+            // The newOne tag is not "removed" by an associated "+invalid".
+            // If newOne version has not been discovered yet, it is easy: register the SVersion -> TagCommit in v2C dictionary.
+            // Otherwise, it is a little bit subtler :-).
             if( v2c.TryGetValue( newOne.Version, out var exists ) )
             {
                 Throw.DebugAssert( topHot != null );
-                // If the version is on different commit, this is a tag conflict.
+                // If the version is on different commit, this is a tag conflict... except if one of the tag is a "+fake" and the other one
+                // is the regular version or a "+deprecated" one: this is a "+fake" tag that has eventually been generated (and potentially deprecated).
+                //
+                // The fake tag must be removed if the regular version has been published (otherwise we keep it in order for the user to be
+                // able to delete the "local/" generated version without losing the "+fake").
+                //
+                if( newOne.IsFakeVersion && (exists.IsRegularVersion || exists.IsDeprecatedVersion) )
+                {
+                    // Easy (we ignore the fake newOne or remove it if the regular or deprecated tag is published): 
+                    if( !exists.IsLocalTag )
+                    {
+                        removableTags ??= new List<Tag>();
+                        removableTags.Add( newOne.Tag );
+                    }
+                    Throw.DebugAssert( "The topHot cannot be the newOne (but it may be the 'exists' one).", topHot != newOne );
+                    continue;
+                }
+                if( exists.IsFakeVersion && (newOne.IsRegularVersion || exists.IsDeprecatedVersion) )
+                {
+                    // The collected fake tag is replaced with the new regular or deprecated one.
+                    v2c[newOne.Version] = newOne;
+                    // Same as above (if newOne is published, we can remove the +fake one).
+                    if( !newOne.IsLocalTag )
+                    {
+                        removableTags ??= new List<Tag>();
+                        removableTags.Add( exists.Tag );
+                    }
+                    // topHot may become regular or deprecated (instead of fake).
+                    if( topHot == exists ) topHot = newOne;
+                    continue;
+                }
+                // Now that "+fake" vs. ("regular" or "deprecated") have been handled, if the same version appears on different commits,
+                // this is a (severe) conflict.
                 if( newOne.Commit.Sha != exists.Sha )
                 {
                     tagConflicts ??= new();
@@ -917,9 +942,10 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     continue;
                 }
                 // But this is not the only conflict...
-                // Actually, the only "valid" (expected) conflict is between a Deprecated and regular version.
+                // Here, we can handle "valid" (expected) conflict between a deprecated and regular version.
                 //
-                // Because we previously excluded bad +deprecated tags, we can keep the code simple here.
+                // Because we previously excluded bad +deprecated tags (with unreadable content), we can keep the
+                // code simple here.
                 //
                 if( exists.IsDeprecatedVersion && newOne.IsRegularVersion )
                 {
@@ -930,7 +956,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         removableTags ??= new List<Tag>();
                         removableTags.Add( newOne.Tag );
                     }
-                    Throw.DebugAssert( "The topHot cannot be the newOne (but it may be the exists deprecated one).", topHot != newOne );
+                    Throw.DebugAssert( "The topHot cannot be the newOne (but it may be the 'exists' deprecated one).", topHot != newOne );
                     continue;
                 }
                 if( newOne.IsDeprecatedVersion && exists.IsRegularVersion )
@@ -950,6 +976,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 }
                 // 2 regular tags: we must be able to chose a best one or this is
                 // a DuplicatedVersionTag tag conflict.
+                // Note: This "best resolution" is questionable. At the start of the CKli project this seemed
+                //       important but now this seems... less obvious.
                 if( exists.IsRegularVersion && newOne.IsRegularVersion )
                 {
                     // If both versions are regular, we try to resolve the conflict by choosing
@@ -964,6 +992,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         continue;
                     }
                 }
+                // No luck: this definitely is a conflict.
                 tagConflicts ??= new();
                 tagConflicts.Add( ((exists.Version, exists.Tag), (newOne.Version, newOne.Tag), TagConflict.DuplicatedVersionTag) );
             }
@@ -1006,7 +1035,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         // Uses TagCommit.CompareTo that reverts the Version.
         lastStables.Sort();
         TagCommit? lastStable = null;
-        TagCommit? lastAvailableStable = null;
         if( lastStables.Count > 0 )
         {
             lastStable = lastStables[0];
@@ -1042,17 +1070,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     AutoDeleteObsoleteCIReleases( monitor, repo, removableTags, v2c, supremum, lowestCI );
                 }
             }
-
-            if( !(lastStable.IsDeprecatedVersion && lastStable.DeprecatedInfo.HasExpired)
-                && lastStable.BuildContentInfo != null )
-            {
-                lastAvailableStable = lastStable;
-            }
-            else
-            {
-                lastAvailableStable = lastStables.FirstOrDefault( tc => !(tc.IsDeprecatedVersion && tc.DeprecatedInfo.HasExpired)
-                                                                        && tc.BuildContentInfo != null );
-            }
         }
         // Two HotZone issues: no version tags (Build plugin can auto fix that) and a top hot that is "too much higher" than the last
         // stable (this is a strong signal of a bad tag that should be deleted).
@@ -1067,7 +1084,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         {
             Throw.DebugAssert( topHot == lastStable || (topHot != null && topHot.Version > lastStable.Version) );
             // The HotZoneInfo will create the required manual fix if topHot.Version >= (lastStable.Major + 1, 0, 0).
-            hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, World, repo, lastStable, topHot, lastAvailableStable );
+            hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, World, repo, lastStable, topHot );
         }
 
         // We capture the invalidTags: may be one day we can create a World.Issue that could
@@ -1113,8 +1130,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         }
 
         return new VersionTagInfo( repo,
-                                   minVersion,
-                                   maxVersion,
+                                   infVersion,
+                                   supVersion,
                                    lastStables,
                                    hotZone,
                                    v2c,

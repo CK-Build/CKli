@@ -131,7 +131,6 @@ public sealed partial class Roadmap
             // we are a solution that is impacted by the upstreams but none of our upstreams must be built (not UpstreamBuild) AND our *.csproj are
             // up to date (not CodeChange). This happens when a our upstreams have been built, our *.csproj have been updated but last build failed
             // miserably: the last build tag has not been updated with the upstreams versions.
-            // Here, when _lastBuild.TagCommit.BuildContentInfo is null, it is because the last build is a +fake: we ignore this here (we are not
             if( buildReason == MustBuildReason.None )
             {
                 Throw.DebugAssert( _lastBuild.TagCommit.BuildContentInfo != null );
@@ -241,7 +240,12 @@ public sealed partial class Roadmap
 
         static VersionChange ComputeVersionChange( SVersion vBase, SVersion vTarget, bool targetIsFake )
         {
-            Throw.DebugAssert( vBase <= vTarget );
+            // Fake based CI versions can be "artificial": they can be the <fake>--ci.X (no major/minor/patch increment).
+            Throw.DebugAssert( vBase <= vTarget || (vBase.IsFake() && vTarget.IsCI()) );
+
+            // And when it is the case, we consider this a non change.
+            if( vBase.IsFake() ) return VersionChange.None;
+
             VersionChange c;
             if( vBase.Major == vTarget.Major )
             {
@@ -390,10 +394,10 @@ public sealed partial class Roadmap
                             ++prereleaseNumber;
                             prereleaseFixNumber = 0;
                         }
-                        suffix = prereleaseChar + '.' + prereleaseNumber.ToString( System.Globalization.CultureInfo.InvariantCulture );
+                        suffix = prereleaseChar + '.' + prereleaseNumber.ToString( CultureInfo.InvariantCulture );
                         if( prereleaseFixNumber > 0 )
                         {
-                            suffix += '.' + prereleaseFixNumber.ToString( System.Globalization.CultureInfo.InvariantCulture );
+                            suffix += '.' + prereleaseFixNumber.ToString( CultureInfo.InvariantCulture );
                         }
                     }
                     targetVersion = NextVersion( vChange, baseVersion, suffix );
@@ -490,12 +494,18 @@ public sealed partial class Roadmap
 
             static SVersion NextVersion( VersionChange vChange, SVersion baseVersion, string? suffix )
             {
+                // The VersionChange that has been computed may be None.
+                // On "+fake" version, we honor this "None": the target version is the "+fake" version (unchanged except the build metadata).
+                // This allows a "v1.0.0+fake" to produce prereleases (like "v1.0.0-a") and/or ci builds (like "v1.0.0--ci.18")
+                // until a non-ci build is done that will produce the "v.1.0.0" version.
+                // For regular base version, there's no "None": "Patch" is assumed.
                 return vChange switch
                 {
                     VersionChange.Major => baseVersion.Major == 0
                                             ? SVersion.Create( 0, baseVersion.Minor + 1, 0, suffix )
                                             : SVersion.Create( baseVersion.Major + 1, 0, 0, suffix ),
                     VersionChange.Minor => SVersion.Create( baseVersion.Major, baseVersion.Minor + 1, 0, suffix ),
+                    _ when baseVersion.IsFake() => SVersion.Create( baseVersion.Major, baseVersion.Minor, baseVersion.Patch, suffix ),
                     _ => SVersion.Create( baseVersion.Major, baseVersion.Minor, baseVersion.Patch + 1, suffix )
                 };
             }

@@ -44,7 +44,8 @@ public sealed partial class BranchModelInfo : RepoInfo
 
     /// <summary>
     /// Gets the root branch.
-    /// Its <see cref="HotBranch.GitBranch"/> can be null (this has to be fixed, <see cref="HasIssue"/> is true).  
+    /// Its <see cref="HotBranch.GitBranch"/> can be null (this has to be fixed, <see cref="HasIssue"/> is true, before doing almost
+    /// anything in this Repo).  
     /// </summary>
     public HotBranch Root => _branches[0];
 

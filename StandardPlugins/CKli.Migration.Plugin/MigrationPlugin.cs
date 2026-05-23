@@ -150,11 +150,12 @@ public sealed class MigrationPlugin : PrimaryPluginBase
         #region Work on master => "stable" branch model. This is idempotent.
         // Even if we already ran this once, the following check is not useless:
         // if we want to recompute the MinVersion, we need the RepositoryInfo.xml.
-        if( !CheckoutMasterAndFetchTags( monitor, repos ) ) return false;
+        if( !CheckoutMasterIfItExistsAndFetchTags( monitor, repos ) ) return false;
 
         // We must computed the MinVersion before removing the RepositoryInfo.xml
         // (so before switching to "stable" if it has already been created).
-        InitializeMinVersion( monitor, repos, _versionTag );
+        // (This is done only on Repo that has a "master" branch.)
+        InitializeInfVersionFromMaster( monitor, repos, _versionTag );
 
         // Ensure the stable branch and checkout: head is now "stable".
         foreach( var repo in repos )
@@ -224,12 +225,25 @@ public sealed class MigrationPlugin : PrimaryPluginBase
         return success;
     }
 
-    static bool CheckoutMasterAndFetchTags( IActivityMonitor monitor, IReadOnlyList<Repo> repos )
+    static bool CheckoutMasterIfItExistsAndFetchTags( IActivityMonitor monitor, IReadOnlyList<Repo> repos )
     {
         bool success = true;
         foreach( var repo in repos )
         {
-            success &= repo.GitRepository.FullCheckout( monitor, "master", skipFetchMerge: false );
+            // When the repository is a new one, then there's no master.
+            if( repo.GitRepository.FetchRemoteBranches( monitor, withTags: false, prune: false ) )
+            {
+                var master = repo.GitRepository.GetBranch( monitor, "master", LogLevel.Info );
+                if( master != null )
+                {
+                    success &= repo.GitRepository.Checkout( monitor, master );
+                }
+            }
+            else
+            {
+                success = false;
+            }
+            // Regardless of whether a master branch exists or not, we (safely) fetch the tags.
             success &= repo.GitRepository.FetchTags( monitor );
         }
         return success;
@@ -309,54 +323,72 @@ public sealed class MigrationPlugin : PrimaryPluginBase
         return success;
     }
 
-    void InitializeMinVersion( IActivityMonitor monitor, IReadOnlyList<Repo> repos, VersionTagPlugin versionTag )
+    static void InitializeInfVersionFromMaster( IActivityMonitor monitor, IReadOnlyList<Repo> repos, VersionTagPlugin versionTag )
     {
-        // Net8 specifics: we must compute the MinVersion because we are not coming from the current
-        // model where the MinVersion is computed when a LTS is created.
+        // Net8 specifics: we must compute the InfVersion because we are not coming from the current
+        // model where the InfVersion is computed when a LTS is created.
         //
         // ==> See VersionTagPlugin.ComputeRepoLTSVersions
         //
         // Once the Net8 -> Net10 migration is done (and the LTS for Net8 exists), we won't need this.
 
-        // To "infer" the MinVersion:
+        // To "infer" the InfVersion:
         // - The current "master/Repository.xml" file may contain a <SimpleGitVersion StartingVersion="">
         // - if master-Net6 exists, the first version tag on or below gives us the last Net6 version.
         // If both exists, we take the biggest one.
         //
+
+        // This code has been written AND executed on the CK stack when InfVersion was MinVersion.
+        // The code below has been rewritten to map the MinVersion (that was defined/"rounded" as a stable version) to
+        // the InfVersion by considering the "MinVersion-0" prerelease version.
+
         var details = new StringBuilder( "Computing MinVersion." );
         foreach( var repo in repos )
         {
             details.AppendLine( repo.DisplayPath );
-            SVersion? vB = null;
-            var bStartNet6 = repo.GitRepository.GetBranch( monitor, "master-Net6" );
-            if( bStartNet6 != null )
+            if( repo.GitRepository.CurrentBranchName != "master" )
             {
-                var d = repo.GitRepository.Repository.Describe( bStartNet6.Tip, new DescribeOptions { Strategy = DescribeStrategy.Tags } );
-                vB = SVersion.TryParse( d );
-                details.AppendLine( $"[B] - {d} - {vB}" );
-                if( vB.IsValid ) vB = SVersion.Create( vB.Major, vB.Minor, vB.Patch + 1 );
-                else vB = null;
+                details.AppendLine( "no master branch => skipped." );
             }
-            SVersion? vX = null;
-            var file = repo.WorkingFolder.AppendPart( "RepositoryInfo.xml" );
-            if( File.Exists( file ) )
+            else
             {
-                var d = XDocument.Load( file ).Root?
-                                     .Element( "SimpleGitVersion" )?
-                                     .Attribute( "StartingVersion" )?
-                                     .Value;
-                vX = SVersion.TryParse( d );
-                details.AppendLine( $"[X] - {d} - {vX}" );
-                if( vX.IsValid ) vX = SVersion.Create( vX.Major, vX.Minor, vX.Patch );
-                else vX = null;
+                SVersion? vB = null;
+                var bStartNet6 = repo.GitRepository.GetBranch( monitor, "master-Net6" );
+                if( bStartNet6 != null )
+                {
+                    var d = repo.GitRepository.Repository.Describe( bStartNet6.Tip, new DescribeOptions { Strategy = DescribeStrategy.Tags } );
+                    vB = SVersion.TryParse( d );
+                    details.AppendLine( $"[B] - {d} - {vB}" );
+                    if( vB.IsValid ) vB = SVersion.Create( vB.Major, vB.Minor, vB.Patch + 1 );
+                    else vB = null;
+                }
+                SVersion? vX = null;
+                var file = repo.WorkingFolder.AppendPart( "RepositoryInfo.xml" );
+                if( File.Exists( file ) )
+                {
+                    var d = XDocument.Load( file ).Root?
+                                         .Element( "SimpleGitVersion" )?
+                                         .Attribute( "StartingVersion" )?
+                                         .Value;
+                    vX = SVersion.TryParse( d );
+                    details.AppendLine( $"[X] - {d} - {vX}" );
+                    if( vX.IsValid ) vX = SVersion.Create( vX.Major, vX.Minor, vX.Patch );
+                    else vX = null;
+                }
+                SVersion? min = vB;
+                if( vX > vB ) min = vX;
+
+                if( min == null ) min = SVersion.Create( 0, 0, 0 );
+
+                // MinVersion to InfVersion projection:
+                SVersion? inf = min.Major == 0 && min.Minor == 0 && min.Patch == 0
+                                    ? null
+                                    : SVersion.Create( min.Major, min.Minor, min.Patch, "0" );
+
+                details.AppendLine( $"==> min = {min}, InfVersion = '{inf}'" );
+
+                versionTag.SetInfVersion( monitor, repo, inf );
             }
-            SVersion? min = vB;
-            if( vX > vB ) min = vX;
-            if( min == null ) min = SVersion.Create( 0, 0, 0 );
-
-            details.AppendLine( $"==> MinVersion = {min}" );
-
-            versionTag.SetMinVersion( monitor, repo, min );
         }
         monitor.Info( details.ToString() );
     }

@@ -97,7 +97,9 @@ public sealed class CommitBuildInfo
                                                                      allowOverwrite: true );
             if( _tagInfo.TagCommits.TryGetValue( _version, out var exists ) )
             {
-                Throw.DebugAssert( "When rebuilding an existing version, the build commit must be the same.", _buildCommit.Sha == exists.Sha );
+                Throw.DebugAssert( "We must not be able to rebuild a +deprecated commit.", !exists.IsDeprecatedVersion );
+                Throw.DebugAssert( "When rebuilding an existing version, the build commit must be the same (except if the existing tag is a +fake).",
+                                   exists.IsFakeVersion || _buildCommit.Sha == exists.Sha );
                 exists.UpdateVersionTag( t );
             }
             else

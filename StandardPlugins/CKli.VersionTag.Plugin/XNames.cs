@@ -8,8 +8,8 @@ namespace CKli.VersionTag.Plugin;
 public static class XNames
 {
     #pragma warning disable 1591 //Missing XML comment for publicly visible type or member
-    public static readonly XName MinVersion = XNamespace.None + "MinVersion";
-    public static readonly XName MaxVersion = XNamespace.None + "MaxVersion";
+    public static readonly XName InfVersion = XNamespace.None + "InfVersion";
+    public static readonly XName SupVersion = XNamespace.None + "SupVersion";
     public static readonly XName Version = XNamespace.None + "Version";
     public static XName Name => CKli.Core.XNames.Name;
 }

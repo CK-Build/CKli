@@ -14,17 +14,15 @@ public sealed partial class VersionTagInfo
         readonly TagCommit _topHot;
         readonly TagCommit _lastStable;
         readonly World.Issue? _hotZoneIssue;
-        readonly TagCommit? _lastAvailableStable;
 
-        HotZoneInfo( TagCommit lastStable, TagCommit topHot, World.Issue? hotZoneIssue, TagCommit? lastAvailableStable )
+        HotZoneInfo( TagCommit lastStable, TagCommit topHot, World.Issue? hotZoneIssue )
         {
             _lastStable = lastStable;
             _topHot = topHot;
             _hotZoneIssue = hotZoneIssue;
-            _lastAvailableStable = lastAvailableStable;
         }
 
-        internal static HotZoneInfo Create( IActivityMonitor monitor, World world, Repo repo, TagCommit lastStable, TagCommit topHot, TagCommit? lastAvailableStable )
+        internal static HotZoneInfo Create( IActivityMonitor monitor, World world, Repo repo, TagCommit lastStable, TagCommit topHot )
         {
             World.Issue? hotZoneIssue = null;
             var hotSupremum = SVersion.Create( lastStable.Version.Major + 1, 0, 0 );
@@ -39,7 +37,7 @@ public sealed partial class VersionTagInfo
                 monitor.Warn( $"Hot zone issue in '{repo.DisplayPath}': {message}" );
                 hotZoneIssue = World.Issue.CreateManual( "Hot zone issue detected.", world.ScreenType.Text( message ), repo );
             }
-            return new HotZoneInfo( lastStable, topHot, hotZoneIssue, lastAvailableStable );
+            return new HotZoneInfo( lastStable, topHot, hotZoneIssue );
         }
 
         /// <summary>
@@ -64,24 +62,11 @@ public sealed partial class VersionTagInfo
         /// Gets the last stable version: this is the common ancestor of the "hot zone" where branch model applies.
         /// <para>
         /// This can be a "+fake" or a "+deprecated" version (<see cref="TagCommit.IsRegularVersion"/> can be false) and
-        /// <see cref="TagCommit.BuildContentInfo"/> may be null. When this happens, the  
+        /// <see cref="TagCommit.BuildContentInfo"/> may be null.  
         /// </para>
         /// </summary>
         public TagCommit LastStable => _lastStable;
 
-        /// <summary>
-        /// Gets the last stable commit that has a non null, known, <see cref="TagCommit.BuildContentInfo"/>.
-        /// <para>
-        /// This is most often <see cref="LastStable"/> but if we are in the corner case
-        /// where <see cref="LastStable"/> is "+fake" or "+deprecated", then this is a fallback to use when
-        /// a current/previous content needs to be obtained.
-        /// </para>
-        /// <para>
-        /// This can be null: it means that all the released tags up to the <see cref="VersionTagInfo.MinVersion"/> (that necessarily
-        /// exists if this HotZone is available) have been deprecated. Highly improbable though...
-        /// </para>
-        /// </summary>
-        public TagCommit? LastAvailableStable => _lastAvailableStable;
     }
 
 }

@@ -28,15 +28,15 @@ public sealed partial class VersionTagInfo : RepoInfo
     readonly List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? _tagConflicts;
     readonly List<Tag>? _badDeprecatedTags;
     readonly World.Issue? _publishedReleaseContentIssue;
-    readonly SVersion _minVersion;
-    readonly SVersion? _maxVersion;
+    readonly SVersion? _infVersion;
+    readonly SVersion? _supVersion;
     readonly bool _hasIssue;
     Dictionary<string, TagCommit>? _sha2C;
     ImmutableArray<TagCommit> _lastMajorMinorStables;
 
     internal VersionTagInfo( Repo repo,
-                             SVersion minVersion,
-                             SVersion? maxVersion,
+                             SVersion? infVersion,
+                             SVersion? supVersion,
                              List<TagCommit> lastStables,
                              HotZoneInfo? hotZone,
                              Dictionary<SVersion, TagCommit> v2c,
@@ -51,8 +51,8 @@ public sealed partial class VersionTagInfo : RepoInfo
         _lastStables = lastStables;
         _hotZone = hotZone;
         _v2C = v2c;
-        _minVersion = minVersion;
-        _maxVersion = maxVersion;
+        _infVersion = infVersion;
+        _supVersion = supVersion;
         _removableTags = removableTags ?? [];
         _invalidTags = invalidTags;
         _tagConflicts = tagConflicts;
@@ -66,21 +66,20 @@ public sealed partial class VersionTagInfo : RepoInfo
     }
 
     /// <summary>
-    /// Gets the smallest possible version configured for this Repo in the VersionTag plugin configuration.
+    /// Gets the optional lower limit of the versions configured for this Repo in the VersionTag plugin configuration.
     /// <para>
-    /// This is necessarily a stable version (prerelease are automatically corrected).
+    /// This is an infimum, not a minimum: when not null, considered versions are strictly greater than this value.
     /// </para>
     /// </summary>
-    public SVersion MinVersion => _minVersion;
+    public SVersion? InfVersion => _infVersion;
 
     /// <summary>
-    /// Gets the greatest possible version configured for this Repo in the VersionTag plugin configuration.
+    /// Gets the optional upper limit of the versions configured for this Repo in the VersionTag plugin configuration.
     /// <para>
-    /// This is necessarily a stable version and this is always null in the default World and always non null
-    /// in a LTS World.
+    /// This is a supremum, not a maximum: when not null, considered versions are strictly lower than this value.
     /// </para>
     /// </summary>
-    public SVersion? MaxVersion => _maxVersion;
+    public SVersion? SupVersion => _supVersion;
 
     /// <summary>
     /// Gets whether this repository has "annoying" issues related to its version tags.
@@ -97,9 +96,8 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <see cref="TagCommit.IsRegularVersion"/> may be false ("+fake" and "+deprecated" appear here).
     /// </para>
     /// <para>
-    /// When this is empty, then <see cref="HotZone"/> is null and <see cref="HasIssue"/> is true: a first stable version of at
-    /// least <see cref="MinVersion"/> should be produced to fix this. This fix is handled by the Build plugin (if the root "stable"
-    /// branch exists).
+    /// When this is empty, then <see cref="HotZone"/> is null and <see cref="HasIssue"/> is true: a first stable version (greater than 
+    /// <see cref="InfVersion"/>) should be produced to fix this. This fix is handled by the Build plugin (if the root "stable" branch exists).
     /// </para>
     /// </summary>
     public IReadOnlyList<TagCommit> LastStables => _lastStables;
@@ -250,39 +248,8 @@ public sealed partial class VersionTagInfo : RepoInfo
         //
         if( _lastStables.Count == 0 )
         {
-            // There is no stable release at all in the (MinVersion,MaxVersion?) range.
-
-            // We allow prerelease (not stable) to be initially produced.
-            // What matters is the Major.Minor.Patch parts that must be based on our MinVersion that
-            // ultimately defaults to 0.0.0.
-            var minMajor = _minVersion.Major + 1;
-            var minMinor = _minVersion.Minor + 1;
-            var minPatch = _minVersion.Patch + 1;
-            if( version.Major > minMajor
-                || (version.Major == 0 && version.Minor > minMinor )
-                || (version.Major == 0 && version.Minor == 0 && version.Patch > minPatch ) )
-            {
-                int fakeMajor = 0, fakeMinor = 0, fakePatch = 0;
-                if( version.Major > 1 ) fakeMajor = version.Major - 1;
-                else if( version.Minor > 1 )
-                {
-                    fakeMajor = version.Major;
-                    fakeMinor = version.Minor - 1;
-                }
-                else
-                {
-                    fakeMajor = version.Major;
-                    fakeMinor = version.Minor;
-                    fakePatch = version.Patch - 1;
-                }
-                monitor.Error( $"""
-                    Invalid first version 'v{version}' (there is no version yet in the configured version range in '{Repo.DisplayPath}').
-                    The first version should be the configured VersionTag.MinVersion = "{_minVersion}".
-
-                    {AllowFakeMessage( buildCommit, fakeMajor, fakeMinor, fakePatch, "non-standard first version" )}
-                    """ );
-                return null;
-            }
+            // There is no stable release at all in the ]InfVersion?,SupVersion?[ range: we allow the target version
+            // to be anywhere in the range.
             return new CommitBuildInfo( this, version, buildCommit, false );
         }
         TagCommit? baseCommit = FindBaseCommitByVersion( monitor, buildCommit, version );
@@ -310,17 +277,23 @@ public sealed partial class VersionTagInfo : RepoInfo
         {
             return false;
         }
-        if( (_maxVersion != null && version > _maxVersion)
-            || version < _minVersion )
+        if( (_supVersion != null && version >= _supVersion) || version <= _infVersion )
         {
             monitor.Error( $"""
-                    Version 'v{version}' is out of the configured MinVersion="{_minVersion}" MaxVersion="{_minVersion}") in '{Repo.DisplayPath}'.
+                    Version 'v{version}' is out of the configured InfVersion="{_infVersion}" SupVersion="{_supVersion}") in '{Repo.DisplayPath}'.
                     """ );
             return false;
         }
         if( _v2C.TryGetValue( version, out var exists ) )
         {
-            if( !CheckFakeOrDeprecatedVersion( monitor, exists ) )
+            // If the version is found and is a +fake, then it is valid: there's nothing more to check as the
+            // build commit can be the one that carries the +fake or not.
+            if( exists.IsFakeVersion )
+            {
+                Throw.DebugAssert( "The version is the exists tag and a +fake is always stable.", version.IsStable );
+                return true;
+            }
+            if( !CheckDeprecatedVersion( monitor, exists ) )
             {
                 return false;
             }
@@ -354,8 +327,22 @@ public sealed partial class VersionTagInfo : RepoInfo
         // a different version (otherwise we would be in the case above where the version exists).
         if( TagCommitsBySha.TryGetValue( buildCommit.Sha, out var already ) )
         {
+            // If the build commit carries a +fake version, then the target version must be "roughly based" on it.
+            if( already.IsFakeVersion )
+            {
+                if( already.Version.IsStableRoughBaseOf( version ) )
+                {
+                    return true;
+                }
+                monitor.Error( $"""
+                        Invalid version 'v{version}' in '{Repo.DisplayPath}'.
+                        This version is not compatible with the fake 'v{already.Version}'.
+                        """ );
+                return false;
+            }
+
             // Already released under a different version.
-            if( !CheckFakeOrDeprecatedVersion( monitor, already ) )
+            if( !CheckDeprecatedVersion( monitor, already ) )
             {
                 return false;
             }
@@ -365,7 +352,8 @@ public sealed partial class VersionTagInfo : RepoInfo
             // There is only one case where it makes sense to produce 2 versions from the same commit: it's when
             // a prerelease has been created and, without any change in the code, a stable version must be produced.
             // This is quite rare as it implies that no dependency updates must be made in the code: this scenario
-            // applies to "rank 0" repositories that have no dependencies to any other repositories in the stack.
+            // applies to "rank 0" repositories that have no dependencies to any other repositories in the stack (no
+            // upstream repositories).
             //
             // => This must be handled by the caller. Here we reject this case.
             //
@@ -388,17 +376,9 @@ public sealed partial class VersionTagInfo : RepoInfo
         }
         return true;
 
-        bool CheckFakeOrDeprecatedVersion( IActivityMonitor monitor, TagCommit exists )
+        bool CheckDeprecatedVersion( IActivityMonitor monitor, TagCommit exists )
         {
-            if( exists.IsFakeVersion )
-            {
-                monitor.Error( $"""
-                    The version '{exists.Version.ParsedText}' in '{Repo.DisplayPath}' is a fake version on '{exists.Sha}'.
-
-                    Fake version tags are here to allow explicit gaps in versions: this version should not be produced.
-                    """ );
-                return false;
-            }
+            Throw.CheckArgument( !exists.IsFakeVersion );
             if( exists.IsDeprecatedVersion )
             {
                 monitor.Error( $"""
@@ -420,22 +400,23 @@ public sealed partial class VersionTagInfo : RepoInfo
             if( version.Minor == 0 )
             {
                 // New version is "Major.0.0".
-                baseCommit = _lastStables.FirstOrDefault( tc => tc.Version.Major < version.Major );
+                baseCommit = _lastStables.FirstOrDefault( tc => tc.Version.Major < version.Major
+                                                                || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
                 if( baseCommit == null )
                 {
                     monitor.Error( $"""
                         Invalid version 'v{version}': there is no stable version 'v{version.Major - 1}.X.Y' in '{Repo.DisplayPath}'.
 
-                        {AllowFakeMessage( buildCommit, version.Major - 1, 0, 0, "new \"retroactive\" major version" )}
+                        {AllowFakeMessage( buildCommit, version.Major, 0, 0, "new \"retroactive\" major version" )}
                         """ );
                     return null;
                 }
-                if( baseCommit.Version.Major != version.Major - 1 )
+                if( !baseCommit.IsFakeVersion && baseCommit.Version.Major != version.Major - 1 )
                 {
                     monitor.Error( $"""
                         Invalid version 'v{version}': the closest major is 'v{baseCommit.Version}' in '{Repo.DisplayPath}'.
 
-                        {AllowFakeMessage( buildCommit, version.Major - 1, 0, 0, "gap between majors" )}
+                        {AllowFakeMessage( buildCommit, version.Major, 0, 0, "gap between majors" )}
                         """ );
                     return null;
                 }
@@ -443,22 +424,23 @@ public sealed partial class VersionTagInfo : RepoInfo
             else
             {
                 // New version is "Major.Minor.0".
-                baseCommit = _lastStables.FirstOrDefault( tc => tc.Version.Major == version.Major && tc.Version.Minor < version.Minor );
+                baseCommit = _lastStables.FirstOrDefault( tc => tc.Version.Major == version.Major && tc.Version.Minor < version.Minor
+                                                                || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
                 if( baseCommit == null )
                 {
                     monitor.Error( $"""
                         Invalid version 'v{version}': there is no stable version 'v{version.Major}.{version.Minor - 1}.X' in '{Repo.DisplayPath}'.
 
-                        {AllowFakeMessage( buildCommit, version.Major, version.Minor - 1, 0, "new \"retroactive\" major.minor version (but this is really weird)" )}
+                        {AllowFakeMessage( buildCommit, version.Major, version.Minor, 0, "new \"retroactive\" major.minor version (but this is really weird)" )}
                         """ );
                     return null;
                 }
-                if( baseCommit.Version.Minor != version.Minor - 1 )
+                if( !baseCommit.IsFakeVersion && baseCommit.Version.Minor != version.Minor - 1 )
                 {
                     monitor.Error( $"""
                         Invalid version 'v{version}': the closest minor is 'v{baseCommit.Version}' in '{Repo.DisplayPath}'.
 
-                        {AllowFakeMessage( buildCommit, version.Major, version.Minor - 1, 0, "gap between minors" )}                        
+                        {AllowFakeMessage( buildCommit, version.Major, version.Minor, 0, "gap between minors" )}                        
                         """ );
                     return null;
                 }
@@ -469,22 +451,23 @@ public sealed partial class VersionTagInfo : RepoInfo
             // New version is "Major.Minor.Patch".
             baseCommit = _lastStables.FirstOrDefault( tc => tc.Version.Major == version.Major
                                                             && tc.Version.Minor == version.Minor
-                                                            && tc.Version.Patch < version.Patch );
+                                                            && tc.Version.Patch < version.Patch
+                                                            || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
             if( baseCommit == null )
             {
                 monitor.Error( $"""
                         Invalid version 'v{version}': there is no stable version 'v{version.Major}.{version.Minor}.X' in '{Repo.DisplayPath}'.
 
-                        {AllowFakeMessage( buildCommit, version.Major, version.Minor, version.Patch - 1, "new \"retroactive\" version (but this is really weird)" )}
+                        {AllowFakeMessage( buildCommit, version.Major, version.Minor, version.Patch, "new \"retroactive\" version (but this is really weird)" )}
                         """ );
                 return null;
             }
-            if( baseCommit.Version.Patch != version.Patch - 1 )
+            if( !baseCommit.IsFakeVersion && baseCommit.Version.Patch != version.Patch - 1 )
             {
                 monitor.Error( $"""
                         Invalid version 'v{version}': the closest patch is 'v{baseCommit.Version}' in '{Repo.DisplayPath}'.
 
-                        {AllowFakeMessage( buildCommit, version.Major, version.Minor, version.Patch - 1, "gap between patches" )}
+                        {AllowFakeMessage( buildCommit, version.Major, version.Minor, version.Patch, "gap between patches" )}
                         """ );
                 return null;
             }
@@ -499,7 +482,7 @@ public sealed partial class VersionTagInfo : RepoInfo
                                     string what )
     {
         return $"""
-                If this is intended, you can tag one of the parent commit of '{buildCommit.Sha}' with a fake version tag:
+                If this is intended, you can tag the commit '{buildCommit.Sha}' (or one of its parents) with a fake version tag:
                 'v{fakeMajor}.{fakeMinor}.{fakePatch}+fake'
 
                 This will (exceptionally!) allow this {what}.

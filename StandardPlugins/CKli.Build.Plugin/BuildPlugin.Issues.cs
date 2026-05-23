@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
+using CSemVer;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -31,14 +32,17 @@ public sealed partial class BuildPlugin
             var branchModel = _branchModel.Get( monitor, versionTagInfo.Repo );
             if( branchModel.Root.GitBranch != null )
             {
-                // We have a root branch: let's fix this by building it with the MinVersion.
+                // We have a root branch: let's fix this by building it based on the InfVersion.
+                var vBase = versionTagInfo.InfVersion ?? SVersion.ZeroVersion;
+                var vInit = $"v{vBase.Major}.{vBase.Minor}.{vBase.Patch}+fake";
                 collector( new NoVersionTagIssue( this,
                                                   versionTagInfo,
                                                   "Missing initial version.",
                                                   screenType.Text( $"""
-                                                      This can be fixed by creating a 'v{versionTagInfo.MinVersion}+fake' on '{branchModel.Root.BranchName}' branch.
+                                                      This can be fixed by creating a '{vInit}' on '{branchModel.Root.BranchName}' branch.
                                                       """ ),
-                                                  branchModel.Root ) );
+                                                  branchModel.Root,
+                                                  vInit ) );
             }
         }
         // Tags rebuild case.
@@ -154,27 +158,23 @@ public sealed partial class BuildPlugin
         readonly BuildPlugin _buildPlugin;
         readonly VersionTagInfo _versionTagInfo;
         readonly HotBranch _root;
+        readonly string _vInit;
 
-        public NoVersionTagIssue( BuildPlugin buildPlugin, VersionTagInfo versionTagInfo, string title, IRenderable body, HotBranch root )
+        public NoVersionTagIssue( BuildPlugin buildPlugin, VersionTagInfo versionTagInfo, string title, IRenderable body, HotBranch root, string vInit )
             : base( title, body, versionTagInfo.Repo )
         {
             _buildPlugin = buildPlugin;
             _versionTagInfo = versionTagInfo;
             _root = root;
+            _vInit = vInit;
         }
 
         protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world )
         {
             Throw.DebugAssert( Repo != null && _root.GitBranch != null );
-
-            // First idea was to create a real build tag: this dos the job.
-            // But this introduces an issue: when this tag should be pushed?
-            // This is not a "real" version and publishing must be an explicit action.
-            // So we decide to use a "+fake" version.
-            var vFake = $"v{_versionTagInfo.MinVersion}+fake";
-            using( monitor.OpenInfo( $"Fixing missing initial version in '{Repo.DisplayPath}' by creating '{vFake}' from '{_root}'." ) )
+            using( monitor.OpenInfo( $"Fixing missing initial version in '{Repo.DisplayPath}' by creating '{_vInit}' on '{_root}'." ) )
             {
-                Repo.GitRepository.Repository.Tags.Add( vFake, _root.GitBranch.Tip );
+                Repo.GitRepository.Repository.Tags.Add( _vInit, _root.GitBranch.Tip );
             }
             return ValueTask.FromResult( true );
         }
