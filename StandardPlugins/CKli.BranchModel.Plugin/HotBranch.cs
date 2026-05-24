@@ -103,13 +103,56 @@ public sealed class HotBranch
     /// <summary>
     /// Gets whether this branch has an issue that should be collected and fixed.
     /// <para>
-    /// The <see cref="GitDevBranch"/> branch can be <see cref="BranchLink.IssueKind.Useless"/>: this is a minor issue
-    /// that is collected by "ckli issue" but is not treated as a real issue.
+    /// This is false when the <see cref="GitDevBranch"/> branch is <see cref="BranchLink.IssueKind.Useless"/>: this is a minor issue
+    /// that is collected by "ckli issue" but is not treated as a real issue. When <paramref name="deleteUselessDevBranch"/> is true,
+    /// the useless "dev/" branch is silently deleted.
     /// </para>
     /// </summary>
-    public bool HasIssue => _link != null
-                                ? _link.Issue != BranchLink.IssueKind.None && _link.Issue != BranchLink.IssueKind.Useless
-                                : _name.Index == 0 || _gitDevBranch != null;
+    /// <returns>True if this branch has issue (other than being useless), false otherwise.</returns>
+    public bool HasIssue( IActivityMonitor monitor, bool deleteUselessDevBranch ) => HasIssue( deleteUselessDevBranch ? monitor : null );
+
+    /// <summary>
+    /// Gets whether this branch has an issue that should be collected and fixed.
+    /// <para>
+    /// See <see cref="HasIssue(IActivityMonitor, bool)"/>.
+    /// </para>
+    /// </summary>
+    /// <returns>True if this branch has issue (other than being useless), false otherwise.</returns>
+    public bool HasIssue() => HasIssue( null );
+
+    bool HasIssue( IActivityMonitor? monitor )
+    {
+        if( _link == null )
+        {
+            return _name.Index == 0 || _gitDevBranch != null;
+        }
+        var i = _link.Issue;
+        if( i == BranchLink.IssueKind.Useless )
+        {
+            if( monitor != null )
+            {
+                Throw.DebugAssert( _gitDevBranch != null );
+                if( _gitDevBranch.IsCurrentRepositoryHead )
+                {
+                    Throw.DebugAssert( """
+                                Issue is NOT Useless if branch is checked out and the repo is dirty:
+                                we can use force: true to skip the CheckCleanCommit call.
+                                """,
+                                !Repo.GitRepository.GetSimpleStatusInfo().IsDirty );
+                    // On error, we throw here: this has no reason to fail and continuing could be really bad.
+                    if( !Repo.GitRepository.Checkout( monitor, _link.Branch, force: true ) )
+                    {
+                        throw new CKException( $"Unable to check out '{_name.Name}' in '{Repo.DisplayPath}' to delete useless '{_name.DevName}' branch." );
+                    }
+                }
+                Repo.GitRepository.Repository.Branches.Remove( _gitDevBranch );
+                _link = BranchLink.Create( _link.Branch, _name.DevName );
+                _gitDevBranch = null;
+            }
+            return false;
+        }
+        return i != BranchLink.IssueKind.None;
+    }
 
     internal void Collect( BranchIssueBuilder issues )
     {
@@ -220,38 +263,6 @@ public sealed class HotBranch
         _link = newLink;
         return true;
     }
-
-    ///// <summary>
-    ///// Creates an empty commit on the <see cref="GitDevBranch"/> if it exists or on the <see cref="GitBranch"/> otherwise.
-    ///// </summary>
-    ///// <param name="monitor">The monitor.</param>
-    ///// <param name="message">The commit message.</param>
-    ///// <returns>True on success, false on error.</returns>
-    //public bool CreateEmptyCommit( IActivityMonitor monitor, string message )
-    //{
-    //    Throw.CheckState( IsActive );
-    //    var b = _gitDevBranch ?? _link.Branch;
-    //    var git = Repo.GitRepository;
-    //    var baseCommit = b.Tip;
-    //    var newCommit = git.Repository.ObjectDatabase.CreateCommit(
-    //                                        baseCommit.Author,
-    //                                        git.Committer,
-    //                                        message,
-    //                                        baseCommit.Tree,
-    //                                        [baseCommit],
-    //                                        prettifyMessage: true );
-    //    var newB = git.Repository.Branches.Add( b.FriendlyName, newCommit, allowOverwrite: true );
-    //    if( _gitDevBranch != null )
-    //    {
-    //        _link = BranchLink.Create( _link.Branch, newB );
-    //        _gitDevBranch = newB;
-    //    }
-    //    else
-    //    {
-    //        _link = BranchLink.Create( _link.Branch, BranchName.DevName );
-    //    }
-    //    return true;
-    //}
 
     /// <summary>
     /// Returns this branch name.

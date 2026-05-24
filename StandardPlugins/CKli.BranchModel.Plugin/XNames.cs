@@ -9,4 +9,5 @@ public static class XNames
 {
     #pragma warning disable 1591 //Missing XML comment for publicly visible type or member
     public static readonly XName Branches = XNamespace.None + "Branches";
+    public static readonly XName AutoFixUselessBranch = XNamespace.None + "AutoFixUselessBranch";
 }

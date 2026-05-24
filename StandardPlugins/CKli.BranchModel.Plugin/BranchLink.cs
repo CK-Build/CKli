@@ -47,12 +47,12 @@ public sealed partial class BranchLink
             {
                 // ...but if the ahead branch is checked out and the working folder is dirty
                 // then we cannot say that the ahead branch is useless! 
-                if( !_ahead.IsCurrentRepositoryHead
-                    || !RepositoryOf( _branch ).RetrieveStatus( new StatusOptions() { IncludeIgnored = false } ).IsDirty )
+                if( _ahead.IsCurrentRepositoryHead
+                    && RepositoryOf( _branch ).RetrieveStatus( new StatusOptions() { IncludeIgnored = false } ).IsDirty )
                 {
-                    return IssueKind.Useless;
+                    return IssueKind.None;
                 }
-                return IssueKind.None;
+                return IssueKind.Useless;
             }
             if( _behindBy != 0 )
             {

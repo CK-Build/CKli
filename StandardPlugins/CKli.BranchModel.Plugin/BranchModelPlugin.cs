@@ -11,6 +11,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
 {
     readonly BranchNamespace _namespace;
     internal readonly ShallowSolutionPlugin _shallowSolution;
+    readonly bool _autoFixUselessBranch;
 
     /// <summary>
     /// This is a primary plugin.
@@ -19,8 +20,9 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
                               ShallowSolutionPlugin shallowSolution )
         : base( primaryContext )
     {
-        _namespace = new BranchNamespace( World.Name.LTSName,
-                                          primaryContext.Configuration.XElement.Attribute( XNames.Branches )?.Value );
+        var configElement = primaryContext.Configuration.XElement;
+        _namespace = new BranchNamespace( World.Name.LTSName, configElement.Attribute( XNames.Branches )?.Value );
+        _autoFixUselessBranch = (bool?)configElement.Attribute( XNames.AutoFixUselessBranch ) ?? true;
         World.Events.Issue += IssueRequested;
         _shallowSolution = shallowSolution;
     }
@@ -98,6 +100,9 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     {
         var info = new BranchModelInfo( repo, _namespace, this );
         var git = repo.GitRepository.Repository;
+
+        bool autoFixUselessBranch = _autoFixUselessBranch && PrimaryPluginContext.Command is not CKliIssue;
+
         var root = HotBranch.Create( monitor, info, repo.GitRepository, _namespace.Root );
         if( root.GitBranch == null )
         {
@@ -110,14 +115,14 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
             return info;
         }
         // We have our hot root "stable" branch.
-        bool hasIssue = root.HasIssue;
+        bool hasIssue = root.HasIssue( monitor, autoFixUselessBranch );
         var hotBranches = new HotBranch[_namespace.Branches.Length];
         hotBranches[0] = root;
         for( int i = 1; i < hotBranches.Length; ++i )
         {
             var branchName = _namespace.Branches[i];
             var b = HotBranch.Create( monitor, info, repo.GitRepository, branchName );
-            hasIssue |= b.HasIssue;
+            hasIssue |= b.HasIssue( monitor, autoFixUselessBranch );
             hotBranches[i] = b;
         }
         info.Initialize( ImmutableCollectionsMarshal.AsImmutableArray( hotBranches ), hasIssue );

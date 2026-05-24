@@ -1,6 +1,5 @@
 using CK.Core;
 using CSemVer;
-using NuGet.Packaging.Signing;
 using System;
 using System.Diagnostics.CodeAnalysis;
 
