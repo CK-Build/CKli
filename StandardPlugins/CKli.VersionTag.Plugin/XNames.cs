@@ -11,5 +11,6 @@ public static class XNames
     public static readonly XName InfVersion = XNamespace.None + "InfVersion";
     public static readonly XName SupVersion = XNamespace.None + "SupVersion";
     public static readonly XName Version = XNamespace.None + "Version";
+    public static readonly XName AutoFixRemovableTag = XNamespace.None + "AutoFixRemovableTag";
     public static XName Name => CKli.Core.XNames.Name;
 }

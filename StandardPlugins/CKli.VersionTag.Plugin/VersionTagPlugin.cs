@@ -18,6 +18,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
 {
     readonly ReleaseDatabasePlugin _releaseDatabase;
     readonly ArtifactHandlerPlugin _artifactHandler;
+    readonly bool _autoFixRemovableTag;
     Dictionary<string, SVersion>? _externalPackages;
 
     public VersionTagPlugin( PrimaryPluginContext primaryContext,
@@ -28,6 +29,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         World.Events.Issue += IssueRequested;
         _releaseDatabase = releaseDatabase;
         _artifactHandler = artifactHandler;
+        _autoFixRemovableTag = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.AutoFixRemovableTag ) ?? false;
     }
 
     void IssueRequested( IssueEvent e )
@@ -1127,6 +1129,14 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         else if( !isExecutingIssue )
         {
             monitor.Warn( $"{tagConflicts.Count} tag conflicts in repository '{repo.DisplayPath}'. Use 'ckli issue' for details." );
+        }
+        if( _autoFixRemovableTag && removableTags != null && !isExecutingIssue )
+        {
+            // On error, let the error be logged but don't throw (or should we throw?).
+            using( monitor.OpenInfo( $"AutoFixRemovableTag: removing {removableTags.Count} tags." ) )
+            {
+                repo.GitRepository.DeleteLocalTags( monitor, removableTags.Select( t => t.CanonicalName ) );
+            }
         }
 
         return new VersionTagInfo( repo,
