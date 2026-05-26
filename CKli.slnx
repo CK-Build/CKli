@@ -3,6 +3,7 @@
     <File Path=".editorconfig" />
     <File Path=".gitignore" />
     <File Path="Directory.Build.props" />
+    <File Path="global.json" />
     <File Path="nuget.config" />
     <File Path="README.md" />
   </Folder>
