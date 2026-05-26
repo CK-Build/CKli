@@ -1,8 +1,6 @@
-`CKli.HotZone.Plugin` is a plugin of the dotnet tool `CKli` that specifically handles the
-branches in the repositories. These branches are defined by the `CKli.BranchModel.Plugin`,
-this plugin provides detailed information across all repositories (the `HotGraph`).
+`CKli.CommonFiles.Plugin` is a plugin of the dotnet tool `CKli` that ensures that some common files
+exist in the repository and check their content.
 
-This package also implements the `FixWorkflow`.
 
 
 
