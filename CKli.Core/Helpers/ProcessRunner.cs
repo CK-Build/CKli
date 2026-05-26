@@ -25,6 +25,9 @@ public static class ProcessRunner
     /// Starts and wait for the end of an external process, optionally handles a timeout and
     /// standard output and/or error capture.
     /// <para>
+    /// The <c>CKliCalled</c> environment variable is set to <c>true</c>.
+    /// </para>
+    /// <para>
     /// This doesn't open a log group, logs the <paramref name="arguments"/> nor the exit code and this is intended:
     /// arguments may contain sensitive information and running a process may be "hidden". By setting <paramref name="noLog"/>
     /// to true, nothing is logged otherwise, by default, the standard output and error are <see cref="LogLevel.Trace"/>
@@ -67,6 +70,7 @@ public static class ProcessRunner
             info.StandardOutputEncoding = Encoding.UTF8;
             info.StandardErrorEncoding = Encoding.UTF8;
         }
+        info.EnvironmentVariables.Add( "CKliCalled", "true" );
         if( environmentVariables != null && environmentVariables.Count > 0 )
         {
             foreach( var kv in environmentVariables ) info.EnvironmentVariables.Add( kv.Key, kv.Value );

@@ -50,6 +50,7 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
             ev.Issues.MoveFile( nInfo.Name, n );
         }
     }
+
     /// <summary>
     /// Gets the "<see cref="LocalWorldName.LocalDataFolder"/>/NuGet" folder.
     /// </summary>
