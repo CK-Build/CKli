@@ -30,4 +30,3 @@ public interface INormalizedFileProvider
     /// <returns>The file information or null.</returns>
     IFileInfo? GetFileInfo( NormalizedPath sub );
 }
-
