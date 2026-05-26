@@ -222,8 +222,17 @@ public class RepoBuilder : RepoInfo
                                 string fileVersion,
                                 bool release )
     {
+        // Currently, we always set ContinuousIntegrationBuild but this may impact the SourceRoot
+        // for SourceLink: if this always allow a local UX that debugs straight to the right source file
+        // then we'll keep this.
+        // If not, we should differentiate "pure local" and "publishable" builds so that local builds
+        // can source link to the local file paths.
         return Repo.RunDotnet( monitor, $"""
-            build -tl:off --nologo --no-incremental -c {(release ? "Release" : "Debug")} /p:Version={version} /p:InformationalVersion="{informationalVersion}" /p:FileVersion="{fileVersion}"
+            build -tl:off --nologo --no-incremental -c {(release ? "Release" : "Debug")
+            } /p:Version="{version
+            }" /p:InformationalVersion="{informationalVersion
+            }" /p:FileVersion="{fileVersion
+            }" /p:ContinuousIntegrationBuild=true
             """ );
     }
 
