@@ -588,7 +588,7 @@ public sealed partial class StackRepository : IDisposable
             // We cheat here: we allow cloning into the CKli-Stack itself if we are in the "CKli-Test" instance.
             var parentStack = FindGitStackPath( parentPath );
             if( !parentStack.IsEmptyPath
-                && !(isCKliTestRunning && parentStack.Path.EndsWith("/CKli/.PublicStack", StringComparison.Ordinal )) )
+                && !(isCKliTestRunning && parentStack.Path.EndsWith("/CKli/.PublicStack", StringComparison.OrdinalIgnoreCase )) )
             {
                 var stackAbove = parentStack.RemoveLastPart();
                 var safeRoot = stackAbove.RemoveLastPart().AppendPart( stackFolderName );
