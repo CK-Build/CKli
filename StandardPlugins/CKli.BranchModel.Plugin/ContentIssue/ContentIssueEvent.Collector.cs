@@ -86,11 +86,24 @@ public sealed partial class ContentIssueEvent
             _createFiles.Add( new EnsureTextFileIssue( path, content, create: true ) );
             ++_issueCount;
         }
+        public void CreateFile( NormalizedPath path, Func<byte[]> content )
+        {
+            _createFiles ??= new List<BaseEnsureFileIssue>();
+            _createFiles.Add( new EnsureBinaryFileIssue( path, content, create: true ) );
+            ++_issueCount;
+        }
 
         public void UpdateFile( NormalizedPath path, Func<string> content )
         {
             _updateFiles ??= new List<BaseEnsureFileIssue>();
             _updateFiles.Add( new EnsureTextFileIssue( path, content, create: false ) );
+            ++_issueCount;
+        }
+
+        public void UpdateFile( NormalizedPath path, Func<byte[]> content )
+        {
+            _updateFiles ??= new List<BaseEnsureFileIssue>();
+            _updateFiles.Add( new EnsureBinaryFileIssue( path, content, create: false ) );
             ++_issueCount;
         }
 

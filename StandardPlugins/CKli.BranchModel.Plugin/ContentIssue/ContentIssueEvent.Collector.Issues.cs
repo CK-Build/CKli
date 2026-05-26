@@ -156,6 +156,19 @@ public sealed partial class ContentIssueEvent
 
             protected override void WriteFile( NormalizedPath path ) => File.WriteAllText( path, _content() );
         }
+
+        sealed class EnsureBinaryFileIssue : BaseEnsureFileIssue
+        {
+            readonly Func<byte[]> _content;
+
+            public EnsureBinaryFileIssue( NormalizedPath path, Func<byte[]> content, bool create )
+                : base( path, create )
+            {
+                _content = content;
+            }
+
+            protected override void WriteFile( NormalizedPath path ) => File.WriteAllBytes( path, _content() );
+        }
     }
 }
 
