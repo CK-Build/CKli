@@ -25,7 +25,8 @@ public static class ProcessRunner
     /// Starts and wait for the end of an external process, optionally handles a timeout and
     /// standard output and/or error capture.
     /// <para>
-    /// The <c>CKliCalled</c> environment variable is set to <c>true</c>.
+    /// The <c>CKliCalled</c> environment variable is set to <c>true</c> and the <c>DOTNET_CLI_UI_LANGUAGE</c> is
+    /// set to <c>en-us</c>.
     /// </para>
     /// <para>
     /// This doesn't open a log group, logs the <paramref name="arguments"/> nor the exit code and this is intended:
@@ -73,7 +74,8 @@ public static class ProcessRunner
         // Don't use EnvironmentVariables.Add!
         // When the environment variable already exists for this process, Add triggers
         // a marvelous "Value does not fall within the expected range." exception.
-        info.EnvironmentVariables[ "CKliCalled" ] = "true";
+        info.EnvironmentVariables["CKliCalled"] = "true";
+        info.EnvironmentVariables["DOTNET_CLI_UI_LANGUAGE"] = "en-us";        
         if( environmentVariables != null && environmentVariables.Count > 0 )
         {
             foreach( var kv in environmentVariables ) info.EnvironmentVariables[ kv.Key ] = kv.Value;
