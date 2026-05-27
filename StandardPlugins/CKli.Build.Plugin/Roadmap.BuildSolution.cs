@@ -123,7 +123,6 @@ public sealed partial class Roadmap
                 buildReason |= _lastBuild.TagCommit.IsFakeVersion
                                 ? MustBuildReason.FakeVersion
                                 : MustBuildReason.DeprecatedVersion;
-                monitor.Trace( $"MustBuildReason.{buildReason} for '{_solution}'." );
             }
 
             // Still none? Save the "last build failed" case.
@@ -139,7 +138,7 @@ public sealed partial class Roadmap
                     if( alreadyBuiltMapping.TryGetMappedVersion( c.PackageId, c.Version, out var mapped ) && c.Version != mapped )
                     {
                         buildReason |= MustBuildReason.UpstreamVersion;
-                        monitor.Trace( $"MustBuildReason.UpstreamVersion for '{_solution}' because of '{c}' -> {mapped}." );
+                        monitor.Trace( $"MustBuildReason.UpstreamVersion for '{_solution}' because of (at least) '{c}' -> {mapped}." );
                         break;
                     }
                 }
@@ -187,6 +186,7 @@ public sealed partial class Roadmap
                 buildReason |= MustBuildReason.DependencyUpdate;
             }
 
+
             // If the upstream doesn't force a Major, we must compute the change from the code in this repository
             // and eventually compute the target version.
             // If we are building from the upstreams or the dependencies must be updated, then we need one more
@@ -195,6 +195,7 @@ public sealed partial class Roadmap
                                                            ref vChange,
                                                            mustAddCommit: (buildReason & (MustBuildReason.UpstreamBuild|MustBuildReason.DependencyUpdate)) != 0 );
 
+            monitor.Info( $"'{_solution}' build reason: '{buildReason}', computed target version: '{targetVersion}'." );
             _buildInfo = new BuildInfo( this,
                                         buildReason,
                                         vChange,
@@ -528,13 +529,17 @@ public sealed partial class Roadmap
                 var published = releaseDatabase.GetBuildContentInfo( monitor, _solution.Repo, targetVersion, fromPublished: true );
                 if( published != null )
                 {
-                    monitor.Error( $"""
+                    monitor.Warn( $"""
                         Repository '{Repo.DisplayPath}' must be build in version '{targetVersion}' but this version already appears in the published database with the content:
                         {published}
-
-                        Local/Remote state seems desynchronized. A 'ckli pull' and/or a 'ckli maintenance release-database rebuild' may be welcome.
                         """ );
-                    return false;
+                    //monitor.Error( $"""
+                    //    Repository '{Repo.DisplayPath}' must be build in version '{targetVersion}' but this version already appears in the published database with the content:
+                    //    {published}
+
+                    //    Local/Remote state seems desynchronized. A 'ckli pull' and/or a 'ckli maintenance release-database rebuild' may be welcome.
+                    //    """ );
+                    //return false;
                 }
                 _mustPublish = true;
                 ++_roadmap._publishSolutionCount;
@@ -574,7 +579,7 @@ public sealed partial class Roadmap
                     {
                         monitor.Error( $"""
                         Repository '{Repo.DisplayPath}' must be published in existing version '{CurrentVersion}' but this version misses local artifacts.
-                        Use "ckli issue" for more details.
+                        Use "ckli log" for more details.
                         """ );
                         return false;
                     }
