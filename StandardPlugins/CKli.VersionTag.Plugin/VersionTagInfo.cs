@@ -624,6 +624,5 @@ public sealed partial class VersionTagInfo : RepoInfo
 
         static string ToString( (SVersion V, Tag T) t ) => $"'{t.V.ParsedText}' on '{t.T.Target.Sha}'";
     }
-
 }
 

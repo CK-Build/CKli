@@ -310,7 +310,7 @@ public static partial class CKliTestHelperExtensions
     /// Create or modify a "CKliTouchAndCommit.txt" file (by default) in the <paramref name="folder"/> and
     /// creates a new commit on a specified branch or on the currently checked out branch.
     /// <para>
-    /// The commit uses a constant Author and Committer "CKli.Testing", "none", "2000-1-1".
+    /// By default, the commit uses the Author and Committer signature "CKli.Testing", "none", <see cref="DateTimeOffset.Now"/>.
     /// </para>
     /// </summary>
     /// <param name="helper">This helper.</param>
@@ -319,14 +319,16 @@ public static partial class CKliTestHelperExtensions
     /// <param name="commitMessage">Optional commit message. Defaults to "Touching '{<paramref name="folder"/>.LastPart}'.".</param>
     /// <param name="fileContent">Optional file content. Defaults to the current content with a new line and the <see cref="Environment.TickCount64"/>.</param>
     /// <param name="fileName">File name to create or alter in the <paramref name="folder"/>.</param>
+    /// <param name="authorAndCommitWhen">Uses an explicit date for author and commit date (instead of <see cref="DateTimeOffset.Now"/>).</param>
     public static void TouchAndCommit( this IMonitorTestHelper helper,
                                        NormalizedPath folder,
                                        string? branchName,
                                        string? commitMessage = null,
                                        string? fileContent = null,
-                                       string fileName = "CKliTouchAndCommit.txt" )
+                                       string fileName = "CKliTouchAndCommit.txt",
+                                       DateTimeOffset? authorAndCommitWhen = null )
     {
-        var committer = new Signature( "CKli.Testing", "none", new DateTimeOffset( 2000, 1, 1, 0, 0, 0, TimeSpan.Zero ) );
+        var committer = new Signature( "CKli.Testing", "none", authorAndCommitWhen ?? DateTimeOffset.Now );
         if( string.IsNullOrEmpty( commitMessage ) )
         {
             commitMessage = $"Touching '{folder.LastPart}'.";

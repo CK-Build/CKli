@@ -8,6 +8,7 @@ using CKli.VersionTag.Plugin;
 using CSemVer;
 using LibGit2Sharp;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
@@ -352,6 +353,8 @@ public sealed partial class Roadmap
             SVersion? targetVersion;
             if( _roadmap._isCIBuild )
             {
+                int buildNumber = ComputeCommitDepth( _versionInfo.BaseBuild.Commit, _versionInfo.GitSolution.GitBranch.Tip );
+
                 var d = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( _versionInfo.BaseBuild.Commit,
                                                                                                  _versionInfo.GitSolution.GitBranch.Tip );
                 Throw.DebugAssert( d.CommonAncestor != null && d.BehindBy is not null );
@@ -359,10 +362,9 @@ public sealed partial class Roadmap
                 monitor.Info( $"""
                     '{_solution}': BaseBuild = '{_versionInfo.BaseBuild.Commit}' => '{_versionInfo.GitSolution.GitBranch.Tip}'
                         - BehindBy = {d.BehindBy.Value}
-                        - CommitsFromBaseBuild.Count = {_versionInfo.CommitsFromBaseBuild.Count}.
-                    """ );
+                        - CommitDepth = {buildNumber}.
+                    """ );                
 
-                int buildNumber = d.BehindBy.Value;
                 if( mustAddCommit ) ++buildNumber;
 
                 if( isPrerelease )
@@ -417,6 +419,36 @@ public sealed partial class Roadmap
             }
 
             return targetVersion;
+
+            static int ComputeCommitDepth( Commit baseCommit, Commit target )
+            {
+                Throw.CheckArgument( target.Committer.When >= baseCommit.Committer.When );
+                var baseCommitSha = baseCommit.Sha;
+                var cache = new Dictionary<string, int> { { baseCommitSha, 0 } };
+                return ComputeCommitDepth( baseCommitSha, baseCommit.Committer.When.UtcDateTime, target, cache );
+
+                static int ComputeCommitDepth( string baseCommitSha, DateTime baseCommitWhen, Commit target, Dictionary<string, int> cache )
+                {
+                    var targetSha = target.Sha;
+                    if( !cache.TryGetValue( targetSha, out int d ) )
+                    {
+                        d = -1;
+                        if( target.Committer.When.UtcDateTime >= baseCommitWhen )
+                        {
+                            foreach( var p in target.Parents )
+                            {
+                                int dP = ComputeCommitDepth( baseCommitSha, baseCommitWhen, p, cache );
+                                if( dP > d )
+                                {
+                                    d = dP + 1;
+                                }
+                            }
+                        }
+                        cache.Add( targetSha, d );
+                    }
+                    return d;
+                }
+            }
 
             static VersionChange DetectVersionChange( Commit c, bool noNone )
             {
