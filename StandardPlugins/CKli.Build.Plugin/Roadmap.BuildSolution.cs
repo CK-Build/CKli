@@ -658,8 +658,6 @@ public sealed partial class Roadmap
 
         internal IRenderable ToRenderable( ScreenType screen, int buildIndexLen, string cRank, ref RStats stats )
         {
-            var repo = _solution.Repo.GitRepository;
-
             IRenderable r = RenderBuildIndexAndRank( screen, buildIndexLen, cRank );
 
             if( _roadmap.Graph.HasPivots )

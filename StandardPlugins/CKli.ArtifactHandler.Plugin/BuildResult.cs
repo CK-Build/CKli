@@ -131,8 +131,10 @@ public sealed partial class BuildResult
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
+    /// <param name="repo">The repository to consider.</param>
     /// <param name="buildInfo">A build info description (used by log).</param>
-    /// <returns>The set of incoming packages or null on error.</returns>
+    /// <param name="packages">The set of incoming packages or null on error.</param>
+    /// <returns>True on success, false on error.</returns>
     /// <remarks>
     /// Collecting the package dependencies can be done in multiple ways:
     /// <list type="bullet">

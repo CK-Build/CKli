@@ -141,7 +141,6 @@ public readonly struct VersionQualityFilter
     /// <summary>
     /// Attempts to parse a string as a <see cref="VersionQualityFilter"/>.
     /// White spaces are silently ignored.
-    /// <para>
     /// </summary>
     /// <param name="head">The string to parse (leading and internal white spaces between tokens are skipped).</param>
     /// <param name="filter">The result.</param>
@@ -151,7 +150,6 @@ public readonly struct VersionQualityFilter
     /// <summary>
     /// Attempts to match a string as a <see cref="VersionQualityFilter"/> (<paramref name="head"/> is forwarded on success).
     /// White spaces are silently ignored.
-    /// <para>
     /// </summary>
     /// <param name="head">The string to parse (leading and internal white spaces between tokens are skipped).</param>
     /// <param name="filter">The result.</param>

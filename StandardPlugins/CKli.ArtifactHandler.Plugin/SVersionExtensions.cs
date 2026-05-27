@@ -5,8 +5,16 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace CKli;
 
+/// <summary>
+/// Extends <see cref="SVersion"/>.
+/// </summary>
 public static class SVersionExtensions
 {
+    /// <summary>
+    /// Gets whether the version is a "-local.fix." prerelease.
+    /// </summary>
+    /// <param name="version">This version.</param>
+    /// <returns>True if this is a "-local.fix." version.</returns>
     public static bool IsLocalFix( this SVersion version ) => version.IsPrerelease && version.Prerelease.StartsWith( "local.fix.", StringComparison.Ordinal );
 
     /// <summary>
@@ -41,6 +49,11 @@ public static class SVersionExtensions
         return false;
     }
 
+    /// <summary>
+    /// Gets whether this is a CI build version.
+    /// </summary>
+    /// <param name="version">This version.</param>
+    /// <returns>Whether this is a CI version.</returns>
     public static bool IsCI( this SVersion version )
     {
         var r = version.Prerelease.AsSpan();

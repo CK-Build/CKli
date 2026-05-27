@@ -231,7 +231,7 @@ public static partial class CKliTestHelperExtensions
 
         /// <summary>
         /// Gets the "Cloned/" path in the test project folder where
-        /// remote repositories are cloned and used by tests (see <see cref="RemotesCollection.Clone"/>).
+        /// remote repositories are cloned and used by tests (see <see cref="RemotesCollection.Clone(NormalizedPath, bool, Action{IActivityMonitor, NormalizedPath, XElement}?, bool)"/>).
         /// </summary>
         public NormalizedPath CKliClonedPath => _clonedPath;
 
@@ -249,7 +249,7 @@ public static partial class CKliTestHelperExtensions
 
     /// <summary>
     /// Must be called by tests to cleanup their respective "Cloned/&lt;test-name&gt;" where they can clone
-    /// the stacks they want from the "Remotes" thanks to <see cref="RemotesCollection.Clone"/>.
+    /// the stacks they want from the "Remotes" thanks to <see cref="RemotesCollection.Clone(ClonedFolder, Action{IActivityMonitor, NormalizedPath, XElement}?, bool)"/>.
     /// </summary>
     /// <param name="helper">This helper.</param>
     /// <param name="methodTestName">The test name.</param>

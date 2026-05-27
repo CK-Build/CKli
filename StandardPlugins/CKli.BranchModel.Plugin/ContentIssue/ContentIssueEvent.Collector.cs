@@ -9,6 +9,9 @@ namespace CKli.BranchModel.Plugin;
 
 public sealed partial class ContentIssueEvent
 {
+    /// <summary>
+    /// Collector for content issue.
+    /// </summary>
     public sealed partial class Collector
     {
         readonly HotBranch _branch;
@@ -32,6 +35,9 @@ public sealed partial class ContentIssueEvent
 
         internal HotBranch Branch => _branch;
 
+        /// <summary>
+        /// Gets the analyzed git branch.
+        /// </summary>
         public Branch GitContentBranch => _gitContentBranch;
 
         /// <summary>
@@ -44,12 +50,20 @@ public sealed partial class ContentIssueEvent
         /// </summary>
         public int ManualCount => _manual == null ? 0 : _manual.Count;
 
+        /// <summary>
+        /// Adds a manual fix issue.
+        /// </summary>
+        /// <param name="description">The manual fix description.</param>
         public void ManualFix( string description )
         {
             _manual ??= new List<string>();
             _manual.Add( description );
         }
 
+        /// <summary>
+        /// Adds a file that must be deleted.
+        /// </summary>
+        /// <param name="path">The file path relative to the repository root to delete.</param>
         public void DeleteFile( NormalizedPath path )
         {
             _deleteFiles ??= new List<NormalizedPath>();
@@ -57,6 +71,10 @@ public sealed partial class ContentIssueEvent
             ++_issueCount;
         }
 
+        /// <summary>
+        /// Adds a folder that must be deleted.
+        /// </summary>
+        /// <param name="path">The folder path relative to the repository root to delete.</param>
         public void DeleteFolder( NormalizedPath path )
         {
             _deleteFolders ??= new List<NormalizedPath>();
@@ -64,6 +82,11 @@ public sealed partial class ContentIssueEvent
             ++_issueCount;
         }
 
+        /// <summary>
+        /// Adds a file that must be moved or renamed (including casing change).
+        /// </summary>
+        /// <param name="source">The source file path relative to the repository root.</param>
+        /// <param name="target">The target file path relative to the repository root.</param>
         public void MoveFile( NormalizedPath source, NormalizedPath target )
         {
             Throw.CheckArgument( source != target );
@@ -72,6 +95,11 @@ public sealed partial class ContentIssueEvent
             ++_issueCount;
         }
 
+        /// <summary>
+        /// Adds a folder that must be moved or renamed (including casing change).
+        /// </summary>
+        /// <param name="source">The source folder path relative to the repository root.</param>
+        /// <param name="target">The target folder path relative to the repository root.</param>
         public void MoveFolder( NormalizedPath source, NormalizedPath target )
         {
             Throw.CheckArgument( source != target );
@@ -80,12 +108,23 @@ public sealed partial class ContentIssueEvent
             ++_issueCount;
         }
 
+        /// <summary>
+        /// Adds a file that must be created.
+        /// </summary>
+        /// <param name="path">The file path relative to the repository root to create.</param>
+        /// <param name="content">The content provider to use when this issue is fixed.</param>
         public void CreateFile( NormalizedPath path, Func<string> content )
         {
             _createFiles ??= new List<BaseEnsureFileIssue>();
             _createFiles.Add( new EnsureTextFileIssue( path, content, create: true ) );
             ++_issueCount;
         }
+
+        /// <summary>
+        /// Adds a file that must be created.
+        /// </summary>
+        /// <param name="path">The file path relative to the repository root to create.</param>
+        /// <param name="content">The content provider to use when this issue is fixed.</param>
         public void CreateFile( NormalizedPath path, Func<byte[]> content )
         {
             _createFiles ??= new List<BaseEnsureFileIssue>();
@@ -93,6 +132,11 @@ public sealed partial class ContentIssueEvent
             ++_issueCount;
         }
 
+        /// <summary>
+        /// Adds a file that must be updated.
+        /// </summary>
+        /// <param name="path">The file path relative to the repository root to create.</param>
+        /// <param name="content">The content provider to use when this issue is fixed.</param>
         public void UpdateFile( NormalizedPath path, Func<string> content )
         {
             _updateFiles ??= new List<BaseEnsureFileIssue>();
@@ -100,6 +144,11 @@ public sealed partial class ContentIssueEvent
             ++_issueCount;
         }
 
+        /// <summary>
+        /// Adds a file that must be updated.
+        /// </summary>
+        /// <param name="path">The file path relative to the repository root to create.</param>
+        /// <param name="content">The content provider to use when this issue is fixed.</param>
         public void UpdateFile( NormalizedPath path, Func<byte[]> content )
         {
             _updateFiles ??= new List<BaseEnsureFileIssue>();

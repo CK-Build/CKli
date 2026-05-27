@@ -7,11 +7,19 @@ using CKli.ShallowSolution.Plugin;
 
 namespace CKli.CommonFiles.Plugin;
 
+/// <summary>
+/// Handles common files content issues.
+/// </summary>
 public sealed class CommonFilesPlugin : PrimaryPluginBase
 {
     readonly BranchModelPlugin _branchModel;
     NormalizedPath _commonFolder;
 
+    /// <summary>
+    /// Listens to the <see cref="BranchModelPlugin.ContentIssue"/>.
+    /// </summary>
+    /// <param name="primaryContext">The primary context.</param>
+    /// <param name="branchModel">The branch model plugin.</param>
     public CommonFilesPlugin( PrimaryPluginContext primaryContext, BranchModelPlugin branchModel )
         : base( primaryContext )
     {

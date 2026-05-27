@@ -52,7 +52,7 @@ public static class ProcessRunner
                                    string fileName,
                                    string arguments,
                                    string workingDirectory,
-                                   Dictionary<string, string>? environmentVariables = null,
+                                   Dictionary<string, string?>? environmentVariables = null,
                                    int timeout = Timeout.Infinite,
                                    StringBuilder? stdOut = null,
                                    StringBuilder? stdErr = null,
@@ -70,10 +70,13 @@ public static class ProcessRunner
             info.StandardOutputEncoding = Encoding.UTF8;
             info.StandardErrorEncoding = Encoding.UTF8;
         }
-        info.EnvironmentVariables.Add( "CKliCalled", "true" );
+        // Don't use EnvironmentVariables.Add!
+        // When the environment variable already exists for this process, Add triggers
+        // a marvelous "Value does not fall within the expected range." exception.
+        info.EnvironmentVariables[ "CKliCalled" ] = "true";
         if( environmentVariables != null && environmentVariables.Count > 0 )
         {
-            foreach( var kv in environmentVariables ) info.EnvironmentVariables.Add( kv.Key, kv.Value );
+            foreach( var kv in environmentVariables ) info.EnvironmentVariables[ kv.Key ] = kv.Value;
         }
         using var process = new Process { StartInfo = info };
         if( stdOut == null )
