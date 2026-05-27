@@ -187,7 +187,6 @@ public sealed partial class Roadmap
                 buildReason |= MustBuildReason.DependencyUpdate;
             }
 
-
             // If the upstream doesn't force a Major, we must compute the change from the code in this repository
             // and eventually compute the target version.
             // If we are building from the upstreams or the dependencies must be updated, then we need one more
@@ -354,17 +353,6 @@ public sealed partial class Roadmap
             if( _roadmap._isCIBuild )
             {
                 int buildNumber = ComputeCommitDepth( _versionInfo.BaseBuild.Commit, _versionInfo.GitSolution.GitBranch.Tip );
-
-                var d = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( _versionInfo.BaseBuild.Commit,
-                                                                                                 _versionInfo.GitSolution.GitBranch.Tip );
-                Throw.DebugAssert( d.CommonAncestor != null && d.BehindBy is not null );
-
-                monitor.Info( $"""
-                    '{_solution}': BaseBuild = '{_versionInfo.BaseBuild.Commit}' => '{_versionInfo.GitSolution.GitBranch.Tip}'
-                        - BehindBy = {d.BehindBy.Value}
-                        - CommitDepth = {buildNumber}.
-                    """ );                
-
                 if( mustAddCommit ) ++buildNumber;
 
                 if( isPrerelease )
@@ -568,17 +556,15 @@ public sealed partial class Roadmap
                 var published = releaseDatabase.GetBuildContentInfo( monitor, _solution.Repo, targetVersion, fromPublished: true );
                 if( published != null )
                 {
-                    monitor.Warn( $"""
+                    //monitor.Warn( $"""
+                    //    Repository '{Repo.DisplayPath}' must be build in version '{targetVersion}' but this version already appears in the published database with the content:
+                    //    {published}
+                    //    """ );
+                    monitor.Error( $"""
                         Repository '{Repo.DisplayPath}' must be build in version '{targetVersion}' but this version already appears in the published database with the content:
                         {published}
                         """ );
-                    //monitor.Error( $"""
-                    //    Repository '{Repo.DisplayPath}' must be build in version '{targetVersion}' but this version already appears in the published database with the content:
-                    //    {published}
-
-                    //    Local/Remote state seems desynchronized. A 'ckli pull' and/or a 'ckli maintenance release-database rebuild' may be welcome.
-                    //    """ );
-                    //return false;
+                    return false;
                 }
                 _mustPublish = true;
                 ++_roadmap._publishSolutionCount;
