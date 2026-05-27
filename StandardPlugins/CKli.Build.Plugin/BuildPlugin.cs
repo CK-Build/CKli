@@ -493,6 +493,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                 {
                     return null;
                 }
+                Throw.DebugAssert( buildResult.Version == buildInfo.Version );
 
                 // Local fix builds have no release tag. If the release local database is reset, we lose them
                 // but this is not an issue, this is used as an optimization that avoids rebuilding origins when

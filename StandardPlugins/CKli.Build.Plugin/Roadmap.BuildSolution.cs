@@ -355,6 +355,13 @@ public sealed partial class Roadmap
                 var d = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( _versionInfo.BaseBuild.Commit,
                                                                                                  _versionInfo.GitSolution.GitBranch.Tip );
                 Throw.DebugAssert( d.CommonAncestor != null && d.BehindBy is not null );
+
+                monitor.Info( $"""
+                    '{_solution}': BaseBuild = '{_versionInfo.BaseBuild.Commit}' => '{_versionInfo.GitSolution.GitBranch.Tip}'
+                        - BehindBy = {d.BehindBy.Value}
+                        - CommitsFromBaseBuild.Count = {_versionInfo.CommitsFromBaseBuild.Count}.
+                    """ );
+
                 int buildNumber = d.BehindBy.Value;
                 if( mustAddCommit ) ++buildNumber;
 
@@ -511,7 +518,7 @@ public sealed partial class Roadmap
                 };
             }
         }
-        #endregion /Initialize
+#endregion /Initialize
 
         internal bool ConcludeInitialization( IActivityMonitor monitor,
                                               ReleaseDatabasePlugin releaseDatabase,

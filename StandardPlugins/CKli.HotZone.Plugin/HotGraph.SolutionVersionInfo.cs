@@ -174,8 +174,6 @@ public sealed partial class HotGraph
         /// <returns>The CI or non CI last build.</returns>
         public BuiltVersion GetLastBuild( bool ciBuild ) => ciBuild ? LastBuildInCI : LastBuildInNonCI;
 
-        public bool VersionMustBuild => _lastAnyBuild.BuildContentInfo == null;
-
         /// <summary>
         /// Gets all the commits from <see cref="GitSolution"/>'s git branch's tip down to <see cref="BaseBuild"/>.
         /// </summary>
