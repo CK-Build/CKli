@@ -4,6 +4,8 @@ using CK.Core;
 using System;
 using System.IO;
 using CKli.ShallowSolution.Plugin;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace CKli.CommonFiles.Plugin;
 
@@ -13,7 +15,9 @@ namespace CKli.CommonFiles.Plugin;
 public sealed class CommonFilesPlugin : PrimaryPluginBase
 {
     readonly BranchModelPlugin _branchModel;
+    readonly HashSet<string> _memorySet;
     NormalizedPath _commonFolder;
+    
 
     /// <summary>
     /// Listens to the <see cref="BranchModelPlugin.ContentIssue"/>.
@@ -24,6 +28,7 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         : base( primaryContext )
     {
         _branchModel = branchModel;
+        _memorySet = new HashSet<string>();
         _branchModel.ContentIssue += ContentIssueRequested;
     }
 
@@ -42,7 +47,13 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         var source = CommonFolder.Combine( path );
         if( !File.Exists( source ) )
         {
-            ev.Monitor.Warn( $"""Missing expected file '{path}' in World's "Common/" folder. Ignoring it.""" );
+            if( _memorySet.Add( path ) )
+            {
+                ev.Monitor.Warn( $"""
+                    Missing expected file '{path}' in World's "Common/" folder: '{CommonFolder}'.
+                    Ignoring it.
+                    """ );
+            }
             return;
         }
         var fileContent = File.ReadAllBytes( source );
