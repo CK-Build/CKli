@@ -157,19 +157,19 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     [Description( "Build-Test-Package and propagates packages from the current repositories to their consumers, keeping them local." )]
     [CommandPath( "build" )]
     public Task<bool> BuildAsync( IActivityMonitor monitor,
-                             CKliEnv context,
-                             [Description( _descBranch )]
-                             [OptionName( "--branch,-b" )]
-                             string? branch = null,
-                             [Description( _descMaxDoP )]
-                             string? maxDop = null,
-                             [Description( "Build all the Repos, not only the current repositories and their consumers." )]
-                             bool all = false,
-                             [Description( "Run tests even if they have already run successfully on the commit." )]
-                             bool forceTests = false,
-                             [Description( _descDryRun )]
-                             [OptionName("--dry-run,-d")]
-                             bool dryRun = false )
+                                  CKliEnv context,
+                                  [Description( _descBranch )]
+                                  [OptionName( "--branch,-b" )]
+                                  string? branch = null,
+                                  [Description( _descMaxDoP )]
+                                  string? maxDop = null,
+                                  [Description( "Build all the Repos, not only the current repositories and their consumers." )]
+                                  bool all = false,
+                                  [Description( "Run tests even if they have already run successfully on the commit." )]
+                                  bool forceTests = false,
+                                  [Description( _descDryRun )]
+                                  [OptionName("--dry-run,-d")]
+                                  bool dryRun = false )
     {
         return DoNonCIAsync( monitor, context, branch, maxDop, all, forceTests, dryRun, isPullBuild: false, publish: false );
     }
@@ -415,18 +415,23 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
 
         // If we can avoid the build (because forceRebuild is false), we skip the build only if the tag has not been deleted:
         // this supports a "natural" force rebuild for the user by deleting the version tag.
-        if( !forceRebuild && versionInfo.TagCommits.ContainsKey( targetVersion ) )
+        if( !forceRebuild )
         {
-            var existingRelease = _releaseDatabase.GetReleaseInfo( monitor, versionInfo.Repo, targetVersion, LogLevel.Debug );
-            if( existingRelease != null && existingRelease.HasAllLocalArtifacts( monitor, out var assetsFolder ) )
+            // Since a local fix has no version tag, always try to skip the build for them.
+            if( targetVersion.IsLocalFix() || versionInfo.TagCommits.ContainsKey( targetVersion ) )
             {
-                // build is not required... But may be running tests is required.
-                if( !runTest.Value )
+                var existingRelease = _releaseDatabase.GetReleaseInfo( monitor, versionInfo.Repo, targetVersion, LogLevel.Debug );
+                if( existingRelease != null && existingRelease.HasAllLocalArtifacts( monitor, out var assetsFolder ) )
                 {
-                    monitor.Info( $"Useless build for '{versionInfo.Repo.DisplayPath}/{targetVersion}' skipped." );
-                    return new BuildResult( versionInfo.Repo, targetVersion, existingRelease.Content, assetsFolder );
+                    // build is not required... But may be running tests is required.
+                    if( !runTest.Value )
+                    {
+                        monitor.Info( $"Useless build for '{versionInfo.Repo.DisplayPath}/{targetVersion}' skipped." );
+                        return new BuildResult( versionInfo.Repo, targetVersion, existingRelease.Content, assetsFolder );
+                    }
                 }
             }
+            forceRebuild = true;
         }
 
         var buildInfo = versionInfo.TryGetCommitBuildInfo( monitor, buildCommit, targetVersion, allowRebuild: forceRebuild );
