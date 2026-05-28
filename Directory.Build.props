@@ -27,13 +27,13 @@
   </ItemGroup>
   <Sdk Name="DotNet.ReproducibleBuilds.Isolated" Version="1.2.39" />
   <PropertyGroup>
-    <!-- InformationalVersion is either the Zero version or provided by the CodeCakeBuilder when in CI build). -->
+    <!-- InformationalVersion is either the Zero version or provided by CKli. -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
   <!--</ReproducibleBuilds>-->
 
-  <!--<ZeroVersion>: When not called by CKli, assemblies always use the ZeroVersion (see CSemVer.InformationalVersion).-->
-  <PropertyGroup Condition=" '$(CKliCalled)' == 'true' ">
+  <!--<ZeroVersion>: Use the ZeroVersion (see CSemVer.InformationalVersion) except when specified on the command line by CKli.-->
+  <PropertyGroup>
     <Version>0.0.0-0</Version>
     <AssemblyVersion>0.0.0</AssemblyVersion>
     <FileVersion>0.0.0.0</FileVersion>
@@ -70,7 +70,7 @@
   <PropertyGroup>
     <CopyDocumentationFilesFromPackages>true</CopyDocumentationFilesFromPackages>
   </PropertyGroup> 
-  <Target Name="_CopyDocumentationFiles" AfterTargets="ResolvePackageAssets">
+  <Target Name="_FilterDocumentationFiles" AfterTargets="ResolvePackageAssets">
     <ItemGroup>
       <ReferenceCopyLocalPaths
         Remove="@(ReferenceCopyLocalPaths)"
