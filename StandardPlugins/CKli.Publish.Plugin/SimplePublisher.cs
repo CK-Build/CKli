@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
+using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ReleaseDatabase.Plugin;
 using CKli.VersionTag.Plugin;
@@ -112,28 +113,82 @@ sealed partial class SimplePublisher
 
     async Task<PublishState.Cursor?> CreateReleaseAsync( IActivityMonitor monitor, RepoPublishInfo repo, int forwardLength, CancellationToken cancel )
     {
-        // To create a release, hosting providers (like GitHub) require that the tag exists in the repository, so it's time to push it.
-        var versionedTag = "v" + repo.PublishVersion.ToString();
         GitRepository r = repo.Repo.GitRepository;
-        if( !r.PushTags( monitor, [versionedTag] ) )
-        {
-            return null;
-        }
-        // Push the branch.
+        // To create a release, hosting providers (like GitHub) require that the tag exists in the repository, so it's time to push it.
+        // The build branch name must obviously exist.
         var branch = r.GetBranch( monitor, repo.BranchName, missingLocalAndRemote: LogLevel.Error );
         if( branch == null )
         {
             return null;
         }
-        if( !r.PushBranch( monitor, branch, autoCreateRemoteBranch: true ) )
+
+        // Enter the atomic phase:
+        // - version tag -> (create draft release -> push build branch with remove remote "dev/" or create remote regular)
+        var versionedTag = "v" + repo.PublishVersion.ToString();
+        if( !r.PushTags( monitor, [versionedTag] ) )
         {
             return null;
         }
-        Throw.DebugAssert( _hostingProvider != null );
-        _releaseId = await _hostingProvider.CreateDraftReleaseAsync( monitor, _hostedRepoPath, versionedTag, cancel ).ConfigureAwait( false );
+
+        _releaseId = await CreateDraftReleaseAndPushBranches( monitor, repo, versionedTag, r, branch, cancel ).ConfigureAwait( false );
+
+        if( _releaseId == null )
+        {
+            // Compensate!
+            // Tries to remove the pushed version tag.
+            if( !r.DeleteRemoteTags( monitor, [versionedTag] ) )
+            {
+                monitor.Error( $"""
+                    Error while compensating the previous error.
+                    The tag '{versionedTag}' has been pushed but should be removed from the 'origin' remote '{r.RepositoryKey.OriginUrl}'.
+                    """ );
+            }
+            return null;
+        }
         return _releaseId == null
                 ? null
                 : _state.ForwardPrimaryCursor( monitor, forwardLength );
+    }
+
+    async Task<string?> CreateDraftReleaseAndPushBranches( IActivityMonitor monitor, RepoPublishInfo repo, string versionedTag, GitRepository r, LibGit2Sharp.Branch branch, CancellationToken cancel )
+    {
+        Throw.DebugAssert( _hostingProvider != null );
+        var releaseId = await _hostingProvider.CreateDraftReleaseAsync( monitor, _hostedRepoPath, versionedTag, cancel ).ConfigureAwait( false );
+        if( releaseId != null )
+        {
+            bool isCI = repo.PublishVersion.IsCI();
+            // Draft release created. Push the branch(es) now.
+            // We use the DeferredPushRefSpecs here to have an atomic push with all the branches manipulation at once.
+            if( !isCI )
+            {
+                // We are publishing a non-CI: the regular branch will be pushed below: we also
+                // suppress its remote "dev/" branch (that has been integrated) by the build.
+                r.DeferredPushRefSpecs.Add( $":refs/remotes/origin/{BranchName.ToDevBranchName( repo.BranchName )}" );
+            }
+            else
+            {
+                // We are publishing a CI: the regular branch MAY be new to the remote when the repository is a brand new one.
+                var regularName = BranchName.ToRegularBranchName( repo.BranchName );
+                // Defensive programming: the regular branch must exist locally.
+                var b = r.GetBranch( monitor, regularName, LogLevel.Warn );
+                if( b != null && b.TrackedBranch == null )
+                {
+                    monitor.Warn( $"Branch '{regularName}' has no tracked branch. Creating branch 'origin/{regularName}'." );
+                    b = r.Repository.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
+                    r.DeferredPushRefSpecs.Add( $"{b.CanonicalName}:{b.CanonicalName}" );
+                }
+            }
+            // Pushes the branch (and may be remove the "dev/" one or push/create the regular one).
+            if( !r.PushBranch( monitor, branch, autoCreateRemoteBranch: true ) )
+            {
+                // TODO:
+                // Compensate!
+                // Delete the draft release.
+                // await _hostingProvider.DeleteDraftReleaseAsync( monitor, _hostedRepoPath, releaseId, cancel ).ConfigureAwait( false );
+                return null;
+            }
+        }
+        return releaseId;
     }
 
     async Task<PublishState.Cursor?> OnInFilesAsync( IActivityMonitor monitor, RepoPublishInfo repo, CancellationToken cancel )
@@ -178,7 +233,7 @@ sealed partial class SimplePublisher
         // Resets the hosting provider and release state.
         _hostingProvider = null;
         _releaseId = null;
-        // If the cleanup fails, we still consider this release done.
+        // Housekeeping: if the cleanup fails, we still consider this release done.
         // Trick here for the tests, we don't cleanup the $Local when testing: we want to keep the versions
         // that a build has produced.
         if( !CKliRootEnv.DefaultCKliEnv.CurrentDirectory.Path.Contains( "CK/.PublicStack/CK-Plugins/Tests/Plugins.Tests" ) )

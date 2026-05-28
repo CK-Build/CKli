@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 
 namespace CKli.BranchModel.Plugin;
@@ -30,7 +31,7 @@ public sealed class BranchName
     /// <summary>
     /// Gets the "dev/<see cref="Name"/>" branch name.
     /// </summary>
-    public string DevName => _devName ??= $"dev/{_name}";
+    public string DevName => _devName ??= ToDevBranchName( _name );
 
     /// <summary>
     /// Gets the index in <see cref="BranchNamespace.Branches"/>.
@@ -49,6 +50,29 @@ public sealed class BranchName
     /// </summary>
     /// <returns>The name of this branch.</returns>
     public override string ToString() => _name;
+
+
+    /// <summary>
+    /// Centralized "dev/" branch name factory.
+    /// This normalizes any case issue on an existing "DEV/" prefix.
+    /// </summary>
+    /// <param name="name">The regular branch name (or already "dev/" branch name).</param>
+    /// <returns>The "dev/" name.</returns>
+    public static string ToDevBranchName( string name ) => name.StartsWith( "dev/", StringComparison.OrdinalIgnoreCase )
+                                                            ? name.StartsWith( "dev/", StringComparison.Ordinal )
+                                                                ? name
+                                                                : $"dev/{name.AsSpan( 4 )}"
+                                                            : $"dev/{name}";
+
+    /// <summary>
+    /// Centralized regular branch name from "dev/" derivation.
+    /// This handles case issue on "DEV/" prefix.
+    /// </summary>
+    /// <param name="name">The "dev/' branch name (or already regular branch name).</param>
+    /// <returns>The regular name (no "dev/" prefix).</returns>
+    public static string ToRegularBranchName( string name ) => name.StartsWith( "dev/", StringComparison.OrdinalIgnoreCase )
+                                                                 ? name.Substring( 4 )
+                                                                 : name;
 
 }
 

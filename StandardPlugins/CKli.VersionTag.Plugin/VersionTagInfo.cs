@@ -293,6 +293,7 @@ public sealed partial class VersionTagInfo : RepoInfo
                 Throw.DebugAssert( "The version is the exists tag and a +fake is always stable.", version.IsStable );
                 return true;
             }
+            // The existing version tag must not be "+deprecated" one.
             if( !CheckDeprecatedVersion( monitor, exists ) )
             {
                 return false;
