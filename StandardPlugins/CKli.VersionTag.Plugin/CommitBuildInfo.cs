@@ -75,6 +75,7 @@ public sealed class CommitBuildInfo
     /// <summary>
     /// Adds or update the <see cref="TagCommit"/> on the <see cref="BuildCommit"/> for <see cref="Version"/>
     /// with the provided <paramref name="releaseMessage"/>.
+    /// <see cref="SVersionExtensions.IsLocalFix(SVersion)"/> are skipped.
     /// <para>
     /// This is the last operation of a build. If this fails, this is a problem.
     /// </para>
@@ -88,6 +89,21 @@ public sealed class CommitBuildInfo
                                       string releaseMessage )
     {
         Throw.CheckArgument( !string.IsNullOrWhiteSpace( releaseMessage ) );
+        // Local fix builds have no release tag. If the release local database is reset, we lose them
+        // but this is not an issue, this is used as an optimization that avoids rebuilding origins when
+        // an impacted repo needs to be rebuilt.
+        // => Skipped local fix.
+        bool isLocalFix = _version.IsLocalFix();
+        monitor.Info( $"""
+                    {(isLocalFix
+                ? "Not setting (local fix build are only registered in the local release database)"
+                : "Setting")} build tag 'v{_version}' on '{Repo.DisplayPath}' (commit: {_buildCommit.Sha}):
+                    {releaseMessage}
+                    """ );
+        if( isLocalFix )
+        {
+            return true;
+        }
         try
         {
             var t = _tagInfo.Repo.GitRepository.Repository.Tags.Add( $"v{_version}",
@@ -111,7 +127,7 @@ public sealed class CommitBuildInfo
         catch( Exception ex )
         {
             // This should be a "World.Problem"
-            // Problems are future new beasts that are serializable proto/persistent-issues with a
+            // Problems may be future new beasts that are serializable proto/persistent-issues with a
             // "bool StillApply( ... out World.Issue issue )". 
             monitor.Error( $"""
                 Unexpecting error while applying 'v{_version}' on commit '{_buildCommit.Sha}' with release message:

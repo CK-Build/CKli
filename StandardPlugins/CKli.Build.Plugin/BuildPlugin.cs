@@ -413,7 +413,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         // Should we run the tests?
         runTest ??= !repoBuilder.HasTestRun( monitor, buildCommit );
 
-        if( !forceRebuild )
+        // If we can avoid the build (because forceRebuild is false), we skip the build only if the tag has not been deleted:
+        // this supports a "natural" force rebuild for the user by deleting the version tag.
+        if( !forceRebuild && versionInfo.TagCommits.ContainsKey( targetVersion ) )
         {
             var existingRelease = _releaseDatabase.GetReleaseInfo( monitor, versionInfo.Repo, targetVersion, LogLevel.Debug );
             if( existingRelease != null && existingRelease.HasAllLocalArtifacts( monitor, out var assetsFolder ) )
@@ -495,23 +497,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                 }
                 Throw.DebugAssert( buildResult.Version == buildInfo.Version );
 
-                // Local fix builds have no release tag. If the release local database is reset, we lose them
-                // but this is not an issue, this is used as an optimization that avoids rebuilding origins when
-                // an impacted repo needs to be rebuilt.
-                bool isLocalFix = buildResult.Version.IsLocalFix();
-                monitor.Info( $"""
-                    {(isLocalFix
-                        ? "Not setting (local fix build are only registered in the local release database)"
-                        : "Setting")
-                    } build tag 'v{buildInfo.Version}' on '{repoBuilder.Repo.DisplayPath}' (commit: {buildInfo.BuildCommit.Sha}):
-                    {content.ToString()}
-                    """ );
-                if( !isLocalFix )
+                if( !buildInfo.ApplyReleaseBuildTag( monitor, context, content.ToString() ) )
                 {
-                    if( !buildInfo.ApplyReleaseBuildTag( monitor, context, content.ToString() ) )
-                    {
-                        return null;
-                    }
+                    return null;
                 }
             }
             return buildResult;
