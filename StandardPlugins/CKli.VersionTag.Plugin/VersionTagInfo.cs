@@ -494,7 +494,8 @@ public sealed partial class VersionTagInfo : RepoInfo
     {
         Throw.DebugAssert( !_v2C.ContainsKey( version ) );
         Throw.DebugAssert( _sha2C != null );
-        Throw.DebugAssert( "This must have been checked by TryGetCommitBuildInfo.", !_sha2C.ContainsKey( buildCommit.Sha ) );
+        Throw.DebugAssert( "This must have been checked by TryGetCommitBuildInfo.",
+                           !_sha2C.TryGetValue( buildCommit.Sha, out var exist ) || exist.IsFakeVersion );
 
         var newOne = new TagCommit( version, buildCommit, t, isFakeVersion: false, deprecatedInfo: null );
         _v2C.Add( version, newOne );
