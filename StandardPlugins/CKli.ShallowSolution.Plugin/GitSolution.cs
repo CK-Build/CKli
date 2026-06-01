@@ -69,10 +69,10 @@ public sealed class GitSolution
     /// Gets whether the solution has at least one dependency that must be updated considering any number of <paramref name="mappings"/>
     /// and collects these updates.
     /// </summary>
-    /// <param name="updates">Called for each update that must be made.</param>
+    /// <param name="updates">Called for each update that must be made. The last parameter is the index of the mapping in <paramref name="mappings"/>.</param>
     /// <param name="mappings">The package mappings to consider in priority order. Some may be null: they are ignored but their index matters.</param>
     /// <returns>True if the dependencies should be updated, false otherwise.</returns>
-    public bool HasUpdates( Action<(PackageInstance Ref, SVersion Update, int MappingIndex)> updates, params ReadOnlySpan<IPackageMapping?> mappings )
+    public bool HasUpdates( Action<PackageInstance, SVersion, int> updates, params ReadOnlySpan<IPackageMapping?> mappings )
     {
         bool hasUpdates = false;
         foreach( var p in _consumed )
@@ -83,7 +83,7 @@ public sealed class GitSolution
                 if( m != null && m.TryGetMappedVersion( p.PackageId, p.Version, out var version ) && p.Version != version )
                 {
                     hasUpdates = true;
-                    updates( (p, version, i) );
+                    updates( p, version, i );
                     break;
                 }
             }

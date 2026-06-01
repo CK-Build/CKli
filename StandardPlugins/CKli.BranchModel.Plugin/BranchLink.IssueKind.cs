@@ -24,8 +24,15 @@ sealed partial class BranchLink
         Unrelated,
 
         /// <summary>
-        /// <see cref="Ahead"/> is behind <see cref="Branch"/> and should be rebased.
+        /// <see cref="Ahead"/> is behind <see cref="Branch"/>: the ahead branch must be synchronized by merging base branch into ahead
+        /// (<see cref="SynchronizeAhead(CK.Core.IActivityMonitor, Core.GitRepository)"/> does that).
         /// </summary>
-        Desynchronized
+        Desynchronized,
+
+        /// <summary>
+        /// <see cref="Ahead"/> is behind <see cref="Branch"/> and is checked out with current pending changes:
+        /// this cannot be handled by <see cref="SynchronizeAhead(CK.Core.IActivityMonitor, Core.GitRepository)"/>.
+        /// </summary>
+        DesynchronizedCheckout
     }
 }

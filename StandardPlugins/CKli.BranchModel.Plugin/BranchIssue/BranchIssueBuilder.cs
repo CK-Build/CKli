@@ -14,6 +14,7 @@ sealed partial class BranchIssueBuilder
 {
     List<(Branch Branch, object BaseOrName)>? _removables;
     List<(Branch Ahead, Branch Base, int BehindBy)>? _desynchronized;
+    List<(Branch Ahead, Branch Base)>? _desynchronizedCheckout;
     List<(Branch Ahead, Branch Base)>? _unrelated;
     bool _hasSevereIssues;
 
@@ -34,6 +35,13 @@ sealed partial class BranchIssueBuilder
     {
         _desynchronized ??= [];
         _desynchronized.Add( (ahead, branch, behindBy) );
+        _hasSevereIssues = true;
+    }
+
+    public void OnDesynchronizedCheckout( Branch ahead, Branch branch )
+    {
+        _desynchronizedCheckout ??= [];
+        _desynchronizedCheckout.Add( (ahead, branch) );
         _hasSevereIssues = true;
     }
 
@@ -59,6 +67,18 @@ sealed partial class BranchIssueBuilder
                                                       screenType.Text( $"""
                                                               Branch '{a.FriendlyName}' is independent of its base '{b.FriendlyName}' (no common ancestor).
                                                               This is an unexpected situation that must be fixed manually.
+                                                              """ ), repo );
+                collector( issue );
+            }
+        }
+        if( _desynchronizedCheckout != null )
+        {
+            foreach( var (a,b) in _desynchronizedCheckout )
+            {
+                var issue = World.Issue.CreateManual( $"Desynchronized checked out.",
+                                                      screenType.Text( $"""
+                                                              Branch '{a.FriendlyName}' is not based on its base '{b.FriendlyName}' and is currently checked out and dirty.
+                                                              This must be fixed manually.
                                                               """ ), repo );
                 collector( issue );
             }

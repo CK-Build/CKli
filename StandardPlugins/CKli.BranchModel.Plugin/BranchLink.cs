@@ -43,14 +43,22 @@ public sealed partial class BranchLink
             if( _ahead == null ) return IssueKind.None;
             // If the ahead branch is not ahead, it is useless. We also consider the case of the exact same content:
             // the "ahead empty commit" is here... it is useless...
-            if( _aheadBy == 0 || _branch.Tip.Tree.Sha == _ahead.Tip.Tree.Sha )
+            bool sameContent = _branch.Tip.Tree.Sha == _ahead.Tip.Tree.Sha;
+            if( _aheadBy == 0 || sameContent )
             {
                 // ...but if the ahead branch is checked out and the working folder is dirty
-                // then we cannot say that the ahead branch is useless! 
+                // then we may not say that the ahead branch is useless:
+                // - Working in a useless branch is the first step to be Desynchronized (it will produce a commit
+                //   not reachable from the regular branch)... or the first step of the standard development workflow:
+                //      - When ahead is on its branch then it's a regular "repository is dirty" case and we consider
+                //        the status to be None.
+                //      - When ahead is behind its branch, it's a Desynchronized state.
                 if( _ahead.IsCurrentRepositoryHead
                     && RepositoryOf( _branch ).RetrieveStatus( new StatusOptions() { IncludeIgnored = false } ).IsDirty )
                 {
-                    return IssueKind.None;
+                    return _behindBy == 0
+                            ? IssueKind.None
+                            : IssueKind.DesynchronizedCheckout;
                 }
                 return IssueKind.Useless;
             }
@@ -87,8 +95,12 @@ public sealed partial class BranchLink
 
     /// <summary>
     /// Synchronizes this <see cref="Branch"/> into <see cref="Ahead"/> when <see cref="Issue"/> is <see cref="IssueKind.Desynchronized"/>.
-    /// WHen Issue is <see cref="IssueKind.Useless"/>, nothing is done. When Issue is <see cref="IssueKind.Unrelated"/>, an error is logged
+    /// When Issue is <see cref="IssueKind.Useless"/>, nothing is done. When Issue is <see cref="IssueKind.Unrelated"/>, an error is logged
     /// and null is returned.
+    /// <para>
+    /// The <see cref="IssueKind.DesynchronizedCheckout"/> is also considered an error. We don't try to automatically reposition ahead on
+    /// its base branch and keeping the working folder changes.
+    /// </para>
     /// <para>
     /// On success, a new <see cref="BranchLink"/> (that replaces this one) is returned.
     /// </para>
@@ -108,6 +120,15 @@ public sealed partial class BranchLink
                     : newAhead == _ahead
                         ? this
                         : new BranchLink( _branch, newAhead, _aheadName, _aheadBy, 0 );
+        }
+        if( issue is IssueKind.DesynchronizedCheckout )
+        {
+            Throw.DebugAssert( _ahead != null );
+            monitor.Error( $"""
+                            Branch '{_ahead.FriendlyName}' is not based on its base '{_branch.FriendlyName}' and is currently checked out and dirty.
+                            This must be fixed manually.
+                            """ );
+            return null;
         }
         if( issue is IssueKind.Unrelated )
         {
@@ -160,7 +181,10 @@ public sealed partial class BranchLink
                 case IssueKind.Desynchronized:
                     issues.OnDesynchronized( _ahead, _branch, _behindBy );
                     break;
-            }
+                 case IssueKind.DesynchronizedCheckout:
+                    issues.OnDesynchronizedCheckout( _ahead, _branch );
+                    break;
+           }
         }
     }
 

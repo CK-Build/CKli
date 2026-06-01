@@ -59,15 +59,15 @@ public sealed partial class Roadmap
             /// </summary>
             public PackageMapper? Discrepancies;
 
-            public void Add( (PackageInstance Ref, SVersion To, int MappingIndex) update )
+            public void Add( PackageInstance origin, SVersion to, int mappingIndex )
             {
-                var m = update.MappingIndex switch
+                var m = mappingIndex switch
                 {
                     0 => Updates ??= new PackageMapper(),
                     1 => Configuration ??= new PackageMapper(),
                     _ => Discrepancies ??= new PackageMapper()
                 };
-                m.Add( update.Ref.PackageId, update.Ref.Version, update.To );
+                m.Add( origin.PackageId, origin.Version, to );
             }
         }
 
@@ -89,7 +89,7 @@ public sealed partial class Roadmap
             {
                 buildReason |= MustBuildReason.UpstreamBuild;
             }
-            // If some packages must be updated, always build.
+            // If some packages must be updated, then we should build.
             // - The alreadyBuiltMapping enables to fix any intra World package references.
             // - The WorldConfiguredMapping applies the VersionTag plugin configuration.
             // - The DiscrepanciesMapping unifies external versions (to the max existing version).
@@ -117,7 +117,7 @@ public sealed partial class Roadmap
             // cases.
             _lastBuild = _versionInfo.GetLastBuild( _roadmap._isCIBuild );
 
-            // Always communicate on these edge cases that are not "skippable".
+            // These edge cases that are not "skippable".
             if( _lastBuild.VersionMustBuild )
             {
                 Throw.DebugAssert( _lastBuild.TagCommit.IsFakeVersion || _lastBuild.TagCommit.IsDeprecatedVersion );
@@ -162,6 +162,15 @@ public sealed partial class Roadmap
                 }
                 if( buildReason == MustBuildReason.None )
                 {
+                    // 
+                    if( packageUpdates.Updates != null )
+                    {
+                        monitor.Error( $"""
+                            '{_solution}' should not be built but requires depedency updates ({packageUpdates.Updates}).
+                            This situation should not happen and reflects a bad repository topology or weird manual modifications that should be fixed manually.
+                            """ );
+                        return false;
+                    }
                     // We compute the version change not for us (this solution will not be built) but for
                     // the downstream solutions to correctly propagate the change level (here it may be None).
                     vChange = ComputeVersionChange( _versionInfo.BaseBuild.Version, _lastBuild.TagCommit.Version, _lastBuild.TagCommit.IsFakeVersion );
