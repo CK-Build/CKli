@@ -213,7 +213,7 @@ public sealed partial class StackRepository : IDisposable
             }
             return worldName;
         }
-        return DefaultWorldName.CheckDefinitionFile( monitor ) ? _defaultWorldName : null;
+        return DefaultWorldName.CheckDefinitionFileExists( monitor ) ? _defaultWorldName : null;
     }
 
     /// <summary>

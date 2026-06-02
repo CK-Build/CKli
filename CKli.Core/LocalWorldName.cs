@@ -78,7 +78,7 @@ public sealed class LocalWorldName : WorldName
     /// <returns>The definition file or null on error.</returns>
     public WorldDefinitionFile? LoadDefinitionFile( IActivityMonitor monitor ) => _definitionFile ??= DoLoadDefinitionFile( monitor );
 
-    internal bool CheckDefinitionFile( IActivityMonitor monitor )
+    internal bool CheckDefinitionFileExists( IActivityMonitor monitor )
     {
         if( !File.Exists( _xmlDescriptionFilePath ) )
         {
@@ -90,7 +90,7 @@ public sealed class LocalWorldName : WorldName
 
     WorldDefinitionFile? DoLoadDefinitionFile( IActivityMonitor monitor )
     {
-        if( !CheckDefinitionFile( monitor ) )
+        if( !CheckDefinitionFileExists( monitor ) )
         {
             return null;
         }
@@ -99,6 +99,20 @@ public sealed class LocalWorldName : WorldName
             var doc = XDocument.Load( _xmlDescriptionFilePath );
             var root = doc.Root;
             Throw.DebugAssert( root != null );
+
+            // Before anything else (even the root element name), if a CKliMinVersion exists then we check it.
+            string? minCKliVersion = root.Attribute( "MinCKliVersion" )?.Value;
+            CSemVer.SVersion? ckliVersion = World.CKliVersion.Version;
+            if( !string.IsNullOrWhiteSpace( minCKliVersion )
+                && ckliVersion != null
+                && ckliVersion.ToString() != minCKliVersion )
+            {
+                monitor.Error( $"""
+                    The world definition file requires CKli version '{ckliVersion}' (at least). File: '{_xmlDescriptionFilePath}'.
+                    Please use 'ckli update'.
+                    """ );
+                return null;
+            }
 
             string stackName = root.Name.LocalName;
             string? ltsName = root.Attribute( "LTSName" )?.Value;

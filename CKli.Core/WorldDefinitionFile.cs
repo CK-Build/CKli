@@ -78,6 +78,10 @@ public sealed class WorldDefinitionFile
     /// <summary>
     /// Gets the root element.
     /// Must not be mutated otherwise a <see cref="InvalidOperationException"/> is raised.
+    /// <para>
+    /// This root carries the optional "MinCKliVersion" attribute. There is no API to change the "MinCKliVersion".
+    /// It must be done by code or manually.
+    /// </para>
     /// </summary>
     public XElement XmlRoot => _root;
 

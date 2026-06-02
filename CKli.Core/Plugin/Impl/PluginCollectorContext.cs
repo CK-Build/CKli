@@ -46,6 +46,8 @@ public sealed class PluginCollectorContext
     static byte[] ComputeSignature( IReadOnlyDictionary<XName, (XElement Config, bool IsDisabled)> configs )
     {
         using var hasher = IncrementalHash.CreateHash( HashAlgorithmName.SHA1 );
+        // Consider the full informational version.
+        hasher.Append( World.CKliVersion.ToString() );
         foreach( var (name, isDisabled) in configs.Select( kv => (kv.Key.LocalName,kv.Value.IsDisabled) ).OrderBy( kv => kv.LocalName ) )
         {
             hasher.Append( name );

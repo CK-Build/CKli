@@ -25,13 +25,11 @@ And auto-update it with:
 ```powershell
 ckli update
 ```
-The `update` command is described below and should handle switching from production and pre-releases easily.
-Unfortunately, there are some issues with `dotnet tool update` (that `ckli update` runs): to switch to the last
-pre-release of CKli, use:
+The `update` command handles switching from production and pre-releases easily (described below).
 
+To manually update or install a specific prerelease version:
 ```powershell
-dotnet tool uninstall CKli -g
-dotnet tool update CKli -g --prerelease --add-source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json --no-http-cache
+dotnet tool update CKli@0.9.1--ci.22 -g --prerelease --add-source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json --no-http-cache
 ```
 
 ### Run CKli

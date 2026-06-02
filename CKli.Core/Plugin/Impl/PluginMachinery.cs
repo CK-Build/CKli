@@ -490,13 +490,13 @@ public sealed partial class PluginMachinery
     {
         Throw.DebugAssert( mode != _definitionFile.CompileMode );
         _definitionFile.SetPluginCompileMode( monitor, mode );
-        return OnPluginChanged( monitor, world, false, true );
+        return OnPluginChanged( monitor, world, reloadPlugins: false );
     }
 
     internal bool ForceRecompilePlugins( IActivityMonitor monitor, World world )
     {
         monitor.Info( "Forcing plugin recompilation." );
-        return OnPluginChanged( monitor, world, updateCompiledPlugins: true, reloadPlugins: true );
+        return OnPluginChanged( monitor, world, reloadPlugins: true );
     }
 
     internal bool CreatePlugin( IActivityMonitor monitor, World world, string shortPluginName, string fullPluginName )
@@ -587,7 +587,7 @@ public sealed partial class PluginMachinery
             monitor.Error( $"Command 'dotnet sln add {fullPluginName}' failed." );
             return false;
         }
-        return OnPluginChanged( monitor, world, true, false );
+        return OnPluginChanged( monitor, world, false );
     }
 
     internal bool AddOrSetPluginPackage( IActivityMonitor monitor,
@@ -614,7 +614,7 @@ public sealed partial class PluginMachinery
             return true;
         }
         _definitionFile.EnsurePluginConfiguration( monitor, shortPluginName );
-        return OnPluginChanged( monitor, world, true, true );
+        return OnPluginChanged( monitor, world, true );
     }
 
     internal bool RemovePlugin( IActivityMonitor monitor, World world, string shortPluginName, string fullPluginName )
@@ -644,21 +644,20 @@ public sealed partial class PluginMachinery
                 return false;
             }
         }
-        return OnPluginChanged( monitor, world, true, true );
+        return OnPluginChanged( monitor, world, reloadPlugins: true );
     }
 
-    bool OnPluginChanged( IActivityMonitor monitor, World world, bool updateCompiledPlugins, bool reloadPlugins )
+    bool OnPluginChanged( IActivityMonitor monitor, World world, bool reloadPlugins )
     {
         world.ReleasePlugins();
-        if( updateCompiledPlugins && !FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile ) )
+        if( !FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile ) )
         {
             return false;
         }
         // When plugins change, the 4 possible reasons are:
         // - SetPluginCompileMode: This doesn't change anything (at least should not).
-        //                         There should be no reason to reload the plugin instances except that the "ckli plugin --compile-mode"
-        //                         displays the plugin infos after the mode change.
-        //                         => reloadPlugins is true.
+        //                         There should be no reason to reload the plugin instances.
+        //                         => reloadPlugins is false.
         //
         // - CreatePlugin: The new plugin does nothing (it doesn't touch its empty configuration element)
         //                 and necessarily works. There's no reason to reload the plugin instances.
@@ -682,7 +681,7 @@ public sealed partial class PluginMachinery
         // This is a "useless" operation (because the plugins won't be used in this run) that costs but it's not every day that
         // a plugin is added, removed or updated.
         //
-        if( !LoadPluginFactory( monitor, updateCompiledPlugins, out PluginCollectorContext? toRecompile )
+        if( !LoadPluginFactory( monitor, preCompile: true, out PluginCollectorContext? toRecompile )
             && (toRecompile == null || !RecompileAndLoad( monitor, toRecompile )) )
         {
             return false;
