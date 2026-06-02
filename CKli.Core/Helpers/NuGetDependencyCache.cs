@@ -10,9 +10,10 @@ using System.Xml;
 namespace CKli.Core;
 
 /// <summary>
-/// Simple NuGet package dependency graph implementation that relies on the <see cref="NuGetHelper.Cache"/>
-/// to obtain the dependencies by reading the Xml nuspec files. The version ranges are read by <see cref="SVersionBound.NugetTryParse(ReadOnlySpan{char})"/>
-/// and only the <see cref="SVersionBound.Base"/> version is 
+/// Simple NuGet package dependency graph implementation that relies on the <see cref="NuGetHelper.Cache"/> to obtain
+/// the dependencies by reading the Xml nuspec files.
+/// The version ranges are read by <see cref="SVersionBound.NugetTryParse(ReadOnlySpan{char})"/> and only the <see cref="SVersionBound.Base"/>
+/// version is considered.
 /// </summary>
 public sealed class NuGetDependencyCache
 {
@@ -81,7 +82,10 @@ public sealed class NuGetDependencyCache
     /// <param name="version">The package version.</param>
     /// <param name="package">On success, the package instance with its dependencies.</param>
     /// <returns>True on success, false on error (and if the package cannot be found).</returns>
-    public bool GetRequired( IActivityMonitor monitor, string packageId, SVersion version, [NotNullWhen(true)]out PackageInstance.WithDependencies? package )
+    public bool GetRequired( IActivityMonitor monitor,
+                             string packageId,
+                             SVersion version,
+                             [NotNullWhen(true)]out PackageInstance.WithDependencies? package )
     {
         if( Get( monitor, packageId, version, out package ) )
         {
