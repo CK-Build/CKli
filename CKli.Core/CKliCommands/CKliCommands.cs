@@ -49,6 +49,7 @@ public static class CKliCommands
 
         cmds.Add( "plugin", null );
         Add( cmds, new CKliPluginAdd() );
+        Add( cmds, new CKliPluginCompile() );
         Add( cmds, new CKliPluginCreate() );
         Add( cmds, new CKliPluginDisable() );
         Add( cmds, new CKliPluginEnable() );

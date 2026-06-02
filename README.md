@@ -80,7 +80,7 @@ The `--allow-downgrade` flags allows package downgrade. This is useful to come b
 the current version is a pre release.
 
 This command transparently updates the CKli version used by the `CKli.Plugins` solution. If a `Tests/Plugins.Tests` project
-exists, the version of the `CKli.Testing` package reference is also updated.
+exists in the `CKi`, the version of the `CKli.Testing` package reference is also updated.
 
 ### `clone <url> --private --allow-duplicate --ignore-parent-stack`
 Clones a Stack and all its current World repositories in the current directory.
@@ -277,21 +277,19 @@ external and optional plugins can be used.
 Plugins are written in .NET and distributed as NuGet packages or can be source code directly
 in the Stack repository.
 
-### `plugin info --compile-mode --force`
+### `plugin info`
 
 Provides information on installed plugins, their state, Xml configuration element and an optional message
 that can be produced by the plugin itself.
 
-`--force` (or `-f`) forces plugin recompilation even if the compile mode hasn't changed.
+### `plugin compile --mode <None|Debug|Release>`
 
-`--compile-mode` is an advanced option to be used when developing plugins. Plugins are discovered
-once (after a creation, an install or a removal) via reflection and then compiled in `Release`
-with generated code that replaces all the reflection.
+Plugins are discovered once (after a creation, an install or a removal) via reflection and then compiled
+(in `Release` mode by default) with generated code that replaces all the reflection.
+Once compiled, a regular load is just an `Assembly.Load` (in a collectible `AssemblyLoadContext`) and a call to a
+single static initialization function that initializes the graph of objects (command handlers, Plugin description, etc.).
 
-A regular load is just an `Assembly.Load` (in a collectible `AssemblyLoadContext`) and a call to an
-initialization function that initializes the graph of objects (command handlers, Plugin description, etc.).
-
-In very specific scenario (developing, debugging), it is possible to set the compile mode to `None` (plugins
+In very specific scenario (developing, debugging), it is possible to set the option `--mode` to `None` (plugins
 are not compiled, reflection is always used) or `Debug` to compile the plugins in debug configuration.
 
 ### `plugin create <name> --allow-lts`
