@@ -48,10 +48,11 @@ public class PluginTests
                 """ );
         }
 
-        display.Clear();
-        // ckli plugin info --compile-mode debug
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "info", "--compile-mode", "debug" )).ShouldBeTrue();
+        // ckli plugin compile --mode debug
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "compile", "--mode", "debug" )).ShouldBeTrue();
 
+        display.Clear();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "info" )).ShouldBeTrue();
         display.ToString().ShouldBe( """
             1 loaded plugins, 1 configured plugins. (CompileMode: Debug)
 
@@ -172,8 +173,8 @@ public class PluginTests
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "command-env-line", "-args a" )).ShouldBeFalse();
         }
 
-        // ckli plugin info --compile-mode none
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "info", "--compile-mode", "none" )).ShouldBeTrue();
+        // ckli plugin compile --mode none
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "compile", "--mode", "none" )).ShouldBeTrue();
 
         // Echo test (via reflection)
         using( TestHelper.Monitor.CollectTexts( out var logs ) )

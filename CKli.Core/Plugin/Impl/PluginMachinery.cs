@@ -119,34 +119,48 @@ public sealed partial class PluginMachinery
     {
         Throw.DebugAssert( World.PluginLoader != null );
         toRecompile = null;
-        bool preCompile = false;
         if( !Directory.Exists( Root ) )
         {
-            CreateSolution( monitor );
-            // Even if the DLLPath in $Local/ folder should not be here, we take no risk and
-            // triggers a compilation.
-            preCompile = true;
-        }
-        else
-        {
-            // When in CKli itself, the CKli-Plugins solution uses project instead of package references:
-            // there is no Directory.Package.props, no version to upgrade, so we skip this step.
-            if( _definitionFile.World.StackName != "CKli"
-                && (_versionChecked == null || !_versionChecked.Contains( Root )) )
+            using( monitor.OpenInfo( $"Creating '{Name}' solution." ) )
             {
-                if( !CheckCKliPluginsCoreVersion( monitor, out preCompile ) )
+                Directory.CreateDirectory( Root );
+                File.WriteAllText( SlnxPath, DefaultSlnFile );
+                Directory.CreateDirectory( CKliPluginsFolder );
+                File.WriteAllText( DirectoryBuildProps, string.Format( DefaultDirectoryBuildPropsPattern, Name ) );
+                File.WriteAllText( DirectoryPackageProps, DefaultDirectoryPackageProps );
+                File.WriteAllText( CKliPluginsCSProj, DefaultCKliPluginsCSProj );
+                File.WriteAllText( CKliPluginsFile, DefaultCKliPluginsFile );
+                File.WriteAllText( NuGetConfigFile, DefaultNuGetConfigFile );
+                if( _nuGetConfigFileHook != null )
                 {
-                    return false;
+                    Throw.CheckState( ApplyNuGetConfigFileHook( monitor, NuGetConfigFile ) );
                 }
-                _versionChecked ??= new HashSet<string>();
-                _versionChecked.Add( Root );
+                // Even if the DLLPath in $Local/ folder should not be here, we take no risk and
+                // triggers a compilation of the empty CKli-Plugins solution.
+                return LoadPluginFactory( monitor, preCompile: true, out toRecompile );
             }
-            // If we have a hook for the NuGet config file it must be applied now,
-            // before any dotnet/nuget interaction.  
-            if( _nuGetConfigFileHook != null && !ApplyNuGetConfigFileHook( monitor, NuGetConfigFile ) )
+        }
+        // Pre compile may be detected by CheckCKliPluginsCoreVersion if the plugins' package references
+        // to CKli.Plugins.Core and/or to the standard plugins (and may be also the CKli.Testing reference
+        // in CKli-Plugins/Tests/Plugins.Tests) have been updated.
+        bool preCompile = false;
+        // When in CKli itself, the CKli-Plugins solution uses project instead of package references:
+        // there is no Directory.Package.props, no version to upgrade, so we skip this step.
+        if( _definitionFile.World.StackName != "CKli"
+            && (_versionChecked == null || !_versionChecked.Contains( Root )) )
+        {
+            if( !CheckCKliPluginsCoreVersion( monitor, out preCompile ) )
             {
                 return false;
             }
+            _versionChecked ??= new HashSet<string>();
+            _versionChecked.Add( Root );
+        }
+        // If we have a hook for the NuGet config file it must be applied now,
+        // before any dotnet/nuget interaction.  
+        if( _nuGetConfigFileHook != null && !ApplyNuGetConfigFileHook( monitor, NuGetConfigFile ) )
+        {
+            return false;
         }
         return LoadPluginFactory( monitor, preCompile, out toRecompile );
     }
