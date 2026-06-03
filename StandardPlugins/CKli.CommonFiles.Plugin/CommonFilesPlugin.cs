@@ -1,10 +1,12 @@
-using CKli.Core;
-using CKli.BranchModel.Plugin;
 using CK.Core;
-using System;
-using System.IO;
+using CKli.BranchModel.Plugin;
+using CKli.Core;
 using CKli.ShallowSolution.Plugin;
+using LibGit2Sharp;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Linq;
 
 namespace CKli.CommonFiles.Plugin;
@@ -17,7 +19,7 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
     readonly BranchModelPlugin _branchModel;
     readonly HashSet<string> _memorySet;
     NormalizedPath _commonFolder;
-    
+    List<(string SourcePath, string RelativeTargetPath, FileType Action)>? _folderContent;
 
     /// <summary>
     /// Listens to the <see cref="BranchModelPlugin.ContentIssue"/>.
@@ -32,39 +34,129 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         _branchModel.ContentIssue += ContentIssueRequested;
     }
 
+    /// <summary>
+    /// Raised for each "[Template]" file in the "Common/" folder.
+    /// <para>
+    /// Any <see cref="LogLevel.Error"/> or <see cref="LogLevel.Fatal"/> emmitted in <see cref="EventMonitoredArgs.Monitor">CommonFileTemplateEvent.Monitor</see>
+    /// is detected as an error that fails the issue command.
+    /// If the <see cref="CommonFileTemplateEvent.Handled"/> is eventually false, this is an error: all template file must be handled.
+    /// </para>
+    /// </summary>
+    public event Action<CommonFileTemplateEvent>? TemplateRequired;
+
     NormalizedPath CommonFolder => _commonFolder.IsEmptyPath
                                     ? (_commonFolder = PrimaryPluginContext.World.Name.SharedDataFolder.AppendPart( "Common" ))
                                     : _commonFolder;
 
+    List<(string SourcePath, string RelativeTargetPath, FileType Action)> GetFolderContent( IActivityMonitor monitor ) => _folderContent ??= ReadCommonFolder( monitor, CommonFolder );
+
     void ContentIssueRequested( ContentIssueEvent ev )
     {
-        SameFile( ev, "global.json" );
-        SameFile( ev, "Directory.Build.props" );
+        var content = GetFolderContent( ev.Monitor );
+        foreach( var item in content )
+        {
+            switch( item.Action )
+            {
+                case FileType.AlwaysCopy: CopyFile( ev, item.SourcePath, item.RelativeTargetPath ); break;
+                case FileType.InitOnly: InitializeFile( ev, item.SourcePath, item.RelativeTargetPath ); break;
+                case FileType.Template: HandleFileTemplate( ev, item.SourcePath, item.RelativeTargetPath ); break;
+            }
+        }
     }
 
-    void SameFile( ContentIssueEvent ev, NormalizedPath path )
+    enum FileType
     {
-        var source = CommonFolder.Combine( path );
-        if( !File.Exists( source ) )
+        AlwaysCopy,
+        InitOnly,
+        Template
+    }
+
+    static List<(string SourcePath, string RelativeTargetPath, FileType Action)> ReadCommonFolder( IActivityMonitor monitor, NormalizedPath commonFolder )
+    {
+        var result = new List<(string, string, FileType)>();
+        var root = Path.GetFullPath( commonFolder );
+        foreach( var f in Directory.EnumerateFiles( root, "*", SearchOption.AllDirectories ) )
         {
-            if( _memorySet.Add( path ) )
+            FileType type = FileType.AlwaysCopy;
+            var sTarget = f.AsSpan( 0, root.Length );
+            if( !HasBracketMarker( sTarget, out var target, ref type ) )
             {
-                ev.Monitor.Warn( $"""
-                    Missing expected file '{path}' in World's "Common/" folder: '{CommonFolder}'.
-                    Ignoring it.
-                    """ );
+                target = new string( sTarget );
             }
-            return;
+            result.Add( (f, target, type) );
         }
-        var fileContent = File.ReadAllBytes( source );
-        var info = ev.Content.GetFileInfo( path );
+        return result;
+
+        static bool HasBracketMarker( ReadOnlySpan<char> s, [NotNullWhen(true)]out string? target, ref FileType type )
+        {
+            var fName = Path.GetFileName( s );
+            int pathLen = s.Length - fName.Length;
+            if( fName.SkipWhiteSpaces()
+                && fName.TryMatch('[')
+                && fName.SkipWhiteSpaces()
+                && TryMatchType( ref fName, ref type )
+                && fName.SkipWhiteSpaces()
+                && fName.TryMatch( ']' )
+                && fName.SkipWhiteSpaces() )
+            {
+                target = $"{s[..pathLen]}{fName}";
+                return true;
+            }
+            target = null;
+            return false;
+        }
+
+        static bool TryMatchType( ref ReadOnlySpan<char> head, ref FileType type )
+        {
+            if( head.TryMatch( "InitOnly", StringComparison.OrdinalIgnoreCase ) )
+            {
+                type = FileType.InitOnly;
+                return true;
+            }
+            if( head.TryMatch( "Template", StringComparison.OrdinalIgnoreCase ) )
+            {
+                type = FileType.Template;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    static void CopyFile( ContentIssueEvent ev, string sourcePath, string relativeTargetPath )
+    {
+        var fileContent = File.ReadAllBytes( sourcePath );
+        var info = ev.Content.GetFileInfo( relativeTargetPath );
         if( info == null )
         {
-            ev.Issues.CreateFile( path, () => fileContent );
+            ev.Issues.CreateFile( relativeTargetPath, () => fileContent );
         }
         else if( !fileContent.SequenceEqual( info.ReadAsBytes() ) )
         {
-            ev.Issues.UpdateFile( path, () => fileContent );
+            ev.Issues.UpdateFile( relativeTargetPath, () => fileContent );
+        }
+    }
+
+    static void InitializeFile( ContentIssueEvent ev, string sourcePath, string relativeTargetPath )
+    {
+        var info = ev.Content.GetFileInfo( relativeTargetPath );
+        if( info == null )
+        {
+            var fileContent = File.ReadAllBytes( sourcePath );
+            ev.Issues.CreateFile( relativeTargetPath, () => fileContent );
+        }
+        else
+        {
+            ev.Monitor.Trace( $"Common file '{relativeTargetPath}' already exists, [InitOnly] left it as-is." );
+        }
+    }
+
+    void HandleFileTemplate( ContentIssueEvent ev, string sourcePath, string relativeTargetPath )
+    {
+        var templateEvent = new CommonFileTemplateEvent( ev, sourcePath, relativeTargetPath );
+        TemplateRequired?.Invoke( templateEvent );
+        if( !templateEvent.Handled )
+        {
+            ev.Monitor.Error( $"No handler exist for Common file Template: '{relativeTargetPath}'." );
         }
     }
 }

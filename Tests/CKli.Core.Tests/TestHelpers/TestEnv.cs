@@ -53,6 +53,11 @@ static partial class TestEnv
         {
             Directory.CreateDirectory( _nugetSourcePath );
         }
+        var gitIgnorePath = _nugetSourcePath.AppendPart( ".gitignore" );
+        if( !File.Exists( gitIgnorePath ) )
+        {
+            File.WriteAllText( gitIgnorePath, "*" );
+        }
         PluginMachinery.NuGetConfigFileHook = ( monitor, nuGetXmlDoc ) =>
         {
             NuGetHelper.SetOrRemoveNuGetSource( monitor,
@@ -73,7 +78,7 @@ static partial class TestEnv
         foreach( var nuget in Directory.EnumerateFiles( _nugetSourcePath ) )
         {
             var p = new NormalizedPath( nuget );
-            if( p != corePath && p != pluginsPath )
+            if( p != corePath && p != pluginsPath && p != gitIgnorePath )
             {
                 FileHelper.DeleteFile( TestHelper.Monitor, p ).ShouldBeTrue();
             }

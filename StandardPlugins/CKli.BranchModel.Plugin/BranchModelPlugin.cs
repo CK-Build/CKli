@@ -73,6 +73,10 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
 
     /// <summary>
     /// Raised when repository content issues must be detected in the hot zone.
+    /// <para>
+    /// Any <see cref="LogLevel.Error"/> or <see cref="LogLevel.Fatal"/> emmitted in <see cref="EventMonitoredArgs.Monitor">ContentIssueEvent.Monitor</see>
+    /// is detected as an error that fails the issue command.
+    /// </para>
     /// </summary>
     public event Action<ContentIssueEvent>? ContentIssue;
 
