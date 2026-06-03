@@ -43,7 +43,7 @@ sealed class GitFileInfo : IFileInfo, IDirectoryContents
     {
         Throw.CheckState( !IsDirectory );
         Debug.Assert( Blob != null );
-        return Blob.GetContentStream();
+        return Blob.GetContentStream( new FilteringOptions( _e.Path ) );
     }
 
     public IEnumerator<IFileInfo> GetEnumerator()

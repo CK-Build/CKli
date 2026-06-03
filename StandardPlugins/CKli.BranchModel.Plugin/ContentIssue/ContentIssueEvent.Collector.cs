@@ -232,7 +232,7 @@ public sealed partial class ContentIssueEvent
                 {
                     h = h.AddBelow( h.ScreenType.Text( $"""
                     > {_createFiles.Count} files must be created:
-                    {_createFiles.Select( p => $"- {p.Path}" ).Concatenate( Environment.NewLine )}'.
+                    {_createFiles.Select( p => $"- {p.Path}" ).Concatenate( Environment.NewLine )}
                     """ ) );
                 }
             }
@@ -247,7 +247,7 @@ public sealed partial class ContentIssueEvent
                 {
                     h = h.AddBelow( h.ScreenType.Text( $"""
                     > {_updateFiles.Count} files must be updated:
-                    {_updateFiles.Select( p => $"- {p.Path}" ).Concatenate( Environment.NewLine )}'.
+                    {_updateFiles.Select( p => $"- {p.Path}" ).Concatenate( Environment.NewLine )}
                     """ ) );
                 }
             }

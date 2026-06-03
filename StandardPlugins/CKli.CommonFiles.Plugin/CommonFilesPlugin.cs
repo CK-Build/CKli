@@ -78,7 +78,7 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         foreach( var f in Directory.EnumerateFiles( root, "*", SearchOption.AllDirectories ) )
         {
             FileType type = FileType.AlwaysCopy;
-            var sTarget = f.AsSpan( 0, root.Length );
+            var sTarget = f.AsSpan( root.Length + 1 );
             if( !HasBracketMarker( sTarget, out var target, ref type ) )
             {
                 target = new string( sTarget );
