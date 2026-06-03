@@ -840,7 +840,9 @@ public sealed partial class StackRepository : IDisposable
                 Logs/
                 .vs/
                 .idea/
+                /CKli-Plugins/CKli.Plugins/CKli.CompiledPlugins.cs
                 !.gitignore
+
                 """ );
         }
     }
