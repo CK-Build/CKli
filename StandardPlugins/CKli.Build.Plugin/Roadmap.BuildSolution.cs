@@ -13,6 +13,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace CKli.Build.Plugin;
 
@@ -166,7 +167,7 @@ public sealed partial class Roadmap
                     if( packageUpdates.Updates != null )
                     {
                         monitor.Error( $"""
-                            '{_solution}' should not be built but requires depedency updates ({packageUpdates.Updates}).
+                            '{_solution}' should not be built but requires dependency updates ({packageUpdates.Updates}).
                             This situation should not happen and reflects a bad repository topology or weird manual modifications that should be fixed manually.
                             """ );
                         return false;
@@ -203,7 +204,12 @@ public sealed partial class Roadmap
             SVersion targetVersion = ComputeTargetVersion( monitor,
                                                            ref vChange,
                                                            mustAddCommit: (buildReason & (MustBuildReason.UpstreamBuild|MustBuildReason.DependencyUpdate)) != 0 );
-
+            // If the base version is a +fake, then IF this happens to be published we must ensure
+            // that the +fake tag appears on the remote otherwise the target version will not be "understandable".
+            if( _versionInfo.BaseBuild.IsFakeVersion )
+            {
+                Repo.GitRepository.DeferredPushRefSpecs.Add( $"+{_versionInfo.BaseBuild.Tag.CanonicalName}" );
+            }
             monitor.Info( $"'{_solution}' build reason: '{buildReason}', computed target version: '{targetVersion}'." );
             _buildInfo = new BuildInfo( this,
                                         buildReason,
