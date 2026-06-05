@@ -64,39 +64,4 @@ sealed class RepoPublishInfo
         : this( result.Repo, branchName, index, baseVersion, result.Version, result.Content )
     {
     }
-
-    public static RepoPublishInfo? Read( IActivityMonitor monitor, World world, ICKBinaryReader r, int version )
-    {
-        var repoId = new RandomId( r.ReadUInt64() );
-        var repo = world.FindByCKliRepoId( monitor, repoId );
-        if( repo == null )
-        {
-            monitor.Error( $"Unable to restore Repo from ckli-repo identifier: '{repoId}'." );
-            return null;
-        }
-        var branchName = r.ReadString();
-        var index = r.ReadNonNegativeSmallInt32();
-        var baseVersion = ReadVersion( r );
-        var buildVersion = ReadVersion( r );
-        var buildContentInfo = new BuildContentInfo( r );
-
-        return new RepoPublishInfo( repo,
-                                    branchName,
-                                    index,
-                                    baseVersion,
-                                    buildVersion,
-                                    buildContentInfo );
-
-        static SVersion ReadVersion( ICKBinaryReader r ) => SVersion.Parse( r.ReadString() );
-    }
-
-    public void Write( ICKBinaryWriter w )
-    {
-        w.Write( _repo.CKliRepoId.Value );
-        w.Write( _branchName );
-        w.WriteNonNegativeSmallInt32( _index );
-        w.Write( _baseVersion.ToString() );
-        w.Write( _publishVersion.ToString() );
-        _buildContentInfo.Write( w );
-    }
 }

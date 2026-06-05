@@ -110,32 +110,4 @@ sealed class WorldReleaseInfo
         return new WorldReleaseInfo( fixWorkflow.ToString(), buildDate, ImmutableCollectionsMarshal.AsImmutableArray( repoInfos ), publishedLength, isCIBuild: false );
     }
 
-
-    internal static WorldReleaseInfo? Read( IActivityMonitor monitor, World world, ICKBinaryReader r, int version )
-    {
-        var title = r.ReadString();
-        var buildDate = r.ReadDateTime();
-        var isCIBuild = r.ReadBoolean();
-        int c = r.ReadNonNegativeSmallInt32();
-        var repos = new RepoPublishInfo[c];
-        for( int i = 0; i < repos.Length; i++ )
-        {
-            var repo = RepoPublishInfo.Read( monitor, world, r, version );
-            if( repo == null ) return null;
-            repos[i] = repo;
-        }
-        int publishedLength = r.ReadNonNegativeSmallInt32();
-        return new WorldReleaseInfo( title, buildDate, ImmutableCollectionsMarshal.AsImmutableArray( repos ), publishedLength, isCIBuild );
-    }
-
-    public void Write( ICKBinaryWriter w )
-    {
-        w.Write( _buildDate );
-        w.Write( _title );
-        w.Write( _isCIBuild );
-        w.WriteNonNegativeSmallInt32( _repos.Length );
-        foreach( var s in _repos ) s.Write( w );
-        w.WriteNonNegativeSmallInt32( _publishedLength );
-    }
-
 }

@@ -371,6 +371,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
 
     }
 
+    // This is used by UpdateExistingDeprecationTag and CreateDeprecationTag: this pushes the
+    // tag creation to the origin remote.
     static void AddTag( Repo repo, TagCommit existing, DeprecatedTagInfo tagInfo, string name )
     {
         repo.GitRepository.Repository.Tags.Add( name,

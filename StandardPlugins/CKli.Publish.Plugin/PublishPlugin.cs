@@ -7,6 +7,7 @@ using CKli.ReleaseDatabase.Plugin;
 using CKli.VersionTag.Plugin;
 using System;
 using System.Collections.Immutable;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -58,9 +59,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
             var packageSender = PackageSender.Create( monitor, prereleaseName: "", ciBuild: false, artifactHandler, world.StackRepository.SecretsStore );
             if( packageSender == null ) return Task.FromResult( false );
 
-            var state = PublishState.Load( monitor, world );
-            if( state == null ) return Task.FromResult( false );
-
+            var state = new PublishState( world );
             var newOne = WorldReleaseInfo.Create( buildDate, fixWorkflow, results );
             state.Add( monitor, newOne );
 
@@ -103,9 +102,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                                                       world.StackRepository.SecretsStore );
             if( packageSender == null ) return Task.FromResult( false );
 
-            var state = PublishState.Load( monitor, world );
-            if( state == null ) return Task.FromResult( false );
-
+            var state = new PublishState( world );
             var newOne = WorldReleaseInfo.Create( buildDate, roadmap );
             state.Add( monitor, newOne );
 
