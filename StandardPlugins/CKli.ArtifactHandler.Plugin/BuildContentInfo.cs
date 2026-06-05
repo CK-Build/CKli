@@ -142,8 +142,10 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
                && _assetFileNames.SequenceEqual( other._assetFileNames );
     }
 
+    /// <inheritdoc />
     public override bool Equals( object? obj ) => Equals( obj as BuildContentInfo );
 
+    /// <inheritdoc />
     public override int GetHashCode()
     {
         HashCode hash = new HashCode();
@@ -298,6 +300,8 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
     public override string ToString() => _toString ??= Write( new StringBuilder() ).ToString();
 
 
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+
     public static bool operator ==( BuildContentInfo? left, BuildContentInfo? right )
     {
         return EqualityComparer<BuildContentInfo>.Default.Equals( left, right );
@@ -307,4 +311,6 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
     {
         return !(left == right);
     }
+
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
 }

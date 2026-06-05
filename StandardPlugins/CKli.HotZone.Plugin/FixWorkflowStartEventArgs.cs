@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 namespace CKli.HotZone.Plugin;
 
 /// <summary>
-/// Event raised by <see cref="BranchModelPlugin.FixStartAsync"/>.
+/// Event raised by <see cref="HotZonePlugin.FixStartAsync"/>.
 /// </summary>
 public sealed class FixWorkflowStartEventArgs : EventMonitoredArgs
 {

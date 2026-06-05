@@ -121,6 +121,7 @@ public sealed partial class GitRepository
     /// the provided <paramref name="branchName"/>.
     /// </para>
     /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
     /// <param name="workingFolder">The repository (working) folder. For bare, a ".git/" subfolder is also created.</param>
     /// <param name="branchName">The default branch name.</param>
     /// <param name="committer">Committer of the initial empty commit. When null, a "CKli (none)" default signature is returned.</param>

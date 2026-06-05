@@ -11,9 +11,19 @@ using System.Xml.Linq;
 
 namespace CKli.ArtifactHandler.Plugin;
 
+/// <summary>
+/// Handles artifacts (NuGet packages and assets).
+/// </summary>
 public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
 {
+    /// <summary>
+    /// Reserved optional top folder name in project.
+    /// </summary>
     public const string DeployFolderName = "Deployment";
+
+    /// <summary>
+    /// Reserved optional folder name in project's <see cref="DeployFolderName"/> folder.
+    /// </summary>
     public const string DeployAssetsName = "Assets";
 
 
@@ -22,6 +32,11 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
     ImmutableArray<NuGetFeed> _feeds;
     XDocument? _defaultNugetConfig;
 
+    /// <summary>
+    /// Initialize a new ArtifactHandlerPlugin.
+    /// </summary>
+    /// <param name="context">The CKli plugin context.</param>
+    /// <param name="branchModel">The branch model plugin.</param>
     public ArtifactHandlerPlugin( PrimaryPluginContext context, BranchModelPlugin branchModel )
         : base( context )
     {
@@ -164,6 +179,12 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
         return _localAssetsPath.AppendPart( repo.DisplayPath.LastPart ).AppendPart( version.ToString() );
     }
 
+    /// <summary>
+    /// <see cref="RepoArtifactInfo"/> factory.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="repo">The repository to consider.</param>
+    /// <returns>The artifact information for the repository.</returns>
     protected override RepoArtifactInfo Create( IActivityMonitor monitor, Repo repo )
     {
         return new RepoArtifactInfo( this, repo );

@@ -5,6 +5,9 @@ using System.Collections.Generic;
 
 namespace CKli.BranchModel.Plugin;
 
+/// <summary>
+/// Handles the branch model defined for a World.
+/// </summary>
 public sealed partial class BranchModelPlugin
 {
     [Description( "Switch the working folder to the given branch." )]

@@ -120,12 +120,19 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>
     /// <returns>The standard compare result.</returns>
     public int CompareTo( TagCommit? other ) => -_version.CompareTo( other?._version );
 
+    /// <inheritdoc />
     public bool Equals( TagCommit? other ) => _version.Equals( other?._version );
 
+    /// <inheritdoc />
     public override bool Equals( object? obj ) => Equals( obj as TagCommit );
 
+    /// <inheritdoc />
     public override int GetHashCode() => _version.GetHashCode();
 
+    /// <summary>
+    /// Overridden to return the tag and referenced commit's sha.
+    /// </summary>
+    /// <returns></returns>
     public override string ToString() => $"Tag '{_version.ParsedText}' references Commit '{_sha}'";
 
     internal void UpdateVersionTag( Tag t )

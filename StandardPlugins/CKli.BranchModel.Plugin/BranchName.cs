@@ -35,7 +35,7 @@ public sealed class BranchName
 
     /// <summary>
     /// Gets the index in <see cref="BranchNamespace.Branches"/>.
-    /// This follows the same pattern as the <see cref="Repo.Index"/>: the <see cref="BranchModelInfo"/> uses this
+    /// This follows the same pattern as the <see cref="CKli.Core.Repo.Index"/>: the <see cref="BranchModelInfo"/> uses this
     /// to associate the corresponding <see cref="HotBranch"/> in each repo.
     /// </summary>
     public int Index => _index;

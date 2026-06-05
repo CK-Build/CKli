@@ -22,9 +22,8 @@ namespace CKli.HotZone.Plugin;
 ///     and packages produced by the fix workflow itself can have a new version.
 ///     </item>
 /// </list>
-/// <para>
-/// the "fix/vMajor.Minor" branches are automatically created in downstream repositories if they don't exist yet.
 /// </para>
+/// the "fix/vMajor.Minor" branches are automatically created in downstream repositories if they don't exist yet.
 /// </summary>
 public sealed partial class FixWorkflow
 {

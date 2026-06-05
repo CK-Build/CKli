@@ -13,6 +13,9 @@ namespace CKli.VersionTag.Plugin;
 [DebuggerDisplay("{ToString()}")]
 public sealed class DeprecatedTagInfo
 {
+    /// <summary>
+    /// Unspecified deprecation description.
+    /// </summary>
     public const string UnspecifiedReason = "(unspecified)";
 
     readonly BuildContentInfo _contentInfo;
@@ -64,8 +67,9 @@ public sealed class DeprecatedTagInfo
     public bool HasExpired => _expiration <= DateOnly.FromDateTime( DateTime.UtcNow );
 
     /// <summary>
-    /// Writes the <see cref="Consumed"/>, <see cref="Produced"/> and <see cref="AssetFileNames"/> as
-    /// a text that can be parsed back by <see cref="TryParse(ReadOnlySpan{char}, out BuildContentInfo?)"/>.
+    /// Writes the <see cref="Reason"/>, <see cref="Expiration"/> and <see cref="DaysDelay"/> and
+    /// the <see cref="ContentInfo"/>.
+    /// This can be parsed back by <see cref="TryParse(ReadOnlySpan{char}, out DeprecatedTagInfo?)"/>.
     /// </summary>
     /// <param name="b">The target builder.</param>
     /// <returns>The builder.</returns>

@@ -13,6 +13,9 @@ using System.Threading.Tasks;
 
 namespace CKli.Publish.Plugin;
 
+/// <summary>
+/// Handles publication of repositories.
+/// </summary>
 public sealed class PublishPlugin : PrimaryPluginBase
 {
     readonly BuildPlugin _build;

@@ -37,7 +37,7 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
     /// <summary>
     /// Raised for each "[Template]" file in the "Common/" folder.
     /// <para>
-    /// Any <see cref="LogLevel.Error"/> or <see cref="LogLevel.Fatal"/> emmitted in <see cref="EventMonitoredArgs.Monitor">CommonFileTemplateEvent.Monitor</see>
+    /// Any <see cref="CK.Core.LogLevel.Error"/> or <see cref="CK.Core.LogLevel.Fatal"/> emitted in <see cref="EventMonitoredArgs.Monitor">CommonFileTemplateEvent.Monitor</see>
     /// is detected as an error that fails the issue command.
     /// If the <see cref="CommonFileTemplateEvent.Handled"/> is eventually false, this is an error: all template file must be handled.
     /// </para>
@@ -75,15 +75,18 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
     {
         var result = new List<(string, string, FileType)>();
         var root = Path.GetFullPath( commonFolder );
-        foreach( var f in Directory.EnumerateFiles( root, "*", SearchOption.AllDirectories ) )
+        if( Directory.Exists( root ) )
         {
-            FileType type = FileType.AlwaysCopy;
-            var sTarget = f.AsSpan( root.Length + 1 );
-            if( !HasBracketMarker( sTarget, out var target, ref type ) )
+            foreach( var f in Directory.EnumerateFiles( root, "*", SearchOption.AllDirectories ) )
             {
-                target = new string( sTarget );
+                FileType type = FileType.AlwaysCopy;
+                var sTarget = f.AsSpan( root.Length + 1 );
+                if( !HasBracketMarker( sTarget, out var target, ref type ) )
+                {
+                    target = new string( sTarget );
+                }
+                result.Add( (f, target, type) );
             }
-            result.Add( (f, target, type) );
         }
         return result;
 

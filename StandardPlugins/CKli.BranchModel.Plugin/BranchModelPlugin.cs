@@ -100,6 +100,12 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         return exists;
     }
 
+    /// <summary>
+    /// <see cref="BranchModelInfo"/> factory.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="repo">The repository to consider.</param>
+    /// <returns>The branch information for the repository.</returns>
     protected override BranchModelInfo Create( IActivityMonitor monitor, Repo repo )
     {
         var info = new BranchModelInfo( repo, _namespace, this );

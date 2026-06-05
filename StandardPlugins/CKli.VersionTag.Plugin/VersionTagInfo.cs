@@ -91,7 +91,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     public override bool HasIssue => _hasIssue;
 
     /// <summary>
-    /// Gets the last stable versions from the <see cref="LastStable"/> one to the oldest one.
+    /// Gets the last stable versions from the last stable one to the oldest one.
     /// <para>
     /// <see cref="TagCommit.IsRegularVersion"/> may be false ("+fake" and "+deprecated" appear here).
     /// </para>

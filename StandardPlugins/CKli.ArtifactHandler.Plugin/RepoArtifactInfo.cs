@@ -8,11 +8,14 @@ using System.IO.Compression;
 
 namespace CKli.ArtifactHandler.Plugin;
 
+/// <summary>
+/// Captures artifact information for a <see cref="Repo"/>.
+/// </summary>
 public sealed class RepoArtifactInfo : RepoInfo
 {
     readonly ArtifactHandlerPlugin _artifactHandler;
 
-    public RepoArtifactInfo( ArtifactHandlerPlugin artifactHandler, Repo repo )
+    internal RepoArtifactInfo( ArtifactHandlerPlugin artifactHandler, Repo repo )
         : base( repo )
     {
         _artifactHandler = artifactHandler;

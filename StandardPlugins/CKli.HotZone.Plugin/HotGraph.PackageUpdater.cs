@@ -15,7 +15,8 @@ public sealed partial class HotGraph
     /// <summary>
     /// Exposes different <see cref="IPackageMapping"/> that must be used to update package dependencies in the <see cref="Graph"/>.
     /// <para>
-    /// This is obtained by <see cref="HotGraph.GetPackageUpdater(IActivityMonitor)"/>. Requires that <see cref="VersionTagPlugin"/> has no issue.
+    /// This is obtained by <see cref="HotGraph.GetPackageUpdater(IActivityMonitor)"/>. Requires that <see cref="CKli.VersionTag.Plugin.VersionTagPlugin"/>
+    /// has no issue.
     /// </para>
     /// </summary>
     public sealed class PackageUpdater

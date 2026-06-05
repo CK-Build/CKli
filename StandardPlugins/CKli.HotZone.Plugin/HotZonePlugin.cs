@@ -13,6 +13,9 @@ using System.Linq;
 
 namespace CKli.HotZone.Plugin;
 
+/// <summary>
+/// Handles the "hot zone" of a repository.
+/// </summary>
 public sealed partial class HotZonePlugin : PrimaryPluginBase
 {
     readonly PerfectEventSender<FixWorkflowStartEventArgs> _onFixStart;
@@ -22,6 +25,15 @@ public sealed partial class HotZonePlugin : PrimaryPluginBase
     readonly ReleaseDatabasePlugin _releaseDatabase;
     readonly ArtifactHandlerPlugin _artifactHandler;
 
+    /// <summary>
+    /// Initializes a new <see cref="HotZonePlugin"/>.
+    /// </summary>
+    /// <param name="primaryContext">The CKli plugin context.</param>
+    /// <param name="branchModel">The branch model plugin.</param>
+    /// <param name="versionTag">The version tag plugin.</param>
+    /// <param name="shallowSolution">The shallow solution plugin.</param>
+    /// <param name="releaseDatabase">The release database plugin.</param>
+    /// <param name="artifactHandler">The artifact handler plugin.</param>
     public HotZonePlugin( PrimaryPluginContext primaryContext,
                           BranchModelPlugin branchModel,
                           VersionTagPlugin versionTag,

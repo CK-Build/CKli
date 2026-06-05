@@ -255,7 +255,7 @@ public sealed partial class GitRepository : IDisposable
     /// <para>
     /// If the branch is created without a remote, it will point at the current head's commit.
     /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
-    /// Use <see cref="Checkout"/> to switch the head onto the branch.
+    /// Use <see cref="Checkout(IActivityMonitor, Branch, bool, bool, bool)"/> to switch the head onto the branch.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -533,13 +533,9 @@ public sealed partial class GitRepository : IDisposable
     /// By default (<paramref name="force"/> is false), the working folder must be clean:
     /// <see cref="CheckCleanCommit(IActivityMonitor)"/> is called.
     /// </para>
-    /// <para>
-    /// By default (<paramref name="resetWorkingFolder"/> is true), the working folder is reset, any
-    /// untracked or ignored files are removed.
-    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
-    /// <param name="localBranch">The local branch to check out.</param>
+    /// <param name="commit">The commit to check out.</param>
     /// <param name="force">True to allow the working folder to initially be dirty (local modifications will be lost).</param>
     /// <param name="deleteUntracked">False to keep the untracked files.</param>
     /// <param name="deleteIgnored">
@@ -548,6 +544,7 @@ public sealed partial class GitRepository : IDisposable
     ///     <item>Enumerating the ignored entries can be costly (think to an ignored node_modules).</item>
     ///     <item>This is useful to obtain a pristine working folder. Usually, ignored files don't harm.</item>
     /// </list>
+    /// </param>
     /// <returns>True on success, false on error.</returns>
     public bool Checkout( IActivityMonitor monitor,
                           Commit commit,
@@ -651,7 +648,7 @@ public sealed partial class GitRepository : IDisposable
     /// <param name="fromAllRemotes">True to consider all remotes, not only 'origin'.</param>
     /// <param name="branchSpec">
     /// Optional branch name filter that applies to the local branch name. Example: "fix/v3.*".
-    /// See <see cref="FetchRemoteBranches(IActivityMonitor, bool, string?)"/>.
+    /// See <see cref="FetchRemoteBranches(IActivityMonitor, bool, string?, bool)"/>.
     /// </param>
     /// <returns>True on success, false otherwise.</returns>
     public bool MergeRemoteBranches( IActivityMonitor monitor, bool continueOnError = false, bool fromAllRemotes = false, string? branchSpec = null )

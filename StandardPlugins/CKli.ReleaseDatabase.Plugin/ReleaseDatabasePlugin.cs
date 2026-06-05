@@ -21,6 +21,11 @@ public sealed class ReleaseDatabasePlugin : PrimaryPluginBase
     readonly Dictionary<RepoKey, RepoReleaseInfo> _releaseInfo;
     readonly Lock _dbLock;
 
+    /// <summary>
+    /// Initializes a new <see cref="ReleaseDatabasePlugin"/>.
+    /// </summary>
+    /// <param name="context">The CKli plugin context.</param>
+    /// <param name="artifactHandler">The artifact handler plugin.</param>
     public ReleaseDatabasePlugin( PrimaryPluginContext context, ArtifactHandlerPlugin artifactHandler )
         : base( context )
     {

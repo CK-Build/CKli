@@ -14,6 +14,9 @@ using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.VersionTag.Plugin;
 
+/// <summary>
+/// Handles version tags for a <see cref="Repo"/>.
+/// </summary>
 public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
 {
     readonly ReleaseDatabasePlugin _releaseDatabase;
@@ -21,6 +24,12 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     readonly bool _autoFixRemovableTag;
     Dictionary<string, SVersion>? _externalPackages;
 
+    /// <summary>
+    /// Initializes a new <see cref="VersionTagPlugin"/>.
+    /// </summary>
+    /// <param name="primaryContext">The CKli plugin context.</param>
+    /// <param name="releaseDatabase">The release database plugin.</param>
+    /// <param name="artifactHandler">The artifact handler plugin.</param>
     public VersionTagPlugin( PrimaryPluginContext primaryContext,
                              ReleaseDatabasePlugin releaseDatabase,
                              ArtifactHandlerPlugin artifactHandler )
@@ -103,7 +112,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     /// <summary>
     /// Destroys a released version. The version tag is deleted, the release database is updated
     /// and any artifacts are removed: this centralizes the calls to <see cref="ReleaseDatabasePlugin.DestroyLocalRelease(IActivityMonitor, Repo, SVersion)"/>
-    /// and <see cref="ArtifactHandlerPlugin.DestroyLocalRelease(IActivityMonitor, Repo, SVersion, BuildContentInfo)"/>
+    /// and <see cref="ArtifactHandlerPlugin.DestroyLocalRelease(IActivityMonitor, Repo, SVersion, BuildContentInfo, bool)"/>
     /// that should not be called directly.
     /// <para>
     /// This is idempotent and doesn't trigger the initialization of the <see cref="VersionTagInfo"/> for the Repo, but if it
@@ -144,13 +153,14 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     /// versioned tag: use <see cref="DestroyLocalRelease(IActivityMonitor, Repo, SVersion, bool)"/> to fully destroy a release.
     /// <para>
     /// This centralizes the calls to <see cref="ReleaseDatabasePlugin.DestroyLocalRelease(IActivityMonitor, Repo, SVersion)"/>
-    /// and <see cref="ArtifactHandlerPlugin.DestroyLocalRelease(IActivityMonitor, Repo, SVersion, BuildContentInfo)"/>
+    /// and <see cref="ArtifactHandlerPlugin.DestroyLocalRelease(IActivityMonitor, Repo, SVersion, BuildContentInfo, bool)"/>
     /// that should not be called directly.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="repo">The source repository.</param>
     /// <param name="version">The version to cleanup.</param>
+    /// <param name="knownContent">Already known content if possible.</param>
     /// <param name="removeFromNuGetGlobalCache">
     /// False to let the package in the NuGet global cache (if it exists).
     /// The global cache is "%userprofile%\.nuget\packages" on windows and "~/.nuget/packages" on Mac/Linux.

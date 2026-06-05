@@ -17,12 +17,11 @@ namespace CKli.HotZone.Plugin;
 /// <summary>
 /// Models a global dependency graph across all repositories.
 /// <para>
-/// Created by <see cref="BranchModelPlugin.GetHotGraph(IActivityMonitor, BranchName, IReadOnlyList{Repo})"/>.
+/// Created by <see cref="HotZonePlugin.GetHotGraph(IActivityMonitor, BranchName, bool, IReadOnlyList{Repo})"/>.
 /// This implies that <see cref="BranchModelInfo.HasIssue"/> is false but doesn't depend on the <see cref="VersionTagPlugin"/>.
-/// <para>
+/// </para>
 /// version tags issues don't prevent a HotGraph to be obtained. They prevent <see cref="PackageUpdater"/>
 /// and <see cref="SolutionVersionInfo"/> to be obtained (and eventually CKli.BuildPlugin.Roadmap creation).
-/// </para>
 /// </summary>
 public sealed partial class HotGraph
 {

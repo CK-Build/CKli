@@ -8,6 +8,9 @@ using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.BranchModel.Plugin;
 
+/// <summary>
+/// Branch related <see cref="RepoInfo"/>.
+/// </summary>
 public sealed partial class BranchModelInfo : RepoInfo
 {
     readonly BranchNamespace _namespace;
