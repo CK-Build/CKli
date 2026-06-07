@@ -18,6 +18,7 @@ sealed class CKliTagList : Command
                 [
                     (["--local"], "Local tags only."),
                     (["--remote"], "Remote tags only."),
+                    (["--diff-only"], "Displays only differences between local and remote tags."),
                     (["--all"], "Lists for all the Repos of the current World (even if current path is in a Repo).")
                 ] )
     {
@@ -30,8 +31,9 @@ sealed class CKliTagList : Command
         bool all = cmdLine.EatFlag( "--all" );
         bool remote = cmdLine.EatFlag( "--remote" );
         bool local = cmdLine.EatFlag( "--local" );
+        bool diffOnly = cmdLine.EatFlag( "--diff-only" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && ListTags( monitor, this, context, all, local, remote ) );
+                                     && ListTags( monitor, this, context, all, local, remote, diffOnly ) );
     }
 
     static bool ListTags( IActivityMonitor monitor,
@@ -39,7 +41,8 @@ sealed class CKliTagList : Command
                           CKliEnv context,
                           bool all,
                           bool local,
-                          bool remote )
+                          bool remote,
+                          bool diffOnly )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -82,7 +85,7 @@ sealed class CKliTagList : Command
                     var header = link.Box( marginRight: 1 ).AddRight( s.Text( $"{tags.Tags.Length} remote tags.", effect: TextEffect.Italic ) );
                     context.Screen.Display( new Collapsable( header.AddBelow( tags.ToRenderable( s ) ) ) );
                 }
-                if( !local && !remote )
+                if( (!local && !remote) || diffOnly )
                 {
                     if( !repo.GitRepository.GetLocalTags( monitor, out var localTags ) )
                     {
@@ -96,7 +99,7 @@ sealed class CKliTagList : Command
 
                     var link = s.Text( repo.DisplayPath, effect: TextEffect.Bold | TextEffect.Invert )
                                     .HyperLink( new Uri( repo.WorkingFolder ) );
-                    context.Screen.Display( new Collapsable( link.AddBelow( diff.ToRenderable( s ) ) ) );
+                    context.Screen.Display( new Collapsable( link.AddBelow( diff.ToRenderable( s, withRegularTags: !diffOnly ) ) ) );
 
                 }
             }
