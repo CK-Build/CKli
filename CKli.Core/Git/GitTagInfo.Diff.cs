@@ -200,7 +200,7 @@ public sealed partial class GitTagInfo
                 if( orderByTagName ) conflicts = conflicts.OrderBy( c => c.CanonicalName );
                 display = display.AddBelow(
                     s.Text( $"⚠ {_stats._conflictCount} conflicts:", foreColor: ConsoleColor.Red ),
-                    Conflicts.Select( c => s.Text( $"- Tag '{c.ShortName}' is locally on '{c.Commit.Id.Sha.AsSpan( 0, 7)}' but targets '{c.ConflictCommitId}' on the remote.",
+                    Conflicts.Select( c => s.Text( $"- Tag '{c.ShortName}' is locally on '{c.Commit.Id.Sha.AsSpan( 0, 7 )}' but targets '{c.ConflictCommitId}' on the remote.",
                                                    foreColor: ConsoleColor.DarkRed ) ) );
             }
             if( display == s.Unit && _entries.Length == 0 )

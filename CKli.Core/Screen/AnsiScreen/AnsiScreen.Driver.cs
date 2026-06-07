@@ -23,7 +23,7 @@ sealed partial class AnsiScreen
 
         protected internal override void GetLogs( out int screenWidth, out VerticalContent? logs )
         {
-            logs = _screen._animation.ClearLogs();
+            logs = null;
             screenWidth = _screen._animation.ScreenWidth;
         }
 

@@ -28,8 +28,6 @@ sealed partial class AnsiScreen
         readonly char[] _workingBuffer;
         readonly Lock _lock;
 
-        List<IRenderable>? _logs;
-        VerticalContent? _finalLogs;
         int _screenWidth;
         int _width;
         DynamicLine? _topLine;
@@ -61,19 +59,9 @@ sealed partial class AnsiScreen
         public void AddLog( IRenderable h )
         {
             if( h.Height == 0 ) return;
-            _logs ??= new List<IRenderable>();
-            _logs.Add( h );
-        }
-
-        /// <summary>
-        /// Clears the current logs and returns them.
-        /// </summary>
-        /// <returns>The current logs.</returns>
-        public VerticalContent? ClearLogs()
-        {
-            var h = _finalLogs;
-            _finalLogs = null;
-            return h;
+            Hide( false );
+            h.Render( _target );
+            Show();
         }
 
         public void OnLog( string? text, bool isOpenGroup )
@@ -220,12 +208,6 @@ sealed partial class AnsiScreen
                     _lastRenderedTopLine = null;
                     if( final )
                     {
-                        if( _logs != null && _logs.Count > 0 )
-                        {
-                            _finalLogs = new VerticalContent( _screenType, _logs.Select( l => l.SetWidth( _screenWidth, false ) ).ToImmutableArray() );
-                            _finalLogs.Render( _target );
-                            _logs.Clear();
-                        }
                         _finalHidden = true;
                     }
                 }
