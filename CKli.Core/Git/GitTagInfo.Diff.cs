@@ -18,7 +18,6 @@ public sealed partial class GitTagInfo
         readonly GitTagInfo _local;
         readonly GitTagInfo _remote;
         readonly ImmutableArray<DiffEntry> _entries;
-        ImmutableArray<string> _unavailableRemoteTags;
         readonly Stats _stats;
 
         internal struct Stats
@@ -28,28 +27,6 @@ public sealed partial class GitTagInfo
             internal int _remoteOnlyCount;
             internal int _commonCount;
             internal int _differCount;
-        }
-
-        /// <summary>
-        /// Gets whether fetching branches is required to obtain information
-        /// on at least one remote tag. See <see cref="UnavailableRemoteTags"/>.
-        /// </summary>
-        public bool FetchRequired => _remote._fetchRequiredCount > 0;
-
-        /// <summary>
-        /// Gets the canonical tag names (starting with "refs/tags/") that exist on the remote
-        /// but for which target objects are not locally available. Fetching the branches that
-        /// contain commits referenced by these tags will make the target objects available
-        /// (without fetching the tags themselves).
-        /// </summary>
-        public ImmutableArray<string> UnavailableRemoteTags
-        {
-            get
-            {
-                return _unavailableRemoteTags.IsDefault
-                         ? (_unavailableRemoteTags = [.. _remote._tags.Take( _remote._fetchRequiredCount ).Select( i => i.CanonicalName )])
-                         : _unavailableRemoteTags;
-            }
         }
 
         /// <summary>
@@ -125,7 +102,6 @@ public sealed partial class GitTagInfo
             _stats = new Stats();
             // Ensure groups initialization.
             var gLocal = local.GroupedTags;
-            Throw.DebugAssert( local._fetchRequiredCount == 0 );
             var gRemote = remote.GroupedTags;
             // For TagDiff.CommitConflict we need the indexed tags on both sides.
             // They are provided to the Entry ctor and are called for each TagInfo
@@ -136,11 +112,6 @@ public sealed partial class GitTagInfo
             // Skips the fetch-required tags.
             // We use a enumerator forward diff below because we can: the TagInfo are strictly ordered.
             var eR = gRemote.GetEnumerator();
-            for( int i = 0; i < remote._fetchRequiredCount; ++i )
-            {
-                bool skipped = eR.MoveNext();
-                Throw.DebugAssert( skipped );
-            }
             var eL = gLocal.GetEnumerator();
             int estimatedCount = Math.Max( gLocal.Length, gRemote.Length );
             var b = ImmutableArray.CreateBuilder<DiffEntry>( estimatedCount + estimatedCount / 10 );
@@ -195,7 +166,6 @@ public sealed partial class GitTagInfo
         /// True to order tags by their name rather than their target commit date that is the default.
         /// This is mainly for tests.
         /// </param>
-        /// <param name="withFetchRequired">Displays the <see cref="UnavailableRemoteTags"/>.</param>
         /// <param name="withLocalInvalidTags">Displays the local tags that are invalid (see <see cref="GitTagInfo.InvalidTags"/>).</param>
         /// <param name="withRemoteInvalidTags">Displays the remote tags that are invalid (see <see cref="GitTagInfo.InvalidTags"/>).</param>
         /// <param name="withConflicts">Displays the tags that are in conflict (see <see cref="Conflicts"/>).</param>
@@ -203,10 +173,10 @@ public sealed partial class GitTagInfo
         /// <param name="withLocalOnlyTags">Displays the tags that are only local.</param>
         /// <param name="withRemoteOnlyTags">Displays the tags that are only on the remote.</param>
         /// <param name="withDifferences">Displays the tags that exists on both sides and differ with the detail of their differences.</param>
+        /// 
         /// <returns>The renderable.</returns>
         public IRenderable ToRenderable( ScreenType s,
                                          bool orderByTagName = false,
-                                         bool withFetchRequired = true,
                                          bool withLocalInvalidTags = true,
                                          bool withRemoteInvalidTags = true,
                                          bool withConflicts = true,
@@ -216,12 +186,6 @@ public sealed partial class GitTagInfo
                                          bool withDifferences = true )
         {
             var display = s.Unit;
-            if( withFetchRequired && FetchRequired )
-            {
-                display = display.AddBelow(
-                    s.Text( $"Unavailable remote tags. A 'ckli fetch' MAY enable target commits resolution for:", foreColor: ConsoleColor.Yellow ),
-                    s.Text( $"- {UnavailableRemoteTags.Concatenate()}.", foreColor: ConsoleColor.DarkYellow ) );
-            }
             if( withLocalInvalidTags && _local.InvalidTags.Length > 0 )
             {
                 display = display.AddBelow( _local.InvalidTagsToRenderable( s, "local ignored tags" ) );

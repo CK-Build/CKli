@@ -233,16 +233,14 @@ public partial class TagTests
             var (branch2, t21, t22) = CreateBranch( context, bobPath, bob.Repository, "Bob", "branch2", "t2", false );
         }
 
-        // Tim sees 2 "fetch required" tags.
+        // Tim sees the 2 remote-only tags.
         tim.GetDiffTags( TestHelper.Monitor, out var diff ).ShouldBeTrue();
-        diff.Entries.ShouldBeEmpty();
-        diff.FetchRequired.ShouldBeTrue();
-        diff.UnavailableRemoteTags.ShouldBe( ["refs/tags/t1-annotated", "refs/tags/t1-lightweight"] );
+        diff.Entries.Length.ShouldBe( 2 );
         {
             var display = DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) );
             display.ShouldBe( """
-                [YELLOW]Unavailable remote tags. A 'ckli fetch' MAY enable target commits resolution for:[GRAY]⮐
-                [DARKYELLOW]- refs/tags/t1-annotated, refs/tags/t1-lightweight.[GRAY]⮐
+                [BLUE]2 remote only:[GRAY]⮐
+                t1-annotated, t1-lightweight⮐
                 
                 """ );
         }
@@ -289,65 +287,17 @@ public partial class TagTests
                 """ );
         }
 
-        // Tim "ckli fetch". It now sees the 2 tags pushed by Bob but t1 tags are "RemoteOnly".
+        // Tim "ckli fetch". It now sees the 2 tags pushed by Bob.
         tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
         tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
-        diff.FetchRequired.ShouldBeFalse();
-        diff.UnavailableRemoteTags.ShouldBeEmpty();
         diff.Entries.Length.ShouldBe( 2 );
         {
-            GitTagInfo.LocalRemoteTag[] sorted = diff.Entries.SelectMany( e => e.Tags ).OrderBy( e => e.CanonicalName ).ToArray();
-
-            sorted[0].CanonicalName.ShouldBe( "refs/tags/t1-annotated" );
-            sorted[0].Diff.ShouldBe( GitTagInfo.TagDiff.RemoteOnly );
-            sorted[0].Remote?.Commit?.Sha.ShouldBe( sorted[0].Commit.Sha );
-            sorted[0].Remote?.Annotation?.Message.ShouldBe( "Bob message.\n" );
-            sorted[0].Commit.Message.ShouldBe( "Bob commit 1.\n" );
-            sorted[0].Local.ShouldBeNull();
-
-            sorted[1].CanonicalName.ShouldBe( "refs/tags/t1-lightweight" );
-            sorted[1].Diff.ShouldBe( GitTagInfo.TagDiff.RemoteOnly );
-            sorted[1].Remote!.Commit?.Sha.ShouldBe( sorted[1].Commit.Sha );
-            sorted[1].Commit.Message.ShouldBe( "Bob commit 2.\n" );
-            sorted[1].Local.ShouldBeNull();
-
             var display = DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) );
             display.ShouldBe( """
-                [BLUE]2 remote only:[GRAY]⮐
                 t1-annotated, t1-lightweight⮐
 
                 """ );
         }
-        // Tim now fetches the "t1-lightweight" tags.
-        tim.PullTags( TestHelper.Monitor, ["t1-lightweight"] ).ShouldBeTrue();
-        tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
-        diff.Entries.Length.ShouldBe( 2 );
-        {
-            GitTagInfo.LocalRemoteTag[] sorted = diff.Entries.SelectMany( e => e.Tags ).OrderBy( e => e.CanonicalName ).ToArray();
-
-            // No change.
-            sorted[0].CanonicalName.ShouldBe( "refs/tags/t1-annotated" );
-            sorted[0].Diff.ShouldBe( GitTagInfo.TagDiff.RemoteOnly );
-            sorted[0].Remote?.Commit?.Sha.ShouldBe( sorted[0].Commit.Sha );
-            sorted[0].Remote?.Annotation?.Message.ShouldBe( "Bob message.\n" );
-            sorted[0].Commit.Message.ShouldBe( "Bob commit 1.\n" );
-            sorted[0].Local.ShouldBeNull();
-
-            // No more difference.
-            sorted[1].CanonicalName.ShouldBe( "refs/tags/t1-lightweight" );
-            sorted[1].Diff.ShouldBe( GitTagInfo.TagDiff.None );
-
-            var display = DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) );
-            display.ShouldBe( """
-                t1-lightweight⮐
-                [BLUE]1 remote only:[GRAY]⮐
-                t1-annotated⮐
-                
-                """ );
-        }
-        // FetchTags is Idempotent.
-        Should.NotThrow( () => tim.PullTags( TestHelper.Monitor, ["t1-lightweight"] ).ShouldBeTrue() );
-
         // Tim & Bob create the same "v4" tag but on 2 different commits.
         tim.FullCheckout( TestHelper.Monitor, "branch1" ).ShouldBeTrue();
         bob.FullCheckout( TestHelper.Monitor, "branch2" ).ShouldBeTrue();
@@ -389,12 +339,9 @@ public partial class TagTests
 
                 """ );
         }
-        // And decides that he is right: he pushes it.
+        // And Bob decides that he is right: he pushes it.
         bob.PushTags( TestHelper.Monitor, ["v4"] ).ShouldBeTrue();
         // Now it is Tim that sees a conflict.
-        // And this is an interesting case: Tim has not locally tracked the Bob's branch2, the
-        // branch2's Tip is not in Tim's local repository and this is a conflict... but with an
-        // unavailable commit.
         {
             bob.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
             DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) ).ShouldBe( """
@@ -405,33 +352,14 @@ public partial class TagTests
                 """ );
             tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
             RedactCommitId( DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) ) ).ShouldBe( """
-                [YELLOW]Unavailable remote tags. A 'ckli fetch' MAY enable target commits resolution for:[GRAY]⮐
-                [DARKYELLOW]- refs/tags/v4.[GRAY]⮐
                 [RED]⚠ 1 conflicts:[GRAY]⮐
-                [DARKRED]- Tag 'v4' is locally on '[Redacted]' but targets 'unavailable' on the remote.[GRAY]⮐
+                [DARKRED]- Tag 'v4' is locally on '[Redacted]' but targets '[Redacted]' on the remote.[GRAY]⮐
                 t1-annotated, t1-lightweight⮐
 
                 """ );
         }
         //
-        // Tim tries to resolve this unavailable commit with a 'ckli fetch'.
-        // No luck: the remote branch2 is considered on-par with Tim's "origin/branch2', git doesn't
-        // follow the "v4" tag that is a "new" one.
-        // ... No change. But we know that is v4 tag is problematic.
-        //
-        tim.FetchRemoteBranches( TestHelper.Monitor, withTags: true ).ShouldBeTrue();
-        {
-            tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
-            RedactCommitId( DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) ) ).ShouldBe( """
-                [YELLOW]Unavailable remote tags. A 'ckli fetch' MAY enable target commits resolution for:[GRAY]⮐
-                [DARKYELLOW]- refs/tags/v4.[GRAY]⮐
-                [RED]⚠ 1 conflicts:[GRAY]⮐
-                [DARKRED]- Tag 'v4' is locally on '[Redacted]' but targets 'unavailable' on the remote.[GRAY]⮐
-                t1-annotated, t1-lightweight⮐
-
-                """ );
-        }
-        // Tim 'ckli tag pull v4'
+        // Tim gives up by pulling: 'ckli tag pull v4'
         // => Its "v4" is lost, Bob's V4 on branch1 is the winner.
         tim.PullTags( TestHelper.Monitor, ["v4"] ).ShouldBeTrue();
         {
@@ -470,41 +398,10 @@ public partial class TagTests
                                      allowOverwrite: true );
             bob.PushTags( TestHelper.Monitor, ["v4"] ).ShouldBeTrue();
         }
-        // I wish Tim could see a different difference... But as this is an annotated object that is not locally known,
-        // we are back to the "Unavailable" tag case :-(.
-        // It seems that following only the refs (without actually replacing local object) is not possible.
+        // Tim sees a v4 tag that differs.
         {
             tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
             RedactCommitId( DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) ) ).ShouldBe( """
-                [YELLOW]Unavailable remote tags. A 'ckli fetch' MAY enable target commits resolution for:[GRAY]⮐
-                [DARKYELLOW]- refs/tags/v4.[GRAY]⮐
-                [RED]⚠ 1 conflicts:[GRAY]⮐
-                [DARKRED]- Tag 'v4' is locally on '[Redacted]' but targets 'unavailable' on the remote.[GRAY]⮐
-                t1-annotated, t1-lightweight⮐
-
-                """ );
-        }
-        // Tim has no other choice to pull the v4 tag...
-        tim.PullTags( TestHelper.Monitor, ["v4"] ).ShouldBeTrue();
-        {
-            tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
-            DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) ).ShouldBe( """
-                t1-annotated, t1-lightweight, v4⮐
-
-                """ );
-        }
-        // So let's check the modification display from Tim's side only...
-        {
-            var t4 = tim.Repository.Tags["v4"];
-            tim.Repository.Tags.Add( "v4",
-                                     t4.Target,
-                                     new Signature( "Tim", "tim@mail.com", new DateTimeOffset( 2000, 1, 1, 0, 0, 0, TimeSpan.Zero ) ),
-                                     "I'm annotated.",
-                                     allowOverwrite: true );
-        }
-        {
-            tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
-            DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) ).ShouldBe( """
                 t1-annotated, t1-lightweight⮐
                 [MAGENTA]1 differences:[GRAY]⮐
                 - 'v4' has:⮐
@@ -521,6 +418,16 @@ public partial class TagTests
 
                 """ );
         }
+        // Tim pulls the v4 tag...
+        tim.PullTags( TestHelper.Monitor, ["v4"] ).ShouldBeTrue();
+        {
+            tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
+            DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) ).ShouldBe( """
+                t1-annotated, t1-lightweight, v4⮐
+
+                """ );
+        }
+        // Tim's only changes the message...
         {
             var t4 = tim.Repository.Tags["v4"];
             tim.Repository.Tags.Add( "v4",
@@ -542,6 +449,7 @@ public partial class TagTests
 
                 """ );
         }
+        // Fixing the message: no more diffs.
         {
             var t4 = tim.Repository.Tags["v4"];
             tim.Repository.Tags.Add( "v4",

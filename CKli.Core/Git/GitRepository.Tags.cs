@@ -1,10 +1,12 @@
 using CK.Core;
+using CommunityToolkit.HighPerformance;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Xml.Linq;
 
 namespace CKli.Core;
 
@@ -112,9 +114,10 @@ public sealed partial class GitRepository
                 return false;
             }
             var result = ImmutableArray.CreateBuilder<TagInfo>();
-            ImmutableArray<TagInfo>.Builder? invalidTags = null;
-            int fetchRequiredCount = 0;
-            var remoteRefs = _git.Network.ListReferences( remote, ( url, user, types ) => creds );
+            ImmutableArray<string>.Builder? invalidTags = null;
+            List<(string CanonicalName, string TargetIdentifier)>? missing = null;
+            LibGit2Sharp.Handlers.CredentialsHandler credHandler = ( url, user, types ) => creds;
+            var remoteRefs = _git.Network.ListReferences( remote, credHandler );
             foreach( var r in remoteRefs )
             {
                 var sName = r.CanonicalName.AsSpan();
@@ -125,16 +128,22 @@ public sealed partial class GitRepository
                         // We ignore the annotated tag reference.
                         continue;
                     }
+                    if( !IsCKliValidTagName( sName.Slice( 10 ) ) )
+                    {
+                        invalidTags ??= ImmutableArray.CreateBuilder<string>();
+                        invalidTags.Add( r.CanonicalName );
+                        continue;
+                    }
                     var dr = r.ResolveToDirectReference();
                     if( dr.Target is TagAnnotation a )
                     {
                         if( a.Target is Commit t )
                         {
-                            CollectTag( result, r.CanonicalName, t, a, ref fetchRequiredCount, ref invalidTags );
+                            result.Add( new TagInfo( r.CanonicalName, t, a ) );
                         }
                         else
                         {
-                            monitor.Trace( $"Ignoring annotated tag '{r.CanonicalName}' that does't target a commit." );
+                            monitor.Trace( $"Ignoring annotated tag '{r.CanonicalName}' that doesn't target a commit." );
                         }
                     }
                     else
@@ -142,7 +151,7 @@ public sealed partial class GitRepository
                         var target = dr.Target;
                         if( target is Commit t )
                         {
-                            CollectTag( result, r.CanonicalName, t, null, ref fetchRequiredCount, ref invalidTags );
+                            result.Add( new TagInfo( r.CanonicalName, t, null ) );
                         }
                         else if( target != null )
                         {
@@ -150,15 +159,41 @@ public sealed partial class GitRepository
                         }
                         else
                         {
-                            // The target is not locally available. We cannot know if it's a
-                            // commit.
-                            CollectTag( result, r.CanonicalName, null, null, ref fetchRequiredCount, ref invalidTags );
+                            missing ??= new List<(string,string)>();
+                            missing.Add( (r.CanonicalName, r.TargetIdentifier) );
+                        }
+                    }
+                }
+            }
+            if( missing != null )
+            {
+                Commands.Fetch( _git, "origin", missing.Select( m => m.TargetIdentifier ), new FetchOptions { CredentialsProvider = credHandler }, null );
+                foreach( var m in missing )
+                {
+                    var target = _git.Lookup( new ObjectId( m.TargetIdentifier ) );
+                    if( target == null )
+                    {
+                        monitor.Warn( ActivityMonitor.Tags.ToBeInvestigated, $"Unable to lookup fetched local tag '{m.CanonicalName}'." );
+                    }
+                    else
+                    {
+                        if( target is Commit t )
+                        {
+                            result.Add( new TagInfo( m.CanonicalName, t, null ) );
+                        }
+                        else if( target is TagAnnotation a && a.Target is Commit aC )
+                        {
+                            result.Add( new TagInfo( m.CanonicalName, aC, a ) );
+                        }
+                        else
+                        {
+                            monitor.Trace( $"Ignoring tag '{m.CanonicalName}' that doesn't target a commit." );
                         }
                     }
                 }
             }
             result.Sort();
-            tags = new GitTagInfo( result, invalidTags, fetchRequiredCount );
+            tags = new GitTagInfo( result, invalidTags );
             return true;
         }
         catch( Exception ex )
@@ -180,22 +215,26 @@ public sealed partial class GitRepository
         try
         {
             var result = ImmutableArray.CreateBuilder<TagInfo>();
-            ImmutableArray<TagInfo>.Builder? invalidTags = null;
-            int fetchRequiredCount = 0;
+            ImmutableArray<string>.Builder? invalidTags = null;
             foreach( var tag in _git.Tags )
             {
+                if( !IsCKliValidTagName( tag.CanonicalName.AsSpan( 10 ) ) )
+                {
+                    invalidTags ??= ImmutableArray.CreateBuilder<string>();
+                    invalidTags.Add( tag.CanonicalName );
+                    continue;
+                }
                 if( tag.PeeledTarget is Commit t )
                 {
-                    CollectTag( result, tag.CanonicalName, t, tag.Annotation, ref fetchRequiredCount, ref invalidTags );
+                    result.Add( new TagInfo( tag.CanonicalName, t, tag.Annotation ) );
                 }
                 else
                 {
                     monitor.Trace( $"Ignoring tag '{tag.CanonicalName}' that does't target a commit." );
                 }
             }
-            Throw.DebugAssert( fetchRequiredCount == 0 );
             result.Sort();
-            tags = new GitTagInfo( result, invalidTags, 0 );
+            tags = new GitTagInfo( result, invalidTags );
             return true;
         }
         catch( Exception ex )
@@ -203,26 +242,6 @@ public sealed partial class GitRepository
             monitor.Error( "Error while listing tags. This requires a manual fix.", ex );
             tags = null;
             return false;
-        }
-    }
-
-    static void CollectTag( ImmutableArray<TagInfo>.Builder result,
-                            string canonicalName,
-                            Commit? commit,
-                            TagAnnotation? annotation,
-                            ref int fetchRequiredCount,
-                            ref ImmutableArray<TagInfo>.Builder? invalidTags )
-    {
-        var newOne = new TagInfo( canonicalName, commit, annotation );
-        if( !IsCKliValidTagName( canonicalName.AsSpan( 10 ) ) )
-        {
-            invalidTags ??= ImmutableArray.CreateBuilder<TagInfo>();
-            invalidTags.Add( newOne );
-        }
-        else
-        {
-            if( commit == null ) ++fetchRequiredCount;
-            result.Add( newOne );
         }
     }
 

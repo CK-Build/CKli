@@ -12,16 +12,14 @@ namespace CKli.Core;
 public sealed partial class GitTagInfo
 {
     readonly ImmutableArray<TagInfo> _tags;
-    readonly ImmutableArray<TagInfo> _invalidTags;
+    readonly ImmutableArray<string> _invalidTags;
     Dictionary<string, TagInfo>? _indexedTags;
     ImmutableArray<TagInfo.Group> _groups;
-    int _fetchRequiredCount;
 
-    internal GitTagInfo( ImmutableArray<TagInfo>.Builder result, ImmutableArray<TagInfo>.Builder? invalidTags, int fetchRequiredCount )
+    internal GitTagInfo( ImmutableArray<TagInfo>.Builder result, ImmutableArray<string>.Builder? invalidTags )
     {
         _tags = result.DrainToImmutable();
         _invalidTags = invalidTags != null ? invalidTags.DrainToImmutable() : [];
-        _fetchRequiredCount = fetchRequiredCount;
     }
 
     /// <summary>
@@ -35,22 +33,10 @@ public sealed partial class GitTagInfo
     /// implements the check.
     /// </para>
     /// </summary>
-    public ImmutableArray<TagInfo> InvalidTags => _invalidTags;
-
-    /// <summary>
-    /// Gets the number of tags that have no local target commit. See <see cref="TagInfo.Commit"/>.
-    /// <para>
-    /// This is always 0 when this <see cref="GitTagInfo"/> has been obtained by <see cref="GitRepository.GetLocalTags(CK.Core.IActivityMonitor, out GitTagInfo?)"/>.
-    /// </para>
-    /// </summary>
-    public int FetchRequiredCount => _fetchRequiredCount;
+    public ImmutableArray<string> InvalidTags => _invalidTags;
 
     /// <summary>
     /// Gets all the tags ordered by <see cref="TagInfo.CommitDateUtc"/> and then by <see cref="TagInfo.CanonicalName"/>.
-    /// <para>
-    /// When obtained by <see cref="GitRepository.GetRemoteTags(CK.Core.IActivityMonitor, out GitTagInfo?, string)"/>,
-    /// this list can start with "fetch required" tags that have a null <see cref="TagInfo.Commit"/>.
-    /// </para>
     /// </summary>
     public ImmutableArray<TagInfo> Tags => _tags;
 
@@ -63,7 +49,7 @@ public sealed partial class GitTagInfo
     /// Gets the tags grouped by <see cref="TagInfo.CommitDateUtc"/> and then by <see cref="TagInfo.CanonicalName"/>.
     /// </summary>
     public ImmutableArray<TagInfo.Group> GroupedTags => _groups.IsDefault
-                                                            ? (_groups = TagInfo.GetGroups( _tags, out _fetchRequiredCount ))
+                                                            ? (_groups = TagInfo.GetGroups( _tags ))
                                                             : _groups;
 
     internal IRenderable ToRenderable( ScreenType s )
@@ -82,7 +68,18 @@ public sealed partial class GitTagInfo
     {
         Throw.DebugAssert( _invalidTags.Length > 0 );
         return s.Text( $"‼ {_invalidTags.Length} {kind}:", foreColor: ConsoleColor.DarkYellow ).Box( marginRight: 1 )
-                        .AddRight( TagInfo.RenderTagNames( s, _invalidTags ) );
-    }
+                        .AddRight( RenderTagNames( s, _invalidTags ) );
+
+        static IEnumerable<IRenderable> RenderTagNames( ScreenType s, ImmutableArray<string> names )
+        {
+            var sep = s.Text( ", ", TextStyle.Default );
+            int i = 0;
+            foreach( var n in names )
+            {
+                if( i++ > 0 ) yield return sep;
+                yield return s.Text( n.Substring( 10 ), effect: TextEffect.Bold ); ;
+            }
+        }
+}
 
 }

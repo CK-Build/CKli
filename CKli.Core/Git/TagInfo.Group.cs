@@ -30,9 +30,9 @@ public sealed partial class TagInfo
         internal TagInfo Head => _sortedTags[_idx];
 
         /// <summary>
-        /// Gets the target commit. Null for a remote tag with a target that doesn't exist locally (a fetch is required).
+        /// Gets the target commit.
         /// </summary>
-        public Commit? Commit => Head.Commit;
+        public Commit Commit => Head.Commit;
 
         /// <summary>
         /// Gets at least one <see cref="TagInfo"/> for this <see cref="Commit"/>.
@@ -65,7 +65,7 @@ public sealed partial class TagInfo
         /// associated tags if available.
         /// </summary>
         /// <returns>A readable string.</returns>
-        public override string ToString() => Commit == null ? Head.ToString() : $"{Commit} - {_tagCount} tags.";
+        public override string ToString() => $"{Commit} - {_tagCount} tags.";
 
         internal IRenderable ToRenderable( ScreenType s, IRenderable? beforeTags = null )
         {
@@ -79,22 +79,11 @@ public sealed partial class TagInfo
 
     }
 
-    internal static ImmutableArray<Group> GetGroups( ImmutableArray<TagInfo> sortedTags, out int remoteOnly )
+    internal static ImmutableArray<Group> GetGroups( ImmutableArray<TagInfo> sortedTags )
     {
         var result = ImmutableArray.CreateBuilder<Group>();
-        int i = 0;
-        for( ; i < sortedTags.Length; i++ )
-        {
-            TagInfo? tag = sortedTags[i];
-            if( tag.Commit != null )
-            {
-                break;
-            }
-            result.Add( new Group( sortedTags, i ) );
-        }
-        remoteOnly = i;
         Group? current = null;
-        for( ; i < sortedTags.Length; i++ )
+        for( int i = 0; i < sortedTags.Length; i++ )
         {
             TagInfo? tag = sortedTags[i];
             Throw.DebugAssert( tag.Commit != null );

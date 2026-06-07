@@ -6,16 +6,16 @@ using System.Collections.Generic;
 namespace CKli.Core;
 
 /// <summary>
-/// Captures a "refs/tags/name", its target commit (if it exists locally) and the <see cref="TagAnnotation"/>
+/// Captures a "refs/tags/name", its target commit and the <see cref="TagAnnotation"/>
 /// if this is an annotated tag (and not a lightweight one).
 /// </summary>
 public sealed partial class TagInfo : IComparable<TagInfo>
 {
     readonly string _canonicalName;
-    readonly Commit? _commit;
+    readonly Commit _commit;
     readonly TagAnnotation? _annotation;
 
-    internal TagInfo( string canonicalName, Commit? commit, TagAnnotation? annotation )
+    internal TagInfo( string canonicalName, Commit commit, TagAnnotation? annotation )
     {
         _canonicalName = canonicalName;
         _commit = commit;
@@ -33,9 +33,9 @@ public sealed partial class TagInfo : IComparable<TagInfo>
     public ReadOnlySpan<char> ShortName => _canonicalName.AsSpan( 10 );
 
     /// <summary>
-    /// Gets the target commit. Null for a remote tag with a target that doesn't exist locally (a fetch is required).
+    /// Gets the target commit.
     /// </summary>
-    public Commit? Commit => _commit;
+    public Commit Commit => _commit;
 
     /// <summary>
     /// Gets the annotation or null for a lightweight tag.
@@ -43,9 +43,9 @@ public sealed partial class TagInfo : IComparable<TagInfo>
     public TagAnnotation? Annotation => _annotation;
 
     /// <summary>
-    /// Gets the commit date or <see cref="Util.UtcMinValue"/> if there is no commit (a fetch is required).
+    /// Gets the commit date.
     /// </summary>
-    public DateTime CommitDateUtc => _commit != null ? _commit.Committer.When.UtcDateTime : Util.UtcMinValue;
+    public DateTime CommitDateUtc => _commit.Committer.When.UtcDateTime;
 
     internal IRenderable ToRenderable( ScreenType s )
     {
@@ -60,9 +60,7 @@ public sealed partial class TagInfo : IComparable<TagInfo>
 
     internal IRenderable GetRenderableCommit( ScreenType s )
     {
-        return s.Text( _commit != null
-                        ? $"{_commit.Id.ToString( 8 )} {Ellipsis( _commit.MessageShort, 20 )}"
-                        : "<<fetch required>>" );
+        return s.Text( $"{_commit.Id.ToString( 8 )} {Ellipsis( _commit.MessageShort, 20 )}" );
 
         static string Ellipsis( string s, int maxLen ) => s.Length > maxLen ? string.Concat( s.AsSpan( 0,maxLen), "…" ) : s;
     }

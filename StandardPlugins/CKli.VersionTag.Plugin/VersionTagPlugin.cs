@@ -708,7 +708,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     if( repo.GitRepository.GetDiffTags( monitor, out var diffTags ) )
                     {
                         b.Add( diffTags );
-                        if( diffTags.FetchRequired || diffTags.ConflictCount > 0 )
+                        if( diffTags.ConflictCount > 0 )
                         {
                             issues ??= new List<int>();
                             issues.Add( repo.Index );
