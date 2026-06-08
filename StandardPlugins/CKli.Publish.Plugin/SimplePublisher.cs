@@ -156,7 +156,7 @@ sealed partial class SimplePublisher
         var releaseId = await _hostingProvider.CreateDraftReleaseAsync( monitor, _hostedRepoPath, versionedTag, cancel ).ConfigureAwait( false );
         if( releaseId != null )
         {
-            bool isCI = repo.PublishVersion.IsCI();
+            bool isCI = repo.PublishVersion.IsCI;
             // Draft release created. Push the branch(es) now.
             // We use the DeferredPushRefSpecs here to have an atomic push with all the branches manipulation at once.
             if( !isCI )

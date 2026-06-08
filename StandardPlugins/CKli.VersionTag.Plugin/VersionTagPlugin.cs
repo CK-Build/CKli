@@ -1049,7 +1049,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             {
                 lastStables.Add( tc );
             }
-            else if( tc.Version.IsCI() && (lowestCI == null || lowestCI.Version > tc.Version) )
+            else if( tc.Version.IsCI && (lowestCI == null || lowestCI.Version > tc.Version) )
             {
                 lowestCI = tc;
             }
@@ -1226,7 +1226,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     {
         Throw.DebugAssert( lowestCI.Version < supremum );
         // There's at least one CI version that should be suppressed.
-        var toRemove = v2c.Values.Where( tc => tc.Version.IsCI() && tc.Version < supremum ).ToList();
+        var toRemove = v2c.Values.Where( tc => tc.Version.IsCI && tc.Version < supremum ).ToList();
         Throw.DebugAssert( toRemove.Contains( lowestCI ) );
         bool success = true;
         using( monitor.OpenInfo( $"Deleting obsolete CI versions: '{toRemove.Select( tc => tc.Version.ParsedText ).Concatenate( "', '" )}'." ) )

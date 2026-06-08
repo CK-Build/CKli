@@ -256,7 +256,7 @@ public sealed partial class Roadmap
         static VersionChange ComputeVersionChange( SVersion vBase, SVersion vTarget, bool targetIsFake )
         {
             // Fake based CI versions can be "artificial": they can be the <fake>--ci.X (no major/minor/patch increment).
-            Throw.DebugAssert( vBase <= vTarget || (vBase.IsFake() && vTarget.IsCI()) );
+            Throw.DebugAssert( vBase <= vTarget || (vBase.IsFake() && vTarget.IsCI) );
 
             // And when it is the case, we consider this a non change.
             if( vBase.IsFake() ) return VersionChange.None;
