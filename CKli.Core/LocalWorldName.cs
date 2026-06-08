@@ -103,15 +103,24 @@ public sealed class LocalWorldName : WorldName
             // Before anything else (even the root element name), if a CKliMinVersion exists then we check it.
             string? minCKliVersion = root.Attribute( "MinCKliVersion" )?.Value;
             SVersion? ckliVersion = World.CKliVersion.Version;
-            if( !string.IsNullOrWhiteSpace( minCKliVersion )
-                && ckliVersion != null
-                && ckliVersion.ToString() != minCKliVersion )
+            if( !string.IsNullOrWhiteSpace( minCKliVersion ) && ckliVersion != null )
             {
-                monitor.Error( $"""
-                    The world definition file requires CKli version '{ckliVersion}' (at least). File: '{_xmlDescriptionFilePath}'.
-                    Please use 'ckli update'.
+                var vMin = SVersion.ParseNoThrow( minCKliVersion );
+                if( !vMin.IsValid )
+                {
+                    monitor.Error( $"""
+                    Invalid <CK MinCKliVersion="{minCKliVersion}" > attribute in world definition file. File: '{_xmlDescriptionFilePath}'.
                     """ );
-                return null;
+                    return null;
+                }
+                if( vMin > ckliVersion )
+                {
+                    monitor.Error( $"""
+                        The world definition file requires CKli version '{minCKliVersion}' (at least). File: '{_xmlDescriptionFilePath}'.
+                        Please use 'ckli update'.
+                        """ );
+                    return null;
+                }
             }
 
             string stackName = root.Name.LocalName;
