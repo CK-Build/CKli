@@ -5,6 +5,14 @@ namespace CKli.BranchModel.Plugin;
 
 public sealed partial class BranchModelPlugin
 {
+    /// <summary>
+    /// Commit any pending changes. 
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The minimal CKli context.</param>
+    /// <param name="message">The required commit message.</param>
+    /// <param name="all">Whether all Repos must be considered.</param>
+    /// <returns>True on success, false on error.</returns>
     [Description( "Commit any pending changes. Does nothing if there's no change to commit." )]
     [CommandPath( "commit" )]
     public bool Commit( IActivityMonitor monitor,

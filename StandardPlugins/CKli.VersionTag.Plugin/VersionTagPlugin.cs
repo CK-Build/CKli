@@ -552,6 +552,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The CKli context.</param>
+    /// <param name="updateRemoteTags">Pushes updated local tags to the origin remote.</param>
     /// <returns>True on success, false on error.</returns>
     [Description( """
         Suppress the published and local databases and rebuild them from the version tags content.

@@ -212,7 +212,7 @@ public class RepoBuilder : RepoInfo
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="version">The version to build.</param>
-    /// <param name="informationalVersion">The informational version to set (see <see cref="CSemVer.InformationalVersion"/>).</param>
+    /// <param name="informationalVersion">The informational version to set (see <see cref="InformationalVersion"/>).</param>
     /// <param name="fileVersion">The windows file version. See <see cref="CommitBuildInfo.FileVersion"/>.</param>
     /// <param name="release">False to use Debug build configuration.</param>
     /// <returns>True on success, false otherwise.</returns>
