@@ -1,5 +1,4 @@
 using CK.Core;
-using CSemVer;
 using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;

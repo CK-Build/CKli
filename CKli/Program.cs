@@ -31,7 +31,7 @@ if( explicitPath != null )
 // Since we Console.WriteLine we don't need the environment to be setup.
 if( arguments.HasVersionFlag )
 {
-    var info = CSemVer.InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() );
+    var info = InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() );
     Console.WriteLine( $"CKli - {info.Version} - {info.OriginalInformationalVersion}." );
     return;
 }
