@@ -2,7 +2,6 @@ using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.ReleaseDatabase.Plugin;
-using CSemVer;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
@@ -214,6 +213,17 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         }
     }
 
+    /// <summary>
+    /// Deprecates the specified version.
+    /// </summary>
+    /// <param name="monitor"></param>
+    /// <param name="context"></param>
+    /// <param name="version"></param>
+    /// <param name="reason"></param>
+    /// <param name="days"></param>
+    /// <param name="immediate"></param>
+    /// <param name="allowUpdate"></param>
+    /// <returns></returns>
     [Description( """
         Deprecates a version tag by ensuring that an associated "+deprecated" tag appears on the same commit and propagates this deprecation to all its downstream packages.
         The tag annotation contains the actual "Expiration" date at which the packages must be unlisted or deleted from any feeds: this must be set thanks to the --immediate flag or --days option.
@@ -251,8 +261,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         {
             return false;
         }
-        var v = SVersion.TryParse( version );
-        if( !v.IsValid )
+        if( !SVersion.TryParse( version, out var v ) )
         {
             monitor.Error( $"Unable to parse version '{version}': {v.ErrorMessage}" );
             return false;
@@ -410,7 +419,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         AddTag( repo, existingCommit, existingTagInfo, name );
         if( existingTagInfo.HasExpired )
         {
-            var n = existingCommit.Version.WithBuildMetaData( null ).ToString();
+            var n = existingCommit.Version.SetBuildMetaData( null ).ToString();
             var vN = 'v' + n;
             monitor.Info( ScreenType.CKliScreenTag, $"Deprecation tag expired. Removing '{vN}' tag (from local and remote) in '{repo.DisplayPath}'." );
 
@@ -786,8 +795,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             {
                 return null;
             }
-            SVersion v = SVersion.TryParse( text );
-            if( !v.IsValid )
+            if( !SVersion.TryParse( text, out var v ) )
             {
                 monitor.Warn( $"""
                     Invalid '{config.Repo.DisplayPath}' VersionTagPlugin.{name.LocalName}: '{text}'.
@@ -825,9 +833,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 hasBadTagNames = true;
                 continue;
             }
-            var v = SVersion.TryParse( tagName );
             // Consider only SVersion tag and target that is a commit (safe cast).
-            if( !v.IsValid || t.Target is not Commit c )
+            if( !SVersion.TryParse( tagName, out var v ) || t.Target is not Commit c )
             {
                 continue;
             }
@@ -1230,7 +1237,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 // If we have collected a "+deprecated", removes the non-deprecated one from the removable tags.
                 if( tc.IsDeprecatedVersion && removableTags != null )
                 {
-                    var vClean = tc.Version.WithBuildMetaData( null );
+                    var vClean = tc.Version.SetBuildMetaData( null );
                     removableTags.RemoveAll( t => SVersion.TryParse( t.FriendlyName, out var v ) && v == vClean );
                 }
                 success &= DoCleanupLocalRelease( monitor,

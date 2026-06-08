@@ -3,7 +3,6 @@ using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
-using CSemVer;
 using System;
 using System.Collections;
 using System.Collections.Generic;

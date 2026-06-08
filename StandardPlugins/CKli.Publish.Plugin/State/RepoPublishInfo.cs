@@ -1,6 +1,6 @@
 using CK.Core;
 using CKli.Core;
-using CSemVer;
+
 using CKli.ArtifactHandler.Plugin;
 
 namespace CKli.Publish.Plugin;
@@ -10,7 +10,6 @@ sealed class RepoPublishInfo
     readonly Repo _repo;
     readonly string _branchName;
     readonly int _index;
-    readonly SVersion _baseVersion;
     readonly SVersion _publishVersion;
     readonly BuildContentInfo _buildContentInfo;
 
@@ -48,20 +47,18 @@ sealed class RepoPublishInfo
     internal RepoPublishInfo( Repo repo,
                               string branchName,
                               int index,
-                              SVersion baseVersion,
                               SVersion publishVersion,
                               BuildContentInfo buildContentInfo )
     {
         _repo = repo;
         _branchName = branchName;
         _index = index;
-        _baseVersion = baseVersion;
         _publishVersion = publishVersion;
         _buildContentInfo = buildContentInfo;
     }
 
     internal RepoPublishInfo( int index, string branchName, SVersion baseVersion, BuildResult result )
-        : this( result.Repo, branchName, index, baseVersion, result.Version, result.Content )
+        : this( result.Repo, branchName, index, result.Version, result.Content )
     {
     }
 }

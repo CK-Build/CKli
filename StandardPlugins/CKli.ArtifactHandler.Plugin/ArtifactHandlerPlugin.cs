@@ -1,7 +1,6 @@
 using CK.Core;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
-using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -103,7 +102,7 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
                     var nugetOrg = new NuGetFeed( "NuGet",
                                                   "https://api.nuget.org/v3/index.json",
                                                   pushCredentials: new NuGetFeedCredentials( "NUGET_ORG_PUSH_API_KEY", null ),
-                                                  pushQualityFilter: new VersionQualityFilter( "pre", includeMin: true, null, true, false ),
+                                                  pushQualityFilter: new SVersionQualityFilter( "romeo", includeMin: true, null, true, false ),
                                                   fakeReadCredentials: null );
                     PrimaryPluginContext.Configuration.Edit( monitor, ( monitor, e ) =>
                     {

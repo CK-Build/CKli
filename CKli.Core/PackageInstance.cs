@@ -1,5 +1,4 @@
 using CK.Core;
-using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -63,9 +62,10 @@ public partial class PackageInstance : IComparable<PackageInstance>, IEquatable<
         int idx = head.IndexOf( '@' );
         if( idx <= 0 ) return false;
         var rest = head.Slice( idx + 1 );
-        var v = SVersion.TryParse( ref rest );
-        if( !v.IsValid ) return false;
-
+        if( !SVersion.TryMatch( ref rest, out var v  ) )
+        {
+            return false;
+        }
         instance = new PackageInstance( new string( head.Slice( 0, idx ) ), v );
         head = rest;
         return true;
@@ -230,10 +230,9 @@ public partial class PackageInstance : IComparable<PackageInstance>, IEquatable<
                 if( h.Length > 0 && char.IsAsciiDigit( h[0] ) )
                 {
                     packageIdLength = fileName.Length - h.Length - 1;
-                    version = SVersion.TryParse( ref h );
                     // Here we allow a starting digit in the package id because this is legit (tested):
                     // Successfully created package '...\package\debug\Truc.0Machin.1.0.0.nupkg
-                    if( version.IsValid )
+                    if( SVersion.TryMatch( ref h, out version ) )
                     {
                         return h.Length == 0;
                     }

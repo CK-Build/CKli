@@ -1,5 +1,4 @@
 using CK.Core;
-using CSemVer;
 using Microsoft.Extensions.FileProviders;
 using System;
 using System.Collections.Generic;
@@ -171,8 +170,7 @@ static class CommonSolution
             }
             return true;
         }
-        version = SVersion.TryParse( a.Value );
-        if( !version.IsValid )
+        if( !SVersion.TryParse( a.Value, out version ) )
         {
             monitor.Error( $"""
                             Unable to parse {attributeName.LocalName} in:

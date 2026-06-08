@@ -4,7 +4,7 @@ using System;
 namespace CKli.Build.Plugin;
 
 /// <summary>
-/// Common build event that unifies <see cref="Roadmap.RoadmapBuildEventArgs"/> and <see cref="FixBuildEventArgs"/>.
+/// Common build event that unifies <see cref="RoadmapBuildEventArgs"/> and <see cref="FixBuildEventArgs"/>.
 /// </summary>
 public abstract class BuildBaseEventArgs : EventMonitoredArgs
 {

@@ -1,5 +1,5 @@
 using CK.Core;
-using CSemVer;
+
 using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Credentials;

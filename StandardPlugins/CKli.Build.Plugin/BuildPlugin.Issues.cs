@@ -2,7 +2,7 @@ using CK.Core;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
-using CSemVer;
+
 using System;
 using System.Linq;
 using System.Threading.Tasks;

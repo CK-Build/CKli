@@ -1,5 +1,4 @@
 using CK.Core;
-using CSemVer;
 using System;
 using System.Diagnostics.CodeAnalysis;
 
@@ -40,8 +39,8 @@ public static class SVersionExtensions
                                                version.Minor,
                                                version.Patch,
                                                buildMetaData: "fake",
-                                               checkBuildMetaDataSyntax: false,
-                                               parsedText: version.ParsedText )
+                                               checkBuildMetaDataSyntax: false )//,
+                                               //parsedText: version.ParsedText )
                             : version;
             return true;
         }

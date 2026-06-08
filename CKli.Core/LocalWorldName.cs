@@ -102,7 +102,7 @@ public sealed class LocalWorldName : WorldName
 
             // Before anything else (even the root element name), if a CKliMinVersion exists then we check it.
             string? minCKliVersion = root.Attribute( "MinCKliVersion" )?.Value;
-            CSemVer.SVersion? ckliVersion = World.CKliVersion.Version;
+            SVersion? ckliVersion = World.CKliVersion.Version;
             if( !string.IsNullOrWhiteSpace( minCKliVersion )
                 && ckliVersion != null
                 && ckliVersion.ToString() != minCKliVersion )

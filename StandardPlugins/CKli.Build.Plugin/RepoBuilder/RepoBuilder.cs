@@ -2,7 +2,7 @@ using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
-using CSemVer;
+
 using LibGit2Sharp;
 using System;
 using System.Collections.Immutable;

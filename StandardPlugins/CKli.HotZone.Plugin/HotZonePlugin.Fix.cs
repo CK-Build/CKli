@@ -3,7 +3,6 @@ using CK.PerfectEvent;
 using CKli.Core;
 using CKli.ReleaseDatabase.Plugin;
 using CKli.VersionTag.Plugin;
-using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;

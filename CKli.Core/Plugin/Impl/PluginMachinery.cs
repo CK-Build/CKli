@@ -1,5 +1,4 @@
 using CK.Core;
-using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -374,8 +373,7 @@ public sealed partial class PluginMachinery
                 }
                 else
                 {
-                    v = SVersion.TryParse( ckliTesting.Attribute( "Version" )?.Value );
-                    if( !v.IsValid )
+                    if( !SVersion.TryParse( ckliTesting.Attribute( "Version" )?.Value, out v ) )
                     {
                         monitor.Error( $"Invalid version in {ckliTesting} (in '{PluginTestsCSProjFilePath}'): {v.ErrorMessage}." );
                         return false;
@@ -425,8 +423,7 @@ public sealed partial class PluginMachinery
                 }
                 return true;
             }
-            v = SVersion.TryParse( ckliPluginsCore.Attribute( "Version" )?.Value );
-            if( !v.IsValid )
+            if( !SVersion.TryParse( ckliPluginsCore.Attribute( "Version" )?.Value, out v ) )
             {
                 monitor.Error( $"Invalid version in {ckliPluginsCore} (in '{directoryPackageProps}'): {v.ErrorMessage}." );
                 return false;

@@ -1,5 +1,4 @@
 using CK.Core;
-using CSemVer;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;

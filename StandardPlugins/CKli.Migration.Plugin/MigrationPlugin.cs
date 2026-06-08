@@ -5,7 +5,7 @@ using CKli.Build.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.VersionTag.Plugin;
-using CSemVer;
+
 using LibGit2Sharp;
 using System.Collections.Generic;
 using System.IO;
@@ -124,7 +124,7 @@ public sealed class MigrationPlugin : PrimaryPluginBase
                 // Deletes all local only version tags.
                 var localOnlyTags = diff.Entries.SelectMany( e => e.Tags )
                                                                   .Where( t => t.Diff == GitTagInfo.TagDiff.LocalOnly && t.CanonicalName != "refs/tags/ckli-repo" )
-                                                                  .Select( t => SVersion.TryParse( t.CanonicalName.Substring( 10 ) ) )
+                                                                  .Select( t => SVersion.ParseNoThrow( t.CanonicalName.Substring( 10 ) ) )
                                                                   .Where( v => v.IsValid );
                 foreach( var localVersion in localOnlyTags )
                 {
@@ -357,7 +357,7 @@ public sealed class MigrationPlugin : PrimaryPluginBase
                 if( bStartNet6 != null )
                 {
                     var d = repo.GitRepository.Repository.Describe( bStartNet6.Tip, new DescribeOptions { Strategy = DescribeStrategy.Tags } );
-                    vB = SVersion.TryParse( d );
+                    vB = SVersion.ParseNoThrow( d );
                     details.AppendLine( $"[B] - {d} - {vB}" );
                     if( vB.IsValid ) vB = SVersion.Create( vB.Major, vB.Minor, vB.Patch + 1 );
                     else vB = null;
@@ -370,7 +370,7 @@ public sealed class MigrationPlugin : PrimaryPluginBase
                                          .Element( "SimpleGitVersion" )?
                                          .Attribute( "StartingVersion" )?
                                          .Value;
-                    vX = SVersion.TryParse( d );
+                    vX = SVersion.ParseNoThrow( d );
                     details.AppendLine( $"[X] - {d} - {vX}" );
                     if( vX.IsValid ) vX = SVersion.Create( vX.Major, vX.Minor, vX.Patch );
                     else vX = null;

@@ -1,4 +1,4 @@
-using CSemVer;
+using CK.Core;
 using System;
 using System.Collections.Immutable;
 

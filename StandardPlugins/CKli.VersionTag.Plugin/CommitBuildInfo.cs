@@ -1,6 +1,6 @@
 using CK.Core;
 using CKli.Core;
-using CSemVer;
+
 using LibGit2Sharp;
 using System;
 
@@ -48,13 +48,13 @@ public sealed class CommitBuildInfo
     public bool Rebuilding => _rebuilding;
 
     /// <summary>
-    /// Gets the informational version (see <see cref="CSemVer.InformationalVersion"/>).
+    /// Gets the informational version (see <see cref="InformationalVersion"/>).
     /// </summary>
     public string InformationalVersion
     {
         get
         {
-            return _informationalVersion ??= CSemVer.InformationalVersion.BuildInformationalVersion( _version,
+            return _informationalVersion ??= CK.Core.InformationalVersion.BuildInformationalVersion( _version,
                                                                                                      _buildCommit.Sha,
                                                                                                      _buildCommit.Committer.When.UtcDateTime );
         }
@@ -64,13 +64,13 @@ public sealed class CommitBuildInfo
     /// Gets the 'Major.Minor.Build.Revision' windows file version to use.
     /// This is currently not used and defaults to '0.0.0.0' (<see cref="InformationalVersion.ZeroFileVersion"/>).
     /// </summary>
-    public string FileVersion => CSemVer.InformationalVersion.ZeroFileVersion;
+    public string FileVersion => CK.Core.InformationalVersion.ZeroFileVersion;
 
     /// <summary>
     /// Gets whether the build must use "Release" configuration: the version to build is a
     /// stable or a release candidate.
     /// </summary>
-    public bool ReleaseConfiguration => !_version.IsPrerelease || _version.AsCSVersion?.PackageQuality == PackageQuality.ReleaseCandidate;
+    public bool ReleaseConfiguration => _version.VersionKind >= CSVersionKind.Romeo;
 
     /// <summary>
     /// Adds or update the <see cref="TagCommit"/> on the <see cref="BuildCommit"/> for <see cref="Version"/>

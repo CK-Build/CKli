@@ -1,4 +1,5 @@
-using CSemVer;
+
+using CK.Core;
 
 namespace CKli.ShallowSolution.Plugin;
 

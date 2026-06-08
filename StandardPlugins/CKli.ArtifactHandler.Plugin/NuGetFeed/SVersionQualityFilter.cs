@@ -1,5 +1,4 @@
 using CK.Core;
-using CSemVer;
 using System;
 using System.Text;
 
@@ -19,15 +18,15 @@ namespace CKli.ArtifactHandler.Plugin;
 ///     </item>
 ///     <item>[pre,]<term></term>
 ///     <description>
-///     Any "pre" version and above including stable ones but not their CI builds (Min = "pre", IncludeMin = true,
+///     Any "romeo" version and above including stable ones but not their CI builds (Min = "romeo", IncludeMin = true,
 ///     Max = null, IncludeMax = true, AllowCI = false).
 ///     This is the regular configuration for the official https://www.nuget.org/ feed (it cannot handle package version
 ///     with the "--ci" double dash prerelease name and we don"t want to pollute this open feed with really unstable versions).
 ///     </description>
 ///     </item>
-///     <item><c>[,pre),ci</c><term></term>
+///     <item><c>[,romeo),ci</c><term></term>
 ///     <description>
-///     Any prerelease up to "pre" (but excluding it) with their CI builds (Min = null, Max = "pre", IncludeMax = false, AllowCI = true).
+///     Any prerelease up to "romeo" (but excluding it) with their CI builds (Min = null, Max = "romeo", IncludeMax = false, AllowCI = true).
 ///     This is a possible configuration for a feed that complements the official https://www.nuget.org/ feed
 ///     (versions are on one or the other feed, not on both).
 ///     </description>
@@ -35,7 +34,7 @@ namespace CKli.ArtifactHandler.Plugin;
 /// </list>
 /// </para>
 /// </summary>
-public readonly struct VersionQualityFilter
+public readonly struct SVersionQualityFilter
 {
     readonly string? _min;
     readonly string? _max;
@@ -113,7 +112,7 @@ public readonly struct VersionQualityFilter
     /// <param name="max">See <see cref="Max"/>.</param>
     /// <param name="includeMax">See <see cref="IncludeMax"/>. When empty or white space, this is normalized to null.</param>
     /// <param name="allowCI">See <see cref="AllowCI"/>.</param>
-    public VersionQualityFilter( string? min, bool includeMin, string? max, bool includeMax, bool allowCI )
+    public SVersionQualityFilter( string? min, bool includeMin, string? max, bool includeMax, bool allowCI )
     {
         if( string.IsNullOrWhiteSpace( min ) ) min = null;
         if( string.IsNullOrWhiteSpace( max ) ) max = null;
@@ -128,33 +127,33 @@ public readonly struct VersionQualityFilter
     /// <summary>
     /// Initializes a new filter from a string.
     /// Throws an <see cref="ArgumentException"/> on invalid syntax.
-    /// Simply uses <see cref="TryParse(ReadOnlySpan{char}, out VersionQualityFilter)"/>) to handle invalid syntax.
+    /// Simply uses <see cref="TryParse(ReadOnlySpan{char}, out SVersionQualityFilter)"/>) to handle invalid syntax.
     /// </summary>
     /// <param name="s">The string.</param>
-    public VersionQualityFilter( ReadOnlySpan<char> s )
+    public SVersionQualityFilter( ReadOnlySpan<char> s )
     {
-        if( !TryParse( s, out VersionQualityFilter p ) ) throw new ArgumentException( "Invalid VersionQualityFilter syntax." );
+        if( !TryParse( s, out SVersionQualityFilter p ) ) throw new ArgumentException( "Invalid VersionQualityFilter syntax." );
         _min = p._min;
         _max = p._max;
     }
 
     /// <summary>
-    /// Attempts to parse a string as a <see cref="VersionQualityFilter"/>.
+    /// Attempts to parse a string as a <see cref="SVersionQualityFilter"/>.
     /// White spaces are silently ignored.
     /// </summary>
     /// <param name="head">The string to parse (leading and internal white spaces between tokens are skipped).</param>
     /// <param name="filter">The result.</param>
     /// <returns>True on success, false on error.</returns>
-    public static bool TryParse( ReadOnlySpan<char> head, out VersionQualityFilter filter ) => TryMatch( ref head, out filter );
+    public static bool TryParse( ReadOnlySpan<char> head, out SVersionQualityFilter filter ) => TryMatch( ref head, out filter );
 
     /// <summary>
-    /// Attempts to match a string as a <see cref="VersionQualityFilter"/> (<paramref name="head"/> is forwarded on success).
+    /// Attempts to match a string as a <see cref="SVersionQualityFilter"/> (<paramref name="head"/> is forwarded on success).
     /// White spaces are silently ignored.
     /// </summary>
     /// <param name="head">The string to parse (leading and internal white spaces between tokens are skipped).</param>
     /// <param name="filter">The result.</param>
     /// <returns>True on success, false on error.</returns>
-    public static bool TryMatch( ref ReadOnlySpan<char> head, out VersionQualityFilter filter )
+    public static bool TryMatch( ref ReadOnlySpan<char> head, out SVersionQualityFilter filter )
     {
         filter = default;
         string? min = null;
@@ -162,7 +161,7 @@ public readonly struct VersionQualityFilter
 
         var h = head.TrimStart();
         bool includeMin = h.TryMatch( '[' );
-        if( !includeMin && !h.TryMatch('(') ) return false;
+        if( !includeMin && !h.TryMatch( '(' ) ) return false;
 
         int comma = h.IndexOf( ',' );
         if( comma < 0 ) return false;
@@ -195,7 +194,7 @@ public readonly struct VersionQualityFilter
         }
 
         head = h;
-        filter = new VersionQualityFilter( min, includeMin, max, includeMax, allowCI );
+        filter = new SVersionQualityFilter( min, includeMin, max, includeMax, allowCI );
         return true;
     }
 

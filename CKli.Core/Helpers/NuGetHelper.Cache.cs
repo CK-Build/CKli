@@ -1,5 +1,4 @@
 using CK.Core;
-using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -60,7 +59,7 @@ public static partial class NuGetHelper
             if( Directory.Exists( p ) )
             {
                 return Directory.EnumerateDirectories( p )
-                                .Select( v => SVersion.TryParse( Path.GetFileName( v ) ) )
+                                .Select( v => SVersion.ParseNoThrow( Path.GetFileName( v ) ) )
                                 .Where( v => v.IsValid );
             }
             return [];

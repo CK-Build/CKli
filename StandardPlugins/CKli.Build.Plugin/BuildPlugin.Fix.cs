@@ -4,7 +4,7 @@ using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
-using CSemVer;
+
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;

@@ -3,7 +3,7 @@ using CKli.ArtifactHandler.Plugin;
 using CKli.Build.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
-using CSemVer;
+
 using System;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
@@ -76,7 +76,7 @@ sealed class WorldReleaseInfo
                                     : s.Solution.Branch.BranchName.Name;
 
                 var (version, content) = s.GetFinalPublishInfo();
-                var r = new RepoPublishInfo( s.Repo, branchName, i, s.VersionInfo.BaseBuild.Version, version, content );
+                var r = new RepoPublishInfo( s.Repo, branchName, i, version, content );
                 repoInfos[i++] = r;
                 publishedLength += r.PublishedLength;
             }

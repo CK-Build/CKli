@@ -5,7 +5,6 @@ using CKli.HotZone.Plugin;
 using CKli.ReleaseDatabase.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
-using CSemVer;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;

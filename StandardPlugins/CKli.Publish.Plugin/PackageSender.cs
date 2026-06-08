@@ -1,7 +1,7 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
-using CSemVer;
+
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -53,8 +53,8 @@ sealed class PackageSender
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="prereleaseName">The prerelease name. See <see cref="VersionQualityFilter.AcceptsPreleaseName(ReadOnlySpan{char})"/>.</param>
-    /// <param name="ciBuild">Whether the packages to publish are CI builds. See <see cref="SVersionExtensions.IsCI(CSemVer.SVersion)"/>.</param>
+    /// <param name="prereleaseName">The prerelease name. See <see cref="SVersionQualityFilter.AcceptsPreleaseName(ReadOnlySpan{char})"/>.</param>
+    /// <param name="ciBuild">Whether the packages to publish are CI builds. See <see cref="SVersion.IsCI"/>.</param>
     /// <param name="artifactHandler">The artifact handler plugin.</param>
     /// <param name="secretsStore">The secret store.</param>
     /// <returns>A package sender.</returns>

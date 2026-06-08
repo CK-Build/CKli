@@ -2,7 +2,6 @@ using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
-using CSemVer;
 using System;
 using System.Collections.Immutable;
 using System.Linq;

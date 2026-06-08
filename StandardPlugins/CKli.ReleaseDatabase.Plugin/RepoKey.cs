@@ -1,5 +1,5 @@
+using CK.Core;
 using CKli.Core;
-using CSemVer;
 using System;
 
 namespace CKli.ReleaseDatabase.Plugin;

@@ -1,7 +1,6 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
-using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;

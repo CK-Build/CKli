@@ -1,4 +1,4 @@
-using CSemVer;
+using CK.Core;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Xml.Linq;

@@ -1,6 +1,5 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
-using CSemVer;
 using LibGit2Sharp;
 using System;
 using System.Diagnostics.CodeAnalysis;

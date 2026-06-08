@@ -51,7 +51,7 @@ sealed class CKliUpdate : Command
             monitor.Error( "Update command cannot be used in interactive mode." );
             return ValueTask.FromResult( false );
         }
-        var info = CSemVer.InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() );
+        var info = InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() );
         if( !info.IsValidSyntax )
         {
             monitor.Error( $"Invalid assembly version: {info.ParseErrorMessage} in '{info.RawVersion}'." );

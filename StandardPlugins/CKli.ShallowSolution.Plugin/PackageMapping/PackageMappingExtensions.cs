@@ -1,4 +1,4 @@
-using CSemVer;
+using CK.Core;
 using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.ShallowSolution.Plugin;

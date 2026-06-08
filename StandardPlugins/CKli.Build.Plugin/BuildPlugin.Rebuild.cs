@@ -1,6 +1,6 @@
 using CK.Core;
 using CKli.Core;
-using CSemVer;
+
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -51,7 +51,7 @@ public sealed partial class BuildPlugin
                     monitor.Warn( $"Version '{tag.Version.ParsedText}' of '{repo.DisplayPath}' cannot be rebuilt." );
                     if( !warnOnly )
                     {
-                        string invalidTag = $"v{tag.Version.WithBuildMetaData( null )}+invalid";
+                        string invalidTag = $"v{tag.Version.SetBuildMetaData( null )}+invalid";
                         monitor.Info( $"Adding '{invalidTag}' on '{tag.Commit.Sha}'." );
                         repo.GitRepository.Repository.Tags.Add( invalidTag, tag.Commit );
                     }
@@ -76,8 +76,7 @@ public sealed partial class BuildPlugin
         {
             return false;
         }
-        var v = SVersion.TryParse( version );
-        if( !v.IsValid )
+        if( !SVersion.TryParse( version, out var v ) )
         {
             monitor.Error( $"Invalid version argument: {v.ErrorMessage}." );
             return false;

@@ -1,5 +1,4 @@
 using CK.Core;
-using CSemVer;
 using System;
 using System.IO;
 using System.Linq;

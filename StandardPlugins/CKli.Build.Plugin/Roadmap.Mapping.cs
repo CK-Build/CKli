@@ -1,6 +1,7 @@
+using CK.Core;
 using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
-using CSemVer;
+
 using System.Collections.Immutable;
 
 namespace CKli.Build.Plugin;

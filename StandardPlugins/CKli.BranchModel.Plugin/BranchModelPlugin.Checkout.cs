@@ -10,6 +10,15 @@ namespace CKli.BranchModel.Plugin;
 /// </summary>
 public sealed partial class BranchModelPlugin
 {
+    /// <summary>
+    /// Checks out the specified branch.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The minimal CKli context.</param>
+    /// <param name="branchName">The branch name to switch to.</param>
+    /// <param name="useFallback">True to use branch fallbacks.</param>
+    /// <param name="all">Consider all the Repos of the current World.</param>
+    /// <returns>True on success, false otherwise.</returns>
     [Description( "Switch the working folder to the given branch." )]
     [CommandPath( "checkout" )]
     public bool Checkout( IActivityMonitor monitor,
