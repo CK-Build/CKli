@@ -54,7 +54,7 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                 Throw.CKException( $"Invalid primary Plugin namespace '{primaryPlugin.Name}': it must be the same as the assembly name '{aName}'." );
             }
 
-            // Consider that packaged plugins have a valid CSemVer InformationalVersion.
+            // Consider that packaged plugins have a valid InformationalVersion.
             // (source packages use the default .Net 1.0.0+<commit-sha>).
             // This is not ideal but this is simple and efficient and avoid tracking assembly
             // origin to detect source packages vs. packaged ones.
