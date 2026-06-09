@@ -808,6 +808,12 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         }
     }
 
+    /// <summary>
+    /// Creates the <see cref="VersionTagInfo"/> for the Repo.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="repo">The repository to consider.</param>
+    /// <returns>The version information for the repository.</returns>
     protected override VersionTagInfo Create( IActivityMonitor monitor, Repo repo )
     {
         var (infVersion, supVersion) = ReadRepoConfiguration( monitor, repo );
