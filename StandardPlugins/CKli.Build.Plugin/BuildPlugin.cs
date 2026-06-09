@@ -417,23 +417,32 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         // this supports a "natural" force rebuild for the user by deleting the version tag.
         if( !forceRebuild )
         {
-            // Since a local fix has no version tag, always try to skip the build for them.
-            if( targetVersion.IsLocalFix() || versionInfo.TagCommits.ContainsKey( targetVersion ) )
+            if( versionInfo.TagCommits.TryGetValue( targetVersion, out var buildTagCommit ) )
             {
+                // The version tag content is necessarily the same as in the release database: the release database has been
+                // updated during VersionTagInfo creation.
                 var existingRelease = _releaseDatabase.GetReleaseInfo( monitor, versionInfo.Repo, targetVersion, LogLevel.Debug );
+                Throw.DebugAssert( existingRelease == null || existingRelease.Content == buildTagCommit.BuildContentInfo );
                 if( existingRelease != null && existingRelease.HasAllLocalArtifacts( monitor, out var assetsFolder ) )
                 {
                     // build is not required... But may be running tests is required.
                     if( !runTest.Value )
                     {
+                        // Here, the BuildResult.Version can be "local/" or not but it is synchronized with the tag name.
                         monitor.Info( $"Useless build for '{versionInfo.Repo.DisplayPath}/{targetVersion}' skipped." );
-                        return new BuildResult( versionInfo.Repo, targetVersion, existingRelease.Content, assetsFolder );
+                        return new BuildResult( versionInfo.Repo,
+                                                buildTagCommit.Tag,
+                                                buildTagCommit.Version,
+                                                existingRelease.Content,
+                                                assetsFolder,
+                                                skippedBuild: true );
                     }
                 }
             }
             forceRebuild = true;
         }
-
+        // On success, we will create a new BuildResult with a "local/" version.
+        targetVersion = targetVersion.SetParsedPrefix( "local/" );
         var buildInfo = versionInfo.TryGetCommitBuildInfo( monitor, buildCommit, targetVersion, allowRebuild: forceRebuild );
         if( buildInfo == null )
         {
@@ -492,20 +501,14 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                                           CommitBuildInfo buildInfo,
                                                           bool runTest )
         {
-            var buildResult = await repoBuilder.BuildAsync( monitor, buildInfo, runTest ).ConfigureAwait( false );
+            var buildResult = await repoBuilder.BuildAsync( monitor, context, buildInfo, runTest ).ConfigureAwait( false );
             if( buildResult != null )
             {
-                var content = buildResult.Content;
-                if( !releaseDatabase.OnLocalBuild( monitor, buildResult.Repo, buildResult.Version, buildInfo.Rebuilding, content ) )
+                if( !releaseDatabase.OnLocalBuild( monitor, buildResult.Repo, buildResult.Version, buildInfo.Rebuilding, buildResult.Content ) )
                 {
                     return null;
                 }
                 Throw.DebugAssert( buildResult.Version == buildInfo.Version );
-
-                if( !buildInfo.ApplyReleaseBuildTag( monitor, context, content.ToString() ) )
-                {
-                    return null;
-                }
             }
             return buildResult;
         }

@@ -71,11 +71,6 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>
     public bool IsRegularVersion => !IsDeprecatedVersion && !_isFakeVersion;
 
     /// <summary>
-    /// Gets whether this is a "local/" tag.
-    /// </summary>
-    public bool IsLocalTag => true;
-
-    /// <summary>
     /// The tag object.
     /// </summary>
     public Tag Tag => _tag;

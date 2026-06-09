@@ -7,6 +7,7 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Immutable;
 using System.IO;
+using System.Reflection.Metadata;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -53,10 +54,12 @@ public class RepoBuilder : RepoInfo
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">Minimal CKli context.</param>
     /// <param name="buildInfo">The build info.</param>
     /// <param name="runTest">Whether tests should be run or not.</param>
     /// <returns>True on success, false otherwise.</returns>
     public async Task<BuildResult?> BuildAsync( IActivityMonitor monitor,
+                                                CKliEnv context,
                                                 CommitBuildInfo buildInfo,
                                                 bool runTest )
     {
@@ -109,12 +112,18 @@ public class RepoBuilder : RepoInfo
                 if( HandleDeployAssets( monitor, deploymentFolder, buildInfo.Version, out var assetsFolder, out var assetFileNames )
                     && _repoArtifact.PublishToNuGetLocalFeed( monitor, buildInfo.Version, outputPath, out var publishedPackages ) ) 
                 {
+                    var content = new BuildContentInfo( [.. consumedPackages], publishedPackages, assetFileNames );
+                    var tagCommit = buildInfo.ApplyReleaseBuildTag( monitor, context, content.ToString() );
+                    if( tagCommit == null )
+                    {
+                        return null;
+                    }
                     var r = new BuildResult( Repo,
-                                             buildInfo.Version,
-                                             consumedPackages,
-                                             publishedPackages,
+                                             tagCommit.Tag,
+                                             tagCommit.Version,
+                                             content,
                                              assetsFolder,
-                                             assetFileNames );
+                                             skippedBuild: false );
 
                     return r;
                 }

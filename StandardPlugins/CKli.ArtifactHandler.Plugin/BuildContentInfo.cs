@@ -298,18 +298,26 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
     /// <returns>The content info.</returns>
     public override string ToString() => _toString ??= Write( new StringBuilder() ).ToString();
 
-
-#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-
+    /// <summary>
+    /// Overridden to support value equality. See <see cref="Equals(BuildContentInfo?)"/>.
+    /// </summary>
+    /// <param name="left">The first content.</param>
+    /// <param name="right">The second content.</param>
+    /// <returns>True if the first content is the same as the second one.</returns>
     public static bool operator ==( BuildContentInfo? left, BuildContentInfo? right )
     {
         return EqualityComparer<BuildContentInfo>.Default.Equals( left, right );
     }
 
+    /// <summary>
+    /// Overridden to support value equality. See <see cref="Equals(BuildContentInfo?)"/>.
+    /// </summary>
+    /// <param name="left">The first content.</param>
+    /// <param name="right">The second content.</param>
+    /// <returns>True if the first content is not the same as the second one.</returns>
     public static bool operator !=( BuildContentInfo? left, BuildContentInfo? right )
     {
         return !(left == right);
     }
 
-#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
 }

@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core;
 
 using CKli.ArtifactHandler.Plugin;
+using LibGit2Sharp;
 
 namespace CKli.Publish.Plugin;
 
@@ -11,6 +12,7 @@ sealed class RepoPublishInfo
     readonly string _branchName;
     readonly int _index;
     readonly SVersion _publishVersion;
+    readonly Tag _publishTag;
     readonly BuildContentInfo _buildContentInfo;
 
     /// <summary>
@@ -44,21 +46,28 @@ sealed class RepoPublishInfo
     /// </summary>
     public SVersion PublishVersion => _publishVersion;
 
+    /// <summary>
+    /// Gets the tag that contains the version to publish for this repository.
+    /// </summary>
+    public Tag PublishTag => _publishTag;
+
     internal RepoPublishInfo( Repo repo,
                               string branchName,
                               int index,
                               SVersion publishVersion,
+                              Tag publishTag,
                               BuildContentInfo buildContentInfo )
     {
         _repo = repo;
         _branchName = branchName;
         _index = index;
         _publishVersion = publishVersion;
+        _publishTag = publishTag;
         _buildContentInfo = buildContentInfo;
     }
 
-    internal RepoPublishInfo( int index, string branchName, SVersion baseVersion, BuildResult result )
-        : this( result.Repo, branchName, index, result.Version, result.Content )
+    internal RepoPublishInfo( int index, string branchName, BuildResult result )
+        : this( result.Repo, branchName, index, result.Version, result.VersionTag, result.Content )
     {
     }
 }

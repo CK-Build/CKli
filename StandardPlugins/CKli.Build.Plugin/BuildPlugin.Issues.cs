@@ -60,7 +60,7 @@ public sealed partial class BuildPlugin
                                              versionTagInfo,
                                              $"{lightWeightTags.Length} lightweight tags must be transformed to annotated tags.",
                                              screenType.Text( $"""
-                                                {lightWeightTags.Select( t => t.Version.ToString() ).Concatenate()}
+                                                {lightWeightTags.Select( t => t.Version.ParsedText ).Concatenate()}
 
                                                 {rebuildMessage}
                                                 """ ),
@@ -71,13 +71,13 @@ public sealed partial class BuildPlugin
         {
             monitor.Info( $"""
                 The {unreadableMessages.Length} following tags in '{versionTagInfo.Repo.DisplayPath}' have unreadable messages:
-                {unreadableMessages.Select( tc => $"- {tc.Version}:{Environment.NewLine}{tc.TagMessage}{Environment.NewLine}" ).Concatenate( Environment.NewLine )}
+                {unreadableMessages.Select( tc => $"- {tc.Version.ParsedText}:{Environment.NewLine}{tc.TagMessage}{Environment.NewLine}" ).Concatenate( Environment.NewLine )}
                 """ );
             collector( new TagsRebuildIssue( this,
                                              versionTagInfo,
                                              $"{unreadableMessages.Length} tags have unreadable content info (see logs for details).",
                                              screenType.Text( $"""
-                                                {unreadableMessages.Select( t => t.Version.ToString() ).Concatenate()}
+                                                {unreadableMessages.Select( t => t.Version.ParsedText ).Concatenate()}
 
                                                 {rebuildMessage}
                                                 """ ),

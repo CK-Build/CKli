@@ -123,7 +123,8 @@ sealed partial class SimplePublisher
         }
 
         // Enter the atomic phase:
-        // - version tag -> (create draft release -> push build branch with remove remote "dev/" or create remote regular)
+        // - version tag -> (create draft release -> push build branch with removed remote "dev/" or create the remote regular branch).
+
         var versionedTag = "v" + repo.PublishVersion.ToString();
         if( !r.PushTags( monitor, [versionedTag] ) )
         {

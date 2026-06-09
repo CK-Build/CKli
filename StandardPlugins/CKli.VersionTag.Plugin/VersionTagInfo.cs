@@ -221,11 +221,12 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="buildCommit">The build commit selected by the build.</param>
-    /// <param name="version">The target version.</param>
+    /// <param name="version">The target version. This is necessarily a "local/" prefixed version.</param>
     /// <param name="allowRebuild">True if the user allows a rebuild of an already built commit.</param>
     /// <returns>The commit build info on success, null on error.</returns>
     public CommitBuildInfo? TryGetCommitBuildInfo( IActivityMonitor monitor, Commit buildCommit, SVersion version, bool allowRebuild )
     {
+        Throw.CheckArgument( version.ParsedPrefix == "local/" );
         // Preconditions for any commit.
         if( !CanBuildAnyCommit( monitor, buildCommit, version, allowRebuild, out bool isRebuild ) )
         {
@@ -489,8 +490,9 @@ public sealed partial class VersionTagInfo : RepoInfo
                 """;
     }
 
-    internal void AddReleaseBuildTag( SVersion version, Commit buildCommit, Tag t )
+    internal TagCommit AddReleaseBuildTag( SVersion version, Commit buildCommit, Tag t )
     {
+        Throw.DebugAssert( version.ParsedPrefix == "local/" );
         Throw.DebugAssert( !_v2C.ContainsKey( version ) );
         Throw.DebugAssert( _sha2C != null );
         Throw.DebugAssert( "This must have been checked by TryGetCommitBuildInfo.",
@@ -506,6 +508,7 @@ public sealed partial class VersionTagInfo : RepoInfo
             _lastStables.Insert( ~idx, newOne );
             _lastMajorMinorStables = default;
         }
+        return newOne;
     }
 
     /// <summary>

@@ -570,10 +570,6 @@ public sealed partial class Roadmap
                 var published = releaseDatabase.GetBuildContentInfo( monitor, _solution.Repo, targetVersion, fromPublished: true );
                 if( published != null )
                 {
-                    //monitor.Warn( $"""
-                    //    Repository '{Repo.DisplayPath}' must be build in version '{targetVersion}' but this version already appears in the published database with the content:
-                    //    {published}
-                    //    """ );
                     monitor.Error( $"""
                         Repository '{Repo.DisplayPath}' must be build in version '{targetVersion}' but this version already appears in the published database with the content:
                         {published}
@@ -668,7 +664,7 @@ public sealed partial class Roadmap
         /// <summary>
         /// Gets whether this solution must be built.
         /// </summary>
-        [MemberNotNullWhen( true, nameof( BuildInfo ) )]
+        [MemberNotNullWhen( true, nameof( BuildInfo ), nameof( _buildInfo ) )]
         public bool MustBuild => _buildInfo != null && _buildInfo.MustBuild;
 
         /// <summary>
@@ -683,15 +679,15 @@ public sealed partial class Roadmap
         /// true and after a successful <see cref="Roadmap.BuildAsync(IActivityMonitor, CKliEnv, BuildPlugin, bool?, int)"/>.
         /// </summary>
         /// <returns>The version and content to publish.</returns>
-        public (SVersion Version, BuildContentInfo Content) GetFinalPublishInfo()
+        public (SVersion Version, Tag Tag, BuildContentInfo Content) GetFinalPublishInfo()
         {
             Throw.CheckState( MustPublish );
             Throw.CheckState( "A successful build must have been done before.", !MustBuild || BuildInfo.BuildResult != null );
 
             Throw.DebugAssert( MustBuild || _lastBuildToPublish != null );
             return MustBuild
-                    ? (BuildInfo.TargetVersion, BuildInfo.BuildResult!.Content)
-                    : (CurrentVersion, _lastBuildToPublish!);
+                    ? (BuildInfo.TargetVersion, BuildInfo.BuildResult!.VersionTag, BuildInfo.BuildResult!.Content)
+                    : (CurrentVersion, _lastBuild.TagCommit.Tag, _lastBuildToPublish!);
         }
 
         /// <summary>
@@ -712,7 +708,7 @@ public sealed partial class Roadmap
 
             var statusAndName = RepoName( screen, Repo, MustBuild, BuildInfo == null );
             r = r.AddRight( statusAndName );
-            var currentVersion = CurrentVersion.ParsedText!;
+            var currentVersion = $"v{CurrentVersion}";
             if( MustBuild )
             {
                 Throw.DebugAssert( "An error has been emitted if a MustBuild target version has already been published.",

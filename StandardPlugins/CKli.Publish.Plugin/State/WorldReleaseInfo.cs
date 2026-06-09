@@ -75,8 +75,8 @@ sealed class WorldReleaseInfo
                                     ? s.Solution.Branch.BranchName.DevName
                                     : s.Solution.Branch.BranchName.Name;
 
-                var (version, content) = s.GetFinalPublishInfo();
-                var r = new RepoPublishInfo( s.Repo, branchName, i, version, content );
+                var (version, tag, content) = s.GetFinalPublishInfo();
+                var r = new RepoPublishInfo( s.Repo, branchName, i, version, tag, content );
                 repoInfos[i++] = r;
                 publishedLength += r.PublishedLength;
             }
@@ -103,7 +103,7 @@ sealed class WorldReleaseInfo
         for( int i = 0; i < results.Length; i++ )
         {
             var b = results[i];
-            var r = new RepoPublishInfo( i, fixWorkflow.Targets[i].BranchName, SVersion.Create( b.Version.Major, b.Version.Minor, b.Version.Patch - 1), b );
+            var r = new RepoPublishInfo( i, fixWorkflow.Targets[i].BranchName, b );
             repoInfos[i++] = r;
             publishedLength += r.PublishedLength;
         }

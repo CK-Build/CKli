@@ -230,7 +230,7 @@ public sealed partial class BuildPlugin
 
             GitRepository gitRepository = target.Repo.GitRepository;
 
-            var branch = gitRepository.GetBranch( monitor, target.BranchName, CK.Core.LogLevel.Error );
+            var branch = gitRepository.GetBranch( monitor, target.BranchName, LogLevel.Error );
             if( branch == null )
             {
                 return false;

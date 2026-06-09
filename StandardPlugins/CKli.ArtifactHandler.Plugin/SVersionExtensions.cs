@@ -24,6 +24,13 @@ public static class SVersionExtensions
     public static bool IsFake( this SVersion version ) => version.BuildMetaData.Equals( "fake", StringComparison.Ordinal );
 
     /// <summary>
+    /// Gets whether <see cref="SVersion.ParsedPrefix"/> is "local/".
+    /// </summary>
+    /// <param name="version">This version.</param>
+    /// <returns>True if this is a "local/" prefixed version.</returns>
+    public static bool IsLocal( this SVersion version ) => version.ParsedPrefix.AsSpan().Equals( "local/", StringComparison.Ordinal );
+
+    /// <summary>
     /// Gets whether <see cref="SVersion.BuildMetaData"/> is "fake" and ensures that the <paramref name="normalized"/> fake version
     /// has no prerelease part.
     /// </summary>

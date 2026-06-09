@@ -1,5 +1,7 @@
 using CK.Core;
 using CKli.Core;
+using LibGit2Sharp;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -10,69 +12,48 @@ namespace CKli.ArtifactHandler.Plugin;
 
 /// <summary>
 /// Captures the result of a successful repository build.
+/// This result can have a true <see cref="SkippedBuild"/> (the commit to build was
+/// already built).
 /// </summary>
 public sealed partial class BuildResult
 {
     readonly Repo _repo;
+    readonly Tag _versionTag;
     readonly SVersion _version;
     readonly BuildContentInfo _buildContentInfo;
     readonly NormalizedPath _assetsFolder;
     readonly bool _skippedBuild;
 
     /// <summary>
-    /// Initializes a build result. <see cref="SkippedBuild"/> is false.
+    /// Initializes a result.
     /// </summary>
     /// <param name="repo">The repository.</param>
-    /// <param name="version">The built version.</param>
-    /// <param name="consumed">The consumed sorted packages. Must be unique and sorted.</param>
-    /// <param name="produced">
-    /// The produced package identifiers.
-    /// Must be unique, lexicographically sorted, have no <see cref="Path.GetInvalidFileNameChars()"/>, no comma and space characters.
+    /// <param name="versionTag">The version tag. It must be up to date and not change anymore.</param>
+    /// <param name="version">
+    /// The built or already built version.
+    /// When <see cref="SkippedBuild"/> is false, this <see cref="SVersion.ParsedPrefix"/> is necessarily "local/".
     /// </param>
-    /// <param name="assetsFolder">
-    /// Assets folder is "$Local/&lt;world name&gt;/Assets/&lt;repo name&gt;/&lt;version&gt;".
-    /// <see cref="NormalizedPath.IsEmptyPath"/> if there is no assets.
-    /// </param>
-    /// <param name="assetFileNames">
-    /// The asset file names.
-    /// Must be unique, lexicographically sorted, have no <see cref="Path.GetInvalidFileNameChars()"/>, no comma and space characters.
-    /// </param>
-    public BuildResult( Repo repo,
-                        SVersion version,
-                        ImmutableArray<PackageInstance> consumed,
-                        ImmutableArray<string> produced,
-                        NormalizedPath assetsFolder,
-                        ImmutableArray<string> assetFileNames )
-    {
-        _buildContentInfo = new BuildContentInfo( [..consumed],
-                                                  produced,
-                                                  assetFileNames );
-        if( !assetFileNames.IsEmpty ) _assetsFolder = assetsFolder;
-        _repo = repo;
-        _version = version;
-    }
-
-    /// <summary>
-    /// Initializes a <see cref="SkippedBuild"/> result.
-    /// </summary>
-    /// <param name="repo">The repository.</param>
-    /// <param name="version">The built version.</param>
     /// <param name="content">Existing content info.</param>
     /// <param name="assetsFolder">
     /// Assets folder is "$Local/&lt;world name&gt;/Assets/&lt;repo name&gt;/&lt;version&gt;".
-    /// <see cref="NormalizedPath.IsEmptyPath"/> if there is no assets.
+    /// <see cref="NormalizedPath.IsEmptyPath"/> if there is no <see cref="BuildContentInfo.AssetFileNames"/>.
     /// </param>
+    /// <param name="skippedBuild">Whether the build has been skipped (the version is up to date and artefacts are available).</param>
     public BuildResult( Repo repo,
+                        Tag versionTag, 
                         SVersion version,
                         BuildContentInfo content,
-                        NormalizedPath assetsFolder )
+                        NormalizedPath assetsFolder,
+                        bool skippedBuild )
     {
         Throw.CheckArgument( assetsFolder.IsEmptyPath == content.AssetFileNames.IsEmpty );
+        Throw.CheckArgument( skippedBuild || version.ParsedPrefix == "local/" );
         _repo = repo;
+        _versionTag = versionTag;
         _version = version;
         _buildContentInfo = content;
         _assetsFolder = assetsFolder;
-        _skippedBuild = true;
+        _skippedBuild = skippedBuild;
     }
 
     /// <summary>
@@ -82,8 +63,15 @@ public sealed partial class BuildResult
 
     /// <summary>
     /// Gets the version built.
+    /// When <see cref="SkippedBuild"/> is false, this <see cref="SVersion.ParsedPrefix"/> is necessarily "local/".
     /// </summary>
     public SVersion Version => _version;
+
+    /// <summary>
+    /// Gets the commit's version tag.
+    /// This tag is up to date and may be a non "local/" one if <see cref="SkippedBuild"/> is true.
+    /// </summary>
+    public Tag VersionTag => _versionTag;
 
     /// <summary>
     /// Gets whether the build has been skipped (the release database
