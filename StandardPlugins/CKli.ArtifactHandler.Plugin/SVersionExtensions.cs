@@ -31,27 +31,6 @@ public static class SVersionExtensions
     public static bool IsLocal( this SVersion version ) => version.ParsedPrefix.AsSpan().Equals( "local/", StringComparison.Ordinal );
 
     /// <summary>
-    /// Gets whether <see cref="SVersion.BuildMetaData"/> is "fake" and ensures that the <paramref name="normalized"/> fake version
-    /// has no prerelease part.
-    /// </summary>
-    /// <param name="version">This version.</param>
-    /// <param name="normalized">The normalized fake version: a fake version is a stable version.</param>
-    /// <returns>True if this is a "+fake" version.</returns>
-    public static bool IsFake( this SVersion version, [NotNullWhen(true)]out SVersion? normalized )
-    {
-        if( version.BuildMetaData.Equals( "fake", StringComparison.Ordinal ) )
-        {
-            // We use Parse here to have a non null ParsedText.
-            normalized = version.IsPrerelease
-                            ? SVersion.ParseNoThrow( $"{version.ParsedPrefix}v{version.Major}.{version.Minor}.{version.Patch}+fake", checkBuildMetaDataSyntax: false )
-                            : version;
-            return true;
-        }
-        normalized = null;
-        return false;
-    }
-
-    /// <summary>
     /// Gets whether this version is a "rough base" of the target. This version MUST be <see cref="SVersion.IsStable"/> otherwise
     /// an <see cref="InvalidOperationException"/> is thrown. The target is roughly based on this version if it has
     /// the same Major.Minor.Patch or any valid increment (Major+1.0.0, Major.Minor+1.0 or Major.Minor.Patch+1).

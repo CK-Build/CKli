@@ -6,6 +6,7 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Xml.Linq;
@@ -832,6 +833,9 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags = null;
         bool hasBadTagNames = false;
         var r = repo.GitRepository.Repository;
+
+        List<string>? nonConformantTags = null;
+        List<string>? invalidParsedPrefixTags = null;
         foreach( var t in r.Tags )
         {
             var tagName = t.FriendlyName;
@@ -840,9 +844,29 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 hasBadTagNames = true;
                 continue;
             }
-            // Consider only SVersion tag and target that is a commit (safe cast).
-            if( !SVersion.TryParse( tagName, out var v, allowPrefix: true ) || t.Target is not Commit c )
+            // Consider only target that is a commit (safe cast).
+            if( t.Target is not Commit c )
             {
+                continue;
+            }
+            // Consider only tag that are Conformant SVersion and a empty or "local/" ParsedPrefix.
+            bool invalidParsedPrefix = false;
+            if( !SVersion.TryParse( tagName, out var v, allowPrefix: true, mustBeCSVersion: true )
+                || (invalidParsedPrefix = (!string.IsNullOrEmpty( v.ParsedPrefix ) && v.ParsedPrefix != "local/")) )
+            {
+                if( invalidParsedPrefix )
+                {
+                    invalidParsedPrefixTags ??= [];
+                    invalidParsedPrefixTags.Add( tagName );
+                }
+                else if( SVersion.TryParse( tagName, out var nonConform, allowPrefix: true ) )
+                {
+                    // The ToString is the "ErrorMessage (ParsedText)".
+                    Debug.Assert( !v.IsValid );
+                    nonConformantTags ??= [];
+                    nonConformantTags.Add( v.ToString() );
+                }
+                // Otherwise, the tag doesn't look like a version, ignore it silently.
                 continue;
             }
             // Above or equal to SupVersion or below or equal to InfVersion: ignore.
@@ -855,7 +879,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             // across the repositories. Once the bad tag doesn't appear anywhere, a +invalid tag 
             // must be removed.
             //
-            if( v.BuildMetaData.Contains( "invalid", StringComparison.Ordinal ) )
+            if( v.HasInvalidMetadata )
             {
                 invalidTags ??= new Dictionary<SVersion, (SVersion V, Tag T)>();
                 // If the same version+invalid has been found already, it is an error (DuplicateInvalidTag)
@@ -901,33 +925,34 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             // We consider that a CI build version cannot be +fake or +deprecated and
             // we collect these as errors to simplify the system.
             //
-            bool isFakeVersion;
-            bool isDeprecatedVersion;
-            if( v.IsFake( out var vFake ) )
-            {
-                isFakeVersion = true;
-                isDeprecatedVersion = false;
-                v = vFake;
-            }
-            else
-            {
-                isFakeVersion = false;
-                isDeprecatedVersion = v.BuildMetaData.Contains( "deprecated", StringComparison.Ordinal );
-            }
-
-
             DeprecatedTagInfo? deprecatedInfo = null;
-            if( isDeprecatedVersion && !DeprecatedTagInfo.TryParse( t.Annotation?.Message, out deprecatedInfo ) )
+            if( v.HasDeprecatedMetadata && !DeprecatedTagInfo.TryParse( t.Annotation?.Message, out deprecatedInfo ) )
             {
                 badDeprecatedTags ??= new List<Tag>();
                 badDeprecatedTags.Add( t );
             }
             else
             {
-                var tc = new TagCommit( v, c, t, isFakeVersion, deprecatedInfo );
+                var tc = new TagCommit( v, c, t, v.HasFakeMetadata, deprecatedInfo );
                 validTags.Add( tc );
             }
         }
+        if( nonConformantTags != null || invalidParsedPrefixTags != null )
+        {
+            if( nonConformantTags != null )
+            {
+                var sep = Environment.NewLine + "- ";
+                monitor.Warn( $"Ignored {nonConformantTags.Count} non Conformant SVersion tags:{sep}{nonConformantTags.Concatenate( sep )}" );
+            }
+            if( invalidParsedPrefixTags != null )
+            {
+                monitor.Warn( $"""
+                    Ignored {invalidParsedPrefixTags.Count} tags with an unexpected prefix:
+                    '{invalidParsedPrefixTags.Concatenate( "', '" )}'.
+                    """ );
+            }
+        }
+
         // Second pass: filters out the invalid tags and produces the v2C index
         //              along with potential tag conflicts.
         //              During this pass, we also compute the topHot (that is the greatest regular version tag).

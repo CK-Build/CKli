@@ -4,6 +4,7 @@ using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ReleaseDatabase.Plugin;
 using CKli.VersionTag.Plugin;
+using LibGit2Sharp;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -116,7 +117,7 @@ sealed partial class SimplePublisher
         GitRepository r = repo.Repo.GitRepository;
         // To create a release, hosting providers (like GitHub) require that the tag exists in the repository, so it's time to push it.
         // The build branch name must obviously exist.
-        var branch = r.GetBranch( monitor, repo.BranchName, missingLocalAndRemote: LogLevel.Error );
+        var branch = r.GetBranch( monitor, repo.BranchName, missingLocalAndRemote: CK.Core.LogLevel.Error );
         if( branch == null )
         {
             return null;
@@ -124,24 +125,32 @@ sealed partial class SimplePublisher
 
         // Enter the atomic phase:
         // - version tag -> (create draft release -> push build branch with removed remote "dev/" or create the remote regular branch).
-
-        var versionedTag = "v" + repo.PublishVersion.ToString();
-        if( !r.PushTags( monitor, [versionedTag] ) )
+        var tag = repo.PublishTag;
+        Throw.DebugAssert( repo.PublishVersion.IsLocal() == tag.CanonicalName.StartsWith( "refs/tags/local/", System.StringComparison.Ordinal ) );
+        if( repo.PublishVersion.IsLocal() )
+        {
+            r.Repository.Tags.Remove( tag.CanonicalName );
+            tag = r.Repository.ApplyTag( $"v{repo.PublishVersion}",
+                                         repo.PublishTag.Target.Sha,
+                                         repo.PublishTag.Annotation.Tagger,
+                                         repo.BuildContentInfo.ToString() );
+        }
+        if( !r.PushTags( monitor, [tag.CanonicalName] ) )
         {
             return null;
         }
 
-        _releaseId = await CreateDraftReleaseAndPushBranches( monitor, repo, versionedTag, r, branch, cancel ).ConfigureAwait( false );
+        _releaseId = await CreateDraftReleaseAndPushBranches( monitor, repo, tag.FriendlyName, r, branch, cancel ).ConfigureAwait( false );
 
         if( _releaseId == null )
         {
             // Compensate!
             // Tries to remove the pushed version tag.
-            if( !r.DeleteRemoteTags( monitor, [versionedTag] ) )
+            if( !r.DeleteRemoteTags( monitor, [tag.CanonicalName] ) )
             {
                 monitor.Error( $"""
                     Error while compensating the previous error.
-                    The tag '{versionedTag}' has been pushed but should be removed from the 'origin' remote '{r.RepositoryKey.OriginUrl}'.
+                    The tag '{tag.CanonicalName}' has been pushed but should be removed from the 'origin' remote '{r.RepositoryKey.OriginUrl}'.
                     """ );
             }
             return null;
@@ -151,7 +160,12 @@ sealed partial class SimplePublisher
                 : _state.ForwardPrimaryCursor( monitor, forwardLength );
     }
 
-    async Task<string?> CreateDraftReleaseAndPushBranches( IActivityMonitor monitor, RepoPublishInfo repo, string versionedTag, GitRepository r, LibGit2Sharp.Branch branch, CancellationToken cancel )
+    async Task<string?> CreateDraftReleaseAndPushBranches( IActivityMonitor monitor,
+                                                           RepoPublishInfo repo,
+                                                           string versionedTag,
+                                                           GitRepository r,
+                                                           Branch branch,
+                                                           CancellationToken cancel )
     {
         Throw.DebugAssert( _hostingProvider != null );
         var releaseId = await _hostingProvider.CreateDraftReleaseAsync( monitor, _hostedRepoPath, versionedTag, cancel ).ConfigureAwait( false );
@@ -171,7 +185,7 @@ sealed partial class SimplePublisher
                 // We are publishing a CI: the regular branch MAY be new to the remote when the repository is a brand new one.
                 var regularName = BranchName.ToRegularBranchName( repo.BranchName );
                 // Defensive programming: the regular branch must exist locally.
-                var b = r.GetBranch( monitor, regularName, LogLevel.Warn );
+                var b = r.GetBranch( monitor, regularName, CK.Core.LogLevel.Warn );
                 if( b != null && b.TrackedBranch == null )
                 {
                     monitor.Warn( $"Branch '{regularName}' has no tracked branch. Creating branch 'origin/{regularName}'." );
