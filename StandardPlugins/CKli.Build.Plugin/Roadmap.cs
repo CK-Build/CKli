@@ -20,8 +20,8 @@ public sealed partial class Roadmap
 {
     readonly VersionTagPlugin _versionTags;
     readonly HotGraph _graph;
+    readonly CIBuildMode _ciBuildMode;
     readonly bool _isPullBuild;
-    readonly bool _isCIBuild;
     readonly bool _mustPublish;
     readonly ImmutableArray<BuildSolution> _orderedSolutions;
     readonly ImmutableArray<BuildSolution> _pivots;
@@ -34,14 +34,14 @@ public sealed partial class Roadmap
              HotGraph graph,
              HotGraph.PackageUpdater packageUpdater,
              bool isPullBuild,
-             bool isCIBuild,
+             CIBuildMode ciBuildMode,
              bool mustPublish )
     {
         _versionTags = versionTags;
         _graph = graph;
         _packageUpdater = packageUpdater;
         _isPullBuild = isPullBuild;
-        _isCIBuild = isCIBuild;
+        _ciBuildMode = ciBuildMode;
         _mustPublish = mustPublish;
         var buildSolutions = new BuildSolution[graph.Solutions.Count];
         var pivots = graph.HasPivots ? new BuildSolution[graph.Pivots.Count] : buildSolutions;
@@ -58,7 +58,7 @@ public sealed partial class Roadmap
             }
         }
         _orderedSolutions = ImmutableCollectionsMarshal.AsImmutableArray( buildSolutions );
-        _packageMapping = new Mapping( packageUpdater, _orderedSolutions, isCIBuild );
+        _packageMapping = new Mapping( packageUpdater, _orderedSolutions, _ciBuildMode != CIBuildMode.None );
         _pivots = ImmutableCollectionsMarshal.AsImmutableArray( pivots );
     }
 
@@ -68,7 +68,7 @@ public sealed partial class Roadmap
                                      ArtifactHandlerPlugin artifactHandler,
                                      HotGraph graph,
                                      bool isPullBuild,
-                                     bool isCIBuild,
+                                     CIBuildMode ciBuildMode,
                                      bool mustPublish )
     {
 
@@ -93,7 +93,7 @@ public sealed partial class Roadmap
             var packageUpdater = graph.GetPackageUpdater( monitor );
             if( packageUpdater == null ) return null;
 
-            roadmap = new Roadmap( versionTags, graph, packageUpdater, isPullBuild, isCIBuild, mustPublish );
+            roadmap = new Roadmap( versionTags, graph, packageUpdater, isPullBuild, ciBuildMode, mustPublish );
             if( !roadmap.Initialize( monitor ) )
             {
                 return null;
@@ -146,7 +146,7 @@ public sealed partial class Roadmap
     /// <summary>
     /// Gets whether this is a build on the "dev/" branch (produces CI packages).
     /// </summary>
-    public bool IsCIBuild => _isCIBuild;
+    public bool IsCIBuild => _ciBuildMode != CIBuildMode.None;
 
     /// <summary>
     /// Gets whether this roadmap must eventually be published or if the artifacts must be kept locally.

@@ -15,12 +15,19 @@ using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Build.Plugin;
 
-
 public sealed partial class BuildPlugin : PrimaryPluginBase
 {
-    const string _descBranch = "Specify the branch to consider. By default, the current head is considered when in a Repo.";
-    const string _descMaxDoP = "Maximal Degree of Parallelism. Defaults to 4.";
-    const string _descDryRun = "Only display the build roadmap.";
+    const string _dBranch = "Specify the branch to consider. By default, the current head is considered when in a Repo.";
+    const string _oBranch = "--branch,-b";
+    const string _dMaxDoP = "Maximal Degree of Parallelism. Defaults to 4.";
+    const string _dCI = "Build CI versions instead of regular exploratory, prerelease or stable versions.";
+    const string _oCI = "--ci";
+    const string _dCIForce = "Extends --ci to build a ci.0 version when a regular version is available.";
+    const string _oCIForce = "--ci.0";
+    const string _dSkipTests = "Don't run tests even if they have never locally run on the commit.";
+    const string _dForceTests = "Run tests even if they have already run successfully on the commit.";
+    const string _dDryRun = "Only display the build roadmap.";
+    const string _oDryRun = "--dry-run,-d";
 
     readonly VersionTagPlugin _versionTags;
     readonly BranchModelPlugin _branchModel;
@@ -66,172 +73,214 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// </summary>
     public PerfectEvent<FixBuildEventArgs> OnFixBuild => _onFixBuild.PerfectEvent;
 
-    [Description( "Build-Test-Package and propagates packages in CI versions from the current repositories to their consumers, keeping them local." )]
-    [CommandPath( "ci build" )]
-    public Task<bool> CIBuildAsync( IActivityMonitor monitor,
-                               CKliEnv context,
-                               [Description( _descBranch )]
-                               [OptionName("--branch,-b")]
-                               string? branch = null,
-                               [Description( _descMaxDoP )]
-                               string? maxDop = null,
-                               [Description( "Build all the Repos, not only the current repositories and their consumers." )]
-                               bool all = false,
-                               [Description( "Don't run tests even if they have never locally run on the commit." )]
-                               bool skipTests = false,
-                               [Description( "Run tests even if they have already run successfully on the commit." )]
-                               bool forceTests = false,
-                               [Description( _descDryRun )]
-                               [OptionName("--dry-run,-d")]
-                               bool dryRun = false )
-    {
-        return DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: false );
-    }
+    //#region ci
+    //[Description( "Build-Test-Package and propagates packages in CI versions from the current repositories to their consumers, keeping them local." )]
+    //[CommandPath( "ci build" )]
+    //public Task<bool> CIBuildAsync( IActivityMonitor monitor,
+    //                   CKliEnv context,
+    //                   [Description( _descBranch )]
+    //                           [OptionName("--branch,-b")]
+    //                           string? branch = null,
+    //                   [Description( _descMaxDoP )]
+    //                           string? maxDop = null,
+    //                   [Description( "Build all the Repos, not only the current repositories and their consumers." )]
+    //                           bool all = false,
+    //                   [Description( "Don't run tests even if they have never locally run on the commit." )]
+    //                           bool skipTests = false,
+    //                   [Description( "Run tests even if they have already run successfully on the commit." )]
+    //                           bool forceTests = false,
+    //                   [Description( _descDryRun )]
+    //                           [OptionName("--dry-run,-d")]
+    //                           bool dryRun = false )
+    //{
+    //    return DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: false );
+    //}
 
-    [Description( "Build-Test-Package and propagates packages in CI versions from the current repositories to their consumers and publishes all the artifacts." )]
-    [CommandPath( "ci publish" )]
-    public Task<bool> CIPublishAsync( IActivityMonitor monitor,
-                                 CKliEnv context,
-                                 [Description( _descBranch )]
-                                 [OptionName("--branch,-b")]
-                                 string? branch = null,
-                                 [Description( _descMaxDoP )]
-                                 string? maxDop = null,
-                                 [Description( "Build all the Repos, not only the current repositories and their consumers." )]
-                                 bool all = false,
-                                 [Description( "Don't run tests even if they have never locally run on the commit." )]
-                                 bool skipTests = false,
-                                 [Description( "Run tests even if they have already run successfully on the commit." )]
-                                 bool forceTests = false,
-                                 [Description( _descDryRun )]
-                                 [OptionName("--dry-run,-d")]
-                                 bool dryRun = false )
-    {
-        return DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: true );
-    }
+    //[Description( "Build-Test-Package and propagates packages in CI versions from the current repositories to their consumers and publishes all the artifacts." )]
+    //[CommandPath( "ci publish" )]
+    //public Task<bool> CIPublishAsync( IActivityMonitor monitor,
+    //                             CKliEnv context,
+    //                             [Description( _descBranch )]
+    //                             [OptionName("--branch,-b")]
+    //                             string? branch = null,
+    //                             [Description( _descMaxDoP )]
+    //                             string? maxDop = null,
+    //                             [Description( "Build all the Repos, not only the current repositories and their consumers." )]
+    //                             bool all = false,
+    //                             [Description( "Don't run tests even if they have never locally run on the commit." )]
+    //                             bool skipTests = false,
+    //                             [Description( "Run tests even if they have already run successfully on the commit." )]
+    //                             bool forceTests = false,
+    //                             [Description( _descDryRun )]
+    //                             [OptionName("--dry-run,-d")]
+    //                             bool dryRun = false )
+    //{
+    //    return DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: true );
+    //}
 
-    [Description( "Build-Test-Package the consumers of the current repositories and propagates packages in CI versions to their consumers, keeping them local." )]
-    [CommandPath( "ci *build" )]
-    public Task<bool> CIStarBuildAsync( IActivityMonitor monitor,
-                                   CKliEnv context,
-                                   [Description( _descBranch )]
-                                   [OptionName("--branch,-b")]
-                                   string? branch = null,
-                                   [Description( _descMaxDoP )]
-                                   string? maxDop = null,
-                                   [Description( "Build all the Repos, not only the ones that consume or produce the current repositories." )]
-                                   bool all = false,
-                                   [Description( "Don't run tests even if they have never locally run on the commit." )]
-                                   bool skipTests = false,
-                                   [Description( "Run tests even if they have already run successfully on the commit." )]
-                                   bool forceTests = false,
-                                   [Description( _descDryRun )]
-                                   [OptionName("--dry-run,-d")]
-                                   bool dryRun = false )
-    {
-        return DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: false );
-    }
+    //[Description( "Build-Test-Package the consumers of the current repositories and propagates packages in CI versions to their consumers, keeping them local." )]
+    //[CommandPath( "ci *build" )]
+    //public Task<bool> CIStarBuildAsync( IActivityMonitor monitor,
+    //                               CKliEnv context,
+    //                               [Description( _descBranch )]
+    //                               [OptionName("--branch,-b")]
+    //                               string? branch = null,
+    //                               [Description( _descMaxDoP )]
+    //                               string? maxDop = null,
+    //                               [Description( "Build all the Repos, not only the ones that consume or produce the current repositories." )]
+    //                               bool all = false,
+    //                               [Description( "Don't run tests even if they have never locally run on the commit." )]
+    //                               bool skipTests = false,
+    //                               [Description( "Run tests even if they have already run successfully on the commit." )]
+    //                               bool forceTests = false,
+    //                               [Description( _descDryRun )]
+    //                               [OptionName("--dry-run,-d")]
+    //                               bool dryRun = false )
+    //{
+    //    return DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: false );
+    //}
 
-    [Description( "Build-Test-Package the consumers of the current repositories and propagates packages in CI versions to their consumers and publishes all the artifacts." )]
-    [CommandPath( "ci *publish" )]
-    public Task<bool> CIStarPublishAsync( IActivityMonitor monitor,
-                                     CKliEnv context,
-                                     [Description( _descBranch )]
-                                     [OptionName("--branch,-b")]
-                                     string? branch = null,
-                                     [Description( _descMaxDoP )]
-                                     string? maxDop = null,
-                                     [Description( "Build all the Repos, not only the ones that consume or produce the current repositories." )]
-                                     bool all = false,
-                                     [Description( "Don't run tests even if they have never locally run on the commit." )]
-                                     bool skipTests = false,
-                                     [Description( "Run tests even if they have already run successfully on the commit." )]
-                                     bool forceTests = false,
-                                     [Description( _descDryRun )]
-                                     [OptionName("--dry-run,-d")]
-                                     bool dryRun = false )
-    {
-        return DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: true );
-    }
+    //[Description( "Build-Test-Package the consumers of the current repositories and propagates packages in CI versions to their consumers and publishes all the artifacts." )]
+    //[CommandPath( "ci *publish" )]
+    //public Task<bool> CIStarPublishAsync( IActivityMonitor monitor,
+    //                                 CKliEnv context,
+    //                                 [Description( _descBranch )]
+    //                                 [OptionName("--branch,-b")]
+    //                                 string? branch = null,
+    //                                 [Description( _descMaxDoP )]
+    //                                 string? maxDop = null,
+    //                                 [Description( "Build all the Repos, not only the ones that consume or produce the current repositories." )]
+    //                                 bool all = false,
+    //                                 [Description( "Don't run tests even if they have never locally run on the commit." )]
+    //                                 bool skipTests = false,
+    //                                 [Description( "Run tests even if they have already run successfully on the commit." )]
+    //                                 bool forceTests = false,
+    //                                 [Description( _descDryRun )]
+    //                                 [OptionName("--dry-run,-d")]
+    //                                 bool dryRun = false )
+    //{
+    //    return DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: true );
+    //} 
+    //#endregion
 
     [Description( "Build-Test-Package and propagates packages from the current repositories to their consumers, keeping them local." )]
     [CommandPath( "build" )]
     public Task<bool> BuildAsync( IActivityMonitor monitor,
                                   CKliEnv context,
-                                  [Description( _descBranch )]
-                                  [OptionName( "--branch,-b" )]
+                                  [Description( _dBranch )]
+                                  [OptionName( _oBranch )]
                                   string? branch = null,
-                                  [Description( _descMaxDoP )]
+                                  [Description( _dMaxDoP )]
                                   string? maxDop = null,
-                                  [Description( "Build all the Repos, not only the current repositories and their consumers." )]
-                                  bool all = false,
-                                  [Description( "Run tests even if they have already run successfully on the commit." )]
+                                  [Description( _dCI )]
+                                  [OptionName( _oCI )]
+                                  bool ci = false,
+                                  [Description( _dCIForce )]
+                                  [OptionName(_oCIForce)]
+                                  bool ciForce = false,
+                                  [Description( _dSkipTests )]
+                                  bool skipTests = false,
+                                  [Description( _dForceTests )]
                                   bool forceTests = false,
-                                  [Description( _descDryRun )]
-                                  [OptionName("--dry-run,-d")]
-                                  bool dryRun = false )
+                                  [Description( _dDryRun )]
+                                  [OptionName(_oDryRun)]
+                                  bool dryRun = false,
+                                  [Description( "Build all the Repos, not only the current repositories and their consumers." )]
+                                  bool all = false )
     {
-        return DoNonCIAsync( monitor, context, branch, maxDop, all, forceTests, dryRun, isPullBuild: false, publish: false );
+        return ci || ciForce
+            ? DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: false )
+            : DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: false );
     }
 
     [Description( "Build-Test-Package and propagates packages from the current repositories to their consumers and publishes all the artifacts." )]
     [CommandPath( "publish" )]
     public Task<bool> PublishAsync( IActivityMonitor monitor,
-                               CKliEnv context,
-                               [Description( _descBranch )]
-                               [OptionName( "--branch,-b" )]
-                               string? branch = null,
-                               [Description( _descMaxDoP )]
-                               string? maxDop = null,
-                               [Description( "Publish all the Repos, not only the current repositories and their consumers." )]
-                               bool all = false,
-                               [Description( "Run tests even if they have already run successfully on the commit." )]
-                               bool forceTests = false,
-                               [Description( _descDryRun )]
-                               [OptionName("--dry-run,-d")]
-                               bool dryRun = false )
+                                    CKliEnv context,
+                                    [Description( _dBranch )]
+                                    [OptionName( _oBranch )]
+                                    string? branch = null,
+                                    [Description( _dMaxDoP )]
+                                    string? maxDop = null,
+                                    [Description( _dCI )]
+                                    [OptionName( _oCI )]
+                                    bool ci = false,
+                                    [Description( _dCIForce )]
+                                    [OptionName(_oCIForce)]
+                                    bool ciForce = false,
+                                    [Description( _dSkipTests )]
+                                    bool skipTests = false,
+                                    [Description( _dForceTests )]
+                                    bool forceTests = false,
+                                    [Description( _dDryRun )]
+                                    [OptionName(_oDryRun)]
+                                    bool dryRun = false,
+                                    [Description( "Publish all the Repos, not only the current repositories and their consumers." )]
+                                    bool all = false )
     {
-        return DoNonCIAsync( monitor, context, branch, maxDop, all, forceTests, dryRun, isPullBuild: false, publish: true );
+        return ci || ciForce
+          ? DoCIAsync( monitor, context, branch, maxDop, all,skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: true )
+          : DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: true );
     }
 
     [Description( "Build-Test-Package the consumers of the current repositories, propagates packages to their consumers and publishes all the artifacts." )]
     [CommandPath( "*build" )]
     public Task<bool> StarBuildAsync( IActivityMonitor monitor,
-                                 CKliEnv context,
-                                 [Description( _descBranch )]
-                                 [OptionName( "--branch,-b" )]
-                                 string? branch = null,
-                                 [Description( _descMaxDoP )]
-                                 string? maxDop = null,
-                                 [Description( "Build all the Repos, not only the ones that consume or produce the current repositories." )]
-                                 bool all = false,
-                                 [Description( "Run tests even if they have already run successfully on the commit." )]
-                                 bool forceTests = false,
-                                 [Description( _descDryRun )]
-                                 [OptionName("--dry-run,-d")]
-                                 bool dryRun = false )
+                                      CKliEnv context,
+                                      [Description( _dBranch )]
+                                      [OptionName( _oBranch )]
+                                      string? branch = null,
+                                      [Description( _dMaxDoP )]
+                                      string? maxDop = null,
+                                      [Description( _dCI )]
+                                      [OptionName( _oCI )]
+                                      bool ci = false,
+                                      [Description( _dCIForce )]
+                                      [OptionName(_oCIForce)]
+                                      bool ciForce = false,
+                                      [Description( _dSkipTests )]
+                                      bool skipTests = false,
+                                      [Description( _dForceTests )]
+                                      bool forceTests = false,
+                                      [Description( _dDryRun )]
+                                      [OptionName(_oDryRun)]
+                                      bool dryRun = false,
+                                      [Description( "Build all the Repos, not only the ones that consume or produce the current repositories." )]
+                                      bool all = false )
     {
-        return DoNonCIAsync( monitor, context, branch, maxDop, all, forceTests, dryRun, isPullBuild: true, publish: false );
+        return ci || ciForce
+         ? DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: false )
+         : DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: false );
     }
 
     [Description( "Build-Test-Package the consumers of the current repositories, propagates packages to their consumers and publishes all the artifacts." )]
     [CommandPath( "*publish" )]
     public Task<bool> StarPublishAsync( IActivityMonitor monitor,
-                                   CKliEnv context,
-                                   [Description( _descBranch )]
-                                   [OptionName( "--branch,-b" )]
-                                   string? branch = null,
-                                   [Description( _descMaxDoP )]
-                                   string? maxDop = null,
-                                   [Description( "Publish all the Repos, not only the ones that consume or produce the current repositories." )]
-                                   bool all = false,
-                                   [Description( "Run tests even if they have already run successfully on the commit." )]
-                                   bool forceTests = false,
-                                   [Description( _descDryRun )]
-                                   [OptionName("--dry-run,-d")]
-                                   bool dryRun = false )
+                                        CKliEnv context,
+                                        [Description( _dBranch )]
+                                        [OptionName( _oBranch )]
+                                        string? branch = null,
+                                        [Description( _dMaxDoP )]
+                                        string? maxDop = null,
+                                        [Description( _dCI )]
+                                        [OptionName( _oCI )]
+                                        bool ci = false,
+                                        [Description( _dCIForce )]
+                                        [OptionName(_oCIForce)]
+                                        bool ciForce = false,
+                                        [Description( _dSkipTests )]
+                                        bool skipTests = false,
+                                        [Description( _dForceTests )]
+                                        bool forceTests = false,
+                                        [Description( _dDryRun )]
+                                        [OptionName(_oDryRun)]
+                                        bool dryRun = false,
+                                        [Description( "Publish all the Repos, not only the ones that consume or produce the current repositories." )]
+                                        bool all = false )
     {
-        return DoNonCIAsync( monitor, context, branch, maxDop, all, forceTests, dryRun, isPullBuild: true, publish: true );
+        return ci || ciForce
+         ? DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: true )
+         : DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: true );
     }
 
     Task<bool> DoCIAsync( IActivityMonitor monitor,
@@ -241,6 +290,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                           bool all,
                           bool skipTests,
                           bool forceTests,
+                          bool ciForce,
                           bool dryRun,
                           bool isPullBuild,
                           bool publish )
@@ -250,7 +300,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return Task.FromResult( false );
         }
-        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, isCIBuild: true, mustPublish: publish, branch, all );
+        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all );
         if( roadmap == null )
         {
             return Task.FromResult( false );
@@ -267,12 +317,17 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                              string? branch,
                              string? maxDop,
                              bool all,
+                             bool skipTests,
                              bool forceTests,
                              bool dryRun,
                              bool isPullBuild,
                              bool publish )
     {
-        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, isCIBuild: false, mustPublish: publish, branch, all );
+        if( skipTests )
+        {
+            monitor.Info( ScreenType.CKliScreenTag, "The --skip-tests option is ignored when building a non CI version." );
+        }
+        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.None, mustPublish: publish, branch, all );
         if( roadmap == null || !HandleMaxDoP( monitor, maxDop, out var vMaDxDop ) )
         {
             return Task.FromResult( false );
@@ -308,7 +363,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     Roadmap? ComputeAndDisplayRoadmap( IActivityMonitor monitor,
                                        CKliEnv context,
                                        bool isPullBuild,
-                                       bool isCIBuild,
+                                       CIBuildMode ciBuildMode,
                                        bool mustPublish,
                                        string? branch,
                                        bool all )
@@ -349,10 +404,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         // When --all is specified, all the repositories are pivots and the actual branch name considered by
         // the hot graph will be the most instable one of all the repositories (but at least as stable as the
         // branchName resolved above of course).
-        var hotGraph = _hotZone.GetHotGraph( monitor, branchName, isCIBuild, pivots );
+        var hotGraph = _hotZone.GetHotGraph( monitor, branchName, ciBuildMode != CIBuildMode.None, pivots );
         if( hotGraph == null ) return null;
 
-        var roadmap = Roadmap.Create( monitor, _versionTags, _releaseDatabase, _artifactHandler, hotGraph, isPullBuild, isCIBuild, mustPublish );
+        var roadmap = Roadmap.Create( monitor, _versionTags, _releaseDatabase, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish );
         if( roadmap != null  )
         {
             context.Screen.Display( roadmap.ToRenderable );

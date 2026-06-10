@@ -97,7 +97,7 @@ public sealed partial class Roadmap
             // The PackagesUpdateDetails collects up to 3 PackageMapper with the package updates for this
             // solution. The display of the roadmap renders them (with the 'U', 'C' and 'D' letters).
             //
-            var alreadyBuiltMapping = _roadmap._packageUpdater.GetAlreadyBuiltMapping( _roadmap._isCIBuild );
+            var alreadyBuiltMapping = _roadmap._packageUpdater.GetAlreadyBuiltMapping( _roadmap.IsCIBuild );
             var packageUpdates = new PackagesUpdateDetails();
             if( _solution.GitSolution.HasUpdates( packageUpdates.Add,
                                                   mustBuildFromUpstreams ? null : alreadyBuiltMapping, // U
@@ -115,7 +115,7 @@ public sealed partial class Roadmap
             // If build is not required here, we check the lastBuild version.
             // The last build tag may be a +fake or a +deprecated: we decide to always trigger a build in such
             // cases.
-            _lastBuild = _versionInfo.GetLastBuild( _roadmap._isCIBuild );
+            _lastBuild = _versionInfo.GetLastBuild( _roadmap.IsCIBuild );
 
             // These edge cases that are not "skippable".
             if( _lastBuild.VersionMustBuild )
@@ -369,7 +369,7 @@ public sealed partial class Roadmap
             }
             // Ite missa est: we can now compute the target version.
             SVersion? targetVersion;
-            if( _roadmap._isCIBuild )
+            if( _roadmap.IsCIBuild )
             {
                 int buildNumber = ComputeCommitDepth( _versionInfo.BaseBuild.Commit, _versionInfo.GitSolution.GitBranch.Tip );
                 if( mustAddCommit ) ++buildNumber;
