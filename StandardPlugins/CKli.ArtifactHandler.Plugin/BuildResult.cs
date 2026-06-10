@@ -29,10 +29,7 @@ public sealed partial class BuildResult
     /// </summary>
     /// <param name="repo">The repository.</param>
     /// <param name="versionTag">The version tag. It must be up to date and not change anymore.</param>
-    /// <param name="version">
-    /// The built or already built version.
-    /// When <see cref="SkippedBuild"/> is false, this <see cref="SVersion.ParsedPrefix"/> is necessarily "local/".
-    /// </param>
+    /// <param name="version">The built or already built version.</param>
     /// <param name="content">Existing content info.</param>
     /// <param name="assetsFolder">
     /// Assets folder is "$Local/&lt;world name&gt;/Assets/&lt;repo name&gt;/&lt;version&gt;".
@@ -47,7 +44,6 @@ public sealed partial class BuildResult
                         bool skippedBuild )
     {
         Throw.CheckArgument( assetsFolder.IsEmptyPath == content.AssetFileNames.IsEmpty );
-        Throw.CheckArgument( skippedBuild || version.ParsedPrefix == "local/" );
         _repo = repo;
         _versionTag = versionTag;
         _version = version;
@@ -63,13 +59,12 @@ public sealed partial class BuildResult
 
     /// <summary>
     /// Gets the version built.
-    /// When <see cref="SkippedBuild"/> is false, this <see cref="SVersion.ParsedPrefix"/> is necessarily "local/".
     /// </summary>
     public SVersion Version => _version;
 
     /// <summary>
     /// Gets the commit's version tag.
-    /// This tag is up to date and may be a non "local/" one if <see cref="SkippedBuild"/> is true.
+    /// This tag is up to date and may be a non "local/" one.
     /// </summary>
     public Tag VersionTag => _versionTag;
 

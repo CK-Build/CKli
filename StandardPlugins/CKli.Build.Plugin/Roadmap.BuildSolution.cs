@@ -202,11 +202,15 @@ public sealed partial class Roadmap
             // commit to update the dependencies.
             SVersion targetVersion = ComputeTargetVersion( monitor,
                                                            ref vChange,
-                                                           mustAddCommit: (buildReason & (MustBuildReason.UpstreamBuild|MustBuildReason.DependencyUpdate)) != 0 );
+                                                           mustAddCommit: (buildReason & (MustBuildReason.UpstreamBuild|MustBuildReason.DependencyUpdate)) != 0 )
+                                     .SetParsedPrefix( "local/" );
+
             // If the base version is a +fake, then IF this happens to be published we must ensure
             // that the +fake tag appears on the remote otherwise the target version will not be "understandable".
             if( _versionInfo.BaseBuild.IsFakeVersion )
             {
+                Throw.DebugAssert( "This has been checked by VersionTagPlugin.Create.",
+                                    string.IsNullOrEmpty( _versionInfo.BaseBuild.Version.ParsedPrefix ) );
                 Repo.GitRepository.DeferredPushRefSpecs.Add( $"+{_versionInfo.BaseBuild.Tag.CanonicalName}" );
             }
             monitor.Info( $"'{_solution}' build reason: '{buildReason}', computed target version: '{targetVersion}'." );
@@ -256,10 +260,11 @@ public sealed partial class Roadmap
         static VersionChange ComputeVersionChange( SVersion vBase, SVersion vTarget, bool targetIsFake )
         {
             // Fake based CI versions can be "artificial": they can be the <fake>--ci.X (no major/minor/patch increment).
-            Throw.DebugAssert( vBase <= vTarget || (vBase.IsFake() && vTarget.IsCI) );
+            // See SVersionExtensions.IsStableRoughBaseOf.
+            Throw.DebugAssert( vBase <= vTarget || (vBase.HasFakeMetadata && vTarget.IsCI) );
 
             // And when it is the case, we consider this a non change.
-            if( vBase.IsFake() ) return VersionChange.None;
+            if( vBase.HasFakeMetadata ) return VersionChange.None;
 
             VersionChange c;
             if( vBase.Major == vTarget.Major )
@@ -539,7 +544,7 @@ public sealed partial class Roadmap
                 // The VersionChange that has been computed may be None.
                 // On "+fake" version, we honor this "None": the target version is the "+fake" version (unchanged except the build metadata).
                 // This allows a "v1.0.0+fake" to produce prereleases (like "v1.0.0-a") and/or ci builds (like "v1.0.0--ci.18")
-                // until a non-ci build is done that will produce the "v.1.0.0" version.
+                // until a non-ci build is done that will produce the "v1.0.0" version.
                 // For regular base version, there's no "None": "Patch" is assumed.
                 return vChange switch
                 {
@@ -547,7 +552,7 @@ public sealed partial class Roadmap
                                             ? SVersion.Create( 0, baseVersion.Minor + 1, 0, suffix )
                                             : SVersion.Create( baseVersion.Major + 1, 0, 0, suffix ),
                     VersionChange.Minor => SVersion.Create( baseVersion.Major, baseVersion.Minor + 1, 0, suffix ),
-                    _ when baseVersion.IsFake() => SVersion.Create( baseVersion.Major, baseVersion.Minor, baseVersion.Patch, suffix ),
+                    _ when baseVersion.HasFakeMetadata => SVersion.Create( baseVersion.Major, baseVersion.Minor, baseVersion.Patch, suffix ),
                     _ => SVersion.Create( baseVersion.Major, baseVersion.Minor, baseVersion.Patch + 1, suffix )
                 };
             }

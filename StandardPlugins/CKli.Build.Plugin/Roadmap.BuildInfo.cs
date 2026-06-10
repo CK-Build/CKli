@@ -62,7 +62,7 @@ public sealed partial class Roadmap
             Throw.DebugAssert( "When we must build then version change s at least Patch.",
                                buildReason == MustBuildReason.None || versionChange >= VersionChange.Patch );
 
-            Throw.DebugAssert( "Currently the version can never be a +fake (the +fake is not skippable).", !_targetVersion.IsFake() );
+            Throw.DebugAssert( "Currently the version can never be a +fake (the +fake is not skippable).", !_targetVersion.HasFakeMetadata );
 
             Throw.DebugAssert( "Any dependency updates appear in the BuildReason.",
                                 (uUpdates != null || cUpdates != null || dUpdates != null) == ((_buildReason & MustBuildReason.DependencyUpdate) != 0) );

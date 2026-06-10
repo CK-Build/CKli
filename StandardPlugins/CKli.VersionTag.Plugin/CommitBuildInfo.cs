@@ -116,8 +116,9 @@ public sealed class CommitBuildInfo
                 Throw.DebugAssert( "We must not be able to rebuild a +deprecated commit.", !exists.IsDeprecatedVersion );
                 Throw.DebugAssert( "When rebuilding an existing version, the build commit must be the same (except if the existing tag is a +fake).",
                                    exists.IsFakeVersion || _buildCommit.Sha == exists.Sha );
-                // This removes any tag that are not "local/".
-                if( exists.Tag.CanonicalName != t.CanonicalName )
+                // This removes any tag that are not "local/", but we don't want to remove
+                // a +fake git tag, this one coexist with its regular counterparts.
+                if( !exists.IsFakeVersion && exists.Tag.CanonicalName != t.CanonicalName )
                 {
                     // Removes the other tag.
                     git.Tags.Remove( exists.Tag.CanonicalName );

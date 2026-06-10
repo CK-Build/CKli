@@ -851,10 +851,17 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             }
             // Consider only tag that are Conformant SVersion and a empty or "local/" ParsedPrefix.
             bool invalidParsedPrefix = false;
+            bool invalidLocalPrefix = false;
             if( !SVersion.TryParse( tagName, out var v, allowPrefix: true, mustBeCSVersion: true )
-                || (invalidParsedPrefix = (!string.IsNullOrEmpty( v.ParsedPrefix ) && v.ParsedPrefix != "local/")) )
+                || (invalidParsedPrefix = (!string.IsNullOrEmpty( v.ParsedPrefix ) && v.ParsedPrefix != "local/"))
+                || (invalidLocalPrefix = (v.HasFakeMetadata || v.HasDeprecatedMetadata || v.HasInvalidMetadata) && v.ParsedPrefix == "local/") )
             {
-                if( invalidParsedPrefix )
+                if( invalidLocalPrefix )
+                {
+                    nonConformantTags ??= [];
+                    nonConformantTags.Add( $"Invalid 'local/' prefix: +fake, +deprecated or +invalid tags must not be local. ({tagName})" );
+                }
+                else if( invalidParsedPrefix )
                 {
                     invalidParsedPrefixTags ??= [];
                     invalidParsedPrefixTags.Add( tagName );

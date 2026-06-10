@@ -79,7 +79,7 @@ public sealed partial class HotZonePlugin
         if( toFix == versionInfo.HotZone.LastStable )
         {
             monitor.Error( $"""
-                The version to fix '{toFix.Version.ParsedText}' is the current last stable version.
+                The version to fix 'v{toFix.Version}' is the current last stable version.
                 Use the regular 'ckli build/publish' or 'ckli ci build/publish' workflows to produce a fix.
                 """ );
             return false;
