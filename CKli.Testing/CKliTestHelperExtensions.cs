@@ -310,6 +310,9 @@ public static partial class CKliTestHelperExtensions
     /// Create or modify a "CKliTouchAndCommit.txt" file (by default) in the <paramref name="folder"/> and
     /// creates a new commit on a specified branch or on the currently checked out branch.
     /// <para>
+    /// The branch must exist: this method doesn't create a branch and this is intended (where should the branch start?).
+    /// </para>
+    /// <para>
     /// By default, the commit uses the Author and Committer signature "CKli.Testing", "none", <see cref="DateTimeOffset.Now"/>.
     /// </para>
     /// </summary>
