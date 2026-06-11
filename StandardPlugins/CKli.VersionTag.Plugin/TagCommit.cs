@@ -22,6 +22,7 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>
     string? _message;
     BuildContentInfo? _buildContentInfo;
     DeprecatedTagInfo? _deprecatedInfo;
+    Tag? _ci0Tag;
 
     internal TagCommit( SVersion version, Commit commit, Tag tag, bool isFakeVersion, DeprecatedTagInfo? deprecatedInfo )
     {
@@ -128,6 +129,13 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>
     /// </summary>
     /// <returns></returns>
     public override string ToString() => $"Tag '{_version.ParsedText}' references Commit '{_sha}'";
+
+    internal void SetCI0VersionTag( Tag t )
+    {
+        Throw.DebugAssert( t.IsAnnotated );
+        Throw.DebugAssert( BuildContentInfo.TryParse( t.Annotation.Message, out _ ) );
+        _ci0Tag = t;
+    }
 
     internal void UpdateVersionTag( Tag t )
     {

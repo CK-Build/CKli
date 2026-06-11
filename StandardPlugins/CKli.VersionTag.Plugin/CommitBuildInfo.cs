@@ -82,26 +82,14 @@ public sealed class CommitBuildInfo
     /// <param name="context">The context.</param>
     /// <param name="releaseMessage">The non empty release message.</param>
     /// <returns>True on success, false on error.</returns>
-    public TagCommit? ApplyReleaseBuildTag( IActivityMonitor monitor,
-                                            CKliEnv context,
-                                            string releaseMessage )
+    public (Tag? T, SVersion? V) ApplyReleaseBuildTag( IActivityMonitor monitor,
+                                                       CKliEnv context,
+                                                       string releaseMessage )
     {
-        Throw.CheckArgument( !string.IsNullOrWhiteSpace( releaseMessage ) );
-        // Local fix builds have no release tag. If the release local database is reset, we lose them
-        // but this is not an issue, this is used as an optimization that avoids rebuilding origins when
-        // an impacted repo needs to be rebuilt.
-        // => Skipped local fix.
-        bool isLocalFix = _version.IsLocalFix();
         monitor.Info( $"""
-                    {(isLocalFix
-                ? "Not setting (local fix build are only registered in the local release database)"
-                : "Setting")} build tag 'local/v{_version}' on '{Repo.DisplayPath}' (commit: {_buildCommit.Sha}):
-                    {releaseMessage}
-                    """ );
-        if( isLocalFix )
-        {
-            throw new NotSupportedException( "LocalFix is no more supported." );
-        }
+                "Setting build tag 'local/v{_version}' on '{Repo.DisplayPath}' (commit: '{_buildCommit}'):
+                {releaseMessage}
+                """ );
         try
         {
             // Our _version is "local/" but the version tag may already exist with or without "local/" prefix.
@@ -111,13 +99,22 @@ public sealed class CommitBuildInfo
                                   context.Committer,
                                   releaseMessage,
                                   allowOverwrite: true );
-            if( _tagInfo.TagCommits.TryGetValue( _version, out var exists ) )
+            TagCommit? exists;
+            if( _version.CINumber == 0 )
+            {
+                // "--ci.0" case: The original non-CI build must exist and we must be on the same commit.
+                Throw.DebugAssert( "We are on the base version commit.", _tagInfo.TagCommits.TryGetValue( _version.SetCINumber( -1 ), out var same )
+                                                                         && same.Commit.Sha == _buildCommit.Sha );
+                exists = _tagInfo.TagCommits[_version.SetCINumber( -1 )];
+                exists.SetCI0VersionTag( t );
+            }
+            else if( _tagInfo.TagCommits.TryGetValue( _version, out exists ) )
             {
                 Throw.DebugAssert( "We must not be able to rebuild a +deprecated commit.", !exists.IsDeprecatedVersion );
                 Throw.DebugAssert( "When rebuilding an existing version, the build commit must be the same (except if the existing tag is a +fake).",
                                    exists.IsFakeVersion || _buildCommit.Sha == exists.Sha );
                 // This removes any tag that are not "local/", but we don't want to remove
-                // a +fake git tag, this one coexist with its regular counterparts.
+                // a +fake git tag (this one coexists with its regular counterparts).
                 if( !exists.IsFakeVersion && exists.Tag.CanonicalName != t.CanonicalName )
                 {
                     // Removes the other tag.
@@ -129,7 +126,7 @@ public sealed class CommitBuildInfo
             {
                 exists = _tagInfo.AddReleaseBuildTag( _version, _buildCommit, t );
             }
-            return exists;
+            return (t,_version);
         }
         catch( Exception ex )
         {
@@ -140,7 +137,7 @@ public sealed class CommitBuildInfo
                 Unexpecting error while applying 'local/v{_version}' on commit '{_buildCommit.Sha}' with release message:
                 {releaseMessage}
                 """, ex );
-            return null;
+            return (null,null);
         }
     }
 
