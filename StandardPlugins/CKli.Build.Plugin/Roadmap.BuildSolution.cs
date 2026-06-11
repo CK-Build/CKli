@@ -12,7 +12,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 
 namespace CKli.Build.Plugin;
 
@@ -117,7 +116,7 @@ public sealed partial class Roadmap
             // cases.
             _lastBuild = _versionInfo.GetLastBuild( _roadmap.IsCIBuild );
 
-            // These edge cases that are not "skippable".
+            // These edge cases are not "skippable".
             if( _lastBuild.VersionMustBuild )
             {
                 Throw.DebugAssert( _lastBuild.TagCommit.IsFakeVersion || _lastBuild.TagCommit.IsDeprecatedVersion );
@@ -151,14 +150,7 @@ public sealed partial class Roadmap
                 bool canSkip = !_roadmap._isPullBuild && _roadmap._graph.HasPivots && !_solution.IsPivot;
                 if( !canSkip )
                 {
-                    if( _lastBuild.HasCodeChange )
-                    {
-                        buildReason |= MustBuildReason.CodeChange;
-                    }
-                    if( packageUpdates.Updates != null )
-                    {
-                        buildReason |= MustBuildReason.DependencyUpdate;
-                    }
+                    UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, ref buildReason );
                 }
                 if( buildReason == MustBuildReason.None )
                 {
@@ -187,17 +179,12 @@ public sealed partial class Roadmap
             }
             Throw.DebugAssert( "We must build.", buildReason != MustBuildReason.None );
             // Since we must build, let's update the reason with all its reasons for coherency (and its costs nothing).
-            if( _lastBuild.HasCodeChange )
-            {
-                buildReason |= MustBuildReason.CodeChange;
-            }
-            if( packageUpdates.Updates != null )
-            {
-                buildReason |= MustBuildReason.DependencyUpdate;
-            }
+            UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, ref buildReason );
 
-            // If the upstream doesn't force a Major, we must compute the change from the code in this repository
-            // and eventually compute the target version.
+            // We must now compute the target version. This uses the vChange that may have been set by the upstream and
+            // if the upstreams don't force a Major, we compute the vChange from the code (previous version tags and
+            // conventional commit messages if needed) in this repository.
+            //
             // If we are building from the upstreams or the dependencies must be updated, then we need one more
             // commit to update the dependencies.
             SVersion targetVersion = ComputeTargetVersion( monitor,
@@ -224,6 +211,28 @@ public sealed partial class Roadmap
                                         packageUpdates.Discrepancies );
             _roadmap._buildSolutionCount++;
             return true;
+
+            static void UpdateSkippableBuildReason( PackagesUpdateDetails packageUpdates,
+                                                    HotGraph.SolutionVersionInfo.BuiltVersion lastBuild,
+                                                    CIBuildMode ciBuildMode,
+                                                    ref MustBuildReason buildReason )
+            {
+                if( lastBuild.HasCodeChange )
+                {
+                    buildReason |= MustBuildReason.CodeChange;
+                }
+                if( packageUpdates.Updates != null )
+                {
+                    buildReason |= MustBuildReason.DependencyUpdate;
+                }
+                // We don't want the "CI0" to appear if any other reason exists (this is particularly true
+                // when any dependency update must be done because a new commit will be created and this will
+                // be a "regular" "ci.1" version.
+                if( buildReason == MustBuildReason.None && ciBuildMode == CIBuildMode.CIForce && !lastBuild.TagCommit.Version.IsCI )
+                {
+                    buildReason |= MustBuildReason.CI0;
+                }
+            }
         }
 
         bool InitializeUpstreams( IActivityMonitor monitor,

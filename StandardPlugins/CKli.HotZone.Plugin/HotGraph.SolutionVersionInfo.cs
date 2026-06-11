@@ -98,11 +98,6 @@ public sealed partial class HotGraph
             }
 
             /// <summary>
-            /// Gets whether this solution has already been built: both <see cref="VersionMustBuild"/> and <see cref="HasCodeChange"/> are false.
-            /// </summary>
-            public bool IsAlreadyBuilt => !VersionMustBuild && !HasCodeChange;
-
-            /// <summary>
             /// Overridden to return the <see cref="TagCommit"/>.
             /// </summary>
             /// <returns>The tag commit.</returns>

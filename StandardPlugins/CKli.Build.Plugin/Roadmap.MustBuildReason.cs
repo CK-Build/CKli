@@ -44,6 +44,12 @@ public sealed partial class Roadmap
         /// Code changed.
         /// </summary>
         CodeChange = 32,
+
+        /// <summary>
+        /// There is no code change, "--ci.0" (<see cref="CIBuildMode.CIForce"/>) is used and the last
+        /// version is a non-CI build: the commit must be rebuilt in CI.
+        /// </summary>
+        CI0 = 64,
     }
 
 }

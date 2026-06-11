@@ -350,30 +350,33 @@ public sealed partial class VersionTagInfo : RepoInfo
             // Interesting case here: the same commit must produce 2 different versions (allowing this directly
             // would require the TagCommitsBySha to be a Dictionary<string,List<TagCommit>>).
             //
-            // There is only one case where it makes sense to produce 2 versions from the same commit: it's when
-            // a prerelease has been created and, without any change in the code, a stable version must be produced.
-            // This is quite rare as it implies that no dependency updates must be made in the code: this scenario
-            // applies to "rank 0" repositories that have no dependencies to any other repositories in the stack (no
-            // upstream repositories).
+            // There is only 2 cases where it makes sense to produce 2 versions from the same commit:
+            // - When a CI version (reps. prerelease) has been created and, without any change in the code, a
+            //   non-CI (resp. stable or "less prerelease") version must be produced.
+            //   This is quite rare as it implies that no dependency updates must be made in the code: this scenario
+            //   applies to "rank 0" repositories that have no dependencies to any other repositories in the stack (no
+            //   upstream repositories).
+            //   => This must be handled by the caller. Here we reject this case.
+            //      A dedicated empty commit point must be created (with no change from its parent) to carry the "more stable" version.
+            // 
+            // - The "--ci.0" version that is a CI version produced from the non-CI commit is a mirror of the previous case:
+            //   here also it implies that no dependency updates must be made in the code: this scenario
+            //   applies to "rank 0" repositories that have no dependencies to any other repositories in the stack (no
+            //   upstream repositories).
+            //   However we handle this without the empty commit in order to have a true 0-based commit depth for CI builds. 
             //
-            // => This must be handled by the caller. Here we reject this case.
-            //
-            monitor.Error( $"""
+
+            bool validCI0 = version.CINumber == 0 && version.SetCINumber( -1 ) == already.Version;
+            if( !validCI0 )
+            {
+                monitor.Error( $"""
                         Invalid build commit '{buildCommit.Sha}' for version 'v{version}' in '{Repo.DisplayPath}'.
                         This commit has already released the version 'v{already.Version}' on {already.Commit.Committer.When}.
 
                         The same commit cannot produce 2 different versions.
                         """ );
-
-            if( version.IsStable && already.Version.IsPrerelease )
-            {
-                monitor.Error( ActivityMonitor.Tags.ToBeInvestigated,
-                               """
-                               Note that this case is a stable version produced from the commit of a prerelease one: this should be handled
-                               by creating a new empty commit dedicated to the stable version.
-                               """ );
+                return false;
             }
-            return false;
         }
         return true;
 
