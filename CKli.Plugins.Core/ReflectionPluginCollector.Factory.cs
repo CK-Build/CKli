@@ -62,7 +62,7 @@ sealed partial class ReflectionPluginCollector
             //
             // To regenerate: use 'ckli plugin compile --mode Debug' (or Release).
             // To force recompilation without changing mode: use 'ckli plugin compile'.
-            // Alternatively, delete this file and run 'ckli plugin info'.
+            // Alternatively, delete this file and run 'ckli plugin info' (or any other command that loads a World).
             // </auto-generated>
 
             #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member

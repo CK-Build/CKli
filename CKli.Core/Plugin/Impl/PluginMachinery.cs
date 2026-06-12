@@ -773,8 +773,17 @@ public sealed partial class PluginMachinery
 
                 namespace CKli.Plugins;
 
+                /// <summary>
+                /// Main adapter between CKli.Plugins.Core and the plugins.
+                /// </summary>
                 public static class Plugins
                 {
+                    /// <summary>
+                    /// Called by CKli.Plugins.Loader when no <c>static CKli.Plugins.CompiledPlugins.Get( PluginCollectorContext ctx )</c>
+                    /// method exists or it returned null because <see cref="PluginCollectorContext.Signature"/> has changed.
+                    /// </summary>
+                    /// <param name="ctx">The collector context.</param>
+                    /// <returns>The reflection based plugin factory.</returns>
                     public static IPluginFactory Register( PluginCollectorContext ctx )
                     {
                         return PluginCollector.Create( ctx ).BuildPluginFactory( [

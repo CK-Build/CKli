@@ -112,11 +112,9 @@ public sealed partial class Roadmap
             Throw.DebugAssert( buildReason == MustBuildReason.None || (buildReason & (MustBuildReason.UpstreamBuild | MustBuildReason.DependencyUpdate)) != 0 );
 
             // If build is not required here, we check the lastBuild version.
-            // The last build tag may be a +fake or a +deprecated: we decide to always trigger a build in such
-            // cases.
+            // The last build tag may be a +fake or a +deprecated: we decide to always trigger a build in such cases:
+            // ==> These edge cases are not "skippable".
             _lastBuild = _versionInfo.GetLastBuild( _roadmap.IsCIBuild );
-
-            // These edge cases are not "skippable".
             if( _lastBuild.VersionMustBuild )
             {
                 Throw.DebugAssert( _lastBuild.TagCommit.IsFakeVersion || _lastBuild.TagCommit.IsDeprecatedVersion );
@@ -163,13 +161,24 @@ public sealed partial class Roadmap
                             """ );
                         return false;
                     }
+                    Throw.DebugAssert( "Fake version triggered MustBuildReason.FakeVersion.", !_lastBuild.TagCommit.IsFakeVersion );
+                    var vTarget = _lastBuild.TagCommit.Version;
+                    // If we are in --ci.0 mode and considered the non skippable conditions and we are here (MustBuildReason.None),
+                    // then the version to consider must be the ci.0 version (not the non-CI build version associated to the TagCommit).
+                    // This ci.0 version necessarily exists otherwise the UpdateSkippableBuildReason would have returned the "CI0" reason.
+                    if( _roadmap._ciBuildMode == CIBuildMode.CIForce && !canSkip && !vTarget.IsCI )
+                    {
+                        Throw.DebugAssert( _lastBuild.TagCommit.CI0VersionTag != null );
+                        vTarget = vTarget.SetCINumber( 0 );
+                        Throw.DebugAssert( _lastBuild.TagCommit.CI0VersionTag.CanonicalName.EndsWith( vTarget.ToString(), StringComparison.Ordinal ) );
+                    }
                     // We compute the version change not for us (this solution will not be built) but for
                     // the downstream solutions to correctly propagate the change level (here it may be None).
-                    vChange = ComputeVersionChange( _versionInfo.BaseBuild.Version, _lastBuild.TagCommit.Version, _lastBuild.TagCommit.IsFakeVersion );
+                    vChange = ComputeVersionChange( _versionInfo.BaseBuild.Version, vTarget, targetIsFake: false );
                     _buildInfo = new BuildInfo( this,
                                                 MustBuildReason.None,
                                                 vChange,
-                                                _lastBuild.TagCommit.Version,
+                                                vTarget,
                                                 directRequirements,
                                                 packageUpdates.Updates,
                                                 packageUpdates.Configuration,
@@ -182,8 +191,8 @@ public sealed partial class Roadmap
             UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, ref buildReason );
 
             // We must now compute the target version. This uses the vChange that may have been set by the upstream and
-            // if the upstreams don't force a Major, we compute the vChange from the code (previous version tags and
-            // conventional commit messages if needed) in this repository.
+            // if the upstreams don't force a Major, we compute the vChange from the code in this repository (previous version
+            // tags and conventional commit messages if needed).
             //
             // If we are building from the upstreams or the dependencies must be updated, then we need one more
             // commit to update the dependencies.
@@ -228,7 +237,10 @@ public sealed partial class Roadmap
                 // We don't want the "CI0" to appear if any other reason exists (this is particularly true
                 // when any dependency update must be done because a new commit will be created and this will
                 // be a "regular" "ci.1" version.
-                if( buildReason == MustBuildReason.None && ciBuildMode == CIBuildMode.CIForce && !lastBuild.TagCommit.Version.IsCI )
+                if( buildReason == MustBuildReason.None
+                    && ciBuildMode == CIBuildMode.CIForce
+                    && !lastBuild.TagCommit.Version.IsCI
+                    && lastBuild.TagCommit.CI0VersionTag == null )
                 {
                     buildReason |= MustBuildReason.CI0;
                 }

@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Xml.Linq;
+using static CK.Core.ActivityMonitor;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.VersionTag.Plugin;
@@ -823,142 +824,29 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
 
         List<Tag>? removableTags = null;
         List<Tag>? badDeprecatedTags = null;
+        List<(SVersion V, Tag T)>? ci0VersionTags = null;
         // Collects conflicting tags.
         List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts = null;
 
-        // First pass. Enumerates all the tags to keep all +invalid and
-        // tags in the MajorRange, excluding +deprecated tags that cannot be parsed.
-        // This list is temporary (first pass) to build the v2c index.
+        // First pass: filters out non conformant tags, versions outside Inf/SupVersion,
+        // non parsable +deprecated tags and collect +invalid tags and ci0 version and tags.
+        // This validTags list is temporary (first pass) to build the v2c index.
         List<TagCommit> validTags = new List<TagCommit>();
         Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags = null;
         bool hasBadTagNames = false;
         var r = repo.GitRepository.Repository;
 
-        List<string>? nonConformantTags = null;
-        List<string>? invalidParsedPrefixTags = null;
-        foreach( var t in r.Tags )
-        {
-            var tagName = t.FriendlyName;
-            if( !GitRepository.IsCKliValidTagName( tagName ) )
-            {
-                hasBadTagNames = true;
-                continue;
-            }
-            // Consider only target that is a commit (safe cast).
-            if( t.Target is not Commit c )
-            {
-                continue;
-            }
-            // Consider only tag that are Conformant SVersion and a empty or "local/" ParsedPrefix.
-            bool invalidParsedPrefix = false;
-            bool invalidLocalPrefix = false;
-            if( !SVersion.TryParse( tagName, out var v, allowPrefix: true, mustBeCSVersion: true )
-                || (invalidParsedPrefix = (!string.IsNullOrEmpty( v.ParsedPrefix ) && v.ParsedPrefix != "local/"))
-                || (invalidLocalPrefix = (v.HasFakeMetadata || v.HasDeprecatedMetadata || v.HasInvalidMetadata) && v.ParsedPrefix == "local/") )
-            {
-                if( invalidLocalPrefix )
-                {
-                    nonConformantTags ??= [];
-                    nonConformantTags.Add( $"Invalid 'local/' prefix: +fake, +deprecated or +invalid tags must not be local. ({tagName})" );
-                }
-                else if( invalidParsedPrefix )
-                {
-                    invalidParsedPrefixTags ??= [];
-                    invalidParsedPrefixTags.Add( tagName );
-                }
-                else if( SVersion.TryParse( tagName, out var nonConform, allowPrefix: true ) )
-                {
-                    // The ToString is the "ErrorMessage (ParsedText)".
-                    Debug.Assert( !v.IsValid );
-                    nonConformantTags ??= [];
-                    nonConformantTags.Add( v.ToString() );
-                }
-                // Otherwise, the tag doesn't look like a version, ignore it silently.
-                continue;
-            }
-            // Above or equal to SupVersion or below or equal to InfVersion: ignore.
-            if( (supVersion != null && v >= supVersion) || v <= infVersion ) continue;
-
-            // A +invalid tag totally cancels an existing version tag. We collect them
-            // and apply them once all the valid tags have been collected.
-            //
-            // The +invalid tags are temporary artifacts that are used to distribute the information
-            // across the repositories. Once the bad tag doesn't appear anywhere, a +invalid tag 
-            // must be removed.
-            //
-            if( v.HasInvalidMetadata )
-            {
-                invalidTags ??= new Dictionary<SVersion, (SVersion V, Tag T)>();
-                // If the same version+invalid has been found already, it is an error (DuplicateInvalidTag)
-                // except if the 2 tags are on the same commit, one is "local/" and the other one is not:
-                // the "local/" is removable because the invalid tag has been published.
-                if( invalidTags.TryGetValue( v, out var exists ) )
-                {
-                    if( exists.T.Target.Sha == c.Sha && v.IsLocal() != exists.V.IsLocal() )
-                    {
-                        removableTags ??= [];
-                        if( v.IsLocal() )
-                        {
-                            removableTags.Add( t );
-                        }
-                        else
-                        {
-                            // The existing local one is removable.
-                            // The invalid is the non local one. 
-                            removableTags.Add( exists.T );
-                            invalidTags[v] = (v, t);
-                        }
-                    }
-                    else
-                    {
-                        tagConflicts ??= [];
-                        tagConflicts.Add( (exists, (v, t), TagConflict.DuplicateInvalidTag) );
-                    }
-                }
-                else
-                {
-                    invalidTags.Add( v, (v, t) );
-                }
-                continue;
-            }
-            // A +deprecated was an actual version. They appear in the VersionTagInfo.TagCommits (like a +fake).
-            // This is required, for instance, to be able to produce a 4.0.1 fix after the deprecated 4.0.0 version.
-            //
-            // As opposed to +invalid tags, +deprecated tags should never be deleted. They memorize the
-            // existence of a version and contain the BuildContentInfo of the deprecated version: if they
-            // cannot be parsed (reason, expiration, build content), we catch them here (these are
-            // issues currently exposed as "RemovableTag" issues) to avoid too complex error handling.
-            //
-            // We consider that a CI build version cannot be +fake or +deprecated and
-            // we collect these as errors to simplify the system.
-            //
-            DeprecatedTagInfo? deprecatedInfo = null;
-            if( v.HasDeprecatedMetadata && !DeprecatedTagInfo.TryParse( t.Annotation?.Message, out deprecatedInfo ) )
-            {
-                badDeprecatedTags ??= new List<Tag>();
-                badDeprecatedTags.Add( t );
-            }
-            else
-            {
-                var tc = new TagCommit( v, c, t, v.HasFakeMetadata, deprecatedInfo );
-                validTags.Add( tc );
-            }
-        }
-        if( nonConformantTags != null || invalidParsedPrefixTags != null )
-        {
-            if( nonConformantTags != null )
-            {
-                var sep = Environment.NewLine + "- ";
-                monitor.Warn( $"Ignored {nonConformantTags.Count} non Conformant SVersion tags:{sep}{nonConformantTags.Concatenate( sep )}" );
-            }
-            if( invalidParsedPrefixTags != null )
-            {
-                monitor.Warn( $"""
-                    Ignored {invalidParsedPrefixTags.Count} tags with an unexpected prefix:
-                    '{invalidParsedPrefixTags.Concatenate( "', '" )}'.
-                    """ );
-            }
-        }
+        FirstTagCollect( monitor,
+                         r,
+                         infVersion,
+                         supVersion,
+                         validTags,
+                         ref hasBadTagNames,
+                         ref removableTags,
+                         ref badDeprecatedTags,
+                         ref tagConflicts,
+                         ref invalidTags,
+                         ref ci0VersionTags );
 
         // Second pass: filters out the invalid tags and produces the v2C index
         //              along with potential tag conflicts.
@@ -1193,9 +1081,56 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, World, repo, lastStable, topHot );
         }
 
+
+        if( ci0VersionTags != null )
+        {
+            foreach( var (v, t) in ci0VersionTags )
+            {
+                Throw.DebugAssert( v.CINumber == 0 );
+                var vBase = v.SetCINumber( -1 );
+                if( v2c.TryGetValue( vBase, out var tBase ) )
+                {
+                    if( tBase.Commit.Sha == t.Target.Sha )
+                    {
+                        if( tBase.CI0VersionTag != null )
+                        {
+                            // The 2 tags can only differ by their "local/" prefix.
+                            // We keep the published, and add the "local/" to the removable tags.
+                            Throw.DebugAssert( tBase.CI0VersionTag.CanonicalName.StartsWith("refs/tags/local/", StringComparison.Ordinal )
+                                                != t.CanonicalName.StartsWith( "refs/tags/local/", StringComparison.Ordinal ) );
+                            removableTags ??= new List<Tag>();
+                            if( tBase.CI0VersionTag.CanonicalName.StartsWith( "refs/tags/local/", StringComparison.Ordinal ) )
+                            {
+                                removableTags.Add( tBase.CI0VersionTag );
+                                tBase.SetCI0VersionTag( t );
+                            }
+                            else
+                            {
+                                removableTags.Add( t );
+                            }
+                        }
+                        else
+                        {
+                            tBase.SetCI0VersionTag( t );
+                        }
+                    }
+                    else
+                    {
+                        tagConflicts ??= new List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>();
+                        tagConflicts.Add( ((v, t), (tBase.Version, tBase.Tag), TagConflict.CI0VersionOnOtherCommit) );
+                    }
+                }
+                else
+                {
+                    removableTags ??= new List<Tag>();
+                    removableTags.Add( t );
+                }
+            }
+        }
+
         // We capture the invalidTags: may be one day we can create a World.Issue that could
         // remove them (we must ensure that the invalidated version tags are removed in other repositories:
-        // the origin remote may be enough).
+        // the origin remote may not be enough).
         //
         // We capture tagConflicts: these MUST be fixed. Most of the branch/build commands will require
         // that there is no more tagConflicts before running.
@@ -1298,6 +1233,159 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 }
             }
             return best;
+        }
+
+        static void FirstTagCollect( IActivityMonitor monitor,
+                                     Repository r,
+                                     SVersion? infVersion,
+                                     SVersion? supVersion,
+                                     List<TagCommit> validTags,
+                                     ref bool hasBadTagNames,
+                                     ref List<Tag>? removableTags,
+                                     ref List<Tag>? badDeprecatedTags,
+                                     ref List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts,
+                                     ref Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags,
+                                     ref List<(SVersion V, Tag T)>? ci0VersionTags )
+        {
+            List<string>? nonConformantTags = null;
+            List<string>? invalidParsedPrefixTags = null;
+            foreach( var t in r.Tags )
+            {
+                var tagName = t.FriendlyName;
+                if( !GitRepository.IsCKliValidTagName( tagName ) )
+                {
+                    hasBadTagNames = true;
+                    continue;
+                }
+                // Consider only target that is a commit (safe cast).
+                if( t.Target is not Commit c )
+                {
+                    continue;
+                }
+                // Consider only tag that are Conformant SVersion and a empty or "local/" ParsedPrefix.
+                bool invalidParsedPrefix = false;
+                bool invalidLocalPrefix = false;
+                if( !SVersion.TryParse( tagName, out var v, allowPrefix: true, mustBeCSVersion: true )
+                    || (invalidParsedPrefix = (!string.IsNullOrEmpty( v.ParsedPrefix ) && v.ParsedPrefix != "local/"))
+                    || (invalidLocalPrefix = (v.HasFakeMetadata || v.HasDeprecatedMetadata || v.HasInvalidMetadata) && v.ParsedPrefix == "local/") )
+                {
+                    if( invalidLocalPrefix )
+                    {
+                        nonConformantTags ??= [];
+                        nonConformantTags.Add( $"Invalid 'local/' prefix: +fake, +deprecated or +invalid tags must not be local. ({tagName})" );
+                    }
+                    else if( invalidParsedPrefix )
+                    {
+                        invalidParsedPrefixTags ??= [];
+                        invalidParsedPrefixTags.Add( tagName );
+                    }
+                    else if( SVersion.TryParse( tagName, out var nonConform, allowPrefix: true ) )
+                    {
+                        // The ToString is the "ErrorMessage (ParsedText)".
+                        Debug.Assert( !v.IsValid );
+                        nonConformantTags ??= [];
+                        nonConformantTags.Add( v.ToString() );
+                    }
+                    // Otherwise, the tag doesn't look like a version, ignore it silently.
+                    continue;
+                }
+                // Above or equal to SupVersion or below or equal to InfVersion: ignore.
+                if( (supVersion != null && v >= supVersion) || v <= infVersion ) continue;
+
+                // A +invalid tag totally cancels an existing version tag. We collect them
+                // and apply them once all the valid tags have been collected.
+                //
+                // The +invalid tags are temporary artifacts that are used to distribute the information
+                // across the repositories. Once the bad tag doesn't appear anywhere, a +invalid tag 
+                // must be removed.
+                //
+                if( v.HasInvalidMetadata )
+                {
+                    invalidTags ??= new Dictionary<SVersion, (SVersion V, Tag T)>();
+                    // If the same version+invalid has been found already, it is an error (DuplicateInvalidTag)
+                    // except if the 2 tags are on the same commit, one is "local/" and the other one is not:
+                    // the "local/" is removable because the invalid tag has been published.
+                    if( invalidTags.TryGetValue( v, out var exists ) )
+                    {
+                        if( exists.T.Target.Sha == c.Sha && v.IsLocal() != exists.V.IsLocal() )
+                        {
+                            removableTags ??= [];
+                            if( v.IsLocal() )
+                            {
+                                removableTags.Add( t );
+                            }
+                            else
+                            {
+                                // The existing local one is removable.
+                                // The invalid is the non local one. 
+                                removableTags.Add( exists.T );
+                                invalidTags[v] = (v, t);
+                            }
+                        }
+                        else
+                        {
+                            tagConflicts ??= [];
+                            tagConflicts.Add( (exists, (v, t), TagConflict.DuplicateInvalidTag) );
+                        }
+                    }
+                    else
+                    {
+                        invalidTags.Add( v, (v, t) );
+                    }
+                    continue;
+                }
+                // A +deprecated was an actual version. They appear in the VersionTagInfo.TagCommits (like a +fake).
+                // This is required, for instance, to be able to produce a 4.0.1 fix after the deprecated 4.0.0 version.
+                //
+                // As opposed to +invalid tags, +deprecated tags should never be deleted. They memorize the
+                // existence of a version and contain the BuildContentInfo of the deprecated version: if they
+                // cannot be parsed (reason, expiration, build content), we catch them here (these are
+                // issues currently exposed as "RemovableTag" issues) to avoid too complex error handling.
+                //
+                // We consider that a CI build version cannot be +fake or +deprecated and
+                // we collect these as errors to simplify the system.
+                //
+                DeprecatedTagInfo? deprecatedInfo = null;
+                if( v.HasDeprecatedMetadata && !DeprecatedTagInfo.TryParse( t.Annotation?.Message, out deprecatedInfo ) )
+                {
+                    badDeprecatedTags ??= new List<Tag>();
+                    badDeprecatedTags.Add( t );
+                }
+                else
+                {
+                    Throw.DebugAssert( "A CI version has no +fake and +deprecated (+invalid is possible but has been handled above).",
+                                       !v.IsCI || !v.HasFakeMetadata && deprecatedInfo == null );
+                    if( v.CINumber == 0 )
+                    {
+                        // This list will be processed after all other processes to either:
+                        // - Set the HasCI0Version flag on the corresponding TagCommit if it exists and the commit is the same.
+                        // - Adds a tagConflict of the non-CI version is defined on another commit than this one.
+                        // - Adds this version tag to the removable tags if the corresponding TagCommit cannot be found.
+                        ci0VersionTags ??= new List<(SVersion V, Tag T)>();
+                        ci0VersionTags.Add( (v, t) );
+                    }
+                    else
+                    {
+                        var tc = new TagCommit( v, c, t, v.HasFakeMetadata, deprecatedInfo );
+                        validTags.Add( tc );
+                    }
+                }
+            }
+            if( nonConformantTags != null || invalidParsedPrefixTags != null )
+            {
+                if( nonConformantTags != null )
+                {
+                    var sep = Environment.NewLine + "- ";
+                    monitor.Warn( $"Ignored {nonConformantTags.Count} non Conformant SVersion tags:{sep}{nonConformantTags.Concatenate( sep )}" );
+                }
+                if( invalidParsedPrefixTags != null )
+                {
+                    monitor.Warn( $"""
+                    Ignored {invalidParsedPrefixTags.Count} tags with an unexpected prefix:
+                    '{invalidParsedPrefixTags.Concatenate( "', '" )}'.
+                    """ );
+                }
+            }
         }
     }
 

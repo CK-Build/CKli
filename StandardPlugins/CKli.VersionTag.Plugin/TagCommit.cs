@@ -130,11 +130,18 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>
     /// <returns></returns>
     public override string ToString() => $"Tag '{_version.ParsedText}' references Commit '{_sha}'";
 
-    internal void SetCI0VersionTag( Tag t )
+    /// <summary>
+    /// Gets the --ci.0" or ".ci.0" tag if one exists for this TagCommit. If it exists, it is necessarily
+    /// the <see cref="SVersion.CINumber"/> = 0 for this <see cref="Version"/> (and this version is not itself a CI version).
+    /// </summary>
+    public Tag? CI0VersionTag => _ci0Tag;
+
+    internal void SetCI0VersionTag( Tag tag )
     {
-        Throw.DebugAssert( t.IsAnnotated );
-        Throw.DebugAssert( BuildContentInfo.TryParse( t.Annotation.Message, out _ ) );
-        _ci0Tag = t;
+        Throw.DebugAssert( tag != null && tag.IsAnnotated && BuildContentInfo.TryParse( tag.Annotation.Message, out _ ) );
+        Throw.DebugAssert( SVersion.Parse( tag.FriendlyName, allowPrefix:true, mustBeCSVersion: true ).CINumber == 0
+                           && SVersion.Parse( tag.FriendlyName, allowPrefix: true, mustBeCSVersion: true ).SetCINumber( -1 ) == _version );
+        _ci0Tag = tag;
     }
 
     internal void UpdateVersionTag( Tag t )

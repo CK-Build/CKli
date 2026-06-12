@@ -87,7 +87,7 @@ public sealed class CommitBuildInfo
                                                        string releaseMessage )
     {
         monitor.Info( $"""
-                "Setting build tag 'local/v{_version}' on '{Repo.DisplayPath}' (commit: '{_buildCommit}'):
+                Setting build tag 'local/v{_version}' on '{Repo.DisplayPath}' (commit: '{_buildCommit}'):
                 {releaseMessage}
                 """ );
         try

@@ -6,5 +6,6 @@ enum TagConflict
     DuplicateInvalidTag,
     InvalidTagOnWrongCommit,
     SameVersionOnDifferentCommit,
+    CI0VersionOnOtherCommit,
     DuplicatedVersionTag
 }
