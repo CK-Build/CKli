@@ -55,19 +55,14 @@ public sealed class MigrationPlugin : PrimaryPluginBase
                 var repo = target.Repo;
                 var b = repo.GitRepository.Repository.Branches[target.BranchName];
                 Throw.CheckState( "The branch necessarily exists.", b != null );
-                // If the branch has a CodeCakeBuilder or RepositoryInfo.xml entry, it needs
-                // to be updated: this quick check avoids useless work.
-                if( b.Tip["CodeCakeBuilder"] != null || b.Tip["RepositoryInfo.xml"] != null )
+                if( repo.GitRepository.Checkout( monitor, b )
+                    && RemoveRepositoryInfoAndCodeCakeBuilderAndSlnx( monitor, repo ) )
                 {
-                    if( repo.GitRepository.Checkout( monitor, b )
-                        && RemoveRepositoryInfoAndCodeCakeBuilderAndSlnx( monitor, repo ) )
-                    {
-                        repo.GitRepository.Commit( monitor, "Net8 migration applied." );
-                    }
-                    else
-                    {
-                        monitor.Error( $"Error while normalizing files and folders for '{repo.DisplayPath}/{target.BranchName}'." );
-                    }
+                    repo.GitRepository.Commit( monitor, "Net8 migration applied." );
+                }
+                else
+                {
+                    monitor.Error( $"Error while normalizing files and folders for '{repo.DisplayPath}/{target.BranchName}'." );
                 }
             }
         }

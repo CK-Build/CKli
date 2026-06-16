@@ -17,10 +17,12 @@ namespace CKli.Build.Plugin;
 public sealed partial class BuildPlugin
 {
 
-    [Description( "Local build the current Fix Workflow." )]
+    [Description( "Builds the current Fix Workflow." )]
     [CommandPath( "fix build" )]
     public Task<bool> FixBuildAsync( IActivityMonitor monitor,
                                      CKliEnv context,
+                                     [Description("Build CI versions instead of the target stable versions.")]
+                                     bool ci = false,
                                      [Description( "Don't run tests even if they have never locally run on a commit." )]
                                      bool skipTests = false,
                                      [Description( "Run tests even if they have already run successfully on a commit." )]
@@ -33,13 +35,15 @@ public sealed partial class BuildPlugin
         {
             return Task.FromResult( false );
         }
-        return DoBuildFixAsync( monitor, context, runTest, workflow, rebuild, publishing: false );
+        return DoBuildFixAsync( monitor, context, runTest, workflow, rebuild, ci, publish: false );
     }
 
-    [Description( "Publishes the current Fix Workflow." )]
+    [Description( "Builds and publishes the current Fix Workflow." )]
     [CommandPath( "fix publish" )]
     public Task<bool> FixPublishAsync( IActivityMonitor monitor,
                                        CKliEnv context,
+                                       [Description( "Publishes CI versions instead of the target stable versions." )]
+                                       bool ci = false,
                                        [Description( "Force a rebuild." )]
                                        bool rebuild = false )
     {
@@ -52,7 +56,8 @@ public sealed partial class BuildPlugin
                                 runTest: rebuild ? true : null,
                                 workflow,
                                 rebuild,
-                                publishing: true );
+                                ci,
+                                publish: true );
     }
 
     async Task<bool> DoBuildFixAsync( IActivityMonitor monitor,
@@ -60,7 +65,8 @@ public sealed partial class BuildPlugin
                                       bool? runTest,
                                       FixWorkflow? workflow,
                                       bool rebuild,
-                                      bool publishing )
+                                      bool isCIBuild,
+                                      bool publish )
     {
         if( workflow == null )
         {
@@ -79,14 +85,14 @@ public sealed partial class BuildPlugin
             using( monitor.OpenInfo( $"Building n°{target.Index} - {target.Repo.DisplayPath}" ) )
             {
                 if( !await BuildOneFixTargetAsync( monitor,
-                                              context,
-                                              runTest,
-                                              rebuild,
-                                              publishing,
-                                              bResults,
-                                              packageMapper,
-                                              packageMapping,
-                                              target ).ConfigureAwait( false ) )
+                                                   context,
+                                                   runTest,
+                                                   rebuild,
+                                                   isCIBuild,
+                                                   bResults,
+                                                   packageMapper,
+                                                   packageMapping,
+                                                   target ).ConfigureAwait( false ) )
                 {
                     break;
                 }
@@ -99,11 +105,10 @@ public sealed partial class BuildPlugin
         var results = bResults.MoveToImmutable();
         var s = context.Screen.ScreenType;
         var display = RenderBuildResults( s, results );
-        if( publishing ) display = s.Text( "Publishing fix:" ).AddBelow( display );
         context.Screen.Display( display );
         if( _onFixBuild.HasHandlers )
         {
-            var e = new FixBuildEventArgs( monitor, workflow, results, publishing );
+            var e = new FixBuildEventArgs( monitor, workflow, results, publish );
             if( !await _onFixBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) )
             {
                 return false;
@@ -116,7 +121,7 @@ public sealed partial class BuildPlugin
             var d = s.Unit.AddBelow( results.Select( r => r.Repo.ToRenderable( s, withBranchName: true )
                                                                 .AddRight( s.Text( r.Version.ToString() )
                                                                             .Box( marginLeft: 1,
-                                                                                    foreColor: r.SkippedBuild
+                                                                                  foreColor: r.SkippedBuild
                                                                                                 ? ConsoleColor.DarkYellow
                                                                                                 : ConsoleColor.Green ) ) ) );
             return d.TableLayout();
@@ -127,7 +132,7 @@ public sealed partial class BuildPlugin
                                              CKliEnv context,
                                              bool? runTest,
                                              bool rebuild,
-                                             bool publishing,
+                                             bool isCIBuild,
                                              ImmutableArray<BuildResult>.Builder bResults,
                                              PackageMapper packageMapper,
                                              FixPackageMapper packageMapping,
@@ -149,9 +154,10 @@ public sealed partial class BuildPlugin
             commitDepth++;
         }
         var targetVersion = target.TargetVersion;
-        if( !publishing )
+        if( isCIBuild )
         {
-            targetVersion = SVersion.Create( targetVersion.Major, targetVersion.Minor, targetVersion.Patch, $"local.fix.{commitDepth}" );
+            // The target version already has the incremented Patch number.
+            targetVersion = targetVersion.SetCINumber( commitDepth, impactStablePatchNumber: false );
         }
 
         var result = await CoreBuildAsync( monitor,
@@ -235,15 +241,12 @@ public sealed partial class BuildPlugin
             {
                 return false;
             }
-
-            var divergence = gitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( toFix.Commit, branch.Tip );
-            if( divergence.BehindBy == null )
+            commitDepth = GitRepository.ComputeCommitDepth( toFix.Commit, branch.Tip );
+            if( commitDepth < 0 )
             {
                 monitor.Error( $"Branch '{target.BranchName}' in '{target.Repo.DisplayPath}' is not related to the commit '{target.ToFixCommitSha}' version 'v{target.ToFixVersion}' to be fixed." );
                 return false;
             }
-            commitDepth = divergence.BehindBy.Value;
-
             return gitRepository.Checkout( monitor, branch );
         }
 

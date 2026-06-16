@@ -392,7 +392,7 @@ public sealed partial class Roadmap
             SVersion? targetVersion;
             if( _roadmap.IsCIBuild )
             {
-                int buildNumber = ComputeCommitDepth( _versionInfo.BaseBuild.Commit, _versionInfo.GitSolution.GitBranch.Tip );
+                int buildNumber = GitRepository.ComputeCommitDepth( _versionInfo.BaseBuild.Commit, _versionInfo.GitSolution.GitBranch.Tip );
                 if( mustAddCommit ) ++buildNumber;
 
                 if( isPrerelease )
@@ -448,35 +448,6 @@ public sealed partial class Roadmap
 
             return targetVersion;
 
-            static int ComputeCommitDepth( Commit baseCommit, Commit target )
-            {
-                Throw.CheckArgument( target.Committer.When >= baseCommit.Committer.When );
-                var baseCommitSha = baseCommit.Sha;
-                var cache = new Dictionary<string, int> { { baseCommitSha, 0 } };
-                return ComputeCommitDepth( baseCommitSha, baseCommit.Committer.When.UtcDateTime, target, cache );
-
-                static int ComputeCommitDepth( string baseCommitSha, DateTime baseCommitWhen, Commit target, Dictionary<string, int> cache )
-                {
-                    var targetSha = target.Sha;
-                    if( !cache.TryGetValue( targetSha, out int d ) )
-                    {
-                        d = -1;
-                        if( target.Committer.When.UtcDateTime >= baseCommitWhen )
-                        {
-                            foreach( var p in target.Parents )
-                            {
-                                int dP = ComputeCommitDepth( baseCommitSha, baseCommitWhen, p, cache );
-                                if( dP > d )
-                                {
-                                    d = dP + 1;
-                                }
-                            }
-                        }
-                        cache.Add( targetSha, d );
-                    }
-                    return d;
-                }
-            }
 
             static VersionChange DetectVersionChange( Commit c, bool noNone )
             {
@@ -722,17 +693,16 @@ public sealed partial class Roadmap
         /// </summary>
         public int BuildNumber => _buildNumber;
 
-        internal IRenderable ToRenderable( ScreenType screen, int buildIndexLen, string cRank, ref RStats stats )
+        internal IRenderable ToRenderable(  ref BuildIndexAndRankDisplayState head, ref RStats stats )
         {
-            IRenderable r = RenderBuildIndexAndRank( screen, buildIndexLen, cRank );
-
+            IRenderable r = head.MoveNext( _buildNumber > 0, marginRight: 0 );
             if( _roadmap.Graph.HasPivots )
             {
                 var prefixStyle = new TextStyle( ConsoleColor.Black, ConsoleColor.DarkYellow );
-                r = r.AddRight( PivotPrefix( screen, _solution, prefixStyle, marginLeft: 1 ) );
+                r = r.AddRight( PivotPrefix( head.Screen, _solution, prefixStyle, marginLeft: 1 ) );
             }
 
-            var statusAndName = RepoName( screen, Repo, MustBuild, BuildInfo == null );
+            var statusAndName = RepoName( head.Screen, Repo, MustBuild, BuildInfo == null );
             r = r.AddRight( statusAndName );
             var currentVersion = $"v{CurrentVersion}";
             if( MustBuild )
@@ -741,15 +711,15 @@ public sealed partial class Roadmap
                                    _mustPublish );
                 Throw.DebugAssert( BuildInfo.BuildReason != MustBuildReason.None );
 
-                r = r.AddRight( screen.Text( currentVersion, ConsoleColor.Blue ),
-                                screen.Text( $"→ v{BuildInfo.TargetVersion} 🡡", ConsoleColor.Green ).Box( marginLeft: 1, marginRight: 1 ),
-                                BuildInfo.RenderBuildReason( screen, ref stats ) );
+                r = r.AddRight( head.Screen.Text( currentVersion, ConsoleColor.Blue ),
+                                head.Screen.Text( $"→ v{BuildInfo.TargetVersion} 🡡", ConsoleColor.Green ).Box( marginLeft: 1, marginRight: 1 ),
+                                BuildInfo.RenderBuildReason( head.Screen, ref stats ) );
             }
             else
             {
                 r = r.AddRight( !_mustPublish
-                                    ? screen.Text( currentVersion, ConsoleColor.DarkBlue )
-                                    : screen.Text( $"{currentVersion} 🡡", ConsoleColor.Blue ) );
+                                    ? head.Screen.Text( currentVersion, ConsoleColor.DarkBlue )
+                                    : head.Screen.Text( $"{currentVersion} 🡡", ConsoleColor.Blue ) );
             }
             return r;
 
@@ -804,20 +774,6 @@ public sealed partial class Roadmap
                             : r.Box( paddingLeft: 2, paddingRight: 1 );
                 return r.Box();
             }
-        }
-
-        IRenderable RenderBuildIndexAndRank( ScreenType screen, int buildIndexLen, string cRank )
-        {
-            if( _buildNumber > 0 )
-            {
-                Throw.DebugAssert( buildIndexLen > 0 );
-                var num = _buildNumber.ToString( CultureInfo.InvariantCulture );
-                return screen.Text( num.PadRight( buildIndexLen + 1 ) + cRank ).Box( TextStyle.Default );
-            }
-            var d = screen.Text( cRank );
-            return buildIndexLen > 0
-                    ? d.Box( TextStyle.Default, paddingLeft: buildIndexLen + 1 )
-                    : d.Box( TextStyle.Default );
         }
 
         [GeneratedRegex( @"^(?<1>\w+)(?:\((?<2>[^()]+)\))?(?<3>!)?:", RegexOptions.CultureInvariant )]

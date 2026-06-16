@@ -84,7 +84,7 @@ sealed class CKliStatus : Command
                              .Select( g => new Collapsable(
                                  screen.Text( g.Key )
                                  .AddBelow( screen.Unit.AddBelow( g.OrderBy( r => r.Index )
-                                                                       .Select( r => r.ToRenderable( screen, false, true, true ) ) )
+                                                                   .Select( r => r.ToRenderable( screen, false, true, true ) ) )
                                                            .TableLayout() ) )
                              ) );
                 }

@@ -1,9 +1,8 @@
-using CKli.Core;
-using System.Collections.Immutable;
 using CK.Core;
-using System.IO;
+using CKli.Core;
 using System;
-using System.Linq;
+using System.Collections.Immutable;
+using System.IO;
 
 namespace CKli.HotZone.Plugin;
 
@@ -23,7 +22,7 @@ namespace CKli.HotZone.Plugin;
 ///     </item>
 /// </list>
 /// </para>
-/// the "fix/vMajor.Minor" branches are automatically created in downstream repositories if they don't exist yet.
+/// The "fix/vMajor.Minor" branches are automatically created in downstream repositories if they don't exist yet.
 /// </summary>
 public sealed partial class FixWorkflow
 {
@@ -66,15 +65,20 @@ public sealed partial class FixWorkflow
                       .AddRight( s.Text( ":" ) )
                       .Box();
 
-        var arrow = s.Text( "->" ).Box( marginRight: 1 );
-        var rows = s.Unit.AddBelow( _targets.Select( t =>
-                     s.Text( $"{t.Index} -" ).Box( marginRight:1, align:ContentAlign.HRight)
-                     .AddRight( s.Text( t.Repo.DisplayPath ).HyperLink( new Uri( t.Repo.WorkingFolder ) ).Box( marginRight: 1 ) )
-                     .AddRight( arrow )
-                     .AddRight( s.Text( t.TargetVersion.ToString() ).Box( foreColor: ConsoleColor.Green, marginRight: 1 ) )
-                     .AddRight( s.Text( $"({t.BranchName})" ).Box( marginRight: 1, foreColor: ConsoleColor.DarkBlue ) ) ) );
-
-        return header.AddBelow( rows.TableLayout() );
+        var rows = ImmutableArray.CreateBuilder<IRenderable>( _targets.Length );
+        var indexAndRank = new BuildIndexAndRankDisplayState( s,
+                                                              _targets.Length,
+                                                              _targets.Length,
+                                                              i => _targets[i].Rank );
+        foreach( var t in _targets )
+        {
+            var r = indexAndRank.MoveNext( isBuildable: true, marginRight: 1 );
+            r = r.AddRight( s.Text( t.Repo.DisplayPath ).HyperLink( new Uri( t.Repo.WorkingFolder ) ).Box( marginRight: 1 ) )
+                 .AddRight( s.Text( $"⎇{t.BranchName}" ).Box( marginRight: 1, foreColor: ConsoleColor.DarkMagenta ) )
+                 .AddRight( s.Text( $"→ v{t.TargetVersion}" ).Box( foreColor: ConsoleColor.Green, marginRight: 1 ) );
+            rows.Add( r );
+        }
+        return header.AddBelow( new VerticalContent( s, rows.MoveToImmutable() ).TableLayout() );
     }
 
     /// <summary>
@@ -192,4 +196,3 @@ public sealed partial class FixWorkflow
         return world.StackRepository.StackWorkingFolder.Combine( $"$Local/{world.Name.FullName}.FixWorkflow.bin" );
     }
 }
-

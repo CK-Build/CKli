@@ -122,7 +122,7 @@ public sealed class Repo
 
         if( withBranchName )
         {
-            folder = folder.AddRight( screenType.Text( status.CurrentBranchName ).Box( marginRight: 1 ) );
+            folder = folder.AddRight( screenType.Text( $"⎇{status.CurrentBranchName}" ).Box( marginRight: 1 ) );
         }
         if( withRemoteDiffCount )
         {

@@ -317,19 +317,14 @@ public sealed partial class Roadmap
                                 _mustPublish );
         var renderables = ImmutableArray.CreateBuilder<IRenderable>( _orderedSolutions.Length );
 
-        int prevRank = -1;
-        for( int i = 0; i < _orderedSolutions.Length; i++ )
-        {
-            BuildSolution s = _orderedSolutions[i];
-            int r = s.Solution.Rank;
-            var begOfRank = prevRank < r;
-            var endOfRank = i == _orderedSolutions.Length - 1 || _orderedSolutions[i + 1].Solution.Rank > r;
+        var indexAndRank = new BuildIndexAndRankDisplayState( screen,
+                                                              _buildSolutionCount,
+                                                              _orderedSolutions.Length,
+                                                              i => _orderedSolutions[i].Solution.Rank );
 
-            var cR = begOfRank
-                        ? (endOfRank ?  "-" : "╓")
-                        : (endOfRank ? "╙" : "║");
-            renderables.Add( s.ToRenderable( screen, buildIndexLen, cR, ref stats ) );
-            prevRank = r;
+        foreach( BuildSolution s in _orderedSolutions )
+        {
+            renderables.Add( s.ToRenderable( ref indexAndRank, ref stats ) );
         }
         return new VerticalContent( screen, renderables.MoveToImmutable() ).TableLayout()
                .AddBelow( stats.Render( screen ) );

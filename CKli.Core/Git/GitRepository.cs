@@ -1190,6 +1190,52 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
+    /// Helper that computes the greatest number of commits between 2 commits: the <paramref name="baseCommit"/> must be
+    /// reachable from <paramref name="target"/> otherwise -1 is returned.
+    /// <para>
+    /// This uses the <see cref="Commit.Committer"/>'s <see cref="Signature.When"/> to avoid useless traversal
+    /// of the commit's graph. We use a 30 minutes margin (as if <paramref name="baseCommit"/> has been committed
+    /// half an hour earlier).
+    /// </para>
+    /// </summary>
+    /// <param name="baseCommit">The base commit (oldest one).</param>
+    /// <param name="target">The newest commit.</param>
+    /// <returns>Greatest number of commits or -1 if <paramref name="baseCommit"/> is not reachable from <paramref name="target"/>.</returns>
+    public static int ComputeCommitDepth( Commit baseCommit, Commit target )
+    {
+        Throw.CheckArgument( ((IBelongToARepository)baseCommit).Repository == ((IBelongToARepository)target).Repository );
+        Throw.CheckArgument( target.Committer.When >= baseCommit.Committer.When );
+
+        var baseCommitSha = baseCommit.Sha;
+        var cache = new Dictionary<string, int> { { baseCommitSha, 0 } };
+        // We take a 1/2 hour margin on the cut: this may handle clock drift and/or minor manual changes or adjustments.
+        return ComputeCommitDepth( baseCommitSha, baseCommit.Committer.When.UtcDateTime.AddMinutes( -30 ), target, cache );
+
+        static int ComputeCommitDepth( string baseCommitSha, DateTime baseCommitWhen, Commit target, Dictionary<string, int> cache )
+        {
+            var targetSha = target.Sha;
+            if( !cache.TryGetValue( targetSha, out int d ) )
+            {
+                d = -1;
+                if( target.Committer.When.UtcDateTime >= baseCommitWhen )
+                {
+                    foreach( var p in target.Parents )
+                    {
+                        int dP = ComputeCommitDepth( baseCommitSha, baseCommitWhen, p, cache );
+                        if( dP > d )
+                        {
+                            d = dP + 1;
+                        }
+                    }
+                }
+                cache.Add( targetSha, d );
+            }
+            return d;
+        }
+    }
+
+
+    /// <summary>
     /// Checks out the specified branch, creating it if it doesn't exist and by default fetch-merge from the remote if
     /// it's a tracking branch.
     /// <para>

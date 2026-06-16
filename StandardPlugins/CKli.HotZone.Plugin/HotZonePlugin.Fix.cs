@@ -29,7 +29,9 @@ public sealed partial class HotZonePlugin
                                            [Description( "The Major or Major.Minor version to fix." )]
                                            string version,
                                            [Description( "Allow 'fix/' branches to be moved on the commit to fix if they are not already on it." )]
-                                           bool moveBranch )
+                                           bool moveBranch,
+                                           [Description( "Ensures that an initial empty commit is created starts the branch (this commit can be amended)." )]
+                                           bool withEmptyCommit )
     {
         // Parses the Major.Minor. Minor is -1 if only Major is specified (we'll consider the max Minor).
         if( !ParseMajorMinor( version, out int major, out int minor ) )
@@ -50,16 +52,18 @@ public sealed partial class HotZonePlugin
         // 
         // So we fetch only the "fix/vMajor.*" branches with tags that limits the pulled tags to the minimum and
         // enables us to handle the floating minor.
-        //
-        // We consider only the "origin" remote here but we COULD allow all remotes.
+        // To secure this start, we don't fetch the fix branches with their tags (withTags: true that uses LibGit2's TagFetchMode.Auto),
+        // but call the safe FetchTags. This is slower but safer.
         //
         var branchSpec = World.Name.LTSName != null
                             ? $"{World.Name.LTSName}/fix/v{major}.*"
                             : $"fix/v{major}.*";
-        if( !repo.GitRepository.FetchRemoteBranches( monitor, withTags: true, branchSpec ) )
+        if( !repo.GitRepository.FetchRemoteBranches( monitor, withTags: false, branchSpec )
+            || !repo.GitRepository.FetchTags( monitor ) )
         {
             return false;
         }
+
         // Now that the tags of the vMajor have been fetched, we can obtain the VersionTagInfo to find the commit that
         // must be fixed.
         var versionInfo = _versionTag.GetWithoutIssue( monitor, repo, "starting a fix" );
@@ -68,7 +72,8 @@ public sealed partial class HotZonePlugin
             return false;
         }
         Throw.DebugAssert( !versionInfo.HasIssue );
-        var toFix = versionInfo.LastStables.Where( c => c.Version.Major == major && (minor == -1 || c.Version.Minor == minor) ).Max();
+        // Using Min() here because TagCommit reverts the Version ordering.
+        var toFix = versionInfo.LastStables.Where( c => c.Version.Major == major && (minor == -1 || c.Version.Minor == minor) ).Min();
         if( toFix == null )
         {
             monitor.Error( minor != -1
@@ -80,7 +85,7 @@ public sealed partial class HotZonePlugin
         {
             monitor.Error( $"""
                 The version to fix 'v{toFix.Version}' is the current last stable version.
-                Use the regular 'ckli build/publish' or 'ckli ci build/publish' workflows to produce a fix.
+                Use the regular workflow with 'ckli build/publish' commands to produce a fix.
                 """ );
             return false;
         }
@@ -113,7 +118,7 @@ public sealed partial class HotZonePlugin
                 // Restarting.
                 // This must resynchronizes the workflow with the remote branches.
                 // It is exactly the same as a "cancel+start".
-                // This "resync" may also be done at the start of 'ckli publish' to detect fix already existing
+                // This "resync" may also be done at the start of 'ckli fix publish' to detect fix already existing
                 // (and may be conflicting) on the remotes...
                 restartingWorkflow = true;
             }
@@ -135,12 +140,12 @@ public sealed partial class HotZonePlugin
         }
         // First, creates the origin (originReleaseInfo,targetVersion) as a FixWorkflow.TargetRepo.
         // If it fails, it is useless to create the downstream repositories targets.
-        var origin = CreateTarget( monitor, context, _versionTag, moveBranch, originReleaseInfo.Repo, toFix, targetVersion, 0 );
+        var origin = CreateTarget( monitor, context, _versionTag, moveBranch, withEmptyCommit, originReleaseInfo.Repo, toFix, targetVersion, 0 );
         if( origin == null )
         {
             return false;
         }
-        if( !CreateTargets( monitor, context, _versionTag, origin, moveBranch, originReleaseInfo, out var targets ) )
+        if( !CreateTargets( monitor, context, _versionTag, origin, moveBranch, withEmptyCommit, originReleaseInfo, out var targets ) )
         {
             return false;
         }
@@ -198,6 +203,7 @@ public sealed partial class HotZonePlugin
                                    VersionTagPlugin versionTags,
                                    FixWorkflow.TargetRepo first,
                                    bool moveBranch,
+                                   bool withEmptyCommit,
                                    RepoReleaseInfo origin,
                                    out ImmutableArray<FixWorkflow.TargetRepo> targets )
         {
@@ -316,7 +322,7 @@ public sealed partial class HotZonePlugin
                 {
                     return false;
                 }
-                var t = CreateTarget( monitor, context, versionTags, moveBranch, info.Repo, commit, targetVersion, rank );
+                var t = CreateTarget( monitor, context, versionTags, moveBranch, withEmptyCommit, info.Repo, commit, targetVersion, rank );
                 if( t == null ) return false;
                 b.Add( t );
             }
@@ -359,7 +365,7 @@ public sealed partial class HotZonePlugin
                     }
                     else
                     {
-                        // We fetch (with the tags) all the "fix/v*" branches here (before computing the version tags).
+                        // We fetch all the "fix/v*" branches here (before computing the version tags) and also FetchTags.
                         // There can be multiple impacts in the same repository (with different minors but
                         // also majors!).
                         // And we do this only once per impacted Repo (hence the HashSet<Repo> fetched).
@@ -367,7 +373,8 @@ public sealed partial class HotZonePlugin
                         {
                             var ltsName = next.Repo.World.Name.LTSName;
                             var branchSpec = ltsName != null ? $"{ltsName}/fix/v*" : "fix/v*";
-                            if( !next.Repo.GitRepository.FetchRemoteBranches( monitor, withTags: true, branchSpec ) )
+                            if( !next.Repo.GitRepository.FetchRemoteBranches( monitor, withTags: false, branchSpec )
+                                || !next.Repo.GitRepository.FetchTags( monitor ) )
                             {
                                 return null;
                             }
@@ -411,6 +418,7 @@ public sealed partial class HotZonePlugin
                                                      CKliEnv context,
                                                      VersionTagPlugin versionTags,
                                                      bool moveBranch,
+                                                     bool withEmptyCommit,
                                                      Repo repo,
                                                      TagCommit toFix,
                                                      SVersion targetVersion,
@@ -449,14 +457,21 @@ public sealed partial class HotZonePlugin
             if( bFix == null || bFix.Tip.Sha == toFix.Commit.Sha )
             {
                 var r = repo.GitRepository.Repository;
-                var c = r.ObjectDatabase.CreateCommit( toFix.Commit.Author,
+                if( withEmptyCommit )
+                {
+                    var c = r.ObjectDatabase.CreateCommit( toFix.Commit.Author,
                                                        context.Committer,
                                                        $"Starting '{branchName}' (this commit can be amended).",
                                                        toFix.Commit.Tree,
                                                        [toFix.Commit],
                                                        prettifyMessage: false );
-                // Create or update the /fix branch.
-                bFix = r.Branches.Add( branchName, c, allowOverwrite: true );
+                    // Create or update the /fix branch.
+                    bFix = r.Branches.Add( branchName, c, allowOverwrite: true );
+                }
+                else
+                {
+                    bFix = r.Branches.Add( branchName, toFix.Commit, allowOverwrite: true );
+                }
             }
 
             return new FixWorkflow.TargetRepo( repo,
@@ -472,9 +487,9 @@ public sealed partial class HotZonePlugin
     [CommandPath( "fix info" )]
     public bool FixInfo( IActivityMonitor monitor, CKliEnv context )
     {
-        if( !FixWorkflow.Load( monitor, World, out var workflow) )
+        if( !FixWorkflow.Load( monitor, World, out var workflow ) )
         {
-            return false; 
+            return false;
         }
         if( workflow == null )
         {
