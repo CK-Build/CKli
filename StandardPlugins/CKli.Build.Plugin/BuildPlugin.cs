@@ -378,7 +378,6 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         // this supports a "natural" force rebuild for the user by deleting the version tag.
         if( !forceRebuild )
         {
-
             if( versionInfo.TryGetTagCommit( targetVersion, out var buildTagCommit ) && !buildTagCommit.IsFakeVersion )
             {
                 if( _artifactHandler.HasAllArtifacts( monitor, versionInfo.Repo, targetVersion, buildTagCommit.BuildContentInfo, out var assetsFolder ) )

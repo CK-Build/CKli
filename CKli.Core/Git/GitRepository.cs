@@ -218,8 +218,7 @@ public sealed partial class GitRepository : IDisposable
             {
                 if( missingLocalAndRemote != LogLevel.None )
                 {
-                    var msg = $"Repository '{repoDisplayName}': Both local '{branchName}' and remote '{remoteName}' not found.";
-                    monitor.Log( missingLocalAndRemote, msg );
+                    monitor.Log( missingLocalAndRemote, $"Repository '{repoDisplayName}': Both local '{branchName}' and remote '{remoteName}' not found." );
                 }
                 return null;
             }

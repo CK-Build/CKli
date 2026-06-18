@@ -146,16 +146,14 @@ public sealed partial class BranchLink
     /// Refreshes the link: if <see cref="Branch"/> doesn't exist anymore, null is returned.
     /// </summary>
     /// <param name="repo">The repository.</param>
-    /// <returns>This link if no change, a refreshed one or null if <see cref="Branch"/> disappeared.</returns>
-    public BranchLink? Refresh( GitRepository repo )
+    /// <returns>A refreshed link or null if <see cref="Branch"/> disappeared.</returns>
+    public BranchLink? Refresh( IActivityMonitor monitor, GitRepository repo )
     {
         Throw.CheckArgument( repo.Repository == RepositoryOf( Branch ) );
-        var newBranch = repo.Repository.Branches[_branch.CanonicalName];
+        var newBranch = repo.GetBranch( monitor, _branch.FriendlyName, LogLevel.None );
         if( newBranch == null ) return null;
-        var newAhead = repo.Repository.Branches[_aheadName];
-        return newBranch.Tip.Sha == _branch.Tip.Sha && newAhead?.Tip.Sha == _ahead?.Tip.Sha
-                ? this
-                : newAhead != null
+        var newAhead = repo.GetBranch( monitor, _aheadName, LogLevel.None );
+        return newAhead != null
                     ? Create( newBranch, newAhead )
                     : new BranchLink( newBranch, null, _aheadName, 0, 0 );
     }

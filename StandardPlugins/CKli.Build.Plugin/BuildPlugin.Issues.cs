@@ -25,27 +25,9 @@ public sealed partial class BuildPlugin
                                   ScreenType screenType,
                                   Action<World.Issue> collector )
     {
-        // No version tag case.
-        if( versionTagInfo.LastStables.Count == 0 )
-        {
-            Throw.DebugAssert( versionTagInfo.HotZone == null );
-            var branchModel = _branchModel.Get( monitor, versionTagInfo.Repo );
-            if( branchModel.Root.GitBranch != null )
-            {
-                // We have a root branch: let's fix this by building it based on the InfVersion.
-                var vBase = versionTagInfo.InfVersion ?? SVersion.ZeroVersion;
-                var vInit = $"v{vBase.Major}.{vBase.Minor}.{vBase.Patch}+fake";
-                collector( new NoVersionTagIssue( this,
-                                                  versionTagInfo,
-                                                  "Missing initial version.",
-                                                  screenType.Text( $"""
-                                                      This can be fixed by creating a '{vInit}' on '{branchModel.Root.BranchName}' branch.
-                                                      """ ),
-                                                  branchModel.Root,
-                                                  vInit ) );
-            }
-        }
+
         // Tags rebuild case.
+        // If there are tags to rebuild, then the "NoVersionTagIssue" is not (yet) relevant.
         var regulars = versionTagInfo.LightweightOrUnreadableRegularTags;
         if( regulars != null )
         {
@@ -86,6 +68,29 @@ public sealed partial class BuildPlugin
                                                  unreadableMessages ) );
             }
         }
+        else
+        {
+            // No version tag case (only if there are no tags to rebuild).
+            if( versionTagInfo.LastStables.Count == 0 )
+            {
+                Throw.DebugAssert( versionTagInfo.HotZone == null );
+                var branchModel = _branchModel.Get( monitor, versionTagInfo.Repo );
+                if( branchModel.Root.GitBranch != null )
+                {
+                    // We have a root branch: let's fix this by building it based on the InfVersion.
+                    var vBase = versionTagInfo.InfVersion ?? SVersion.ZeroVersion;
+                    var vInit = $"v{vBase.Major}.{vBase.Minor}.{vBase.Patch}+fake";
+                    collector( new NoVersionTagIssue( this,
+                                                      versionTagInfo,
+                                                      "Missing initial version.",
+                                                      screenType.Text( $"""
+                                                      This can be fixed by creating a '{vInit}' on '{branchModel.Root.BranchName}' branch.
+                                                      """ ),
+                                                      branchModel.Root,
+                                                      vInit ) );
+                }
+            }
+        }
     }
 
     sealed class TagsRebuildIssue : World.Issue
@@ -112,15 +117,29 @@ public sealed partial class BuildPlugin
             using var gLog = monitor.OpenInfo( $"Fixing {_tagsToRebuild.Length} tags content info in '{Repo.DisplayPath}'." );
             foreach( var (v,t) in _tagsToRebuild )
             {
-                if( await _buildPlugin.CoreBuildAsync( monitor,
-                                                       context,
-                                                       _versionTagInfo,
-                                                       (Commit)t.PeeledTarget,
-                                                       v,
-                                                       runTest: false,
-                                                       forceRebuild: true ) == null )
+                var buildResult = await _buildPlugin.CoreBuildAsync( monitor,
+                                                                     context,
+                                                                     _versionTagInfo,
+                                                                     (Commit)t.PeeledTarget,
+                                                                     v,
+                                                                     runTest: false,
+                                                                     forceRebuild: true );
+                if( buildResult == null)
                 {
                     return false;
+                }
+                // If the tag that triggered the build differs from the final "local/" one, removes it.
+                Throw.DebugAssert( "Tags to rebuild are regular ones.", v.BuildMetaData.Length == 0 );
+                if( t.CanonicalName != buildResult.VersionTag.CanonicalName )
+                {
+                    Repo.GitRepository.DeleteLocalTags( monitor, [t.CanonicalName] );
+                }
+                if( !v.IsLocal() )
+                {
+                    monitor.Warn( $"""
+                        Tag '{v.ParsedText}' in '{Repo.DisplayPath}' has been rebuilt.
+                        It must be manually published.
+                        """ );
                 }
             }
             return true;

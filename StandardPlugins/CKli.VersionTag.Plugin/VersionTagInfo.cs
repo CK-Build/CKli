@@ -157,15 +157,11 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// For "ci.0" version (when <see cref="SVersion.CINumber"/> is 0, this returns the commit of the base version.
     /// The found base may have a <see cref="TagCommit.CI0VersionTag"/>.
     /// </para>
-    /// <para>
-    /// <see cref="HasIssue"/> must be false or a <see cref="InvalidOperationException"/> is thrown.
-    /// </para>
     /// </summary>
     /// <param name="version">The version to find.</param>
     /// <returns>The tag commit if it exists, null otherwise.</returns>
     public TagCommit? GetTagCommit( SVersion version )
     {
-        Throw.CheckState( !HasIssue );
         if( _v2C.TryGetValue( version, out var tc ) )
         {
             return tc;
@@ -186,9 +182,6 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <para>
     /// For "ci.0" version (when <see cref="SVersion.CINumber"/> is 0, this locates the commit of the base version.
     /// The found base may have a <see cref="TagCommit.CI0VersionTag"/>.
-    /// </para>
-    /// <para>
-    /// <see cref="HasIssue"/> must be false or a <see cref="InvalidOperationException"/> is thrown.
     /// </para>
     /// </summary>
     /// <param name="version">The version to find.</param>
@@ -295,10 +288,20 @@ public sealed partial class VersionTagInfo : RepoInfo
         {
             return null;
         }
+        // Here isRebuild is true when the commit with the version has been found AND allowRebuild is true.
         if( isRebuild )
         {
             return new CommitBuildInfo( this, version, buildCommit, isRebuild );
         }
+        // However, when allowRebuild is true, we don't want to fail here because the topology is not valid:
+        // we must be able to rebuild versions in order to reach a "valid topology" state...
+        // So, here, when allowRebuild is true, we blindly allow the operation.
+        // => This may change in the future (with a new parameter?)...
+        if( allowRebuild )
+        {
+            return new CommitBuildInfo( this, version, buildCommit, true );
+        }
+
         // We are not rebuilding (the version doesn't exist).
         // Considering the existing versions, whatever the build process is, there are some invariants
         // that must be respected.
@@ -380,7 +383,6 @@ public sealed partial class VersionTagInfo : RepoInfo
                 // This should have been handled by the builder before calling TryGetCommitBuildInfo: this is a security.
                 monitor.Error( $"""
                     The version 'v{version}' in '{Repo.DisplayPath}' already exists on the commit '{exists.Sha}' but rebuilding it is not allowed.
-                    The --rebuild flag may be used.
                     """ );
                 return false;
             }

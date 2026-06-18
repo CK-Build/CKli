@@ -2,14 +2,12 @@ using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using LibGit2Sharp;
-using NuGet.Protocol.Plugins;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Xml.Linq;
-using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.VersionTag.Plugin;
 

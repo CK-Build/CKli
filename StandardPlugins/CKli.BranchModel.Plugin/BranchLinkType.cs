@@ -1,7 +1,7 @@
 namespace CKli.BranchModel.Plugin;
 
 /// <summary>
-/// Defines the type of link between a <see cref="BranchName"/> and its more stable predecessors.
+/// Defines the type of link between a <see cref="BranchName"/> and its more stable parent.
 /// </summary>
 enum BranchLinkType
 {
@@ -11,7 +11,7 @@ enum BranchLinkType
     None,
 
     /// <summary>
-    /// Restricted propagation ("|"): only stable releases are propagated downwards.
+    /// Restricted propagation ("|"): only published stable releases are propagated downwards.
     /// </summary>
     Stable,
 
