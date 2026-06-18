@@ -233,8 +233,7 @@ public sealed partial class BuildPlugin
                 return null;
             }
 
-            // CoreBuildAsync interacts with the ReleaseDatabasePlugin and this plugin is "thread safe" (thanks to a simple basic lock).
-            // It also interacts with the ArtifactHandlerPlugin that is mainly a proxy of the file system (the $Local NuGet and Assets folders).
+            // CoreBuildAsync interacts with the ArtifactHandlerPlugin that is mainly a proxy of the file system (the $Local NuGet and Assets folders).
             var result = await _buildPlugin.CoreBuildAsync( monitor,
                                                             _context,
                                                             build.Solution.VersionInfo.VersionTagInfo,
@@ -244,7 +243,7 @@ public sealed partial class BuildPlugin
                                                             forceRebuild: false ).ConfigureAwait( false );
             Throw.DebugAssert( result == null || result.Content.Produced.All( p => _roadmap.PackageMapping.GetMappedVersion( p, build.Solution.CurrentVersion ) == result.Version ) );
             // On error, we ensure that we let the repository on the "dev/" branch (this applies to non CI
-            // build - in CI build as we already are on the "dev/" branch).
+            // build - in CI build we already are on the "dev/" branch).
             if( result == null && !_roadmap.IsCIBuild )
             {
                 // The files are exactly the same by design (hard reset has already been done by CoeBuild, no need to handle untracked & ignored files).

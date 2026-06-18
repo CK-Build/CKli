@@ -1,4 +1,5 @@
 using CK.Core;
+using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using LibGit2Sharp;
 using System;
@@ -14,54 +15,60 @@ namespace CKli.VersionTag.Plugin;
 /// </summary>
 public sealed partial class VersionTagInfo : RepoInfo
 {
-    readonly List<TagCommit> _lastStables;
-    readonly HotZoneInfo? _hotZone;
-    readonly Dictionary<SVersion, TagCommit> _v2C;
-    readonly IReadOnlyList<Tag> _removableTags;
+    readonly VersionTagPlugin _versionTagPlugin;
+    readonly SVersion? _infVersion;
+    readonly SVersion? _supVersion;
+
+    [AllowNull] List<TagCommit> _lastStables;
+    [AllowNull] Dictionary<SVersion, TagCommit> _v2C;
+    [AllowNull] IReadOnlyList<Tag> _removableTags;
+    HotZoneInfo? _hotZone;
     //
     // The +invalid tags are already handled, kept here but not used anymore:
     // one day, may be, we'll remove them but before, we must ensure that the hidden
     // version tags are removed in other repositories...
     //
-    readonly Dictionary<SVersion, (SVersion V, Tag T)>? _invalidTags;
-    readonly List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? _tagConflicts;
-    readonly List<Tag>? _badDeprecatedTags;
-    readonly World.Issue? _publishedReleaseContentIssue;
-    readonly SVersion? _infVersion;
-    readonly SVersion? _supVersion;
-    readonly bool _hasIssue;
+    Dictionary<SVersion, (SVersion V, Tag T)>? _invalidTags;
+    List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? _tagConflicts;
+    List<Tag>? _badDeprecatedTags;
+    List<(SVersion V, Tag T)>? _lightweightOrUnreadableRegularTags;
+    bool _hasIssue;
+    // Lazy initialization.
     Dictionary<string, TagCommit>? _sha2C;
     ImmutableArray<TagCommit> _lastMajorMinorStables;
 
-    internal VersionTagInfo( Repo repo,
+    internal VersionTagInfo( VersionTagPlugin plugin,
+                             Repo repo,
                              SVersion? infVersion,
-                             SVersion? supVersion,
-                             List<TagCommit> lastStables,
-                             HotZoneInfo? hotZone,
-                             Dictionary<SVersion, TagCommit> v2c,
-                             List<Tag>? removableTags,
-                             Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags,
-                             List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts,
-                             List<Tag>? badDeprecatedTags,
-                             World.Issue? publishedReleaseContentIssue,
-                             bool hasMissingContentInfo )
-        : base( repo )
+                             SVersion? supVersion )
+           : base( repo )
+    {
+        _versionTagPlugin = plugin;
+        _infVersion = infVersion;
+        _supVersion = supVersion;
+    }
+
+    internal void Initialize( List<TagCommit> lastStables,
+                              HotZoneInfo? hotZone,
+                              Dictionary<SVersion, TagCommit> v2c,
+                              List<Tag>? removableTags,
+                              Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags,
+                              List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts,
+                              List<Tag>? badDeprecatedTags,
+                              List<(SVersion V, Tag T)>? lightweightOrUnreadableRegularTags )
     {
         _lastStables = lastStables;
         _hotZone = hotZone;
         _v2C = v2c;
-        _infVersion = infVersion;
-        _supVersion = supVersion;
         _removableTags = removableTags ?? [];
         _invalidTags = invalidTags;
         _tagConflicts = tagConflicts;
         _badDeprecatedTags = badDeprecatedTags;
-        _publishedReleaseContentIssue = publishedReleaseContentIssue;
+        _lightweightOrUnreadableRegularTags = lightweightOrUnreadableRegularTags;
         _hasIssue = hotZone == null || hotZone.HotZoneIssue != null
-                     || hasMissingContentInfo
+                     || lightweightOrUnreadableRegularTags != null
                      || tagConflicts != null
-                     || badDeprecatedTags != null
-                     || publishedReleaseContentIssue != null;
+                     || badDeprecatedTags != null;
     }
 
     /// <summary>
@@ -145,9 +152,49 @@ public sealed partial class VersionTagInfo : RepoInfo
     public HotZoneInfo? HotZone => _hotZone;
 
     /// <summary>
-    /// Gets the versioned tag commits indexed by their version.
+    /// Gets a <see cref="TagCommit"/> for a version.
+    /// <para>
+    /// For "ci.0" version (when <see cref="SVersion.CINumber"/> is 0, this returns the commit of the base version.
+    /// The found base may have a <see cref="TagCommit.CI0VersionTag"/>.
+    /// </para>
+    /// <para>
+    /// <see cref="HasIssue"/> must be false or a <see cref="InvalidOperationException"/> is thrown.
+    /// </para>
     /// </summary>
-    public IReadOnlyDictionary<SVersion, TagCommit> TagCommits => _v2C;
+    /// <param name="version">The version to find.</param>
+    /// <returns>The tag commit if it exists, null otherwise.</returns>
+    public TagCommit? GetTagCommit( SVersion version )
+    {
+        Throw.CheckState( !HasIssue );
+        if( _v2C.TryGetValue( version, out var tc ) )
+        {
+            return tc;
+        }
+        if( version.CINumber == 0 )
+        {
+            var vBase = version.SetCINumber( -1 );
+            if( _v2C.TryGetValue( vBase, out tc ) )
+            {
+                return tc;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Gets a <see cref="TagCommit"/> for a version.
+    /// <para>
+    /// For "ci.0" version (when <see cref="SVersion.CINumber"/> is 0, this locates the commit of the base version.
+    /// The found base may have a <see cref="TagCommit.CI0VersionTag"/>.
+    /// </para>
+    /// <para>
+    /// <see cref="HasIssue"/> must be false or a <see cref="InvalidOperationException"/> is thrown.
+    /// </para>
+    /// </summary>
+    /// <param name="version">The version to find.</param>
+    /// <param name="tagCommit">On success, the found tag commit.</param>
+    /// <returns>True in success, false if the version doesn't exist.</returns>
+    public bool TryGetTagCommit( SVersion version, [NotNullWhen( true )] out TagCommit? tagCommit ) => (tagCommit = GetTagCommit( version )) != null;
 
     /// <summary>
     /// Gets the versioned tag commit indexed by their <see cref="TagCommit.Sha"/>.
@@ -169,6 +216,11 @@ public sealed partial class VersionTagInfo : RepoInfo
     }
 
     /// <summary>
+    /// Gets all the <see cref="TagCommit"/>.
+    /// </summary>
+    public IEnumerable<TagCommit> AllTagCommits => _v2C.Values;
+
+    /// <summary>
     /// Gets the tags that can be removed (at least locally).
     /// </summary>
     public IReadOnlyList<Tag> RemovableTags => _removableTags;
@@ -177,6 +229,17 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// Gets whether tag conflicts have been found.
     /// </summary>
     public bool HasTagConflicts => _tagConflicts != null;
+
+    /// <summary>
+    /// Gets the version tags from which the <see cref="BuildContentInfo"/> cannot be read.
+    /// It may be because the tag is not an annotated tag or its <see cref="TagAnnotation.Message"/> is not
+    /// parsable by <see cref="BuildContentInfo.TryParse(ReadOnlySpan{char}, out BuildContentInfo?)"/>.
+    /// <para>
+    /// The Build plugin exposes this as an automatic issue by offering to compile the commits to restore
+    /// their build content info.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<(SVersion V, Tag T)>? LightweightOrUnreadableRegularTags => _lightweightOrUnreadableRegularTags;
 
     /// <summary>
     /// Checks that <see cref="HasTagConflicts"/> is false or emits an error that invites
@@ -493,15 +556,16 @@ public sealed partial class VersionTagInfo : RepoInfo
                 """;
     }
 
-    internal TagCommit AddReleaseBuildTag( SVersion version, Commit buildCommit, Tag t )
+    internal TagCommit AddReleaseBuildTag( SVersion version, Commit buildCommit, Tag t, BuildContentInfo contentInfo )
     {
-        Throw.DebugAssert( version.ParsedPrefix == "local/" );
+        Throw.DebugAssert( "New version is local.", version.ParsedPrefix == "local/" );
+        Throw.DebugAssert( "The 'ci.0' is on an existing TagCommit.", version.CINumber != 0 );
         Throw.DebugAssert( !_v2C.ContainsKey( version ) );
         Throw.DebugAssert( _sha2C != null );
         Throw.DebugAssert( "This must have been checked by TryGetCommitBuildInfo.",
                            !_sha2C.TryGetValue( buildCommit.Sha, out var exist ) || exist.IsFakeVersion );
 
-        var newOne = new TagCommit( version, buildCommit, t, isFakeVersion: false, deprecatedInfo: null );
+        var newOne = new TagCommit( this, version, buildCommit, t, contentInfo, deprecatedInfo: null );
         _v2C.Add( version, newOne );
         _sha2C.Add( newOne.Sha, newOne );
         if( version.IsStable )
@@ -590,10 +654,6 @@ public sealed partial class VersionTagInfo : RepoInfo
                 }
             }
         }
-        if( _publishedReleaseContentIssue != null )
-        {
-            collector( _publishedReleaseContentIssue );
-        }
         if( _removableTags.Count > 0 )
         {
             collector( new RemovableVersionTagIssue(
@@ -622,7 +682,7 @@ public sealed partial class VersionTagInfo : RepoInfo
                                 Repo,
                                 _badDeprecatedTags ) );
         }
-      if( _hotZone != null && _hotZone.HotZoneIssue != null )
+        if( _hotZone != null && _hotZone.HotZoneIssue != null )
         {
             collector( _hotZone.HotZoneIssue );
         }

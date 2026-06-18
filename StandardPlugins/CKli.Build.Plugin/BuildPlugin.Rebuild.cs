@@ -37,6 +37,7 @@ public sealed partial class BuildPlugin
                 var versionTagInfo = _versionTags.Get( monitor, repo );
                 foreach( var tag in versionTagInfo.LastStables.Reverse() )
                 {
+                    if( !tag.IsRegularVersion ) continue;
                     if( await CoreBuildAsync( monitor,
                                               context,
                                               versionTagInfo,
@@ -86,8 +87,12 @@ public sealed partial class BuildPlugin
         {
             return false;
         }
-        var versionTagInfo = _versionTags.Get( monitor, repo );
-        if( !versionTagInfo.TagCommits.TryGetValue( v, out var tag ) )
+        var versionTagInfo = _versionTags.GetWithoutIssue( monitor, repo );
+        if( versionTagInfo == null )
+        {
+            return false;
+        }
+        if( !versionTagInfo.TryGetTagCommit( v, out var tag ) )
         {
             monitor.Error( $"Unable to find version 'v{v}'." );
             return false;

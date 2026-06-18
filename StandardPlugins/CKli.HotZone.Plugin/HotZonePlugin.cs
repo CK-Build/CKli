@@ -3,7 +3,6 @@ using CK.PerfectEvent;
 using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
-using CKli.ReleaseDatabase.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
 using System;
@@ -22,7 +21,6 @@ public sealed partial class HotZonePlugin : PrimaryPluginBase
     readonly BranchModelPlugin _branchModel;
     readonly VersionTagPlugin _versionTag;
     readonly ShallowSolutionPlugin _shallowSolution;
-    readonly ReleaseDatabasePlugin _releaseDatabase;
     readonly ArtifactHandlerPlugin _artifactHandler;
 
     /// <summary>
@@ -32,13 +30,11 @@ public sealed partial class HotZonePlugin : PrimaryPluginBase
     /// <param name="branchModel">The branch model plugin.</param>
     /// <param name="versionTag">The version tag plugin.</param>
     /// <param name="shallowSolution">The shallow solution plugin.</param>
-    /// <param name="releaseDatabase">The release database plugin.</param>
     /// <param name="artifactHandler">The artifact handler plugin.</param>
     public HotZonePlugin( PrimaryPluginContext primaryContext,
                           BranchModelPlugin branchModel,
                           VersionTagPlugin versionTag,
                           ShallowSolutionPlugin shallowSolution,
-                          ReleaseDatabasePlugin releaseDatabase,
                           ArtifactHandlerPlugin artifactHandler )
         : base( primaryContext )
     {
@@ -46,7 +42,6 @@ public sealed partial class HotZonePlugin : PrimaryPluginBase
         _branchModel = branchModel;
         _versionTag = versionTag;
         _shallowSolution = shallowSolution;
-        _releaseDatabase = releaseDatabase;
         _artifactHandler = artifactHandler;
     }
 

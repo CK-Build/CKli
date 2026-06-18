@@ -2,7 +2,7 @@ using CK.Core;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
-
+using LibGit2Sharp;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -46,85 +46,59 @@ public sealed partial class BuildPlugin
             }
         }
         // Tags rebuild case.
-        var regulars = versionTagInfo.TagCommits.Values.Where( tc => tc.IsRegularVersion );
-        var lightWeightTags = regulars.Where( tc => !tc.Tag.IsAnnotated ).ToArray();
-        const string rebuildMessage = """
+        var regulars = versionTagInfo.LightweightOrUnreadableRegularTags;
+        if( regulars != null )
+        {
+            var lightWeightTags = regulars.Where( tc => !tc.T.IsAnnotated ).ToArray();
+            const string rebuildMessage = """
             Fixing these tags recompiles the commit to obtain the consumed/produced packages and asset files.
             On success, the tag content is updated.
             When the commit cannot be successfully recompiled, the command 'ckli maintenance rebuild old'
             can try to build them and sets a "+invalid" tag on failure.
             """;
-        if( lightWeightTags.Length > 0 )
-        {
-            collector( new TagsRebuildIssue( this,
-                                             versionTagInfo,
-                                             $"{lightWeightTags.Length} lightweight tags must be transformed to annotated tags.",
-                                             screenType.Text( $"""
-                                                {lightWeightTags.Select( t => t.Version.ParsedText ).Concatenate()}
+            if( lightWeightTags.Length > 0 )
+            {
+                collector( new TagsRebuildIssue( this,
+                                                 versionTagInfo,
+                                                 $"{lightWeightTags.Length} lightweight tags must be transformed to annotated tags.",
+                                                 screenType.Text( $"""
+                                                        {lightWeightTags.Select( vt => vt.V.ParsedText ).Concatenate()}
 
-                                                {rebuildMessage}
-                                                """ ),
-                                             lightWeightTags ) );
-        }
-        var unreadableMessages = regulars.Where( tc => tc.Tag.IsAnnotated && tc.BuildContentInfo == null ).ToArray();
-        if( unreadableMessages.Length > 0 )
-        {
-            monitor.Info( $"""
+                                                        {rebuildMessage}
+                                                        """ ),
+                                                 lightWeightTags ) );
+            }
+            var unreadableMessages = regulars.Where( tc => tc.T.IsAnnotated ).ToArray();
+            if( unreadableMessages.Length > 0 )
+            {
+                monitor.Info( $"""
                 The {unreadableMessages.Length} following tags in '{versionTagInfo.Repo.DisplayPath}' have unreadable messages:
-                {unreadableMessages.Select( tc => $"- {tc.Version.ParsedText}:{Environment.NewLine}{tc.TagMessage}{Environment.NewLine}" ).Concatenate( Environment.NewLine )}
+                {unreadableMessages.Select( vt => $"- {vt.V.ParsedText}:{Environment.NewLine}{vt.T.Annotation.Message}{Environment.NewLine}" ).Concatenate( Environment.NewLine )}
                 """ );
-            collector( new TagsRebuildIssue( this,
-                                             versionTagInfo,
-                                             $"{unreadableMessages.Length} tags have unreadable content info (see logs for details).",
-                                             screenType.Text( $"""
-                                                {unreadableMessages.Select( t => t.Version.ParsedText ).Concatenate()}
+                collector( new TagsRebuildIssue( this,
+                                                 versionTagInfo,
+                                                 $"{unreadableMessages.Length} tags have unreadable content info (see logs for details).",
+                                                 screenType.Text( $"""
+                                                        {unreadableMessages.Select( vt => vt.V.ParsedText ).Concatenate()}
 
-                                                {rebuildMessage}
-                                                """ ),
-                                             unreadableMessages ) );
+                                                        {rebuildMessage}
+                                                        """ ),
+                                                 unreadableMessages ) );
+            }
         }
-
-        // Since this doesn't push the results, this is not a good idea.
-        // Temporarily removed.
-
-        //// Ultimate case: the regular tags with a content that appear in the Local database but miss artifacts.
-        //// => If it appears in the Published database, then we can remove it from the Local database (this may be done
-        ////    in the ReleaseDatabasePlugin.OnExistingVersionTags... whether it misses artifacts or not...).
-        ////    For the moment, if it appears in the Published database, we ignore it.
-        //// => Otherwise, we must rebuild it.
-        //var missingArtifacts = regulars.Where( tc => tc.BuildContentInfo != null
-        //                                             && _releaseDatabase.GetBuildContentInfo( monitor, versionTagInfo.Repo, tc.Version ) != null
-        //                                             && _releaseDatabase.GetBuildContentInfo( monitor, versionTagInfo.Repo, tc.Version, fromPublished: true ) == null
-        //                                             && !_artifactHandler.HasAllArtifacts( monitor, versionTagInfo.Repo, tc.Version, tc.BuildContentInfo, out _ ) ).ToArray();
-        //if( missingArtifacts.Length > 0 )
-        //{
-        //    monitor.Info( $"""
-        //        The {missingArtifacts.Length} following tags in '{versionTagInfo.Repo.DisplayPath}' must be rebuilt (expected artifacts are missing):
-        //        {missingArtifacts.Select( tc => $"- {tc.Version}:{Environment.NewLine}{tc.TagMessage}{Environment.NewLine}" ).Concatenate( Environment.NewLine )}
-        //        """ );
-        //    collector( new TagsRebuildIssue( this,
-        //                                     versionTagInfo,
-        //                                     $"{missingArtifacts.Length} tags have missing artifacts (see logs for details).",
-        //                                     screenType.Text( $"""
-        //                                        {missingArtifacts.Select( t => t.Version.ToString() ).Concatenate()}
-
-        //                                        These commits must be rebuilt to produce the packages and asset files.
-        //                                        """ ),
-        //                                     missingArtifacts ) );
-        //}
     }
 
     sealed class TagsRebuildIssue : World.Issue
     {
         readonly BuildPlugin _buildPlugin;
         readonly VersionTagInfo _versionTagInfo;
-        readonly TagCommit[] _tagsToRebuild;
+        readonly (SVersion V, Tag T)[] _tagsToRebuild;
 
         public TagsRebuildIssue( BuildPlugin buildPlugin,
                                  VersionTagInfo versionTagInfo,
                                  string title,
                                  IRenderable body,
-                                 TagCommit[] tagsToRebuild )
+                                 (SVersion V, Tag T)[] tagsToRebuild )
             : base( title, body, versionTagInfo.Repo )
         {
             _buildPlugin = buildPlugin;
@@ -136,13 +110,13 @@ public sealed partial class BuildPlugin
         {
             Throw.DebugAssert( Repo != null );
             using var gLog = monitor.OpenInfo( $"Fixing {_tagsToRebuild.Length} tags content info in '{Repo.DisplayPath}'." );
-            foreach( var tc in _tagsToRebuild )
+            foreach( var (v,t) in _tagsToRebuild )
             {
                 if( await _buildPlugin.CoreBuildAsync( monitor,
                                                        context,
                                                        _versionTagInfo,
-                                                       tc.Commit,
-                                                       tc.Version,
+                                                       (Commit)t.PeeledTarget,
+                                                       v,
                                                        runTest: false,
                                                        forceRebuild: true ) == null )
                 {

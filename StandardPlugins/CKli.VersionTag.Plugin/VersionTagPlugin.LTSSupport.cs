@@ -41,7 +41,7 @@ public sealed partial class VersionTagPlugin
         var result = new RepoLTSVersion[allVersions.Length];
         foreach( var versions in allVersions )
         {
-            var lastProduced = versions.TagCommits.Keys.Max() ?? versions.InfVersion ?? SVersion.ZeroVersion;
+            var lastProduced = versions.HotZone?.LastStable.Version ?? versions.InfVersion ?? SVersion.ZeroVersion;
             var cut = SVersion.Create( lastProduced.Major + 1, 0, 0, "0" );
             result[versions.Repo.Index] = new RepoLTSVersion( versions.Repo, versions.InfVersion, cut );
         }

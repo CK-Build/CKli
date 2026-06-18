@@ -1,16 +1,14 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
-using CKli.ReleaseDatabase.Plugin;
 using LibGit2Sharp;
+using NuGet.Protocol.Plugins;
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Xml.Linq;
-using static CK.Core.ActivityMonitor;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.VersionTag.Plugin;
@@ -20,25 +18,22 @@ namespace CKli.VersionTag.Plugin;
 /// </summary>
 public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
 {
-    readonly ReleaseDatabasePlugin _releaseDatabase;
-    readonly ArtifactHandlerPlugin _artifactHandler;
+    readonly ArtifactHandlerPlugin _artifactHandlerPlugin;
     readonly bool _autoFixRemovableTag;
+    ReleaseDatabase? _releaseDatabase;
     Dictionary<string, SVersion>? _externalPackages;
 
     /// <summary>
     /// Initializes a new <see cref="VersionTagPlugin"/>.
     /// </summary>
     /// <param name="primaryContext">The CKli plugin context.</param>
-    /// <param name="releaseDatabase">The release database plugin.</param>
     /// <param name="artifactHandler">The artifact handler plugin.</param>
     public VersionTagPlugin( PrimaryPluginContext primaryContext,
-                             ReleaseDatabasePlugin releaseDatabase,
                              ArtifactHandlerPlugin artifactHandler )
         : base( primaryContext )
     {
         World.Events.Issue += IssueRequested;
-        _releaseDatabase = releaseDatabase;
-        _artifactHandler = artifactHandler;
+        _artifactHandlerPlugin = artifactHandler;
         _autoFixRemovableTag = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.AutoFixRemovableTag ) ?? false;
     }
 
@@ -110,109 +105,79 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         }
     }
 
+
     /// <summary>
-    /// Destroys a released version. The version tag is deleted, the release database is updated
-    /// and any artifacts are removed: this centralizes the calls to <see cref="ReleaseDatabasePlugin.DestroyLocalRelease(IActivityMonitor, Repo, SVersion)"/>
-    /// and <see cref="ArtifactHandlerPlugin.DestroyLocalRelease(IActivityMonitor, Repo, SVersion, BuildContentInfo, bool)"/>
-    /// that should not be called directly.
+    /// Destroys a "local/" released version. The version tag is deleted, any artifacts are removed.
     /// <para>
-    /// This is idempotent and doesn't trigger the initialization of the <see cref="VersionTagInfo"/> for the Repo, but if it
-    /// <see cref="RepoPluginBase{T}.HasRepoInfoBeenCreated(Repo)">has been created</see> it is updated.
+    /// This is idempotent (if the "local/" version tag doesn't exist, nothing is done) and doesn't trigger the initialization
+    /// of the <see cref="VersionTagInfo"/> for the Repo, but if it <see cref="RepoPluginBase{T}.HasRepoInfoBeenCreated(Repo)">has been created</see>
+    /// the existing <see cref="TagCommit"/> is removed.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="repo">The source repository.</param>
-    /// <param name="version">The release to destroy.</param>
+    /// <param name="version">
+    /// The release to destroy.
+    /// <see cref="SVersion.IsCSVersion"/> must be true and <see cref="SVersion.BuildMetaData"/> must be empty.
+    /// </param>
     /// <param name="removeFromNuGetGlobalCache">
     /// False to let the package in the NuGet global cache (if it exists).
     /// The global cache is "%userprofile%\.nuget\packages" on windows and "~/.nuget/packages" on Mac/Linux.
     /// </param>
-    /// <returns>True on success, false on error (only errors are that assets cannot be properly deleted).</returns>
+    /// <returns>True on success, false on error: the "local/v<paramref name="version"/>" tag is not found and  or the assets cannot be properly deleted.</returns>
     public bool DestroyLocalRelease( IActivityMonitor monitor, Repo repo, SVersion version, bool removeFromNuGetGlobalCache = true )
     {
-        TagCommit? tagCommit = HasRepoInfoBeenCreated( repo ) ? Get( monitor, repo ).RemoveTagCommit( version ) : null;
+        Throw.CheckArgument( version.IsCSVersion && version.BuildMetaData.Length == 0 );
 
-        Tag? tag = tagCommit?.Tag;
-        BuildContentInfo? tagContent = tagCommit?.BuildContentInfo;
-        if( tag == null )
+        Tag? tag = null;
+        BuildContentInfo? tagContent = null;
+        if( HasRepoInfoBeenCreated( repo ) )
         {
-            tag = repo.GitRepository.Repository.Tags[$"v{version.ToString()}"] ?? repo.GitRepository.Repository.Tags[version.ToString()];
-            if( tag != null )
+            var vInfo = Get( monitor, repo );
+            var tagCommit = Get( monitor, repo ).GetTagCommit( version );
+            if( tagCommit == null )
             {
-                _ = BuildContentInfo.TryParse( tag.Annotation?.Message, out tagContent );
+                monitor.Trace( $"Version tag 'local/v{version}' not found. Skipped DestroyLocalRelease." );
+                return true;
             }
+            if( !tagCommit.Version.IsLocal() )
+            {
+                monitor.Error( $"DestroyLocalRelease failed: tag '{tagCommit.Tag.FriendlyName}' is not 'local/'." );
+                return true;
+            }
+            if( !tagCommit.IsRegularVersion )
+            {
+                monitor.Error( $"DestroyLocalRelease failed: tag '{tagCommit.Tag.FriendlyName}' must not be +fake or +deprecated." );
+                return false;
+            }
+            tag = tagCommit.Tag;
+            tagContent = tagCommit.BuildContentInfo;
+            // Because we remove the TagCommit here, we should delete the tag before the artifacts.
+            vInfo.RemoveTagCommit( version );
         }
-        if( tag != null )
+        else
         {
-            repo.GitRepository.DeleteLocalTags( monitor, [tag.CanonicalName] );
+            var tagName = $"refs/tags/local/v{version}";
+            tag = repo.GitRepository.Repository.Tags[tagName];
+            if( tag == null )
+            {
+                monitor.Trace( $"Tag '{tagName}' already deleted. Skipped DestroyLocalRelease." );
+                return true;
+            }
+            var message = tag.Annotation?.Message;
+            if( !BuildContentInfo.TryParse( message, out tagContent ) )
+            {
+                monitor.Error( $"""
+                    DestroyLocalRelease failed, unable to parse '{tag.FriendlyName}' content:
+                    {message}
+                    """ );
+                return false;
+            }
+
         }
-        return CleanupLocalRelease( monitor, repo, version, tagContent, removeFromNuGetGlobalCache );
-    }
-
-    /// <summary>
-    /// Centralized deletion of the artifacts of a release. This tries to delete every possible traces but doesn't remove the
-    /// versioned tag: use <see cref="DestroyLocalRelease(IActivityMonitor, Repo, SVersion, bool)"/> to fully destroy a release.
-    /// <para>
-    /// This centralizes the calls to <see cref="ReleaseDatabasePlugin.DestroyLocalRelease(IActivityMonitor, Repo, SVersion)"/>
-    /// and <see cref="ArtifactHandlerPlugin.DestroyLocalRelease(IActivityMonitor, Repo, SVersion, BuildContentInfo, bool)"/>
-    /// that should not be called directly.
-    /// </para>
-    /// </summary>
-    /// <param name="monitor">The monitor.</param>
-    /// <param name="repo">The source repository.</param>
-    /// <param name="version">The version to cleanup.</param>
-    /// <param name="knownContent">Already known content if possible.</param>
-    /// <param name="removeFromNuGetGlobalCache">
-    /// False to let the package in the NuGet global cache (if it exists).
-    /// The global cache is "%userprofile%\.nuget\packages" on windows and "~/.nuget/packages" on Mac/Linux.
-    /// </param>
-    /// <returns>True on success, false on error (only errors are that assets cannot be properly deleted).</returns>
-    public bool CleanupLocalRelease( IActivityMonitor monitor,
-                                     Repo repo,
-                                     SVersion version,
-                                     BuildContentInfo? knownContent,
-                                     bool removeFromNuGetGlobalCache = true )
-    {
-        return DoCleanupLocalRelease( monitor, repo, version, knownContent, removeFromPublishedDatabase: false, removeFromNuGetGlobalCache );
-    }
-
-    bool DoCleanupLocalRelease( IActivityMonitor monitor,
-                                Repo repo,
-                                SVersion version,
-                                BuildContentInfo? knownContent,
-                                bool removeFromPublishedDatabase,
-                                bool removeFromNuGetGlobalCache = true )
-    {
-        using( monitor.OpenInfo( $"Deleting local release '{repo.DisplayPath}/{version}'." ) )
-        {
-            // Take no risk: delete every possible traces (but avoids calling twice the same destroy).
-            //
-            // If we must suppress the Published release, call DestroyPublishedRelease, otherwise we must
-            // only lookup for the content.
-            var dbPubContent = removeFromPublishedDatabase
-                                ? _releaseDatabase.DestroyPublishedRelease( monitor, repo, version )
-                                : _releaseDatabase.GetBuildContentInfo( monitor, repo, version, fromPublished: true );
-
-            var dbLocContent = _releaseDatabase.DestroyLocalRelease( monitor, repo, version );
-
-            bool success = true;
-            if( knownContent != null )
-            {
-                if( knownContent == dbPubContent ) dbPubContent = null;
-                if( knownContent == dbLocContent ) dbLocContent = null;
-                success = _artifactHandler.DestroyLocalRelease( monitor, repo, version, knownContent, removeFromNuGetGlobalCache );
-            }
-            if( dbPubContent != null )
-            {
-                if( dbPubContent == dbLocContent ) dbLocContent = null;
-                success &= _artifactHandler.DestroyLocalRelease( monitor, repo, version, dbPubContent, removeFromNuGetGlobalCache );
-            }
-            if( dbLocContent != null )
-            {
-                success &= _artifactHandler.DestroyLocalRelease( monitor, repo, version, dbLocContent, removeFromNuGetGlobalCache );
-            }
-            return success;
-        }
+        // Ignore errors: we try to remove everything we can.
+        repo.GitRepository.DeleteLocalTags( monitor, [tag.CanonicalName] );
+        return _artifactHandlerPlugin.DestroyLocalRelease( monitor, repo, version, tagContent, removeFromNuGetGlobalCache );
     }
 
     /// <summary>
@@ -244,20 +209,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                                   [Description("Allow the deprecated tag to already exist and updates it (must not already be expired).")]
                                   bool allowUpdate = false )
     {
-        // Before deprecating a version, we make sure that no version issue exist on any repo (a deprecation
-        // can impact any number of repositories).
-        // We check this before resolving the current repository.
-        var all = World.GetAllDefinedRepo( monitor );
-        if( all == null ) return false;
-        var haveIssues = all.Where( r => Get( monitor, r ) == null ).ToList();
-        if( haveIssues.Count > 0 )
-        {
-            monitor.Error( $"""
-                No version issues must exist before deprecating a version.
-                Please fix version issues in '{haveIssues.Select( r => r.DisplayPath.Path ).Concatenate("', '")}' before retrying.
-                """ );
-            return false;
-        }
+        // Before the actual deprecation that requires no version tag issue on any repository (because deprecation can touch multiple repositories),
+        // we check that the version exists and is not a "local/" one.
         var repo = World.GetDefinedRepo( monitor, context.CurrentDirectory );
         if( repo == null )
         {
@@ -269,6 +222,32 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             return false;
         }
         var info = Get( monitor, repo );
+        if( !info.TryGetTagCommit( v, out var tagCommit ) )
+        {
+            monitor.Error( $"Unable to find version tag 'v{version}'." );
+            return false;
+        }
+        if( tagCommit.Version.IsLocal() )
+        {
+            monitor.Error( $"Version 'v{version}' has not been published yet." );
+            return false;
+        }
+        if( tagCommit.IsFakeVersion )
+        {
+            monitor.Error( $"""
+                Version 'v{v}' is a '+fake' version.
+                You can use 'ckli tag delete' to remove the tag if needed.
+                """ );
+            return false;
+        }
+
+        // Now, lets start by building the version database.
+        var releaseDatabase = EnsureDatabase( monitor );
+        if( releaseDatabase == null )
+        {
+            return false;
+        }
+        // Now, we know that there's no issue on our starting repository.
         Throw.DebugAssert( !info.HasIssue );
         int daysDelay = -1;
         if( immediate )
@@ -288,38 +267,16 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 return false;
             }
         }
-        if( !info.TagCommits.TryGetValue( v, out var existing ) )
-        {
-            monitor.Error( $"Unable to find version tag 'v{v}' in '{repo.DisplayPath}'." );
-            return false;
-        }
-        if( existing.IsFakeVersion )
-        {
-            monitor.Error( $"""
-                Version 'v{v}' is a '+fake' version.
-                You can use 'ckli tag delete' to remove the tag if needed.
-                """ );
-            return false;
-        }
-
         // Ensures that:
         //  - The +deprecated tag exists in this repo (creates or updates it).
         //  - And that it appears in the DeferredPushRefSpec ("+refs/tags/...").
         //  - And if HasExpired, the deprecated tag version appears in the DeferredPushRefSpec (in order to remove it ":refs/tags/...").
-        DeprecatedTagInfo? tagInfo = EnsureRootDeprecatedTag( monitor, repo, existing, reason, daysDelay, allowUpdate );
+        DeprecatedTagInfo? tagInfo = EnsureRootDeprecatedTag( monitor, tagCommit, reason, daysDelay, allowUpdate );
         if( tagInfo == null )
         {
             return false;
         }
-        var releaseInfo = _releaseDatabase.GetReleaseInfo( monitor, repo, v, LogLevel.None );
-        if( releaseInfo == null )
-        {
-            monitor.Info( ScreenType.CKliScreenTag,
-                          $"""
-                          Deprecated version '{existing.Version.ParsedText}' not found in local nor release database.
-                          """ );
-            return true;
-        }
+        var releaseInfo = releaseDatabase.GetReleaseInfo( monitor, tagCommit );
         var visited = new HashSet<RepoReleaseInfo>() { releaseInfo };
         EnsureImpliedDeprecatedTag( monitor, releaseInfo, visited, path: [releaseInfo], tagInfo.DaysDelay, tagInfo.Expiration );
 
@@ -335,7 +292,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
 
 
         static DeprecatedTagInfo? EnsureRootDeprecatedTag( IActivityMonitor monitor,
-                                                           Repo repo,
                                                            TagCommit existing,
                                                            string? reason,
                                                            int daysDelay,
@@ -349,7 +305,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     monitor.Error( "To create a new deprecation tag, flag --immediate or option --days must be specified." );
                     return null;
                 }
-                return CreateDeprecationTag( monitor, repo, existing, reason, daysDelay );
+                return CreateDeprecationTag( monitor, existing, reason, daysDelay );
             }
             if( tagInfo.HasExpired )
             {
@@ -387,7 +343,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
 
             return newExpiration == tagInfo.Expiration && (reason == null || reason == tagInfo.Reason)
                     ? tagInfo
-                    : UpdateExistingDeprecationTag( monitor, repo, existing, tagInfo, reason, daysDelay, newExpiration );
+                    : UpdateExistingDeprecationTag( monitor, existing, tagInfo, reason, daysDelay, newExpiration );
         }
 
     }
@@ -405,7 +361,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     }
 
     static DeprecatedTagInfo UpdateExistingDeprecationTag( IActivityMonitor monitor,
-                                                           Repo repo,
                                                            TagCommit existingCommit,
                                                            DeprecatedTagInfo existingTagInfo,
                                                            string? reason,
@@ -418,6 +373,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                                                  reason != null ? reason : existingTagInfo.Reason );
 
         var name = existingCommit.Tag.FriendlyName;
+        var repo = existingCommit.Repo;
         AddTag( repo, existingCommit, existingTagInfo, name );
         if( existingTagInfo.HasExpired )
         {
@@ -444,7 +400,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         return existingTagInfo;
     }
 
-    static DeprecatedTagInfo CreateDeprecationTag( IActivityMonitor monitor, Repo repo, TagCommit existing, string? reason, int daysDelay )
+    static DeprecatedTagInfo CreateDeprecationTag( IActivityMonitor monitor, TagCommit existing, string? reason, int daysDelay )
     {
         Throw.DebugAssert( "We used GetWithoutIssue and existing is not a +fake.", existing.BuildContentInfo != null );
         var tagInfo = new DeprecatedTagInfo( existing.BuildContentInfo,
@@ -453,21 +409,21 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                                              reason ?? DeprecatedTagInfo.UnspecifiedReason );
 
         var name = $"v{existing.Version}+deprecated";
-        AddTag( repo, existing, tagInfo, name );
+        AddTag( existing.Repo, existing, tagInfo, name );
         if( tagInfo.HasExpired )
         {
-            monitor.Info( ScreenType.CKliScreenTag, $"Deprecation tag expired. Removing '{existing.Version.ParsedText}' tag (from local and remote) in '{repo.DisplayPath}'." );
+            monitor.Info( ScreenType.CKliScreenTag, $"Deprecation tag expired. Removing '{existing.Version.ParsedText}' tag (from local and remote) in '{existing.Repo.DisplayPath}'." );
 
-            var localTags = repo.GitRepository.Repository.Tags;
+            var localTags = existing.Repo.GitRepository.Repository.Tags;
             if( localTags[existing.Version.ParsedText] != null )
             {
                 localTags.Remove( existing.Version.ParsedText );
             }
-            repo.GitRepository.DeferredPushRefSpecs.Add( $":refs/tags/{existing.Version.ParsedText}" );
+            existing.Repo.GitRepository.DeferredPushRefSpecs.Add( $":refs/tags/{existing.Version.ParsedText}" );
         }
         else
         {
-            monitor.Info( ScreenType.CKliScreenTag, $"Version tag '{name}' has been created in '{repo.DisplayPath}'." );
+            monitor.Info( ScreenType.CKliScreenTag, $"Version tag '{name}' has been created in '{existing.Repo.DisplayPath}'." );
         }
         return tagInfo;
     }
@@ -486,11 +442,11 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             {
                 var versionInfo = Get( monitor, impact.Repo );
                 Throw.DebugAssert( "No version issue on any repo.", !versionInfo.HasIssue );
-                if( !versionInfo.TagCommits.TryGetValue( impact.Version, out var tagCommit ) )
+                if( !versionInfo.TryGetTagCommit( impact.Version, out var tagCommit ) )
                 {
                     monitor.Warn( $"""
                         Version tag 'v{impact.Version}' in '{impact.Repo.DisplayPath}' not found.
-                        {StoppingDeprecationMessage(monitor,impact)}
+                        {StoppingDeprecationMessage( monitor, impact )}
                         """ );
                 }
                 else if( tagCommit.IsFakeVersion )
@@ -511,7 +467,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         if( tagInfo.Expiration > expiration )
                         {
                             tagInfo = UpdateExistingDeprecationTag( monitor,
-                                                                    impact.Repo,
                                                                     tagCommit,
                                                                     tagInfo,
                                                                     reason: null,
@@ -525,11 +480,11 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         var sb = new StringBuilder( "Deprecated by " );
                         for( int i = path.Count - 1; i >= 0; --i )
                         {
-                            var c = path[ i ];
+                            var c = path[i];
                             sb.Append( c.Repo.DisplayPath ).Append( '/' ).Append( c.Version );
                             if( i > 0 ) sb.Append( " <- " );
                         }
-                        tagInfo = CreateDeprecationTag( monitor, impact.Repo, tagCommit, reason: sb.ToString(), daysDelay );
+                        tagInfo = CreateDeprecationTag( monitor, tagCommit, reason: sb.ToString(), daysDelay );
                     }
                     path.Add( impact );
                     EnsureImpliedDeprecatedTag( monitor, impact, visited, path, daysDelay, expiration );
@@ -541,222 +496,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         static string StoppingDeprecationMessage( IActivityMonitor monitor, RepoReleaseInfo i )
         {
             return $"Stopping deprecation propagation on '{i}' and its direct consumers ('{i.GetDirectConsumers( monitor ).Select( i => i.ToString() ).Concatenate( "', '" )}').";
-        }
-    }
-
-    /// <summary>
-    /// Rebuilds the published and local databases.
-    /// Remote tags drives the update of the published database and are updated on the remote: a local only version
-    /// tag will remain local.
-    /// <para>
-    /// Artefacts are not pushed.
-    /// </para>
-    /// </summary>
-    /// <param name="monitor">The monitor.</param>
-    /// <param name="context">The CKli context.</param>
-    /// <param name="updateRemoteTags">Pushes updated local tags to the origin remote.</param>
-    /// <returns>True on success, false on error.</returns>
-    [Description( """
-        Suppress the published and local databases and rebuild them from the version tags content.
-        Remote tags drives the update of the published database: a local only version tag will remain local.
-        """ )]
-    [CommandPath( "maintenance release-database rebuild" )]
-    public bool RebuildReleaseDatabases( IActivityMonitor monitor,
-                                         CKliEnv context,
-                                         [Description("Pushes the local tag to update an existing remote tag if its content differ.")]
-                                         bool updateRemoteTags = false )
-    {
-        var repos = World.GetAllDefinedRepo( monitor );
-        if( repos == null ) return false;
-
-        // Before destroying the databases, we require that the tags (GitTagInfo.Diff) are "clean":
-        // there must not be "fetch required" (tags with unknown commit target) nor tag conflicts
-        // (tag that exists on local and remote and targets 2 different commits).
-        //
-        // Obtaining these tags info will allow us to consider that a version tag that is on the
-        // remote side is de facto published: we'll publish the local release that transfers its
-        // information from the local to the published database.
-        //
-        // Moreover (below), if the version tag differ, we push the local one (that updates the remote one):
-        // this supports a move from obsolete (or legacy lightweight) tags to an up-to-date version of the tags content.
-        //
-        if( !GetAllDiffTags( monitor, context, repos, out var allDiffTags ) )
-        {
-            return false;
-        }
-
-        // Deleting the databases.
-        _releaseDatabase.DestroyDatabases( monitor );
-
-        // Resolving the VersionTagInfo repopulates (and saves) the local database.
-        // If there is any version tag issue (rebuild is needed to compute the tag content),
-        // we demand to execute a "ckli issue --fix".
-        if( !TryGetAllWithoutIssue( monitor, out var allInfo, before: "retrying" ) )
-        {
-            return false;
-        }
-        // Consider remote version tags: move the release from local to remote database and update the remote tag if it differs.
-        bool pushTagFailed = false;
-        var pushTagBuffer = new List<Tag>();
-        var updateRemoteTagsWarning = updateRemoteTags ? null : new StringBuilder();
-        int publishedReleaseCount = 0;
-        foreach( var repo in repos )
-        {
-            using( monitor.OpenInfo( $"Analyzing releases of '{repo.DisplayPath}'." ) )
-            {
-                var diffTags = allDiffTags[repo.Index];
-                var versionTags = Get( monitor, repo );
-                foreach( var tc in versionTags.TagCommits.Values.Where( tc => tc.IsRegularVersion ) )
-                {
-                    GitTagInfo.DiffEntry e = diffTags.Entries.FirstOrDefault( e => e.Commit.Sha == tc.Sha );
-                    GitTagInfo.LocalRemoteTag? t = e.Tags?.FirstOrDefault( t => t.CanonicalName == tc.Tag.CanonicalName );
-                    if( t == null )
-                    {
-                        // This should not happen: stop early.
-                        monitor.Error( ActivityMonitor.Tags.ToBeInvestigated,
-                                       $"""
-                                       Version tag '{tc.Version.ParsedText}' on commit '{tc.Sha}' with content:
-                                       {tc.BuildContentInfo}
-
-                                       Cannot be found in any GitTagInfo.DiffEntry of '{repo.DisplayPath}'. 
-                                       """ );
-                        return false;
-                    }
-                    Throw.DebugAssert( "Otherwise we wouldn't have found it.", t.Local != null );
-                    // Ignores local only.
-                    if( t.Remote != null )
-                    {
-                        // This release has a remote tag: publish it.
-                        monitor.Info( $"Moving '{tc.Version.ParsedText}' to published database." );
-                        // This has no reason to fail: stop early.
-                        if( !_releaseDatabase.PublishRelease( monitor, repo, tc.Version ) )
-                        {
-                            return false;
-                        }
-                        ++publishedReleaseCount;
-                        if( (t.Diff & GitTagInfo.TagDiff.DifferMask) != 0 )
-                        {
-                            // The remote tag must be updated.
-                            pushTagBuffer.Add( tc.Tag );
-                        }
-                    }
-                }
-                if( pushTagBuffer.Count > 0 )
-                {
-                    if( updateRemoteTagsWarning == null )
-                    {
-                        monitor.Info( "Updating remote tags that differ from locally updated ones." );
-                        if( !repo.GitRepository.PushTags( monitor, pushTagBuffer.Select( t => t.CanonicalName ) ) )
-                        {
-                            // When push failed, odds are that we miss the key.
-                            // it seems better to stop immediately.
-                            pushTagFailed = true;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        updateRemoteTagsWarning.Append( $"""
-                            - {repo.DisplayPath}:
-                              '{pushTagBuffer.Select( t => t.FriendlyName ).Concatenate( "', '" )}'
-
-
-                            """ );
-                    }
-                    pushTagBuffer.Clear();
-                }
-            }
-        }
-        if( publishedReleaseCount > 0 )
-        {
-            if( !World.StackRepository.Commit( monitor, $"Updated published database with {publishedReleaseCount} releases." ) )
-            {
-                return false;
-            }
-        }
-        if( pushTagFailed )
-        {
-            Throw.DebugAssert( updateRemoteTagsWarning == null );
-            monitor.Warn( """
-                Some tag pushes have failed. Use 'ckli tag list' to analyze tag differences.
-                These differences should be fixed manually.
-                """ );
-        }
-        else if( updateRemoteTagsWarning != null && updateRemoteTagsWarning.Length > 0 )
-        {
-            updateRemoteTagsWarning.AppendLine().Append( """
-                Above repositories have remote tags that differ from their local counterparts.
-                They should be updated by using the --update-remote-tags flag or differences can be analyzed with 'ckli tag list'.
-                """ );
-            monitor.Warn( updateRemoteTagsWarning.ToString() );
-        }
-        monitor.Info( ScreenType.CKliScreenTag, "Databases of 'Published' and 'Local' releases been successfully rebuilt:" );
-        return true;
-    }
-
-    /// <summary>
-    /// This is used by RebuildReleaseDatabases: there must be no conflicting nor "fetched required" tags
-    /// for 'ckli maintenance release-database rebuild' to be successfully executed.
-    /// </summary>
-    /// <param name="monitor">The monitor.</param>
-    /// <param name="context">The CKli context.</param>
-    /// <param name="repos">The repositories to consider.</param>
-    /// <param name="allDiffTags">On success, contains the tags diff info.</param>
-    /// <returns>True on success, false on error.</returns>
-    static bool GetAllDiffTags( IActivityMonitor monitor,
-                                CKliEnv context,
-                                IReadOnlyList<Repo> repos,
-                                out ImmutableArray<GitTagInfo.Diff> allDiffTags )
-    {
-        using( monitor.OpenInfo( "Analyzing Tags on the repositories and their 'origin' remotes. Checking that no blocking issue exist for them." ) )
-        {
-            bool success = true;
-            var b = ImmutableArray.CreateBuilder<GitTagInfo.Diff>( repos.Count );
-            List<int>? issues = null;
-            foreach( var repo in repos )
-            {
-                using( monitor.OpenInfo( $"Collecting local & remote tags of '{repo.DisplayPath}'." ) )
-                {
-                    if( repo.GitRepository.GetDiffTags( monitor, out var diffTags ) )
-                    {
-                        b.Add( diffTags );
-                        if( diffTags.ConflictCount > 0 )
-                        {
-                            issues ??= new List<int>();
-                            issues.Add( repo.Index );
-                        }
-                    }
-                    else
-                    {
-                        success = false;
-                    }
-                }
-            }
-            if( !success )
-            {
-                allDiffTags = default;
-                return false;
-            }
-            if( issues != null )
-            {
-                allDiffTags = default;
-                monitor.Error( $"{issues.Count} repositories have tag issues that must be fixed. Please fix them before retrying." );
-                // We want to display only the "fetch required" and the conflicts. Existing tags, local/remote and even differences
-                // are not really relevant here.
-                context.Screen.Display( s => s.Unit.AddBelow(
-                    issues.Select( idx => (Repo: repos[idx], Diff: b[idx]) )
-                          .Select( d => new Collapsable( s.Text( d.Repo.DisplayPath ).HyperLink( new Uri( d.Repo.WorkingFolder ) )
-                                                          .AddBelow( d.Diff.ToRenderable( s,
-                                                                                          withLocalInvalidTags: false,
-                                                                                          withRemoteInvalidTags: false,
-                                                                                          withRegularTags: false,
-                                                                                          withLocalOnlyTags: false,
-                                                                                          withRemoteOnlyTags: false,
-                                                                                          withDifferences: false ) ) ) ) ) );
-                return false;
-            }
-            allDiffTags = b.MoveToImmutable();
-            return true;
         }
     }
 
@@ -819,11 +558,14 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     protected override VersionTagInfo Create( IActivityMonitor monitor, Repo repo )
     {
         var (infVersion, supVersion) = ReadRepoConfiguration( monitor, repo );
+        // We initialize the info in two steps because TagCommits need their VersionTagInfo.
+        var info = new VersionTagInfo( this, repo, infVersion, supVersion );
 
         var isExecutingIssue = PrimaryPluginContext.Command is CKliIssue;
 
         List<Tag>? removableTags = null;
         List<Tag>? badDeprecatedTags = null;
+        List<(SVersion V, Tag T)>? lightweightOrUnreadableRegularTags = null;
         List<(SVersion V, Tag T)>? ci0VersionTags = null;
         // Collects conflicting tags.
         List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts = null;
@@ -833,17 +575,15 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         // This validTags list is temporary (first pass) to build the v2c index.
         List<TagCommit> validTags = new List<TagCommit>();
         Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags = null;
-        bool hasBadTagNames = false;
         var r = repo.GitRepository.Repository;
 
         FirstTagCollect( monitor,
+                         info,
                          r,
-                         infVersion,
-                         supVersion,
                          validTags,
-                         ref hasBadTagNames,
                          ref removableTags,
                          ref badDeprecatedTags,
+                         ref lightweightOrUnreadableRegularTags,
                          ref tagConflicts,
                          ref invalidTags,
                          ref ci0VersionTags );
@@ -918,7 +658,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 // The commit is tagged with 2 identical versions. What differs is the +fake, +deprecated, and/or "local/" prefix.
                 // "local/" applies to regular (deprecations are published) but we can ignore this here: if a "local/" duplicates
                 // a non "local/" (with the same build metadata), we consider that the non local wins.
-                if( exists.IsFakeVersion == newOne.IsFakeVersion && exists.IsDeprecatedVersion == newOne.IsDeprecatedVersion
+                if( exists.IsFakeVersion == newOne.IsFakeVersion
+                    && exists.IsDeprecatedVersion == newOne.IsDeprecatedVersion
                     && exists.Version.IsLocal() != newOne.Version.IsLocal() )
                 {
                     if( newOne.Version.IsLocal() )
@@ -1000,10 +741,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             }
         }
 
-        if( hasBadTagNames )
-        {
-            monitor.Warn( $"One or more tags have been ignored in '{repo.DisplayPath}'. Use 'ckli tag list' to identify them." );
-        }
         // topHot can be +deprecated... The correct workflow should be to deprecate a version after having produced at least one next version.
         // If this happens, we can:
         // - Restore the regular tag:
@@ -1011,6 +748,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         //   - otherwise, recreating it from the content info in the deprecated tag.
         // - Do nothing (current choice).
 
+        // Third step.
         // LastStables are used by ckli fix. They must be sorted (in reverse version order, TagCommit.CompareTo does that).
         // We use an explicit for each loop so we also compute the lowestCI tag to support auto-deletion of obsolete CI builds.
         var lastStables = new List<TagCommit>();
@@ -1081,7 +819,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, World, repo, lastStable, topHot );
         }
 
-
         if( ci0VersionTags != null )
         {
             foreach( var (v, t) in ci0VersionTags )
@@ -1128,68 +865,36 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             }
         }
 
-        // We capture the invalidTags: may be one day we can create a World.Issue that could
-        // remove them (we must ensure that the invalidated version tags are removed in other repositories:
-        // the origin remote may not be enough).
-        //
-        // We capture tagConflicts: these MUST be fixed. Most of the branch/build commands will require
-        // that there is no more tagConflicts before running.
-        //
-        // We feed the release database with the existing tags: this costs but it guaranties that release
-        // databases are pure "index" that can be rebuilt any time.
-        // We handle only regular versions:
-        //  - Fake versions are, by design, skipped.
-        //  - Deprecated versions are also filtered out: whether the version is deprecated is not the concern of
-        //    the release database. Purging deprecated versions will be done later and through dedicated mechanisms.
-        //
-        // This step can also produce an important issue: the fact that a release tag is NOT the same as the Published
-        // release database contains. This is odd and should almost never happen but this is a checkpoint that doesn't
-        // cost much.
-        //
-        bool hasMissingContentInfo = false;
-        World.Issue? publishedReleaseContentIssue = null;
-        if( tagConflicts == null )
+
+        if( !isExecutingIssue )
         {
-            // This iterator provides all the versions per repository to the release database and detects
-            // version tags content difference between the tag and the Published database:
-            // publishedReleaseContentIssue is a manual issue that may be emitted.
-            //
-            // Version tags with missing or bad content info are handled by the Build plugin (the issue
-            // is implemented in the build plugin because its fix requires builds to be run).
-            //
-            var it = new RegularVersionTagIterator( v2c );
-            publishedReleaseContentIssue = _releaseDatabase.OnExistingVersionTags( monitor, repo, it.GetVersions() );
-            hasMissingContentInfo = it.HasMissingContentInfo;
-            if( !isExecutingIssue && (publishedReleaseContentIssue != null || hasMissingContentInfo) )
+            if( tagConflicts != null )
+            {
+                monitor.Warn( $"{tagConflicts.Count} tag conflicts in repository '{repo.DisplayPath}'. Use 'ckli issue' for details." );
+            }
+            else if( lightweightOrUnreadableRegularTags != null )
             {
                 monitor.Warn( $"At least one version tag issue in '{repo.DisplayPath}'. Use 'ckli issue' for details." );
             }
-        }
-        else if( !isExecutingIssue )
-        {
-            monitor.Warn( $"{tagConflicts.Count} tag conflicts in repository '{repo.DisplayPath}'. Use 'ckli issue' for details." );
-        }
-        if( _autoFixRemovableTag && removableTags != null && !isExecutingIssue )
-        {
-            // On error, let the error be logged but don't throw (or should we throw?).
-            using( monitor.OpenInfo( $"AutoFixRemovableTag: removing {removableTags.Count} tags." ) )
+            else if( _autoFixRemovableTag && removableTags != null )
             {
-                repo.GitRepository.DeleteLocalTags( monitor, removableTags.Select( t => t.CanonicalName ) );
+                // On error, let the error be logged but don't throw (or should we throw?).
+                using( monitor.OpenInfo( $"AutoFixRemovableTag: removing {removableTags.Count} tags." ) )
+                {
+                    repo.GitRepository.DeleteLocalTags( monitor, removableTags.Select( t => t.CanonicalName ) );
+                }
             }
         }
 
-        return new VersionTagInfo( repo,
-                                   infVersion,
-                                   supVersion,
-                                   lastStables,
-                                   hotZone,
-                                   v2c,
-                                   removableTags,
-                                   invalidTags,
-                                   tagConflicts,
-                                   badDeprecatedTags,
-                                   publishedReleaseContentIssue,
-                                   hasMissingContentInfo );
+        info.Initialize( lastStables,
+                         hotZone,
+                         v2c,
+                         removableTags,
+                         invalidTags,
+                         tagConflicts,
+                         badDeprecatedTags,
+                         lightweightOrUnreadableRegularTags );
+        return info;
 
         static TagCommit? ResolveConflict( Dictionary<SVersion, TagCommit> v2c, TagCommit exists, TagCommit newOne, ref List<Tag>? removableTags )
         {
@@ -1236,17 +941,17 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         }
 
         static void FirstTagCollect( IActivityMonitor monitor,
+                                     VersionTagInfo info,
                                      Repository r,
-                                     SVersion? infVersion,
-                                     SVersion? supVersion,
                                      List<TagCommit> validTags,
-                                     ref bool hasBadTagNames,
                                      ref List<Tag>? removableTags,
                                      ref List<Tag>? badDeprecatedTags,
+                                     ref List<(SVersion V, Tag T)>? lightweightOrUnreadableRegularTags,
                                      ref List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts,
                                      ref Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags,
                                      ref List<(SVersion V, Tag T)>? ci0VersionTags )
         {
+            bool hasBadTagNames = false;
             List<string>? nonConformantTags = null;
             List<string>? invalidParsedPrefixTags = null;
             foreach( var t in r.Tags )
@@ -1290,7 +995,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     continue;
                 }
                 // Above or equal to SupVersion or below or equal to InfVersion: ignore.
-                if( (supVersion != null && v >= supVersion) || v <= infVersion ) continue;
+                if( (info.SupVersion != null && v >= info.SupVersion) || v <= info.InfVersion ) continue;
 
                 // A +invalid tag totally cancels an existing version tag. We collect them
                 // and apply them once all the valid tags have been collected.
@@ -1366,10 +1071,23 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     }
                     else
                     {
-                        var tc = new TagCommit( v, c, t, v.HasFakeMetadata, deprecatedInfo );
-                        validTags.Add( tc );
+                        BuildContentInfo? contentInfo = null;
+                        if( !v.HasFakeMetadata && deprecatedInfo == null && !BuildContentInfo.TryParse( t.Annotation?.Message, out contentInfo ) )
+                        {
+                            lightweightOrUnreadableRegularTags ??= [];
+                            lightweightOrUnreadableRegularTags.Add( (v, t) );
+                        }
+                        else
+                        {
+                            var tc = new TagCommit( info, v, c, t, contentInfo ?? deprecatedInfo?.ContentInfo, deprecatedInfo );
+                            validTags.Add( tc );
+                        }
                     }
                 }
+            }
+            if( hasBadTagNames )
+            {
+                monitor.Warn( $"One or more tags have been ignored in '{info.Repo.DisplayPath}'. Use 'ckli tag list' to identify them." );
             }
             if( nonConformantTags != null || invalidParsedPrefixTags != null )
             {
@@ -1413,12 +1131,12 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     var vClean = tc.Version.SetBuildMetaData( null );
                     removableTags.RemoveAll( t => SVersion.TryParse( t.FriendlyName, out var v ) && v == vClean );
                 }
-                success &= DoCleanupLocalRelease( monitor,
-                                                  repo,
-                                                  tc.Version,
-                                                  tc.BuildContentInfo,
-                                                  removeFromPublishedDatabase: true,
-                                                  removeFromNuGetGlobalCache: true );
+                Throw.DebugAssert( !tc.IsFakeVersion );
+                success &= _artifactHandlerPlugin.DestroyLocalRelease( monitor,
+                                                                       repo,
+                                                                       tc.Version,
+                                                                       tc.BuildContentInfo,
+                                                                       removeFromNuGetGlobalCache: true );
             }
             if( success )
             {
@@ -1428,33 +1146,4 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         }
     }
 
-    sealed class RegularVersionTagIterator
-    {
-        readonly Dictionary<SVersion, TagCommit> _v2c;
-        public bool HasMissingContentInfo;
-
-        public RegularVersionTagIterator( Dictionary<SVersion, TagCommit> v2c )
-        {
-            _v2c = v2c;
-        }
-
-        internal IEnumerable<(SVersion, BuildContentInfo)> GetVersions()
-        {
-            foreach( var tc in _v2c.Values )
-            {
-                if( tc.IsRegularVersion )
-                {
-                    var info = tc.BuildContentInfo;
-                    if( info != null )
-                    {
-                        yield return (tc.Version, info);
-                    }
-                    else
-                    {
-                        HasMissingContentInfo = true;
-                    }
-                }
-            }
-        }
-    }
 }

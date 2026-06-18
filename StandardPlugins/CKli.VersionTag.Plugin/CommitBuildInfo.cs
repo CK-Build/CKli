@@ -1,4 +1,5 @@
 using CK.Core;
+using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 
 using LibGit2Sharp;
@@ -25,7 +26,7 @@ public sealed class CommitBuildInfo
         _version = version;
         _buildCommit = buildCommit;
         _rebuilding = rebuilding;
-        _toString = $"{tagInfo.Repo.DisplayPath}/{version}";
+        _toString = $"{tagInfo.Repo.DisplayPath}/v{version}";
     }
 
     /// <summary>
@@ -76,19 +77,19 @@ public sealed class CommitBuildInfo
 
     /// <summary>
     /// Adds or update the <see cref="TagCommit"/> on the <see cref="BuildCommit"/> for <see cref="Version"/>
-    /// with the provided <paramref name="releaseMessage"/>.
+    /// with the provided <paramref name="contentInfo"/>.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">The context.</param>
-    /// <param name="releaseMessage">The non empty release message.</param>
-    /// <returns>True on success, false on error.</returns>
+    /// <param name="contentInfo">The build content info.</param>
+    /// <returns>The non null tag and version on success.</returns>
     public (Tag? T, SVersion? V) ApplyReleaseBuildTag( IActivityMonitor monitor,
                                                        CKliEnv context,
-                                                       string releaseMessage )
+                                                       BuildContentInfo contentInfo )
     {
         monitor.Info( $"""
                 Setting build tag 'local/v{_version}' on '{Repo.DisplayPath}' (commit: '{_buildCommit}'):
-                {releaseMessage}
+                {contentInfo}
                 """ );
         try
         {
@@ -97,34 +98,37 @@ public sealed class CommitBuildInfo
             var t = git.Tags.Add( $"local/v{_version}",
                                   _buildCommit,
                                   context.Committer,
-                                  releaseMessage,
+                                  contentInfo.ToString(),
                                   allowOverwrite: true );
-            TagCommit? exists;
-            if( _version.CINumber == 0 )
-            {
-                // "--ci.0" case: The original non-CI build must exist and we must be on the same commit.
-                Throw.DebugAssert( "We are on the base version commit.", _tagInfo.TagCommits.TryGetValue( _version.SetCINumber( -1 ), out var same )
-                                                                         && same.Commit.Sha == _buildCommit.Sha );
-                exists = _tagInfo.TagCommits[_version.SetCINumber( -1 )];
-                exists.SetCI0VersionTag( t );
-            }
-            else if( _tagInfo.TagCommits.TryGetValue( _version, out exists ) )
+
+            if( _tagInfo.TryGetTagCommit( _version, out var exists ) )
             {
                 Throw.DebugAssert( "We must not be able to rebuild a +deprecated commit.", !exists.IsDeprecatedVersion );
                 Throw.DebugAssert( "When rebuilding an existing version, the build commit must be the same (except if the existing tag is a +fake).",
                                    exists.IsFakeVersion || _buildCommit.Sha == exists.Sha );
-                // This removes any tag that are not "local/", but we don't want to remove
-                // a +fake git tag (this one coexists with its regular counterparts).
-                if( !exists.IsFakeVersion && exists.Tag.CanonicalName != t.CanonicalName )
+                if( _version.CINumber == 0 )
                 {
-                    // Removes the other tag.
-                    git.Tags.Remove( exists.Tag.CanonicalName );
+                    // "--ci.0" case: we must be on the same original non-CI build commit.
+                    Throw.DebugAssert( "We are on the base version commit.", exists.Commit.Sha == _buildCommit.Sha );
+                    exists.SetCI0VersionTag( t );
                 }
-                exists.UpdateVersionTag( t );
+                else
+                {
+                    // This removes any tag that are not "local/", but we don't want to remove
+                    // a +fake git tag (this one coexists with its regular counterparts).
+                    if( !exists.IsFakeVersion && exists.Tag.CanonicalName != t.CanonicalName )
+                    {
+                        // Removes the other tag.
+                        git.Tags.Remove( exists.Tag.CanonicalName );
+                    }
+                    exists.UpdateVersionTag( t );
+                }
             }
             else
             {
-                exists = _tagInfo.AddReleaseBuildTag( _version, _buildCommit, t );
+                Throw.DebugAssert( "We are not on a 'ci.0' version (the commit would have been found).",
+                                   _version.CINumber != 0 );
+                exists = _tagInfo.AddReleaseBuildTag( _version, _buildCommit, t, contentInfo );
             }
             return (t,_version);
         }
@@ -134,8 +138,8 @@ public sealed class CommitBuildInfo
             // Problems may be future new beasts that are serializable proto/persistent-issues with a
             // "bool StillApply( ... out World.Issue issue )". 
             monitor.Error( $"""
-                Unexpecting error while applying 'local/v{_version}' on commit '{_buildCommit.Sha}' with release message:
-                {releaseMessage}
+                Unexpecting error while applying 'local/v{_version}'  on '{Repo.DisplayPath}' (commit: '{_buildCommit.Sha}') with content:
+                {contentInfo}
                 """, ex );
             return (null,null);
         }

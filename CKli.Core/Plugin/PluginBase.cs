@@ -37,7 +37,6 @@ public abstract class PluginBase
             "CKli.HotZone.Plugin",
             "CKli.Migration.Plugin",
             "CKli.Publish.Plugin",
-            "CKli.ReleaseDatabase.Plugin",
             "CKli.ShallowSolution.Plugin",
             "CKli.VersionTag.Plugin"
         ];

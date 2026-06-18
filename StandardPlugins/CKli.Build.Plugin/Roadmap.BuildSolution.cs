@@ -2,7 +2,6 @@ using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
-using CKli.ReleaseDatabase.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
@@ -552,66 +551,41 @@ public sealed partial class Roadmap
 #endregion /Initialize
 
         internal bool ConcludeInitialization( IActivityMonitor monitor,
-                                              ReleaseDatabasePlugin releaseDatabase,
                                               ArtifactHandlerPlugin artifactHandlerPlugin,
                                               ref int idxBuildNumber )
         {
+            Throw.DebugAssert( !_mustPublish );
             if( MustBuild )
             {
                 Throw.DebugAssert( _buildNumber == 0 && idxBuildNumber >= 1 );
                 _buildNumber = idxBuildNumber++;
-                Throw.DebugAssert( !_mustPublish );
-
-                // The TargetVersion must not already be published.
-                var targetVersion = BuildInfo.TargetVersion;
-                var published = releaseDatabase.GetBuildContentInfo( monitor, _solution.Repo, targetVersion, fromPublished: true );
-                if( published != null )
-                {
-                    monitor.Error( $"""
-                        Repository '{Repo.DisplayPath}' must be build in version '{targetVersion}' but this version already appears in the published database with the content:
-                        {published}
-                        """ );
-                    return false;
-                }
                 _mustPublish = true;
                 ++_roadmap._publishSolutionCount;
             }
             else
             {
-                // The CurrentVersion may already be published.
-                Throw.DebugAssert( !_mustPublish );
-                // If we cannot find the CurrentVersion (that is the last built version) in the Published database then we must (at least)
-                // publish it because it may come from a previous build.
-                // But, in order to publish it, it must appear in the Local database and its artifacts must be locally available...
-                // If not, we must rebuild this version (and eventually publish it).
-                // This is an unusual situation as this version should be available somewhere!
+                // The CurrentVersion may already be published (not "local/" anymore).
+                // If the CurrentVersion (that is the last built version) is "local/", we must  publish it (comes from a previous build).
                 //
+                // But, in order to publish it, its artifacts must be locally available... If not, we must rebuild this version (and eventually
+                // publish it).
+                // This is an unusual situation as this version should be available somewhere!
                 // First idea was to consider that this must be fixed here (and without the "upstream pivot condition"):
                 // even if this happens in an upstream of a Pivot, we must trigger the build of this solution.
-                //
                 // However, this looks more like an issue that can be detected at the VersionTagInfo level, when "ckli issue" is
                 // executed (not preemptively), so we error here and ask the user to use "ckli issue". This avoid the "_mustPublish"
                 // to appear in the Initialize step and scopes it only here, in the ConcludeInitialization step.
                 //
-                _mustPublish = releaseDatabase.GetBuildContentInfo( monitor, _solution.Repo, CurrentVersion, fromPublished: true ) == null;
+                _mustPublish = CurrentVersion.IsLocal();
                 if( _mustPublish )
                 {
-                    // The last built version doesn't appear in the Published database but we MUST be able to find it
-                    // in the local database because when VersionTagInfo are created, any versioned tag with a parsable content
-                    // are automatically inserted or updated in the Local database.
-                    _lastBuildToPublish = releaseDatabase.GetBuildContentInfo( monitor, _solution.Repo, CurrentVersion, fromPublished: false );
-                    if( _lastBuildToPublish == null )
-                    {
-                        monitor.Error( ActivityMonitor.Tags.ToBeInvestigated, $"""
-                            Repository '{Repo.DisplayPath}' must be published in existing version '{CurrentVersion}' but this version doesn't appear in local release database.
-                            """ );
-                        return false;
-                    }
+                    _lastBuildToPublish = _lastBuild.TagCommit.BuildContentInfo;
+                    Throw.DebugAssert( "Because CurrentVersion cannot be a +fake (MustBuild would be true).", _lastBuildToPublish != null ); 
                     if( !artifactHandlerPlugin.HasAllArtifacts( monitor, _solution.Repo, CurrentVersion, _lastBuildToPublish, out _ ) )
                     {
                         monitor.Error( $"""
                         Repository '{Repo.DisplayPath}' must be published in existing version '{CurrentVersion}' but this version misses local artifacts.
-                        Use "ckli log" for more details.
+                        Use "maintenance rebuild version" to rebuild it.
                         """ );
                         return false;
                     }

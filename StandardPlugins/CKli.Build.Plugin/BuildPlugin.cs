@@ -4,7 +4,6 @@ using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
-using CKli.ReleaseDatabase.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
 
@@ -33,7 +32,6 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     readonly BranchModelPlugin _branchModel;
     readonly HotZonePlugin _hotZone;
     readonly RepositoryBuilderPlugin _repoBuilder;
-    readonly ReleaseDatabasePlugin _releaseDatabase;
     readonly ArtifactHandlerPlugin _artifactHandler;
     readonly ShallowSolutionPlugin _solutionPlugin;
     readonly PerfectEventSender<RoadmapBuildEventArgs> _onRoadmapBuild;
@@ -45,7 +43,6 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                         BranchModelPlugin branchModel,
                         HotZonePlugin hotZone,
                         RepositoryBuilderPlugin repoBuilder,
-                        ReleaseDatabasePlugin releaseDatabase,
                         ArtifactHandlerPlugin artifactHandler,
                         ShallowSolutionPlugin solutionPlugin )
         : base( primaryContext )
@@ -54,7 +51,6 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         _branchModel = branchModel;
         _hotZone = hotZone;
         _repoBuilder = repoBuilder;
-        _releaseDatabase = releaseDatabase;
         _artifactHandler = artifactHandler;
         _solutionPlugin = solutionPlugin;
         World.Events.Issue += IssueRequested;
@@ -317,7 +313,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         var hotGraph = _hotZone.GetHotGraph( monitor, branchName, ciBuildMode != CIBuildMode.None, pivots );
         if( hotGraph == null ) return null;
 
-        var roadmap = Roadmap.Create( monitor, _versionTags, _releaseDatabase, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish );
+        var roadmap = Roadmap.Create( monitor, _versionTags, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish );
         if( roadmap != null  )
         {
             context.Screen.Display( roadmap.ToRenderable );
@@ -382,13 +378,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         // this supports a "natural" force rebuild for the user by deleting the version tag.
         if( !forceRebuild )
         {
-            if( versionInfo.TagCommits.TryGetValue( targetVersion, out var buildTagCommit ) )
+
+            if( versionInfo.TryGetTagCommit( targetVersion, out var buildTagCommit ) && !buildTagCommit.IsFakeVersion )
             {
-                // The version tag content is necessarily the same as in the release database: the release database has been
-                // updated during VersionTagInfo creation.
-                var existingRelease = _releaseDatabase.GetReleaseInfo( monitor, versionInfo.Repo, targetVersion, LogLevel.Debug );
-                Throw.DebugAssert( existingRelease == null || existingRelease.Content == buildTagCommit.BuildContentInfo );
-                if( existingRelease != null && existingRelease.HasAllLocalArtifacts( monitor, out var assetsFolder ) )
+                if( _artifactHandler.HasAllArtifacts( monitor, versionInfo.Repo, targetVersion, buildTagCommit.BuildContentInfo, out var assetsFolder ) )
                 {
                     // build is not required... But may be running tests is required.
                     if( !runTest.Value )
@@ -398,7 +391,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                         return new BuildResult( versionInfo.Repo,
                                                 buildTagCommit.Tag,
                                                 buildTagCommit.Version,
-                                                existingRelease.Content,
+                                                buildTagCommit.BuildContentInfo,
                                                 assetsFolder,
                                                 skippedBuild: true );
                     }
@@ -441,12 +434,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         BuildResult? result = null;
         try
         {
-            result = await DoCoreBuildAsync( monitor,
-                                                 context,
-                                                 repoBuilder,
-                                                 _releaseDatabase,
-                                                 buildInfo,
-                                                 runTest.Value ).ConfigureAwait( false );
+            result = await repoBuilder.BuildAsync( monitor,
+                                                   context,
+                                                   buildInfo,
+                                                   runTest.Value ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -459,23 +450,5 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         }
         return result;
 
-        static async Task<BuildResult?> DoCoreBuildAsync( IActivityMonitor monitor,
-                                                          CKliEnv context,
-                                                          RepoBuilder repoBuilder,
-                                                          ReleaseDatabasePlugin releaseDatabase,
-                                                          CommitBuildInfo buildInfo,
-                                                          bool runTest )
-        {
-            var buildResult = await repoBuilder.BuildAsync( monitor, context, buildInfo, runTest ).ConfigureAwait( false );
-            if( buildResult != null )
-            {
-                if( !releaseDatabase.OnLocalBuild( monitor, buildResult.Repo, buildResult.Version, buildInfo.Rebuilding, buildResult.Content ) )
-                {
-                    return null;
-                }
-                Throw.DebugAssert( buildResult.Version == buildInfo.Version );
-            }
-            return buildResult;
-        }
     }
 }

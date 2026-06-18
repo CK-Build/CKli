@@ -2,7 +2,6 @@ using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
-using CKli.ReleaseDatabase.Plugin;
 using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
 using System.IO;
@@ -18,7 +17,6 @@ sealed partial class SimplePublisher
 {
     readonly PublishState _state;
     readonly PackageSender _packageSender;
-    readonly ReleaseDatabasePlugin _releaseDatabase;
     readonly ArtifactHandlerPlugin _artifactHandler;
     readonly VersionTagPlugin _versionTag;
 
@@ -28,13 +26,11 @@ sealed partial class SimplePublisher
 
     public SimplePublisher( PublishState state,
                             PackageSender packageSender,
-                            ReleaseDatabasePlugin releaseDatabase,
                             ArtifactHandlerPlugin artifactHandler,
                             VersionTagPlugin versionTag )
     {
         _state = state;
         _packageSender = packageSender;
-        _releaseDatabase = releaseDatabase;
         _artifactHandler = artifactHandler;
         _versionTag = versionTag;
     }
@@ -228,17 +224,6 @@ sealed partial class SimplePublisher
 
     async Task<PublishState.Cursor?> OnEndOfRepoAsync( IActivityMonitor monitor, RepoPublishInfo repo, CancellationToken cancel )
     {
-        // Moves the release from local to published database.
-        if( !_releaseDatabase.PublishRelease( monitor, repo.Repo, repo.PublishVersion ) )
-        {
-            return null;
-        }
-        // To consider that the war is won, we could ensure that the published database
-        // is pushed in the Stack repository... But this is a lot of commits (one for each repository)!
-        // And this is not crucial because the published database is just an index (the tag matters),
-        // so we postpone the stack push to the end of the world.
-        // if( !repo.Repo.World.StackRepository.PushChanges( monitor ) ) return null; 
-
         // We are almost done: finalize the hosted release.
         Throw.DebugAssert( _hostingProvider != null && _releaseId != null );
         if( !await _hostingProvider.FinalizeReleaseAsync( monitor, _hostedRepoPath, _releaseId, cancel ).ConfigureAwait( false ) )
@@ -253,7 +238,7 @@ sealed partial class SimplePublisher
         // that a build has produced.
         if( !CKliRootEnv.DefaultCKliEnv.CurrentDirectory.Path.Contains( "CK/.PublicStack/CK-Plugins/Tests/Plugins.Tests" ) )
         {
-            _versionTag.CleanupLocalRelease( monitor, repo.Repo, repo.PublishVersion, repo.BuildContentInfo, removeFromNuGetGlobalCache: false );
+            _artifactHandler.DestroyLocalRelease( monitor, repo.Repo, repo.PublishVersion, repo.BuildContentInfo, removeFromNuGetGlobalCache: false );
         }
         return _state.ForwardPrimaryCursor( monitor, 1 );
     }

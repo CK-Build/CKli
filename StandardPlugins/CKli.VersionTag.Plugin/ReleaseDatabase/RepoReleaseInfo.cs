@@ -2,44 +2,40 @@ using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using System.Collections.Generic;
+using System.Diagnostics;
 
-namespace CKli.ReleaseDatabase.Plugin;
+namespace CKli.VersionTag.Plugin;
 
 /// <summary>
 /// Captures the information for the release of a <see cref="Repo"/> in a <see cref="Version"/>.
 /// </summary>
+[DebuggerDisplay( "{ToString(),nq}" )]
 public sealed class RepoReleaseInfo
 {
-    readonly ReleaseDatabasePlugin _releaseDatabase;
-    readonly Repo _repo;
+    readonly VersionTagPlugin.ReleaseDatabase _releaseDatabase;
     readonly RepoKey _repoKey;
-    readonly BuildContentInfo _content;
+    readonly BuildContentInfo _buildContentInfo;
     readonly List<RepoReleaseInfo> _directProducers;
     readonly HashSet<RepoReleaseInfo> _allProducers;
-    readonly bool _isLocal;
     IReadOnlyList<RepoReleaseInfo>? _directConsumers;
 
-    internal RepoReleaseInfo( ReleaseDatabasePlugin releaseDatabase,
-                              Repo repo,
+    internal RepoReleaseInfo( VersionTagPlugin.ReleaseDatabase releaseDatabase,
                               RepoKey repoKey,
-                              BuildContentInfo buildContent,
+                              BuildContentInfo buildContentInfo,
                               List<RepoReleaseInfo> directProducers,
-                              HashSet<RepoReleaseInfo> allProducers,
-                              bool isLocal )
+                              HashSet<RepoReleaseInfo> allProducers )
     {
         _releaseDatabase = releaseDatabase;
-        _repo = repo;
         _repoKey = repoKey;
-        _content = buildContent;
+        _buildContentInfo = buildContentInfo;
         _directProducers = directProducers;
         _allProducers = allProducers;
-        _isLocal = isLocal;
     }
 
     /// <summary>
     /// Gets the released repository.
     /// </summary>
-    public Repo Repo => _repo;
+    public Repo Repo => _repoKey.Repo;
 
     /// <summary>
     /// Gets the released version.
@@ -49,7 +45,7 @@ public sealed class RepoReleaseInfo
     /// <summary>
     /// Gets the Repo's release content.
     /// </summary>
-    public BuildContentInfo Content => _content;
+    public BuildContentInfo Content => _buildContentInfo;
 
     /// <summary>
     /// Gets the direct producers of this release.
@@ -60,11 +56,6 @@ public sealed class RepoReleaseInfo
     /// Gets the closure of all producers of this release.
     /// </summary>
     public IReadOnlySet<RepoReleaseInfo> AllProducers => _allProducers;
-
-    /// <summary>
-    /// Gets whether this is a local, not yet published release.
-    /// </summary>
-    public bool IsLocal => _isLocal;
 
     /// <summary>
     /// Gets whether all <see cref="BuildContentInfo.Produced"/> NuGet packages are in "$Local/&lt;world name&gt;/NuGet"
@@ -78,7 +69,7 @@ public sealed class RepoReleaseInfo
     /// <returns>True if all the assets are locally available.</returns>
     public bool HasAllLocalArtifacts( IActivityMonitor monitor, out NormalizedPath assetsFolder )
     {
-        return _releaseDatabase._artifactHandler.HasAllArtifacts( monitor, Repo, Version, Content, out assetsFolder );
+        return _releaseDatabase.ArtifactHandlerPlugin.HasAllArtifacts( monitor, Repo, Version, Content, out assetsFolder );
     }
 
     /// <summary>
@@ -99,6 +90,6 @@ public sealed class RepoReleaseInfo
     /// The format is "Repo/v{Version}" that intentionally differs from the <see cref="PackageInstance.ToString()"/>.
     /// </summary>
     /// <returns>Repo display path/v{Released version}.</returns>
-    public override string ToString() => $"{_repo.DisplayPath}/v{_repoKey.Version}";
+    public override string ToString() => $"{Repo.DisplayPath}/v{Version}";
 
 }

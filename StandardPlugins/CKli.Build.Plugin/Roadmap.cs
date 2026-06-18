@@ -2,7 +2,6 @@ using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
-using CKli.ReleaseDatabase.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
 using System;
@@ -64,7 +63,6 @@ public sealed partial class Roadmap
 
     internal static Roadmap? Create( IActivityMonitor monitor,
                                      VersionTagPlugin versionTags,
-                                     ReleaseDatabasePlugin releaseDatabase,
                                      ArtifactHandlerPlugin artifactHandler,
                                      HotGraph graph,
                                      bool isPullBuild,
@@ -106,7 +104,7 @@ public sealed partial class Roadmap
         }
         while( hasChanged );
 
-        if( !roadmap.ConcludeInitialization( monitor, releaseDatabase, artifactHandler ) )
+        if( !roadmap.ConcludeInitialization( monitor, artifactHandler ) )
         {
             return null;
         }
@@ -177,14 +175,13 @@ public sealed partial class Roadmap
     }
 
     bool ConcludeInitialization( IActivityMonitor monitor,
-                                 ReleaseDatabasePlugin releaseDatabase,
                                  ArtifactHandlerPlugin artifactHandler )
     {
         bool success = true;
         int idxBuildNumber = 1;
         foreach( var s in _orderedSolutions )
         {
-            success &= s.ConcludeInitialization( monitor, releaseDatabase, artifactHandler, ref idxBuildNumber );
+            success &= s.ConcludeInitialization( monitor, artifactHandler, ref idxBuildNumber );
         }
         return success;
     }

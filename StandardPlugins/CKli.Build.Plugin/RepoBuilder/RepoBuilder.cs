@@ -113,7 +113,7 @@ public class RepoBuilder : RepoInfo
                     && _repoArtifact.PublishToNuGetLocalFeed( monitor, buildInfo.Version, outputPath, out var publishedPackages ) ) 
                 {
                     var content = new BuildContentInfo( [.. consumedPackages], publishedPackages, assetFileNames );
-                    var (tag,version) = buildInfo.ApplyReleaseBuildTag( monitor, context, content.ToString() );
+                    var (tag,version) = buildInfo.ApplyReleaseBuildTag( monitor, context, content );
                     if( tag == null )
                     {
                         return null;

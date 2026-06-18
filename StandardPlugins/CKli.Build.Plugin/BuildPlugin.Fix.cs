@@ -223,7 +223,7 @@ public sealed partial class BuildPlugin
         {
             commitDepth = 0;
             // We must be able to retrieve the TagCommit to fix.
-            if( !versionInfo.TagCommits.TryGetValue( target.ToFixVersion, out toFix ) )
+            if( !versionInfo.TryGetTagCommit( target.ToFixVersion, out toFix ) )
             {
                 monitor.Error( $"Unable to find the commit '{target.ToFixCommitSha}' version 'v{target.ToFixVersion}' to be fixed in '{target.Repo.DisplayPath}'." );
                 return false;

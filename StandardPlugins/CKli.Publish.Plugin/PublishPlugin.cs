@@ -3,7 +3,6 @@ using CKli.ArtifactHandler.Plugin;
 using CKli.Build.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
-using CKli.ReleaseDatabase.Plugin;
 using CKli.VersionTag.Plugin;
 using System;
 using System.Collections.Immutable;
@@ -19,19 +18,16 @@ public sealed class PublishPlugin : PrimaryPluginBase
 {
     readonly BuildPlugin _build;
     readonly ArtifactHandlerPlugin _artifactHandler;
-    readonly ReleaseDatabasePlugin _releaseDatabase;
     readonly VersionTagPlugin _versionTag;
 
     public PublishPlugin( PrimaryPluginContext primaryContext,
                           BuildPlugin build,
                           ArtifactHandlerPlugin artifactHandler,
-                          ReleaseDatabasePlugin releaseDatabase,
                           VersionTagPlugin versionTag )
         : base( primaryContext )
     {
         _build = build;
         _artifactHandler = artifactHandler;
-        _releaseDatabase = releaseDatabase;
         _versionTag = versionTag;
         _build.OnRoadmapBuild.Async += OnRoadmapBuildAsync;
         _build.OnFixBuild.Async += OnFixBuildAsync;
@@ -41,7 +37,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
     {
         if( e.ShouldPublish )
         {
-            if( !await PublishAsync( monitor, World, _artifactHandler, _releaseDatabase, _versionTag, e.BuildDate, e.FixWorkflow, e.Results, cancel ) )
+            if( !await PublishAsync( monitor, World, _artifactHandler, _versionTag, e.BuildDate, e.FixWorkflow, e.Results, cancel ) )
             {
                 e.SetFailed();
             }
@@ -50,7 +46,6 @@ public sealed class PublishPlugin : PrimaryPluginBase
         static Task<bool> PublishAsync( IActivityMonitor monitor,
                                         World world,
                                         ArtifactHandlerPlugin artifactHandler,
-                                        ReleaseDatabasePlugin releaseDatabase,
                                         VersionTagPlugin versionTag,
                                         DateTime buildDate,
                                         FixWorkflow fixWorkflow,
@@ -65,7 +60,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
             var newOne = WorldReleaseInfo.Create( buildDate, fixWorkflow, results );
             state.Add( monitor, newOne );
 
-            var publisher = new SimplePublisher( state, packageSender, releaseDatabase, artifactHandler, versionTag );
+            var publisher = new SimplePublisher( state, packageSender, artifactHandler, versionTag );
             return publisher.RunAsync( monitor, cancel );
         }
     }
@@ -82,7 +77,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
             //    monitor.Info( $"Checking that remote feeds contain the packages." );
             // }
             // else 
-            if( !await PublishAsync( monitor, World, _artifactHandler, _releaseDatabase, _versionTag, e.BuildDate, e.Roadmap, cancel ).ConfigureAwait( false ) )
+            if( !await PublishAsync( monitor, World, _artifactHandler, _versionTag, e.BuildDate, e.Roadmap, cancel ).ConfigureAwait( false ) )
             {
                 e.SetFailed();
             }
@@ -91,7 +86,6 @@ public sealed class PublishPlugin : PrimaryPluginBase
         static Task<bool> PublishAsync( IActivityMonitor monitor,
                                         World world,
                                         ArtifactHandlerPlugin artifactHandler,
-                                        ReleaseDatabasePlugin releaseDatabase,
                                         VersionTagPlugin versionTag,
                                         DateTime buildDate,
                                         Roadmap roadmap,
@@ -108,7 +102,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
             var newOne = WorldReleaseInfo.Create( buildDate, roadmap );
             state.Add( monitor, newOne );
 
-            var publisher = new SimplePublisher( state, packageSender, releaseDatabase, artifactHandler, versionTag );
+            var publisher = new SimplePublisher( state, packageSender, artifactHandler, versionTag );
             return publisher.RunAsync( monitor, cancel );
         }
     }
