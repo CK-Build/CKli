@@ -1200,14 +1200,20 @@ public sealed partial class GitRepository : IDisposable
     /// <param name="baseCommit">The base commit (oldest one).</param>
     /// <param name="target">The newest commit.</param>
     /// <returns>Greatest number of commits or -1 if <paramref name="baseCommit"/> is not reachable from <paramref name="target"/>.</returns>
-    public static int ComputeCommitDepth( Commit baseCommit, Commit target )
+    public int ComputeCommitDepth( IActivityMonitor monitor, Commit baseCommit, Commit target )
     {
-        Throw.CheckArgument( ((IBelongToARepository)baseCommit).Repository == ((IBelongToARepository)target).Repository );
-        Throw.CheckArgument( target.Committer.When >= baseCommit.Committer.When );
+        Throw.CheckArgument( ((IBelongToARepository)baseCommit).Repository == Repository
+                              && ((IBelongToARepository)target).Repository == Repository );
+        // We take a 1/2 hour margin on the cut: this may handle clock drift and/or minor manual changes or adjustments.
+        var baseCommitWhen = baseCommit.Committer.When.UtcDateTime.AddMinutes( -30 );
+        if( target.Committer.When < baseCommitWhen )
+        {
+            monitor.Warn( $"Unable to compute commit depth in '{DisplayPath}': the target commit '{target}' is older than the base commit '{baseCommit}'." );
+            return -1;
+        }
 
         var baseCommitSha = baseCommit.Sha;
         var cache = new Dictionary<string, int> { { baseCommitSha, 0 } };
-        // We take a 1/2 hour margin on the cut: this may handle clock drift and/or minor manual changes or adjustments.
         return ComputeCommitDepth( baseCommitSha, baseCommit.Committer.When.UtcDateTime.AddMinutes( -30 ), target, cache );
 
         static int ComputeCommitDepth( string baseCommitSha, DateTime baseCommitWhen, Commit target, Dictionary<string, int> cache )

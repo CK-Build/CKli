@@ -195,10 +195,14 @@ public sealed partial class Roadmap
             //
             // If we are building from the upstreams or the dependencies must be updated, then we need one more
             // commit to update the dependencies.
-            SVersion targetVersion = ComputeTargetVersion( monitor,
-                                                           ref vChange,
-                                                           mustAddCommit: (buildReason & (MustBuildReason.UpstreamBuild|MustBuildReason.DependencyUpdate)) != 0 )
-                                     .SetParsedPrefix( "local/" );
+            SVersion? targetVersion = ComputeTargetVersion( monitor,
+                                                            ref vChange,
+                                                            mustAddCommit: (buildReason & (MustBuildReason.UpstreamBuild | MustBuildReason.DependencyUpdate)) != 0 );
+            if( targetVersion == null )
+            {
+                return false;
+            }
+            targetVersion = targetVersion.SetParsedPrefix( "local/" );
 
             // If the base version is a +fake, then IF this happens to be published we must ensure
             // that the +fake tag appears on the remote otherwise the target version will not be "understandable".
@@ -311,7 +315,7 @@ public sealed partial class Roadmap
             return c;
         }
 
-        SVersion ComputeTargetVersion( IActivityMonitor monitor,
+        SVersion? ComputeTargetVersion( IActivityMonitor monitor,
                                        ref VersionChange vChange,
                                        bool mustAddCommit )
         {
@@ -391,7 +395,12 @@ public sealed partial class Roadmap
             SVersion? targetVersion;
             if( _roadmap.IsCIBuild )
             {
-                int buildNumber = GitRepository.ComputeCommitDepth( _versionInfo.BaseBuild.Commit, _versionInfo.GitSolution.GitBranch.Tip );
+                int buildNumber = Repo.GitRepository.ComputeCommitDepth( monitor, _versionInfo.BaseBuild.Commit, _versionInfo.GitSolution.GitBranch.Tip );
+                if( buildNumber < 0 )
+                {
+                    monitor.Error( $"Unable to compute commit depth from branch '{_versionInfo.GitSolution.GitBranch.FriendlyName}' to the base '{_versionInfo.BaseBuild}'." );
+                    return null;
+                }
                 if( mustAddCommit ) ++buildNumber;
 
                 if( isPrerelease )

@@ -241,10 +241,13 @@ public sealed partial class BuildPlugin
             {
                 return false;
             }
-            commitDepth = GitRepository.ComputeCommitDepth( toFix.Commit, branch.Tip );
+            commitDepth = gitRepository.ComputeCommitDepth( monitor, toFix.Commit, branch.Tip );
             if( commitDepth < 0 )
             {
-                monitor.Error( $"Branch '{target.BranchName}' in '{target.Repo.DisplayPath}' is not related to the commit '{target.ToFixCommitSha}' version 'v{target.ToFixVersion}' to be fixed." );
+                monitor.Error( $"""
+                    Unable to compute commit depth.
+                    Branch '{target.BranchName}' in '{target.Repo.DisplayPath}' may not be related to the commit '{target.ToFixCommitSha}' version 'v{target.ToFixVersion}' to be fixed.
+                    """ );
                 return false;
             }
             return gitRepository.Checkout( monitor, branch );
