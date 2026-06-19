@@ -110,6 +110,25 @@ public sealed class Repo
     /// <returns>The renderable.</returns>
     public IRenderable ToRenderable( ScreenType screenType, bool withBranchName = false, bool withRemoteDiffCount = false, bool withOriginUrl = false )
     {
+        return ToRenderable( screenType, withBranchName ? GitStatus.CurrentBranchName : null, withRemoteDiffCount, withOriginUrl );
+    }
+
+    /// <summary>
+    /// Returns the <see cref="DisplayPath"/> (with its link to <see cref="WorkingFolder"/>) as a <see cref="ContentBox"/>
+    /// or a <see cref="HorizontalContent"/> with it and:
+    /// <list type="number">
+    ///     <item>A box with its current branch name.</item>
+    ///     <item>A Box with the commit remotes ↑0↓0 differences indicator.</item>
+    ///     <item>A Box with the <see cref="Repo.OriginUrl"/>.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="branchName">Non null to add a box with the branch name.</param>
+    /// <param name="withRemoteDiffCount">True to add a box with the commit remotes ↑0↓0 differences indicator.</param>
+    /// <param name="withOriginUrl">True to add a box with the <see cref="OriginUrl"/>.</param>
+    /// <returns>The renderable.</returns>
+    public IRenderable ToRenderable( ScreenType screenType, string? branchName = null, bool withRemoteDiffCount = false, bool withOriginUrl = false )
+    {
         var status = GitStatus;
         var folderStyle = new TextStyle( status.IsDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen, ConsoleColor.Black );
 
@@ -120,9 +139,9 @@ public sealed class Repo
                     : folder.Box( paddingLeft: 2, paddingRight: 1 );
         folder = folder.Box( style: folderStyle );
 
-        if( withBranchName )
+        if( branchName != null )
         {
-            folder = folder.AddRight( screenType.Text( $"⎇{status.CurrentBranchName}" ).Box( marginRight: 1 ) );
+            folder = folder.AddRight( screenType.Text( $"⎇ {branchName}" ).Box( marginRight: 1 ) );
         }
         if( withRemoteDiffCount )
         {

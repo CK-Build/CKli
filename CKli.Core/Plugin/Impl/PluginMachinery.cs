@@ -61,6 +61,7 @@ public sealed partial class PluginMachinery
 
     /// <summary>
     /// Gets an identifier for the "<see cref="WorldName"/> Plugins" environment.
+    /// Computed by <see cref="GetPluginSolutionName(WorldName)"/>.
     /// </summary>
     public string Name => _name;
 

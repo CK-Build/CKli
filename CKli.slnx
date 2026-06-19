@@ -15,7 +15,6 @@
     <Project Path="StandardPlugins/CKli.HotZone.Plugin/CKli.HotZone.Plugin.csproj" />
     <Project Path="StandardPlugins/CKli.Migration.Plugin/CKli.Migration.Plugin.csproj" />
     <Project Path="StandardPlugins/CKli.Publish.Plugin/CKli.Publish.Plugin.csproj" />
-    <Project Path="StandardPlugins/CKli.ReleaseDatabase.Plugin/CKli.ReleaseDatabase.Plugin.csproj" />
     <Project Path="StandardPlugins/CKli.ShallowSolution.Plugin/CKli.ShallowSolution.Plugin.csproj" />
     <Project Path="StandardPlugins/CKli.VersionTag.Plugin/CKli.VersionTag.Plugin.csproj" />
   </Folder>

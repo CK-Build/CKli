@@ -325,7 +325,7 @@ public class StackRepositoryTests
             > Public stack [WHITE]CKt[GRAY] (1 repositories)⮐
             │  [DARKGREEN]T/Cloned/Clone_with_diff_casing_Async/CKt/.PublicStack[GRAY]⮐
             │  [DARKBLUE]file:///T/remotes/bare/ckt/ckt-stack[GRAY]⮐
-            [DARKGREEN]  CK-Core-Projects/CKt-Core [GRAY]master ↑0↓0 [DARKBLUE]file:///T/remotes/bare/ckt/CKt-Core[GRAY] ⮐
+            [DARKGREEN]  CK-Core-Projects/CKt-Core [GRAY]⎇ master ↑0↓0 [DARKBLUE]file:///T/remotes/bare/ckt/CKt-Core[GRAY] ⮐
             [BLACK,darkgreen]❰✓❱[GRAY,black]⮐
 
             """ );

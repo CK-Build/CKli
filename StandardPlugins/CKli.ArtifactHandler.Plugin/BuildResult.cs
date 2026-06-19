@@ -44,6 +44,7 @@ public sealed partial class BuildResult
                         bool skippedBuild )
     {
         Throw.CheckArgument( assetsFolder.IsEmptyPath == content.AssetFileNames.IsEmpty );
+        Throw.CheckArgument( version.IsCSVersion );
         _repo = repo;
         _versionTag = versionTag;
         _version = version;

@@ -74,7 +74,7 @@ public sealed partial class FixWorkflow
         {
             var r = indexAndRank.MoveNext( isBuildable: true, marginRight: 1 );
             r = r.AddRight( s.Text( t.Repo.DisplayPath ).HyperLink( new Uri( t.Repo.WorkingFolder ) ).Box( marginRight: 1 ) )
-                 .AddRight( s.Text( $"⎇{t.BranchName}" ).Box( marginRight: 1, foreColor: ConsoleColor.DarkMagenta ) )
+                 .AddRight( s.Text( $"⎇ {t.BranchName}" ).Box( marginRight: 1, foreColor: ConsoleColor.DarkMagenta ) )
                  .AddRight( s.Text( $"→ v{t.TargetVersion}" ).Box( foreColor: ConsoleColor.Green, marginRight: 1 ) );
             rows.Add( r );
         }
