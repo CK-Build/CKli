@@ -99,6 +99,7 @@ public sealed class LocalWorldName : WorldName
             var doc = XDocument.Load( _xmlDescriptionFilePath );
             var root = doc.Root;
             Throw.DebugAssert( root != null );
+            string mustBeStackName = root.Name.LocalName;
 
             // Before anything else (even the root element name), if a CKliMinVersion exists then we check it.
             string? minCKliVersion = root.Attribute( "MinCKliVersion" )?.Value;
@@ -109,7 +110,7 @@ public sealed class LocalWorldName : WorldName
                 if( !vMin.IsValid )
                 {
                     monitor.Error( $"""
-                    Invalid <CK MinCKliVersion="{minCKliVersion}" > attribute in world definition file. File: '{_xmlDescriptionFilePath}'.
+                    Invalid <{mustBeStackName} MinCKliVersion="{minCKliVersion}" > attribute in world definition file. File: '{_xmlDescriptionFilePath}'.
                     """ );
                     return null;
                 }
@@ -127,11 +128,10 @@ public sealed class LocalWorldName : WorldName
                 }
             }
 
-            string stackName = root.Name.LocalName;
             string? ltsName = root.Attribute( "LTSName" )?.Value;
-            if( !StringComparer.OrdinalIgnoreCase.Equals( root.Name.LocalName, StackName ) )
+            if( !StringComparer.OrdinalIgnoreCase.Equals( mustBeStackName, StackName ) )
             {
-                monitor.Error( $"Invalid world definition root element name. Must be '{StackName}'. File: '{_xmlDescriptionFilePath}'." );
+                monitor.Error( $"Invalid world definition root element name '{mustBeStackName}'. Must be '{StackName}'. File: '{_xmlDescriptionFilePath}'." );
                 return null;
             }
             if( !StringComparer.OrdinalIgnoreCase.Equals( root.Attribute( "LTSName" )?.Value, LTSName ) )
@@ -146,8 +146,8 @@ public sealed class LocalWorldName : WorldName
                 }
                 return null;
             }
-            var fixedWorldName = stackName != StackName || ltsName != LTSName
-                                    ? new LocalWorldName( _stack, LTSName, _root, _xmlDescriptionFilePath, stackName )
+            var fixedWorldName = mustBeStackName != StackName || ltsName != LTSName
+                                    ? new LocalWorldName( _stack, LTSName, _root, _xmlDescriptionFilePath, mustBeStackName )
                                     : this;
             return WorldDefinitionFile.Create( monitor, fixedWorldName, root );
         }
