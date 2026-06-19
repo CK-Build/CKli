@@ -103,7 +103,7 @@ public sealed class LocalWorldName : WorldName
             // Before anything else (even the root element name), if a CKliMinVersion exists then we check it.
             string? minCKliVersion = root.Attribute( "MinCKliVersion" )?.Value;
             SVersion? ckliVersion = World.CKliVersion.Version;
-            if( !string.IsNullOrWhiteSpace( minCKliVersion ) && ckliVersion != null )
+            if( !string.IsNullOrWhiteSpace( minCKliVersion ) )
             {
                 var vMin = SVersion.ParseNoThrow( minCKliVersion );
                 if( !vMin.IsValid )
@@ -113,7 +113,11 @@ public sealed class LocalWorldName : WorldName
                     """ );
                     return null;
                 }
-                if( vMin > ckliVersion )
+                if( ckliVersion == SVersion.ZeroVersion )
+                {
+                    monitor.Warn( $"Using locally compiled CKli (version 0.0.0-0)." );
+                }
+                else if( vMin > ckliVersion )
                 {
                     monitor.Error( $"""
                         The world definition file requires CKli version '{minCKliVersion}' (at least). File: '{_xmlDescriptionFilePath}'.
