@@ -104,7 +104,7 @@ public sealed partial class BuildPlugin
         }
         var results = bResults.MoveToImmutable();
         var s = context.Screen.ScreenType;
-        var display = RenderBuildResults( s, results );
+        var display = RenderBuildResults( s, workflow, results );
         context.Screen.Display( display );
         if( _onFixBuild.HasHandlers )
         {
@@ -116,12 +116,12 @@ public sealed partial class BuildPlugin
         }
         return true;
 
-        static IRenderable RenderBuildResults( ScreenType s, ImmutableArray<BuildResult> results )
+        static IRenderable RenderBuildResults( ScreenType s, FixWorkflow workflow, ImmutableArray<BuildResult> results )
         {
-            var d = s.Unit.AddBelow( results.Select( r => r.Repo.ToRenderable( s, withBranchName: true )
-                                                                .AddRight( s.Text( r.Version.ToString() )
+            var d = s.Unit.AddBelow( workflow.Targets.Select( t => t.Repo.ToRenderable( s, t.BranchName )
+                                                                    .AddRight( s.Text( results[t.Index].Version.ToString() )
                                                                             .Box( marginLeft: 1,
-                                                                                  foreColor: r.SkippedBuild
+                                                                                  foreColor: results[t.Index].SkippedBuild
                                                                                                 ? ConsoleColor.DarkYellow
                                                                                                 : ConsoleColor.Green ) ) ) );
             return d.TableLayout();
