@@ -1,3 +1,4 @@
+using CKli.HotZone.Plugin;
 using System;
 
 namespace CKli.Build.Plugin;

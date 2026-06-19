@@ -1,6 +1,5 @@
 using CK.Core;
 using Microsoft.Extensions.FileProviders;
-using Microsoft.IO;
 using System.IO;
 using System.Text;
 

@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
+using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
 using System;
 using System.Collections.Immutable;
@@ -102,12 +103,12 @@ public sealed partial class Roadmap
         public PackageMapper? UUpdates => _uUpdates;
 
         /// <summary>
-        /// Gets the package updates from <see cref="BranchModel.Plugin.HotGraph.PackageUpdater.WorldConfiguredMapping"/> if any.
+        /// Gets the package updates from <see cref="HotGraph.PackageUpdater.WorldConfiguredMapping"/> if any.
         /// </summary>
         public PackageMapper? CUpdates => _cUpdates;
 
         /// <summary>
-        /// Gets the package updates from <see cref="BranchModel.Plugin.HotGraph.PackageUpdater.DiscrepanciesMapping"/> if any.
+        /// Gets the package updates from <see cref="HotGraph.PackageUpdater.WorldConfiguredMapping"/> if any.
         /// </summary>
         public PackageMapper? DUpdates => _dUpdates;
 

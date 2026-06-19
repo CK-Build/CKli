@@ -6,14 +6,15 @@ using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
-
 using LibGit2Sharp;
 using System;
 using System.Threading.Tasks;
-using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Build.Plugin;
 
+/// <summary>
+/// Plugin that implements the build commands.
+/// </summary>
 public sealed partial class BuildPlugin : PrimaryPluginBase
 {
     const string _dBranch = "Specify the branch to consider. By default, the current head is considered when in a Repo.";
@@ -69,6 +70,20 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// </summary>
     public PerfectEvent<FixBuildEventArgs> OnFixBuild => _onFixBuild.PerfectEvent;
 
+    /// <summary>
+    /// Build command.
+    /// </summary>
+    /// <param name="monitor"></param>
+    /// <param name="context"></param>
+    /// <param name="branch"></param>
+    /// <param name="maxDop"></param>
+    /// <param name="ci"></param>
+    /// <param name="ciForce"></param>
+    /// <param name="skipTests"></param>
+    /// <param name="forceTests"></param>
+    /// <param name="dryRun"></param>
+    /// <param name="all"></param>
+    /// <returns></returns>
     [Description( "Build-Test-Package and propagates packages from the current repositories to their consumers, keeping them local." )]
     [CommandPath( "build" )]
     public Task<bool> BuildAsync( IActivityMonitor monitor,

@@ -7,7 +7,6 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Immutable;
 using System.IO;
-using System.Reflection.Metadata;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 

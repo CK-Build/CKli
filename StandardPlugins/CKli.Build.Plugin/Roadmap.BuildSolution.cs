@@ -6,7 +6,6 @@ using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
@@ -16,6 +15,9 @@ namespace CKli.Build.Plugin;
 
 public sealed partial class Roadmap
 {
+    /// <summary>
+    /// Capture build information for a <see cref="Repo"/>.
+    /// </summary>
     public sealed partial class BuildSolution
     {
         readonly Roadmap _roadmap;
@@ -762,6 +764,10 @@ public sealed partial class Roadmap
         [GeneratedRegex( @"^(?<1>\w+)(?:\((?<2>[^()]+)\))?(?<3>!)?:", RegexOptions.CultureInvariant )]
         private static partial Regex ConventionalCommitHeader();
 
+        /// <summary>
+        /// Overridden to return the solution and current/target versions.
+        /// </summary>
+        /// <returns>A readable string.</returns>
         public override string ToString() => _buildInfo == null
                                                 ? $"{_solution} [out of scope]"
                                                 : _buildInfo.MustBuild

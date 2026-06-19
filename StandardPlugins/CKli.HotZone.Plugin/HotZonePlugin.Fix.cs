@@ -21,6 +21,15 @@ public sealed partial class HotZonePlugin
     /// </summary>
     public PerfectEvent<FixWorkflowStartEventArgs> OnFixStart => _onFixStart.PerfectEvent;
 
+    /// <summary>
+    /// Starts fix command.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The minimal CKli context.</param>
+    /// <param name="version">The version to fix.</param>
+    /// <param name="moveBranch">Whether the 'fix/' can be moved.</param>
+    /// <param name="withEmptyCommit">True to create an initial empty commit.</param>
+    /// <returns>True on success, false on error.</returns>
     [Description( "Starts a Fix Workflow. This Repo 'fix/vMajor.Minor' branch is checked out." )]
     [CommandPath( "fix start" )]
     public async Task<bool> FixStartAsync( IActivityMonitor monitor,
@@ -472,6 +481,12 @@ public sealed partial class HotZonePlugin
 
     }
 
+    /// <summary>
+    /// Dumps the current Fix Workflow.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The minimal CKli context.</param>
+    /// <returns>True on success, false on error.</returns>
     [Description( "Dumps the current Fix Workflow." )]
     [CommandPath( "fix info" )]
     public bool FixInfo( IActivityMonitor monitor, CKliEnv context )
@@ -491,6 +506,12 @@ public sealed partial class HotZonePlugin
         return true;
     }
 
+    /// <summary>
+    /// Cancels the current Fix Workflow.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The minimal CKli context.</param>
+    /// <returns>True on success, false on error.</returns>
     [Description( "Cancels the current Fix Workflow." )]
     [CommandPath( "fix cancel" )]
     public bool FixCancel( IActivityMonitor monitor, CKliEnv context )

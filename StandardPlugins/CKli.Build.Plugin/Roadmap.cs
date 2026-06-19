@@ -294,7 +294,7 @@ public sealed partial class Roadmap
 
     }
 
-    public IRenderable ToRenderable( ScreenType screen )
+    internal IRenderable ToRenderable( ScreenType screen )
     {
         int buildIndexLen = _buildSolutionCount switch
         {

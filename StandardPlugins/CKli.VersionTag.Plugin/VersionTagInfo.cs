@@ -582,7 +582,7 @@ public sealed partial class VersionTagInfo : RepoInfo
 
     /// <summary>
     /// Removes the tag commit (not the Git tag from the repository).
-    /// Handles the <see cref="TagCommits"/> and <see cref="TagCommitsBySha"/>.
+    /// Handles the <see cref="AllTagCommits"/> and <see cref="TagCommitsBySha"/>.
     /// </summary>
     /// <param name="version">The version to remove.</param>
     /// <returns>The removed tag commit if has been removed.</returns>

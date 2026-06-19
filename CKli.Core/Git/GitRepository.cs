@@ -1197,6 +1197,7 @@ public sealed partial class GitRepository : IDisposable
     /// half an hour earlier).
     /// </para>
     /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
     /// <param name="baseCommit">The base commit (oldest one).</param>
     /// <param name="target">The newest commit.</param>
     /// <returns>Greatest number of commits or -1 if <paramref name="baseCommit"/> is not reachable from <paramref name="target"/>.</returns>

@@ -145,6 +145,7 @@ public sealed partial class BranchLink
     /// <summary>
     /// Refreshes the link: if <see cref="Branch"/> doesn't exist anymore, null is returned.
     /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
     /// <param name="repo">The repository.</param>
     /// <returns>A refreshed link or null if <see cref="Branch"/> disappeared.</returns>
     public BranchLink? Refresh( IActivityMonitor monitor, GitRepository repo )

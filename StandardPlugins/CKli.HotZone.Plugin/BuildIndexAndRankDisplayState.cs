@@ -55,6 +55,7 @@ public ref struct BuildIndexAndRankDisplayState
     /// Whether the next solution must be built: its one-based build index
     /// must appear before the rank range symbols.
     /// </param>
+    /// <param name="marginRight">The right margin size to add.</param>
     /// <returns>The renderable.</returns>
     public IRenderable MoveNext( bool isBuildable, int marginRight )
     {

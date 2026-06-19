@@ -1,8 +1,6 @@
 using CK.Core;
 using CKli.Core;
 
-using System.Linq;
-
 namespace CKli.VersionTag.Plugin;
 
 public sealed partial class VersionTagPlugin

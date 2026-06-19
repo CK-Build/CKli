@@ -32,7 +32,7 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     /// <summary>
     /// Raised right before the build by the <see cref="RepoBuilder"/>.
     /// <para>
-    /// The working folder is ready (the "nuget.config" file contains the $"Local/&ltworld name&gt;/NuGet" local feed)
+    /// The working folder is ready (the "nuget.config" file contains the $"Local/&lt;world name&gt;/NuGet" local feed)
     /// and will be restored after the build.
     /// </para>
     /// </summary>

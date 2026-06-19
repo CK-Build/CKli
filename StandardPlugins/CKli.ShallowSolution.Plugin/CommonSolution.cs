@@ -146,7 +146,7 @@ static class CommonSolution
     /// <param name="attributeRequiredMessage">The "Expected ..." message part if the attribute is required.</param>
     /// <param name="a">Outputs the attribute if found.</param>
     /// <param name="version">Outputs the version if the attribute has been found and the version is successfully parsed.</param>
-    /// <returns>True on sucess, false on error.</returns>
+    /// <returns>True on success, false on error.</returns>
     internal static bool ReadVersionAttribute( IActivityMonitor monitor,
                                               string sourceFilePath,
                                               XElement e,
