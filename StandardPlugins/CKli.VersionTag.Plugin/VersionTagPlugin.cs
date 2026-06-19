@@ -965,10 +965,19 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 {
                     continue;
                 }
+                var v = SVersion.ParseNoThrow( tagName, allowPrefix: true );
+                // If the tag doesn't look like a version, ignore it.
+                // And if it is valid but above or equal to SupVersion or below or equal to InfVersion: ignore.
+                if( !v.IsValid
+                    || (info.SupVersion != null && v >= info.SupVersion) || v <= info.InfVersion )
+                {
+                    continue;
+                }
+                // The tag is a valid SVersion and in the ]Inf,Sup[ range.
                 // Consider only tag that are Conformant SVersion and a empty or "local/" ParsedPrefix.
                 bool invalidParsedPrefix = false;
                 bool invalidLocalPrefix = false;
-                if( !SVersion.TryParse( tagName, out var v, allowPrefix: true, mustBeCSVersion: true )
+                if( v.VersionKind == CSVersionKind.None
                     || (invalidParsedPrefix = (!string.IsNullOrEmpty( v.ParsedPrefix ) && v.ParsedPrefix != "local/"))
                     || (invalidLocalPrefix = (v.HasFakeMetadata || v.HasDeprecatedMetadata || v.HasInvalidMetadata) && v.ParsedPrefix == "local/") )
                 {
@@ -982,18 +991,18 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         invalidParsedPrefixTags ??= [];
                         invalidParsedPrefixTags.Add( tagName );
                     }
-                    else if( SVersion.TryParse( tagName, out var nonConform, allowPrefix: true ) )
+                    else
                     {
+                        // Reparse to have the error explanation.
+                        v = SVersion.ParseNoThrow( tagName, allowPrefix: true, mustBeCSVersion: true );
+                        Throw.DebugAssert( !v.IsValid );
                         // The ToString is the "ErrorMessage (ParsedText)".
-                        Debug.Assert( !v.IsValid );
                         nonConformantTags ??= [];
                         nonConformantTags.Add( v.ToString() );
                     }
-                    // Otherwise, the tag doesn't look like a version, ignore it silently.
+                    // Skip this non-conformant version.
                     continue;
                 }
-                // Above or equal to SupVersion or below or equal to InfVersion: ignore.
-                if( (info.SupVersion != null && v >= info.SupVersion) || v <= info.InfVersion ) continue;
 
                 // A +invalid tag totally cancels an existing version tag. We collect them
                 // and apply them once all the valid tags have been collected.
@@ -1092,15 +1101,16 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 if( nonConformantTags != null )
                 {
                     var sep = Environment.NewLine + "- ";
-                    monitor.Warn( $"Ignored {nonConformantTags.Count} non Conformant SVersion tags:{sep}{nonConformantTags.Concatenate( sep )}" );
+                    monitor.Info( $"Ignored {nonConformantTags.Count} non Conformant SVersion tags:{sep}{nonConformantTags.Concatenate( sep )}" );
                 }
                 if( invalidParsedPrefixTags != null )
                 {
-                    monitor.Warn( $"""
+                    monitor.Info( $"""
                     Ignored {invalidParsedPrefixTags.Count} tags with an unexpected prefix:
                     '{invalidParsedPrefixTags.Concatenate( "', '" )}'.
                     """ );
                 }
+
             }
         }
     }

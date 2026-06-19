@@ -400,7 +400,7 @@ public sealed partial class Roadmap
                 int buildNumber = Repo.GitRepository.ComputeCommitDepth( monitor, _versionInfo.BaseBuild.Commit, _versionInfo.GitSolution.GitBranch.Tip );
                 if( buildNumber < 0 )
                 {
-                    monitor.Error( $"Unable to compute commit depth from branch '{_versionInfo.GitSolution.GitBranch.FriendlyName}' to the base '{_versionInfo.BaseBuild}'." );
+                    monitor.Error( $"Unable to compute commit depth from branch '{_versionInfo.GitSolution.GitBranch.FriendlyName}' to the base {_versionInfo.BaseBuild}." );
                     return null;
                 }
                 if( mustAddCommit ) ++buildNumber;
