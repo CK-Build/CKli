@@ -560,31 +560,66 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         var info = new VersionTagInfo( this, repo, infVersion, supVersion );
 
         var isExecutingIssue = PrimaryPluginContext.Command is CKliIssue;
-
-        List<Tag>? removableTags = null;
-        List<Tag>? badDeprecatedTags = null;
-        List<(SVersion V, Tag T)>? lightweightOrUnreadableRegularTags = null;
-        List<(SVersion V, Tag T)>? ci0VersionTags = null;
-        // Collects conflicting tags.
-        List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts = null;
-
-        // First pass: filters out non conformant tags, versions outside Inf/SupVersion,
-        // non parsable +deprecated tags and collect +invalid tags and ci0 version and tags.
-        // This validTags list is temporary (first pass) to build the v2c index.
-        List<TagCommit> validTags = new List<TagCommit>();
-        Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags = null;
         var r = repo.GitRepository.Repository;
 
+        // Collects +invalid tags during the first pass. Subsequent passes ignores any version tags
+        // that appears in this map.
+        Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags = null;
+        // Collects conflicting tags.
+        List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts = null;
+        // Collects tags that are ignored and can be locally removed (typically because they have
+        // a corresponding invalidTags).
+        List<Tag>? removableTags = null;
+        // +deprecated tags that are lightweight or have a non parsable DeprecatedTagInfo. 
+        List<(SVersion V, Tag T)>? badDeprecatedTags = null;
+        // Regular tags (non +fake nor +deprecated) that are lightweight or have a non parsable BuildContentInfo.
+        List<(SVersion V, Tag T)>? lightweightOrUnreadableRegularTags = null;
+        // Collects the tags that are "ci.0" or "--ci.0". They are not directly TagCommits but associated
+        // to their primary, non-CI TagCommit.
+        List<(SVersion V, Tag T)>? ci0VersionTags = null;
+        // The potentially valid TagCommit that will be processed by subsequent passes to be added to
+        // the v2c dictionary.
+        // This validTags list is temporary (first pass) to build the v2c index.
+        List<TagCommit> validTags = new List<TagCommit>();
+
+        // First pass: filters out non conformant tags (warns), versions outside Inf/SupVersion (ignore),
+        // non parsable regular and +deprecated and collect +invalid and ci0 version and tags.
         FirstTagCollect( monitor,
                          info,
                          r,
                          validTags,
                          ref removableTags,
-                         ref badDeprecatedTags,
-                         ref lightweightOrUnreadableRegularTags,
                          ref tagConflicts,
                          ref invalidTags,
+                         ref badDeprecatedTags,
+                         ref lightweightOrUnreadableRegularTags,
                          ref ci0VersionTags );
+
+        // Applies +invalid tags to badDeprecatedTags and lightweightOrUnreadableRegularTags (for ci0VersionTags
+        // this is done below, when processing them).
+        if( badDeprecatedTags != null && invalidTags != null )
+        {
+            for( int i = 0; i < badDeprecatedTags.Count; ++i )
+            {
+                var (v,t) = badDeprecatedTags[i];
+                if( ApplyInvalid( invalidTags, ref tagConflicts, ref removableTags, v, t ) )
+                {
+                    badDeprecatedTags.RemoveAt( i-- );
+                }
+            }
+        }
+
+        if( lightweightOrUnreadableRegularTags != null && invalidTags != null )
+        {
+            for( int i = 0; i < lightweightOrUnreadableRegularTags.Count; ++i )
+            {
+                var (v,t) = lightweightOrUnreadableRegularTags[i];
+                if( ApplyInvalid( invalidTags, ref tagConflicts, ref removableTags, v, t ) )
+                {
+                    lightweightOrUnreadableRegularTags.RemoveAt( i-- );
+                }
+            }
+        }
 
         // Second pass: filters out the invalid tags and produces the v2C index
         //              along with potential tag conflicts.
@@ -594,20 +629,11 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         foreach( var newOne in validTags )
         {
             // This filters out any version tags (regular, +fake or +deprecated): +invalid always wins.
-            if( invalidTags != null && invalidTags.TryGetValue( newOne.Version, out var invalid ) )
+            if( invalidTags != null && ApplyInvalid( invalidTags, ref tagConflicts, ref removableTags, newOne.Version, newOne.Tag ) )
             {
-                if( newOne.Commit.Sha != invalid.T.Target.Sha )
-                {
-                    tagConflicts ??= new();
-                    tagConflicts.Add( (invalid, (newOne.Version, newOne.Tag), TagConflict.InvalidTagOnWrongCommit) );
-                }
-                else
-                {
-                    removableTags ??= [];
-                    removableTags.Add( newOne.Tag );
-                }
                 continue;
             }
+
             // The newOne tag is not "removed" by an associated "+invalid".
             // If newOne version has not been discovered yet, it is easy: register the SVersion -> TagCommit in v2C dictionary.
             // Otherwise, it is a little bit subtler :-).
@@ -817,11 +843,18 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, World, repo, lastStable, topHot );
         }
 
+        // Time to work on the "ci.0" version tags.
         if( ci0VersionTags != null )
         {
-            foreach( var (v, t) in ci0VersionTags )
+            for( int i = 0; i < ci0VersionTags.Count; ++i )
             {
+                (SVersion? v, Tag? t) = ci0VersionTags[i];
                 Throw.DebugAssert( v.CINumber == 0 );
+                if( invalidTags != null && ApplyInvalid( invalidTags, ref tagConflicts, ref removableTags, v, t ) )
+                {
+                    ci0VersionTags.RemoveAt( i-- );
+                    continue;
+                }
                 var vBase = v.SetCINumber( -1 );
                 if( v2c.TryGetValue( vBase, out var tBase ) )
                 {
@@ -943,10 +976,10 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                                      Repository r,
                                      List<TagCommit> validTags,
                                      ref List<Tag>? removableTags,
-                                     ref List<Tag>? badDeprecatedTags,
-                                     ref List<(SVersion V, Tag T)>? lightweightOrUnreadableRegularTags,
                                      ref List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts,
                                      ref Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags,
+                                     ref List<(SVersion V, Tag T)>? badDeprecatedTags,
+                                     ref List<(SVersion V, Tag T)>? lightweightOrUnreadableRegularTags,
                                      ref List<(SVersion V, Tag T)>? ci0VersionTags )
         {
             bool hasBadTagNames = false;
@@ -1060,8 +1093,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 DeprecatedTagInfo? deprecatedInfo = null;
                 if( v.HasDeprecatedMetadata && !DeprecatedTagInfo.TryParse( t.Annotation?.Message, out deprecatedInfo ) )
                 {
-                    badDeprecatedTags ??= new List<Tag>();
-                    badDeprecatedTags.Add( t );
+                    badDeprecatedTags ??= new List<(SVersion V, Tag T)>();
+                    badDeprecatedTags.Add( (v, t) );
                 }
                 else
                 {
@@ -1112,6 +1145,29 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 }
 
             }
+        }
+
+        static bool ApplyInvalid( Dictionary<SVersion, (SVersion V, Tag T)> invalidTags,
+                                  ref List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts,
+                                  ref List<Tag>? removableTags,
+                                  SVersion v,
+                                  Tag t )
+        {
+            if( invalidTags.TryGetValue( v, out var invalid ) )
+            {
+                if( t.PeeledTarget.Sha != invalid.T.Target.Sha )
+                {
+                    tagConflicts ??= new();
+                    tagConflicts.Add( (invalid, (v, t), TagConflict.InvalidTagOnWrongCommit) );
+                }
+                else
+                {
+                    removableTags ??= [];
+                    removableTags.Add( t );
+                }
+                return true;
+            }
+            return false;
         }
     }
 

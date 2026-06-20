@@ -30,7 +30,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     //
     Dictionary<SVersion, (SVersion V, Tag T)>? _invalidTags;
     List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? _tagConflicts;
-    List<Tag>? _badDeprecatedTags;
+    List<(SVersion V, Tag T)>? _badDeprecatedTags;
     List<(SVersion V, Tag T)>? _lightweightOrUnreadableRegularTags;
     bool _hasIssue;
     // Lazy initialization.
@@ -54,7 +54,7 @@ public sealed partial class VersionTagInfo : RepoInfo
                               List<Tag>? removableTags,
                               Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags,
                               List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts,
-                              List<Tag>? badDeprecatedTags,
+                              List<(SVersion V, Tag T)>? badDeprecatedTags,
                               List<(SVersion V, Tag T)>? lightweightOrUnreadableRegularTags )
     {
         _lastStables = lastStables;
@@ -676,13 +676,13 @@ public sealed partial class VersionTagInfo : RepoInfo
             collector( new RemovableVersionTagIssue(
                                 $"Found {_badDeprecatedTags.Count} invalid +deprecated tags.",
                                 screenType.Text( $"""
-                                {_badDeprecatedTags.Select( t => t.FriendlyName ).Concatenate()}
+                                {_badDeprecatedTags.Select( t => t.T.FriendlyName ).Concatenate()}
 
                                 Deprecated tags must be annotated tags with a content that describe the deprecation.
                                 This will be fixed by deleting them locally.
                                 """ ),
                                 Repo,
-                                _badDeprecatedTags ) );
+                                [.. _badDeprecatedTags.Select( t => t.T )] ) );
         }
         if( _hotZone != null && _hotZone.HotZoneIssue != null )
         {
