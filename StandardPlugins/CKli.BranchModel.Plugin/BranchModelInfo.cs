@@ -4,6 +4,7 @@ using CKli.ShallowSolution.Plugin;
 using LibGit2Sharp;
 using System;
 using System.Collections.Immutable;
+using System.Linq;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.BranchModel.Plugin;
@@ -13,6 +14,8 @@ namespace CKli.BranchModel.Plugin;
 /// </summary>
 public sealed partial class BranchModelInfo : RepoInfo
 {
+    static readonly string[] _autoPrevRootBranchNames = ["stable", "main", "master", "root", "trunk", "mother", "primary", "develop"];
+
     readonly BranchNamespace _namespace;
     readonly BranchModelPlugin _plugin;
 
@@ -66,7 +69,7 @@ public sealed partial class BranchModelInfo : RepoInfo
         do
         {
             if( b.GitBranch != null ) return b;
-            b = b.Previous;
+            b = b.Parent;
         }
         while( b != null );
         return null;
@@ -90,10 +93,11 @@ public sealed partial class BranchModelInfo : RepoInfo
         if( Root.GitBranch == null )
         {
             // Use "dev/stable" if it exists.
-            Branch? mainOrMaster = Root.GitDevBranch
-                                    ?? Repo.GitRepository.GetBranch( monitor, "main", LogLevel.Info )
-                                    ?? Repo.GitRepository.GetBranch( monitor, "master", LogLevel.Info );
-            collector( MissingRootBranchIssue.Create( monitor, Root, mainOrMaster, screenType ) );
+            Branch? prevRoot = Root.GitDevBranch
+                                    ?? _autoPrevRootBranchNames.Where( n => !n.Equals( _namespace.Root.Name, StringComparison.OrdinalIgnoreCase ) )
+                                                                   .Select( n => Repo.GitRepository.GetBranch( monitor, n, LogLevel.Info ) )
+                                                                   .FirstOrDefault( b => b != null );
+            collector( MissingRootBranchIssue.Create( monitor, Root, prevRoot, screenType ) );
             hasSevereIssues = true;
             return;
         }

@@ -52,11 +52,19 @@ public sealed class HotBranch
     /// Refreshes this branch state and returns <see cref="IsActive"/>.
     /// </summary>
     /// <param name="monitor">The required monitor.</param>
-    /// <returns>Whether the <see cref="GitBranch"/> exists in the repository.</returns>
+    /// <returns>Whether the <see cref="GitBranch"/> exists in the repository (ie. <see cref="IsActive"/> is true).</returns>
     [MemberNotNullWhen( true, nameof( GitBranch ), nameof( _link ) )]
     public bool Refresh( IActivityMonitor monitor )
     {
-        DoCreate( monitor, Repo.GitRepository, _name, out _link, out _gitDevBranch );
+        if( _link != null )
+        {
+            _link = _link.Refresh( monitor, Repo.GitRepository );
+            _gitDevBranch = _link?.Ahead;
+        }
+        else
+        {
+            DoCreate( monitor, Repo.GitRepository, _name, out _link, out _gitDevBranch );
+        }
         return IsActive;
     }
 
@@ -174,23 +182,10 @@ public sealed class HotBranch
     }
 
     /// <summary>
-    /// Gets the previous <see cref="HotBranch"/> in <see cref="BranchModelInfo.Branches"/>.
-    /// Null if this is the root "stable" branch.
+    /// Gets the parent <see cref="HotBranch"/> in <see cref="BranchModelInfo.Branches"/>.
+    /// Null if this is the root branch.
     /// </summary>
-    public HotBranch? Previous => _name.Index > 0 ? _info.Branches[_name.Index - 1] : null;
-
-    /// <summary>
-    /// Gets the next <see cref="HotBranch"/> in <see cref="BranchModelInfo.Branches"/>.
-    /// Null if this is the last, most instable, branch.
-    /// </summary>
-    public HotBranch? Next
-    {
-        get
-        {
-            int i = _name.Index + 1;
-            return i < _info.Branches.Length ? _info.Branches[i] : null;
-        }
-    }
+    public HotBranch? Parent => _name.Parent != null ? _info.Branches[_name.Parent.Index] : null;
 
     /// <summary>
     /// Commits into this <see cref="BranchLink"/>. Development always takes place in the "dev/" branch,

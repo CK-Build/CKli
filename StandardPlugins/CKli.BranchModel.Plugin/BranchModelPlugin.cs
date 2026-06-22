@@ -16,12 +16,16 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     /// <summary>
     /// This is a primary plugin.
     /// </summary>
+    /// <param name="primaryContext">The CKli plugin context.</param>
+    /// <param name="shallowSolution">The shallow solution plugin.</param>
     public BranchModelPlugin( PrimaryPluginContext primaryContext,
                               ShallowSolutionPlugin shallowSolution )
         : base( primaryContext )
     {
         var configElement = primaryContext.Configuration.XElement;
-        _namespace = new BranchNamespace( World.Name.LTSName, configElement.Attribute( XNames.Branches )?.Value );
+        _namespace = new BranchNamespace( World.Name.LTSName,
+                                          configElement.Attribute( XNames.MainLine )?.Value,
+                                          configElement.Element( XNames.Branches ) );
         _autoFixUselessBranch = (bool?)configElement.Attribute( XNames.AutoFixUselessBranch ) ?? true;
         World.Events.Issue += IssueRequested;
         _shallowSolution = shallowSolution;
@@ -74,7 +78,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     /// <summary>
     /// Raised when repository content issues must be detected in the hot zone.
     /// <para>
-    /// Any <see cref="LogLevel.Error"/> or <see cref="LogLevel.Fatal"/> emmitted in <see cref="EventMonitoredArgs.Monitor">ContentIssueEvent.Monitor</see>
+    /// Any <see cref="LogLevel.Error"/> or <see cref="LogLevel.Fatal"/> emitted in <see cref="EventMonitoredArgs.Monitor">ContentIssueEvent.Monitor</see>
     /// is detected as an error that fails the issue command.
     /// </para>
     /// </summary>

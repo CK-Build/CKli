@@ -11,16 +11,16 @@ public sealed class BranchName
 {
     readonly string _name;
     string? _devName;
+    readonly BranchName? _parent;
     readonly int _index;
     readonly BranchLinkType _linkType;
 
-    internal BranchName( BranchLinkType linkType, string? ltsName, string name, int index )
+    internal BranchName( BranchLinkType linkType, string name, int index, BranchName? parent )
     {
         _index = index;
+        _parent = parent;
         _linkType = linkType;
-        _name = ltsName == null
-                    ? name
-                    : ltsName + '/' + name;
+        _name = name;
     }
 
     /// <summary>
@@ -40,8 +40,12 @@ public sealed class BranchName
     /// </summary>
     public int Index => _index;
 
+    /// Gets the parent branch name or null if this is the root branch name.
+    /// </summary>
+    public BranchName? Parent => _parent;
+
     /// <summary>
-    /// Gets the link type.
+    /// Gets the link type that describes the relationships regarding the <see cref="ParentIndex"/>.
     /// </summary>
     internal BranchLinkType LinkType => _linkType;
 

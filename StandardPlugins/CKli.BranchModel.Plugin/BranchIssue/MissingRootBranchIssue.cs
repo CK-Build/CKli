@@ -8,22 +8,22 @@ namespace CKli.BranchModel.Plugin;
 sealed class MissingRootBranchIssue : World.Issue
 {
     readonly HotBranch _root;
-    readonly Branch _mainOrMaster;
+    readonly Branch _prevRoot;
 
     MissingRootBranchIssue( string title, IRenderable body, HotBranch root, Branch mainOrMaster )
         : base( title, body, root.Repo )
     {
         _root = root;
-        _mainOrMaster = mainOrMaster;
+        _prevRoot = mainOrMaster;
     }
 
     public static World.Issue Create( IActivityMonitor monitor,
                                       HotBranch root,
-                                      Branch? mainOrMaster,
+                                      Branch? prevRoot,
                                       ScreenType screenType )
     {
         var title = $"Missing root branch '{root.BranchName.Name}'.";
-        if( mainOrMaster == null )
+        if( prevRoot == null )
         {
             return CreateManual( title, screenType.Text( $"""
                     No 'master' nor 'main' branch found.
@@ -31,15 +31,15 @@ sealed class MissingRootBranchIssue : World.Issue
                     """ ), root.Repo );
         }
         return new MissingRootBranchIssue( title,
-                                           screenType.Text( $"Can be fixed by creating it from '{mainOrMaster.FriendlyName}'." ),
+                                           screenType.Text( $"Can be fixed by creating it from '{prevRoot.FriendlyName}'." ),
                                            root,
-                                           mainOrMaster );
+                                           prevRoot );
     }
 
     protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world )
     {
         Throw.DebugAssert( Repo != null );
-        BranchLink.CreateAheadBranch( Repo.GitRepository, _mainOrMaster.Tip, _root.BranchName.Name, withEmptyInitializationCommit: true );
+        BranchLink.CreateAheadBranch( Repo.GitRepository, _prevRoot.Tip, _root.BranchName.Name, withEmptyInitializationCommit: true );
         return ValueTask.FromResult( true );
     }
 }

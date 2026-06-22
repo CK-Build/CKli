@@ -11,24 +11,25 @@ namespace CKli.BranchModel.Plugin;
 public sealed partial class BranchModelPlugin
 {
     /// <summary>
-    /// Checks out the specified branch.
+    /// Switch the working folder to the specified branch.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">The minimal CKli context.</param>
     /// <param name="branchName">The branch name to switch to.</param>
-    /// <param name="useFallback">True to use branch fallbacks.</param>
+    /// <param name="forceOpen">True to open an unexisting branch.</param>
     /// <param name="all">Consider all the Repos of the current World.</param>
     /// <returns>True on success, false otherwise.</returns>
-    [Description( "Switch the working folder to the given branch." )]
-    [CommandPath( "checkout" )]
-    public bool Checkout( IActivityMonitor monitor,
-                          CKliEnv context,
-                          [Description( "Branch name to checkout." )]
-                          string branchName,
-                          [Description( "Don't create the branch if it doesn't exist, instead checks out the closest existing one." )]
-                          bool useFallback = false,
-                          [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
-                          bool all = false )
+    [Description( "Switch the working folder to the specified branch, optionally opening it." )]
+    [CommandPath( "branch switch" )]
+    public bool BranchSwitch( IActivityMonitor monitor,
+                              CKliEnv context,
+                              [Description( "Branch name to checkout." )]
+                              string branchName,
+                              [Description( "Open the branch if it doesn't exist, instead of switching to the closest opened one." )]
+                              [OptionName("--force-open,-o")]
+                              bool forceOpen = false,
+                              [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
+                              bool all = false )
     {
         var repos = all
                     ? World.GetAllDefinedRepo( monitor )
@@ -50,7 +51,7 @@ public sealed partial class BranchModelPlugin
         {
             Throw.DebugAssert( b.IsActive );
             bool exists = b.BranchName == name && (!isDevName || b.GitDevBranch != null);
-            if( !exists && !useFallback )
+            if( !exists && forceOpen )
             {
                 var info = b.BranchModelInfo;
                 var git = info.Repo.GitRepository.Repository;
@@ -81,7 +82,7 @@ public sealed partial class BranchModelPlugin
             {
                 // Should this be:
                 //      isDevName ? (b.GitDevBranch ?? b.GitBranch) : b.GitBranch
-                // Currently we always check out the "dev/" branch if it exists even if it has
+                // Currently we always switch to the "dev/" branch if it exists even if it has
                 // not been specified.
                 // This introduces an asymmetry with the create case above...
                 // ...but this seems "natural".
