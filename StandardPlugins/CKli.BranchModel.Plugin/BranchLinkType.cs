@@ -6,22 +6,30 @@ namespace CKli.BranchModel.Plugin;
 enum BranchLinkType
 {
     /// <summary>
-    /// No propagation at all ("||"). The branch are never automatically updated.
+    /// No propagation at all ("||"): the "dev/" child branch must be manually updated.
     /// </summary>
     None,
 
     /// <summary>
-    /// Restricted propagation ("|"): only published stable releases are propagated downwards.
+    /// Restricted propagation ("|"): the "dev/" child branch is synchronized with the parent branch (a stable or a prerelease
+    /// must be built on the parent branch to impact the child).
+    /// <para>
+    /// Commits of stable or prerelease versions are merged into the "dev/" child branch. 
+    /// </para>
     /// </summary>
-    Stable,
+    Release,
 
     /// <summary>
-    /// This is the default link ("->"). Pre releases are propagated when published.
+    /// This is the default link ("->"): the "dev/" child branch is synchronized with the "dev/" parent branch but only on built commits
+    /// (a build or build --ci must be done on the parent branch to impact the child).
+    /// <para>
+    /// All versioned commits are merged into the "dev/" child branch. 
+    /// </para>
     /// </summary>
-    PreRelease,
+    CI,
 
     /// <summary>
-    /// Full link ("=>"). CI builds are propagated.
+    /// Full link ("=>"): the "dev/" child branch is synchronized with the "dev/" parent branch.
     /// </summary>
     Full
 }

@@ -25,7 +25,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         var configElement = primaryContext.Configuration.XElement;
         _namespace = new BranchNamespace( World.Name.LTSName,
                                           configElement.Attribute( XNames.MainLine )?.Value,
-                                          configElement.Element( XNames.Branches ) );
+                                          configElement );
         _autoFixUselessBranch = (bool?)configElement.Attribute( XNames.AutoFixUselessBranch ) ?? true;
         World.Events.Issue += IssueRequested;
         _shallowSolution = shallowSolution;

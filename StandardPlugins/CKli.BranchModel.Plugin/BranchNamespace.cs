@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -14,184 +15,224 @@ namespace CKli.BranchModel.Plugin;
 /// </summary>
 public sealed partial class BranchNamespace
 {
+    const string _defaultRootName = "stable";
+
     readonly BranchName _root;
     readonly ImmutableArray<BranchName> _branches;
     readonly Dictionary<string, BranchName> _byName;
 
     internal BranchNamespace( string? ltsName,
                               string? sMainLine,
-                              XElement? otherBranches )
+                              XElement? exploratory )
     {
         Create( ltsName,
-                sMainLine != null ? ParseMainLine( sMainLine ) : [("stable", BranchLinkType.None)],
-                otherBranches,
+                ParseMainLine( sMainLine ),
+                exploratory,
                 out _branches,
                 out _byName );
         _root = _branches[0];
-    }
 
-    static void Create( string? ltsName,
-                        IEnumerable<(string BranchName, BranchLinkType Link)> mainLine,
-                        XElement? otherBranches,
-                        out ImmutableArray<BranchName> branches,
-                        out Dictionary<string, BranchName> byName )
-    {
-        var result = ImmutableArray.CreateBuilder<BranchName>();
-        byName = new Dictionary<string, BranchName>();
-        var e = mainLine.GetEnumerator();
-        if( !e.MoveNext() )
+        static void Create( string? ltsName,
+                            List<(string BranchName, BranchLinkType Link)> mainLine,
+                            XElement? exploratory,
+                            out ImmutableArray<BranchName> branches,
+                            out Dictionary<string, BranchName> byName )
         {
-            throw new CKException( "Empty configuration." );
-        }
-        // root branch.
-        var name = e.Current.BranchName;
-        name = ltsName == null
-                    ? name
-                    : ltsName + '/' + name;
-        var b = new BranchName( BranchLinkType.None, name, 0, null );
-        result.Add( b );
-        byName.Add( b.Name, b );
-        while( e.MoveNext() )
-        {
-            name = e.Current.BranchName;
+            Throw.DebugAssert( mainLine.Count > 0 );
+            var result = ImmutableArray.CreateBuilder<BranchName>();
+            byName = new Dictionary<string, BranchName>();
+            var e = mainLine.GetEnumerator();
+            e.MoveNext();
+            // root branch.
+            var name = e.Current.BranchName;
             name = ltsName == null
                         ? name
                         : ltsName + '/' + name;
-            b = new BranchName( e.Current.Link, name, b.Index + 1, b );
+            var b = new BranchName( BranchLinkType.None, name, 0, null );
             result.Add( b );
             byName.Add( b.Name, b );
-        }
-        int lastMainLineIndex = result.Count;
-        if( otherBranches != null )
-        {
-            AddBranches( otherBranches.Elements( XNames.Branch ), ltsName, result, byName, parent: null );
-        }
-        branches = result.DrainToImmutable();
-
-
-        static void AddBranches( IEnumerable<XElement> branches,
-                                 string? ltsName,
-                                 ImmutableArray<BranchName>.Builder result,
-                                 Dictionary<string, BranchName> index,
-                                 BranchName? parent )
-        {
-            foreach( var e in branches )
+            while( e.MoveNext() )
             {
-                // The Parent name is required or rejected.
-                var pAttr = e.Attribute( XNames.Parent );
-                if( parent == null )
-                {
-                    var pName = (string?)pAttr;
-                    parent = string.IsNullOrWhiteSpace( pName ) ? null : index.GetValueOrDefault( pName );
-                    if( parent == null )
-                    {
-                        throw new CKException( $"""Unable to find Parent="{pName}" parent branch in BranchModel configuration.""" );
-                    }
-                }
-                else if( pAttr != null )
-                {
-                    throw new CKException( $"""Unexpected Parent="..." attribute in BranchModel configuration (parent is '{parent}' branch).""" );
-                }
-                // Handling Name="<linkType>name".
-                // LinkType is optional.
-                // Currently defaults to None.
-                BranchLinkType linkType = BranchLinkType.None;
-                var name = (string?)e.Attribute( XNames.Name );
-                if( string.IsNullOrWhiteSpace( name ) )
-                {
-                    throw new CKException( $"""Expected Name="..." attribute in BranchModel configuration.""" );
-                }
-                var h = name.AsSpan();
-                name = MatchLinkTypeAndBranchName( ref h, ref linkType, expectLinkType: false );
+                name = e.Current.BranchName;
                 name = ltsName == null
                             ? name
                             : ltsName + '/' + name;
-                if( index.ContainsKey( name ) )
-                {
-                    Throw.CKException( $"Duplicate branch name '{name}' in BranchModel configuration." );
-                }
-                var b = new BranchName( linkType, name, result.Count, parent );
+                b = new BranchName( e.Current.Link, name, b.Index + 1, b );
                 result.Add( b );
-                index.Add( b.Name, b ); 
+                byName.Add( b.Name, b );
+            }
+            int lastMainLineIndex = result.Count;
+            if( exploratory != null )
+            {
+                AddBranches( exploratory.Elements( XNames.Explo ), ltsName, result, byName, parent: null );
+            }
+            branches = result.DrainToImmutable();
+
+
+            static void AddBranches( IEnumerable<XElement> branches,
+                                     string? ltsName,
+                                     ImmutableArray<BranchName>.Builder result,
+                                     Dictionary<string, BranchName> index,
+                                     BranchName? parent )
+            {
+                foreach( var e in branches )
+                {
+                    // The Parent name is required or rejected.
+                    var parentAttr = e.Attribute( XNames.Parent );
+                    if( parent == null )
+                    {
+                        var pName = (string?)parentAttr;
+                        parent = string.IsNullOrWhiteSpace( pName ) ? null : index.GetValueOrDefault( pName );
+                        if( parent == null )
+                        {
+                            throw new CKException( $"""Unable to find Parent="{pName}" parent branch in BranchModel configuration.""" );
+                        }
+                    }
+                    else if( parentAttr != null )
+                    {
+                        throw new CKException( $"""Unexpected Parent="..." attribute in BranchModel configuration (parent is '{parent}' branch).""" );
+                    }
+                    var name = (string?)e.Attribute( XNames.Name );
+                    if( string.IsNullOrWhiteSpace( name ) )
+                    {
+                        throw new CKException( $"""
+                            Expected Name="..." attribute in BranchModel configuration.
+                            """ );
+                    }
+                    // Handling Name="<linkType>name".
+                    // LinkType is optional (defaults to CI).
+                    var h = name.AsSpan();
+                    MatchLinkType( ref h, out var linkType );
+                    var hName = h;
+                    bool hasExplo = h.TryMatch( "explo/", StringComparison.Ordinal );
+                    if( !MatchBranchSegment( ref h, out var bName ) || h.Length > 0 )
+                    {
+                        throw new CKException( $"""
+                            Invalid exploratory branch Name attribute in BranchModel configuration.
+                            Expected a lowercase ASCII identifier (which may contain dash '-' or underscore '_'), got:
+                            {hName}
+                            """ );
+                    }
+                    name = new string( hName );
+                    if( !hasExplo ) name = "explo/" + name;
+                    name = ltsName == null
+                                ? name
+                                : ltsName + '/' + name;
+                    if( index.ContainsKey( name ) )
+                    {
+                        Throw.CKException( $"""
+                            Duplicate branch name '{name}' in BranchModel configuration:
+                            {e}
+                            """ );
+                    }
+                    var b = new BranchName( linkType, name, result.Count, parent );
+                    result.Add( b );
+                    index.Add( b.Name, b ); 
+                }
             }
         }
-    }
 
-    static List<(string BranchName, BranchLinkType Link)> ParseMainLine( string configuration )
-    {
-        var result = new List<(string BranchName, BranchLinkType Link)>();
-        int count = 0;
-        string? prevBranchName = null;
-        ReadOnlySpan<char> h = configuration;
-        while( h.SkipWhiteSpaces() && h.Length > 0 )
+        static List<(string BranchName, BranchLinkType Link)> ParseMainLine( string? configuration )
         {
-            BranchLinkType linkType = BranchLinkType.None;
-            string branchName = MatchLinkTypeAndBranchName( ref h, ref linkType, count > 0 );
-            if( prevBranchName != null && prevBranchName.CompareTo( branchName, StringComparison.Ordinal ) <= 0 )
+            var result = new List<(string BranchName, BranchLinkType Link)>();
+            ReadOnlySpan<char> h = configuration;
+            if( !h.SkipWhiteSpaces() || h.Length == 0 )
+            {
+                result.Add( (_defaultRootName, BranchLinkType.None) );
+                return result;
+            }
+            if( !MatchBranchSegment( ref h, out var name ) )
             {
                 throw new CKException( $"""
-                    Invalid branch name '{branchName}' in BranchModel configuration.
-                    The branch name must be greater than '{prevBranchName}'.
+                    Invalid root branch name in BranchModel MainLine configuration.
+                    Expected a lowercase ASCII identifier (which may contain dash '-' or underscore '_'), got:
+                    {h}
                     """ );
             }
-            prevBranchName = branchName;
-            ++count;
-            result.Add( (branchName, linkType) );
-        }
-        return result;
+            if( CSVersionKindExtensions.TryParse( name, out _, StringComparison.Ordinal ) )
+            {
+                throw new CKException( $"""
+                    Invalid root branch name in BranchModel MainLine configuration: '{name}' must not be one of the prerelease name.
+                    It is typically 'stable' or 'main'.
+                    """ );
+            }
+            result.Add( (new string( name ), BranchLinkType.None) );
 
+            CSVersionKind prevKind = CSVersionKind.None;
+            while( h.SkipWhiteSpaces() && h.Length > 0 )
+            {
+                BranchLinkType linkType = BranchLinkType.CI;
+                if( !MatchLinkType( ref h, out linkType ) )
+                {
+                    throw new CKException( $"""
+                        Unable to parse link type in BranchModel MainLine configuration.
+                        Expected '||' (None), '|' (Release), '->' (CI) or '=>' (Full), got:
+                        {h}
+                        """ );
+                }
+                h.SkipWhiteSpaces();
+                if( !CSVersionKindExtensions.TryParse( h, out var csKind, StringComparison.Ordinal ) )
+                {
+                    throw new CKException( $"""
+                        Invalid BranchModel MainLine configuration.
+                        Expected lowercase Conformant SVersion prerelease name ('alpha', 'bravo',... 'zulu'), got:
+                        {h}
+                        """ );
+                }
+                if( prevKind >= csKind )
+                {
+                    throw new CKException( $"""
+                        Invalid prelease ordering in BranchModel MainLine configuration: '{prevKind.ToPrerelease()}' must appear before '{csKind.ToPrerelease()}'.
+                        """ );
+                }
+                result.Add( (csKind.ToPrerelease(), linkType) );
+            }
+            return result;
+
+        }
     }
 
     static bool MatchLinkType( ref ReadOnlySpan<char> h, out BranchLinkType t )
     {
-        t = BranchLinkType.PreRelease;
+        t = BranchLinkType.CI;
         if( h.TryMatch( '|' ) )
         {
             t = h.TryMatch( '|' )
                     ? BranchLinkType.None
-                    : BranchLinkType.Stable;
+                    : BranchLinkType.Release;
         }
         else
         {
+            var savedH = h;
             bool full = h.TryMatch( '=' );
             if( !full && !h.TryMatch( '-' )
                 || !h.TryMatch( '>' ) )
             {
+                h = savedH;
                 return false;
             }
-            t = full ? BranchLinkType.Full : BranchLinkType.PreRelease;
+            t = full ? BranchLinkType.Full : BranchLinkType.CI;
         }
         h.SkipWhiteSpaces();
         return true;
     }
 
-    static string MatchLinkTypeAndBranchName( ref ReadOnlySpan<char> h, ref BranchLinkType linkType, bool expectLinkType )
+    static bool MatchBranchSegment( ref ReadOnlySpan<char> h, out ReadOnlySpan<char> branchName )
     {
-        if( expectLinkType && !MatchLinkType( ref h, out linkType ) )
+        var e = ValidBranchSegment().EnumerateMatches( h );
+        if( e.MoveNext() )
         {
-            throw new CKException( $"""
-                    Unable to parse link type in BranchModel configuration.
-                    Expected '||' (None), '|' (Stable), '->' (Prerelease) or '=>' (CI), got:
-                    {h}
-                    """ );
+            Throw.DebugAssert( e.Current.Index == 0 );
+            branchName = h.Slice( 0, e.Current.Length );
+            h = h.Slice( branchName.Length );
+            return true;
         }
-        var e = ValidBranchName().EnumerateMatches( h );
-        if( !e.MoveNext() )
-        {
-            throw new CKException( $"""
-                    Unable to parse a branch name in BranchModel configuration.
-                    Expected a lowercase ASCII identifier (which may contain dash '-' or underscore '_'), got:
-                    {h}
-                    """ );
-        }
-        Throw.DebugAssert( e.Current.Index == 0 );
-        var sBranchName = h.Slice( 0, e.Current.Length );
-        h = h.Slice( e.Current.Length );
-        return new string( sBranchName );
+        branchName = default;
+        return false;
     }
 
     [GeneratedRegex( "^[a-z][0-9a-z_-]+", RegexOptions.CultureInvariant )]
-    private static partial Regex ValidBranchName();
+    private static partial Regex ValidBranchSegment();
 
     /// <summary>
     /// Gets the "stable" root branch name.
