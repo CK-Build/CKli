@@ -312,6 +312,14 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                     return null;
                 }
             }
+            if( branch == "(no branch)" )
+            {
+                monitor.Error( $"""
+                                A branch must be checked out or the --branch <name> must be specified.
+                                (At least, '{pivots[0].DisplayPath}' is on detached head state).
+                                """ );
+                return null;
+            }
             monitor.Info( ScreenType.CKliScreenTag, $"Selecting --branch '{branch}'." );
         }
         // If we are not on a known branch (defined by the Branch Model), give up.

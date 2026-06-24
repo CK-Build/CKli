@@ -4,6 +4,7 @@ using NUnit.Framework;
 using Shouldly;
 using System;
 using System.IO;
+using System.Linq;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
@@ -23,6 +24,27 @@ public partial class GitRepositoryTests
                                   Environment.CurrentDirectory )
                      .ShouldBe( 0 );
     }
+
+    [Test]
+    public void GitStatus_detached_head_state()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        using var r = GitRepository.InitOrphanRepository( TestHelper.Monitor,
+                                                          context.SecretsStore,
+                                                          context.CurrentDirectory,
+                                                          context.CurrentDirectory.LastPart,
+                                                          isPublic: true );
+        r.ShouldNotBeNull();
+        r.GetSimpleStatusInfo().CurrentBranchName.ShouldBe( "main" );
+        r.GetSimpleStatusInfo().IsDetachedHead.ShouldBeFalse();
+        File.WriteAllText( context.CurrentDirectory.AppendPart( "SomeFile.txt" ), "Some content." );
+        r.Commit( TestHelper.Monitor, "First commit." );
+        Commands.Checkout( r.Repository, r.Repository.Head.Tip );
+        var status = r.GetSimpleStatusInfo();
+        status.IsDetachedHead.ShouldBeTrue();
+        status.CurrentBranchName.ShouldBe( "(no branch)" );
+    }
+
 
     [Test]
     public void fetch_merge_push_and_pull()

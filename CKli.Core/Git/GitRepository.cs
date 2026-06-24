@@ -124,7 +124,10 @@ public sealed partial class GitRepository : IDisposable
     /// <summary>
     /// Captures minimal status information.
     /// </summary>
-    /// <param name="CurrentBranchName">The currently checked out branch.</param>
+    /// <param name="CurrentBranchName">
+    /// The currently checked out branch.
+    /// This is "(no branch)" when the repository is in a detached head state.
+    /// </param>
     /// <param name="IsDirty">Whether the working folder is dirty.</param>
     /// <param name="CommitAhead">
     /// The number of commit that are ahead of the origin.
@@ -142,6 +145,11 @@ public sealed partial class GitRepository : IDisposable
         /// Gets whether this status is the <c>default</c>, uninitialized value.
         /// </summary>
         public bool IsDefault => CurrentBranchName == null;
+
+        /// <summary>
+        /// Gets whether the repository is in the detached head state.
+        /// </summary>
+        public bool IsDetachedHead => CurrentBranchName == "(no branch)";
 
         /// <summary>
         /// Gets whether the <see cref="CurrentBranchName"/> is tracked.
