@@ -131,7 +131,7 @@ public sealed partial class HotZonePlugin : PrimaryPluginBase
                 {
                     // Consider the closest Git branch that exists in the repository (at the BranchName level).
                     var branchInfo = _branchModel.Get( monitor, repo );
-                    var hotBranch = branchInfo.GetClosestActiveBranch( branchName );
+                    var hotBranch = branchInfo.GetClosestExistingBranch( branchName );
                     Throw.DebugAssert( "There is no Branch Model issue: the closest hot branch necessarily exists.", hotBranch?.GitBranch != null );
 
                     // Invariant (arbitrary choice): solution.IsPivot => graph.HasPivot (ie. !graph.HasPivot => !solution.IsPivot).

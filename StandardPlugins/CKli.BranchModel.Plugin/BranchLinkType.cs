@@ -3,7 +3,7 @@ namespace CKli.BranchModel.Plugin;
 /// <summary>
 /// Defines the type of link between a <see cref="BranchName"/> and its more stable parent.
 /// </summary>
-enum BranchLinkType
+public enum BranchLinkType
 {
     /// <summary>
     /// No propagation at all ("||"): the "dev/" child branch must be manually updated.

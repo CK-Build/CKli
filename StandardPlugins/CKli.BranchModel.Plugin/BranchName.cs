@@ -1,3 +1,5 @@
+using CK.Core;
+using CKli.Core;
 using System;
 using System.Diagnostics;
 
@@ -54,7 +56,6 @@ public sealed class BranchName
     /// </summary>
     /// <returns>The name of this branch.</returns>
     public override string ToString() => _name;
-
 
     /// <summary>
     /// Centralized "dev/" branch name factory.

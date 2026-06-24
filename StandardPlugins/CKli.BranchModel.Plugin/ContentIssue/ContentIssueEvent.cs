@@ -33,7 +33,7 @@ public sealed partial class ContentIssueEvent : EventMonitoredArgs
     public Repo Repo => _collector.Branch.Repo;
 
     /// <summary>
-    /// Gets the hot branch that must be analyzed (<see cref="HotBranch.IsActive"/> is true).
+    /// Gets the hot branch that must be analyzed (<see cref="HotBranch.Exists"/> is true).
     /// </summary>
     public HotBranch Branch => _collector.Branch;
 

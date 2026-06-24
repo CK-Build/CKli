@@ -92,7 +92,7 @@ public sealed partial class HotGraph
                 get
                 {
                     HotBranch hotBranch = _info._solution.Branch;
-                    Throw.DebugAssert( hotBranch.IsActive );
+                    Throw.DebugAssert( hotBranch.Exists );
                     return _tagCommit.Commit.Tree.Sha != (hotBranch.GitDevBranch ?? hotBranch.GitBranch).Tip.Tree.Sha;
                 }
             }

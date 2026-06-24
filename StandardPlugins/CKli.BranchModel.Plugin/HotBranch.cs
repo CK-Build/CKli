@@ -49,10 +49,10 @@ public sealed class HotBranch
     }
 
     /// <summary>
-    /// Refreshes this branch state and returns <see cref="IsActive"/>.
+    /// Refreshes this branch state and returns <see cref="Exists"/>.
     /// </summary>
     /// <param name="monitor">The required monitor.</param>
-    /// <returns>Whether the <see cref="GitBranch"/> exists in the repository (ie. <see cref="IsActive"/> is true).</returns>
+    /// <returns>Whether the <see cref="GitBranch"/> exists in the repository (ie. <see cref="Exists"/> is true).</returns>
     [MemberNotNullWhen( true, nameof( GitBranch ), nameof( _link ) )]
     public bool Refresh( IActivityMonitor monitor )
     {
@@ -65,7 +65,7 @@ public sealed class HotBranch
         {
             DoCreate( monitor, Repo.GitRepository, _name, out _link, out _gitDevBranch );
         }
-        return IsActive;
+        return Exists;
     }
 
     /// <summary>
@@ -94,10 +94,10 @@ public sealed class HotBranch
     public Branch? GitDevBranch => _gitDevBranch;
 
     /// <summary>
-    /// Gets whether the <see cref="GitBranch"/> exists in the repository.
+    /// Gets whether the <see cref="GitBranch"/> exists in this <see cref="Repo"/>.
     /// </summary>
     [MemberNotNullWhen( true, nameof( GitBranch ), nameof( _link ) )]
-    public bool IsActive => _link != null;
+    public bool Exists => _link != null;
 
     /// <summary>
     /// Gets whether <see cref="GitDevBranch"/> exists but this branch is not active.
@@ -201,7 +201,7 @@ public sealed class HotBranch
     /// <returns>True on success, false on error.</returns>
     public bool Commit( IActivityMonitor monitor, string message )
     {
-        Throw.CheckState( IsActive && GitDevBranch != null && GitDevBranch.IsCurrentRepositoryHead );
+        Throw.CheckState( Exists && GitDevBranch != null && GitDevBranch.IsCurrentRepositoryHead );
         var newLink = _link.CommitAhead( monitor, Repo.GitRepository, message );
         if( newLink == null ) return false;
         _link = newLink;
@@ -217,7 +217,7 @@ public sealed class HotBranch
     /// <returns>True on success, false on error.</returns>
     public bool IntegrateDevBranch( IActivityMonitor monitor )
     {
-        Throw.CheckState( IsActive && GitDevBranch != null );
+        Throw.CheckState( Exists && GitDevBranch != null );
         var newLink = _link.IntegrateAhead( monitor, Repo.GitRepository );
         if( newLink == null ) return false;
         _link = newLink;
@@ -234,7 +234,7 @@ public sealed class HotBranch
     [MemberNotNull( nameof( GitDevBranch ) )]
     public Branch EnsureDevBranch( bool withEmptyInitializationCommit = false )
     {
-        Throw.CheckState( IsActive );
+        Throw.CheckState( Exists );
         if( _gitDevBranch == null )
         {
             Throw.DebugAssert( _link.Ahead == null );
@@ -252,7 +252,7 @@ public sealed class HotBranch
     /// <returns>True on success, false on error.</returns>
     public bool SynchronizeDevBranch( IActivityMonitor monitor )
     {
-        Throw.CheckState( IsActive );
+        Throw.CheckState( Exists );
         var newLink = _link.SynchronizeAhead( monitor, Repo.GitRepository );
         if( newLink == null ) return false;
         _link = newLink;

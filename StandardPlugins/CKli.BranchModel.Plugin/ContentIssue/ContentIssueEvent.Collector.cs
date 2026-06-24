@@ -28,7 +28,7 @@ public sealed partial class ContentIssueEvent
 
         internal Collector( HotBranch branch )
         {
-            Throw.DebugAssert( branch.IsActive );
+            Throw.DebugAssert( branch.Exists );
             _branch = branch;
             _gitContentBranch = branch.GitDevBranch ?? branch.GitBranch;
         }

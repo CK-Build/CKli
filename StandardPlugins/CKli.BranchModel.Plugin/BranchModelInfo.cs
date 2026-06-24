@@ -63,7 +63,7 @@ public sealed partial class BranchModelInfo : RepoInfo
     /// </summary>
     /// <param name="name">The starting branch.</param>
     /// <returns>The branch to consider.</returns>
-    public HotBranch? GetClosestActiveBranch( BranchName name )
+    public HotBranch? GetClosestExistingBranch( BranchName name )
     {
         var b = _branches[name.Index];
         do

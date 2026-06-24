@@ -26,7 +26,7 @@ public sealed partial class ContentIssueBuilder
         IRenderable manualBody = screenType.Unit;
         foreach( var b in _info.Branches )
         {
-            if( !b.IsActive ) continue;
+            if( !b.Exists ) continue;
             var ev = new ContentIssueEvent( monitor, b, _info.ShallowSolutionPlugin );
 
             if( !_eventSender( monitor, ev ) )

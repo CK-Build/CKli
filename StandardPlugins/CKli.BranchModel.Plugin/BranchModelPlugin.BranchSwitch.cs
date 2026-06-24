@@ -49,7 +49,7 @@ public sealed partial class BranchModelPlugin
         bool success = true;
         foreach( var b in closestActive )
         {
-            Throw.DebugAssert( b.IsActive );
+            Throw.DebugAssert( b.Exists );
             bool exists = b.BranchName == name && (!isDevName || b.GitDevBranch != null);
             if( !exists && forceOpen )
             {
@@ -100,7 +100,7 @@ public sealed partial class BranchModelPlugin
         foreach( var repo in repos )
         {
             var info = Get( monitor, repo );
-            var b = info.GetClosestActiveBranch( name );
+            var b = info.GetClosestExistingBranch( name );
             if( b == null )
             {
                 monitor.Error( $"Missing root '{_namespace.Root.Name}' branch in '{repo.DisplayPath}'. Please create it or use 'ckli issue' to fix this." );

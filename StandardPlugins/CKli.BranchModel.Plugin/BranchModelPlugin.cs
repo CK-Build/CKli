@@ -25,7 +25,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         var configElement = primaryContext.Configuration.XElement;
         _namespace = new BranchNamespace( World.Name.LTSName,
                                           configElement.Attribute( XNames.MainLine )?.Value,
-                                          configElement );
+                                          configElement.Elements( XNames.Explo ) );
         _autoFixUselessBranch = (bool?)configElement.Attribute( XNames.AutoFixUselessBranch ) ?? true;
         World.Events.Issue += IssueRequested;
         _shallowSolution = shallowSolution;
@@ -97,8 +97,8 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         if( !_namespace.ByName.TryGetValue( branchName, out var exists ) )
         {
             monitor.Error( $"""
-                Invalid branch '{branchName}'.
-                Supported branches are '{_namespace.Branches.Select( b => b.Name ).Concatenate( "', '" )}'.
+                Invalid opened branch '{branchName}'.
+                Opened branches are '{_namespace.Branches.Select( b => b.Name ).Concatenate( "', '" )}'.
                 """ );
         }
         return exists;
