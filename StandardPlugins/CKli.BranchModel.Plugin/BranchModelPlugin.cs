@@ -85,26 +85,6 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     public event Action<ContentIssueEvent>? ContentIssue;
 
     /// <summary>
-    /// Finds the <paramref name="branchName"/> in the <see cref="BranchNamespace"/> or emits an error
-    /// if this is not a valid name.
-    /// </summary>
-    /// <param name="monitor">The monitor to emit the error.</param>
-    /// <param name="branchName">The branch name to lookup.</param>
-    /// <returns>The name or null on error.</returns>
-    public BranchName? GetValidBranchName( IActivityMonitor monitor, string branchName )
-    {
-        // If we are not on a known branch (defined by the Branch Model), give up.
-        if( !_namespace.ByName.TryGetValue( branchName, out var exists ) )
-        {
-            monitor.Error( $"""
-                Invalid opened branch '{branchName}'.
-                Opened branches are '{_namespace.Branches.Select( b => b.Name ).Concatenate( "', '" )}'.
-                """ );
-        }
-        return exists;
-    }
-
-    /// <summary>
     /// <see cref="BranchModelInfo"/> factory.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>

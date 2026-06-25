@@ -1,8 +1,12 @@
 using CK.Core;
+using CKli.Core;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.ComponentModel.DataAnnotations;
+using System.Data.Common;
 using System.Linq;
+using System.Numerics;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -23,6 +27,9 @@ public sealed partial class BranchNamespace
 
     /// <summary>
     /// Initializes a new namespace.
+    /// <para>
+    /// This constructor is public mainly for tests.
+    /// </para>
     /// </summary>
     /// <param name="ltsName">Optional <see cref="CKli.Core.WorldName.LTSName"/>.</param>
     /// <param name="sMainLine">
@@ -71,70 +78,8 @@ public sealed partial class BranchNamespace
                 byName.Add( b.Name, b );
             }
             mainLineCount = result.Count;
-            AddBranches( exploratories, ltsName, result, byName, parent: null );
+            AddExploBranches( exploratories, ltsName, result, byName, parent: null );
             branches = result.DrainToImmutable();
-
-
-            static void AddBranches( IEnumerable<XElement> exploratories,
-                                     string? ltsName,
-                                     ImmutableArray<BranchName>.Builder result,
-                                     Dictionary<string, BranchName> index,
-                                     BranchName? parent )
-            {
-                foreach( var e in exploratories )
-                {
-                    // The Parent name is required or rejected.
-                    var parentAttr = e.Attribute( XNames.Parent );
-                    if( parent == null )
-                    {
-                        var pName = (string?)parentAttr;
-                        parent = string.IsNullOrWhiteSpace( pName ) ? null : index.GetValueOrDefault( pName );
-                        if( parent == null )
-                        {
-                            throw new CKException( $"""Unable to find Parent="{pName}" parent branch in BranchModel configuration.""" );
-                        }
-                    }
-                    else if( parentAttr != null )
-                    {
-                        throw new CKException( $"""Unexpected Parent="..." attribute in BranchModel configuration (parent is '{parent}' branch).""" );
-                    }
-                    var name = (string?)e.Attribute( XNames.Name );
-                    if( string.IsNullOrWhiteSpace( name ) )
-                    {
-                        throw new CKException( $"""
-                            Expected Name="..." attribute in BranchModel configuration.
-                            """ );
-                    }
-                    // Handling Name="<linkType>name".
-                    // LinkType is optional (defaults to CI).
-                    var h = name.AsSpan();
-                    MatchLinkType( ref h, out var linkType );
-                    var hName = h;
-                    bool hasExplo = h.TryMatch( "explo/", StringComparison.Ordinal );
-                    if( !MatchBranchSegment( ref h, out var bName ) || h.Length > 0 )
-                    {
-                        throw new CKException( $"""
-                            Invalid exploratory branch Name attribute in BranchModel configuration.
-                            Expected a lowercase ASCII identifier (which may contain dash '-' or underscore '_'), got:
-                            {hName}
-                            """ );
-                    }
-                    name = new string( hName );
-                    if( !hasExplo ) name = "explo/" + name;
-                    if( ltsName != null ) name = ltsName + '/' + name;
-
-                    if( index.ContainsKey( name ) )
-                    {
-                        Throw.CKException( $"""
-                            Duplicate branch name '{name}' in BranchModel configuration:
-                            {e}
-                            """ );
-                    }
-                    var b = new BranchName( linkType, name, result.Count, parent );
-                    result.Add( b );
-                    index.Add( b.Name, b ); 
-                }
-            }
         }
 
         static List<(string BranchName, BranchLinkType Link)> ParseMainLine( string? configuration )
@@ -167,7 +112,7 @@ public sealed partial class BranchNamespace
             while( h.SkipWhiteSpaces() && h.Length > 0 )
             {
                 BranchLinkType linkType = BranchLinkType.CI;
-                if( !MatchLinkType( ref h, out linkType ) )
+                if( !h.TryMatchLinkTypeCode( out linkType ) )
                 {
                     throw new CKException( $"""
                         Unable to parse link type in BranchModel MainLine configuration.
@@ -199,6 +144,74 @@ public sealed partial class BranchNamespace
         _ltsName = ltsName;
     }
 
+    static void AddExploBranches( IEnumerable<XElement> exploratories,
+                                  string? ltsName,
+                                  ImmutableArray<BranchName>.Builder result,
+                                  Dictionary<string, BranchName> byName,
+                                  BranchName? parent )
+    {
+        foreach( var e in exploratories )
+        {
+            // The Parent name is required or rejected.
+            var parentAttr = e.Attribute( XNames.Parent );
+            if( parent == null )
+            {
+                var pName = (string?)parentAttr;
+                parent = string.IsNullOrWhiteSpace( pName ) ? null : byName.GetValueOrDefault( pName );
+                if( parent == null )
+                {
+                    throw new CKException( $"""Unable to find Parent="{pName}" parent branch in BranchModel configuration.""" );
+                }
+            }
+            else if( parentAttr != null )
+            {
+                throw new CKException( $"""Unexpected Parent="..." attribute in BranchModel configuration (parent is '{parent}' branch).""" );
+            }
+            var name = (string?)e.Attribute( XNames.Name );
+            if( string.IsNullOrWhiteSpace( name ) )
+            {
+                throw new CKException( $"""
+                            Expected Name="..." attribute in BranchModel configuration.
+                            """ );
+            }
+            // Handling Name="<linkType>name".
+            // LinkType is optional (defaults to CI).
+            var h = name.AsSpan();
+            h.TryMatchLinkTypeCode( out var linkType );
+            if( linkType == BranchLinkType.None ) linkType = BranchLinkType.CI;
+            var hName = h;
+            bool hasLTSName = ltsName != null && h.TryMatch( ltsName, StringComparison.Ordinal ) && h.TryMatch( '/' );
+            bool hasExplo = h.TryMatch( "explo/", StringComparison.Ordinal );
+            if( !MatchBranchSegment( ref h, out var bName ) || h.Length > 0 )
+            {
+                throw new CKException( $"""
+                            Invalid exploratory branch Name attribute in BranchModel configuration.
+                            Expected a lowercase ASCII identifier (which may contain dash '-' or underscore '_'), got:
+                            {hName}
+                            """ );
+            }
+            if( !hasExplo || (ltsName != null && !hasLTSName) )
+            {
+                name = new string( hName );
+                if( !hasExplo ) name = "explo/" + name;
+                if( ltsName != null ) name = ltsName + '/' + name;
+            }
+
+            if( byName.ContainsKey( name ) )
+            {
+                Throw.CKException( $"""
+                            Duplicate branch name '{name}' in BranchModel configuration:
+                            {e}
+                            """ );
+            }
+            var b = new BranchName( linkType, name, result.Count, parent );
+            result.Add( b );
+            byName.Add( b.Name, b );
+            AddExploBranches( e.Elements( XNames.Explo ), ltsName, result, byName, b );
+        }
+    }
+
+
     BranchNamespace( string? ltsName,
                      ImmutableArray<BranchName> branches,
                      int mainLineCount,
@@ -209,31 +222,6 @@ public sealed partial class BranchNamespace
         _root = branches[0];
         _mainLineCount = mainLineCount;
         _byName = byName;
-    }
-
-    static bool MatchLinkType( ref ReadOnlySpan<char> h, out BranchLinkType t )
-    {
-        t = BranchLinkType.CI;
-        if( h.TryMatch( '|' ) )
-        {
-            t = h.TryMatch( '|' )
-                    ? BranchLinkType.None
-                    : BranchLinkType.Release;
-        }
-        else
-        {
-            var savedH = h;
-            bool full = h.TryMatch( '=' );
-            if( !full && !h.TryMatch( '-' )
-                || !h.TryMatch( '>' ) )
-            {
-                h = savedH;
-                return false;
-            }
-            t = full ? BranchLinkType.Full : BranchLinkType.CI;
-        }
-        h.SkipWhiteSpaces();
-        return true;
     }
 
     internal static bool MatchBranchSegment( ref ReadOnlySpan<char> h, out ReadOnlySpan<char> branchName )
@@ -273,17 +261,7 @@ public sealed partial class BranchNamespace
     /// </summary>
     /// <param name="name">The branch name.</param>
     /// <returns>The branch or null.</returns>
-    public BranchName? Find( string name ) => _byName.GetValueOrDefault( EnsureLTSPrefix( name ) );
-
-    string EnsureLTSPrefix( string name )
-    {
-        if( _ltsName != null
-            && (!name.StartsWith( _ltsName ) || name.Length <= _ltsName.Length + 1 || name[_ltsName.Length] != '/') )
-        {
-            name = $"{_ltsName}/{name}";
-        }
-        return name;
-    }
+    public BranchName? Find( string name ) => _byName.GetValueOrDefault( WorldName.EnsureLTSPrefix( _ltsName, name ) );
 
     /// <summary>
     /// Finds the <paramref name="branchName"/> in this <see cref="BranchNamespace"/> or emits an error
@@ -298,7 +276,7 @@ public sealed partial class BranchNamespace
         if( b == null )
         {
             monitor.Error( $"""
-                Invalid opened branch '{EnsureLTSPrefix( branchName )}'.
+                Invalid opened branch '{WorldName.EnsureLTSPrefix( _ltsName, branchName )}'.
                 Opened branches are '{_branches.Select( b => b.Name ).Concatenate( "', '" )}'.
                 """ );
         }
@@ -309,61 +287,27 @@ public sealed partial class BranchNamespace
     /// Creates a new namespace with a new or updated branch name.
     /// </summary>
     /// <param name="linkType">The link type.</param>
-    /// <param name="prerelease">The prerelease to consider. Must be between <see cref="CSVersionKind.Alpha"/> and <see cref="CSVersionKind.Zulu"/>.</param>
-    /// <returns>A new namespace.</returns>
-    public BranchNamespace AddOrUpdate( BranchLinkType linkType, CSVersionKind prerelease )
+    /// <param name="prerelease">
+    /// The prerelease to consider.
+    /// Must be between <see cref="CSVersionKind.Alpha"/> and <see cref="CSVersionKind.Zulu"/>.
+    /// </param>
+    /// <returns>The namespace and its updated branch name.</returns>
+    public (BranchNamespace, BranchName) AddOrUpdate( BranchLinkType linkType, CSVersionKind prerelease )
     {
         Throw.CheckArgument( prerelease is >= CSVersionKind.Alpha and <= CSVersionKind.Zulu );
 
-        var newByName = new Dictionary<string, BranchName>( _byName );
         var branchName = prerelease.ToPrerelease();
         if( _ltsName != null ) branchName = _ltsName + '/' + branchName;
 
-        BranchName? newB = null;
-        ImmutableArray<BranchName>.Builder? newBranches = null;
-        int iNewIndex = 0;
-        for( int i = 1; i < _mainLineCount; i++ )
-        {
-            var b = _branches[i];
-            int cmp = b.Name.CompareTo( branchName, StringComparison.Ordinal );
-            if( cmp == 0 )
-            {
-                if( linkType == b.LinkType ) return this;
-                newB = new BranchName( linkType, branchName, b.Index, b.Parent );
-                newByName[branchName] = newB;
-                return new BranchNamespace( _ltsName, _branches.SetItem( i, newB ), _mainLineCount, newByName );
-            }
-            if( cmp > 0 )
-            {
-                iNewIndex = i;
-                newB = new BranchName( linkType, branchName, i, _branches[i - 1] );
-                newBranches = ImmutableArray.CreateBuilder<BranchName>( _branches.Length + 1 );
-                newBranches.AddRange( _branches, i );
-                newBranches.Add( newB );
-                newByName.Add( branchName, newB );
-                while( i < _mainLineCount )
-                {
-                    var e = _branches[i];
-                    var newE = new BranchName( e.LinkType, e.Name, i + 1, newB );
-                    newBranches.Add( newE );
-                    newByName[e.Name] = newE;
-                    newB = newE;
-                    ++i;
-                }
-                break;
-            }
-        }
-        Throw.DebugAssert( newB != null && newBranches != null );
-        for( int i = _mainLineCount; i < _branches.Length; i++ )
-        {
-            var e = _branches[i];
-            Throw.DebugAssert( e.Name.StartsWith( "explo/" ) && e.Parent != null );
-            var parent = e.Parent.Index < iNewIndex ? e.Parent : newBranches[e.Parent.Index + 1];
-            var newE = new BranchName( e.LinkType, e.Name, i + 1, parent );
-            newBranches.Add( newE );
-            newByName[e.Name] = newE;
-        }
-        return new BranchNamespace( _ltsName, newBranches.MoveToImmutable(), _mainLineCount + 1, newByName );
+        return Rebuild( _ltsName,
+                        _root,
+                        _branches.Skip( 1 ).Take( _mainLineCount - 1 )
+                                 .Where( b => b.Name != branchName )
+                                 .Select( b => (b.LinkType, b.Name) )
+                                 .Append( (linkType, branchName) )
+                                 .OrderByDescending( e => e.Item2 ),
+                        _branches.Skip( _mainLineCount ).Select( b => (b.LinkType, b.Name, b.Parent!.Name) ),
+                        branchName );
     }
 
     /// <summary>
@@ -371,64 +315,41 @@ public sealed partial class BranchNamespace
     /// </summary>
     /// <param name="branchName">The "explo/name" branch name to add.</param>
     /// <param name="linkType">The optional link type Defaults to <see cref="BranchLinkType.CI"/> for a new branch.</param>
-    /// <param name="parent">The optional parent branch. Defaults to </param>
-    /// <returns>A new namespace.</returns>
-    public BranchNamespace AddOrUpdateExplo( string branchName, BranchLinkType? linkType = null, BranchName? parent = null )
+    /// <param name="parent">The optional parent branch. Defaults to the most instable opened prerelease branch for a new branch.</param>
+    /// <returns>The namespace and its updated branch name.</returns>
+    public (BranchNamespace, BranchName) AddOrUpdateExplo( string branchName, BranchLinkType? linkType = null, BranchName? parent = null )
     {
         Throw.CheckArgument( branchName.StartsWith( "explo/", StringComparison.Ordinal ) && ValidBranchSegment().IsMatch( branchName, 6 ) );
         Throw.CheckArgument( "BranchName mismatch.", parent == null || Branches[parent.Index] == parent );
 
         if( _ltsName != null ) branchName = _ltsName + '/' + branchName;
         if( _byName.TryGetValue( branchName, out var exists )
-            && exists.LinkType == linkType
-            && exists.Parent == parent )
+            && (linkType is null || exists.LinkType == linkType.Value)
+            && (parent is null || exists.Parent == parent) )
         {
-            return this;
+            return (this, exists);
         }
         if( exists != null )
         {
-            Throw.DebugAssert( exists.Parent != null );
-            BranchName newE;
-            if( parent == exists.Parent )
-            {
-                newE = new BranchName( linkType ?? exists.LinkType, branchName, exists.Index, parent );
-                var newByName = new Dictionary<string, BranchName>( _byName );
-                newByName[branchName] = newE;
-                return new BranchNamespace( _ltsName, _branches.SetItem( exists.Index, newE ), _mainLineCount, newByName );
-            }
-            return Remove( exists ).AddExplo( branchName, linkType ?? exists.LinkType, parent ?? exists.Parent );
-        }
-        return AddExplo( branchName, linkType ?? BranchLinkType.CI, parent ?? _root );
-    }
+            return Rebuild( _ltsName,
+                            _root,
+                            _branches.Skip( 1 ).Take( _mainLineCount - 1 )
+                                     .Select( b => (b.LinkType, b.Name) ),
+                            _branches.Skip( _mainLineCount )
+                                     .Where( b => b.Name != branchName )
+                                     .Select( b => (b.LinkType, b.Name, b.Parent!.Name) )
+                                     .Append( (linkType ?? exists.LinkType, branchName, (parent ?? exists.Parent)!.Name) ),
+                            branchName );
 
-    BranchNamespace AddExplo( string branchName, BranchLinkType linkType, BranchName parent )
-    {
-        BranchName newB;
-        if( parent.Index < _mainLineCount )
-        {
-            // The parent is a Conformant SVersion prerelease.
-            newB = new BranchName( linkType, branchName, _branches.Length, parent );
-            var newByName = new Dictionary<string, BranchName>( _byName ) { { branchName, newB } };
-            return new BranchNamespace( _ltsName, _branches.Add( newB ), _mainLineCount, newByName );
         }
-        // The parent is another "explo/".
-        var newBranches = ImmutableArray.CreateBuilder<BranchName>( _branches.Length + 1 );
-        newBranches.AddRange( _branches, parent.Index + 1 );
-        newB = new BranchName( linkType, branchName, newBranches.Count, parent );
-        newBranches.Add( newB );
-        for( int i = parent.Index + 1; i < _branches.Length; i++ )
-        {
-            var b = _branches[i];
-            Throw.DebugAssert( "We are not on the root.", b.Parent != null );
-            int parentIndex = b.Parent.Index;
-            if( parentIndex >= newB.Index )
-            {
-                ++parentIndex;
-            }
-            newBranches.Add( new BranchName( b.LinkType, b.Name, b.Index + 1, newBranches[parentIndex] ) );
-        }
-        var branches = newBranches.MoveToImmutable();
-        return new BranchNamespace( _ltsName, branches, _mainLineCount, branches.ToDictionary( b => b.Name ) );
+        return Rebuild( _ltsName,
+                        _root,
+                        _branches.Skip( 1 ).Take( _mainLineCount - 1 )
+                                 .Select( b => (b.LinkType, b.Name) ),
+                        _branches.Skip( _mainLineCount )
+                                 .Select( b => (b.LinkType, b.Name, b.Parent!.Name) )
+                                 .Append( (linkType ?? BranchLinkType.CI, branchName, (parent ?? _branches[_mainLineCount-1]).Name) ),
+                        branchName );
     }
 
     /// <summary>
@@ -440,28 +361,108 @@ public sealed partial class BranchNamespace
     {
         Throw.CheckArgument( "Root branch cannot be removed.", branchName.Parent != null );
         Throw.CheckArgument( "BranchName mismatch.", Branches[branchName.Index] == branchName );
-        var newBranches = ImmutableArray.CreateBuilder<BranchName>( _branches.Length - 1 );
-        newBranches.AddRange( _branches, branchName.Index );
-        for( int i = branchName.Index + 1; i < _branches.Length; i++ )
-        {
-            var b = _branches[i];
-            Throw.DebugAssert( "We are not on the root.", b.Parent != null );
-            int parentIndex = b.Parent.Index;
-            if( parentIndex > branchName.Index )
-            {
-                --parentIndex;
-                Throw.DebugAssert( parentIndex >= 0 );
-            }
-            else if( parentIndex == branchName.Index )
-            {
-                parentIndex = b.Parent.Parent?.Index ?? 0;
-            }
-            var newB = new BranchName( b.LinkType, b.Name, b.Index - 1, newBranches[parentIndex] );
-            newBranches.Add( newB );
-        }
-        int mainLineCount = _mainLineCount < branchName.Index ? _mainLineCount - 1 : _mainLineCount;
-        var branches = newBranches.MoveToImmutable();
-        return new BranchNamespace( _ltsName, branches, mainLineCount, branches.ToDictionary( b => b.Name ) );
+
+        return Rebuild( _ltsName,
+                        _root,
+                        _branches.Skip( 1 ).Take( _mainLineCount - 1 ).Where( b => b != branchName ).Select( b => (b.LinkType, b.Name)),
+                        _branches.Skip( _mainLineCount ).Where( b => b != branchName ).Select( b => (b.LinkType, b.Name, b.Parent!.Name) ) );
     }
 
+    static (BranchNamespace,BranchName) Rebuild( string? ltsName,
+                                                 BranchName root,
+                                                 IEnumerable<(BranchLinkType T, string N)> mainLine,
+                                                 IEnumerable<(BranchLinkType T, string N, string P)> exploratories,
+                                                 string returnedBranchName )
+    {
+        var ns = Rebuild( ltsName, root, mainLine, exploratories );
+        return (ns, ns._byName[returnedBranchName]);
+    }
+
+
+    static BranchNamespace Rebuild( string? ltsName,
+                                    BranchName root,
+                                    IEnumerable<(BranchLinkType T, string N)> mainLine,
+                                    IEnumerable<(BranchLinkType T, string N, string P)> exploratories )
+    {
+        var byName = new Dictionary<string, BranchName>() { { root.Name, root } };
+        var branches = ImmutableArray.CreateBuilder<BranchName>();
+        branches.Add( root );
+        var previous = root;
+        int mainLineCount = 1;
+        foreach( var (type, name) in mainLine )
+        {
+            Throw.DebugAssert( ltsName == null
+                               || name.StartsWith( ltsName )
+                                  && name.Length > ltsName.Length + 1
+                                  && name[ltsName.Length] == '/'
+                                  && CSVersionKindExtensions.TryParse( name.AsSpan( ltsName.Length + 1 ), out _, StringComparison.Ordinal ) );
+            var newM = new BranchName( type, name, branches.Count, previous );
+            previous = newM;
+            branches.Add( newM );
+            byName.Add( newM.Name, newM );
+            ++mainLineCount;
+        }
+
+        // To handle the exploratories, instead of reinventing an intermediate tree structure, we use
+        // the XElement structure and reuse the AddExploBranches method.
+        //
+        // This is not really efficient but be really don't care.
+        // First, there's few chances to use sub explo branches.
+        // Second, this orders/groups the exploratory branches under their parents: the configuration rewriting is optimized,
+        // the read will be efficient and this is what matters, not the mutation of the branch model.
+        //
+        List<XElement> roots = new List<XElement>();
+
+        static XElement? Find( List<XElement> roots, string name )
+        {
+            return roots.DescendantsAndSelf( XNames.Explo ).FirstOrDefault( e => (string?)e.Attribute(XNames.Name) == name );
+        }
+
+        // Populates the roots and collects sub explo branches (if any).
+        List<(BranchLinkType T, string N, string P)>? sub = null;
+        foreach( var (type,name,parentName) in exploratories )
+        {
+            var h = name.AsSpan();
+            bool hasLTSName = ltsName != null && h.TryMatch( ltsName, StringComparison.Ordinal ) && h.TryMatch( '/' );
+            if( h.TryMatch( "explo/", StringComparison.Ordinal ) )
+            {
+                sub ??= new List<(BranchLinkType T, string N, string P)>();
+                sub.Add( (type, name, parentName) );
+            }
+            else
+            {
+                var parent = root.Name == parentName
+                                ? root
+                                : branches.First( b => b.Name.CompareTo( parentName, StringComparison.Ordinal ) <= 0 );
+                roots.Add( new XElement( XNames.Explo, new XAttribute( XNames.Name, $"{type.ToCodeString()} {name}" ),
+                                                        new XElement( XNames.Parent, parent.Name ) ) );
+            }
+        }
+        if( sub != null )
+        {
+            // Process the sub explo branches until all of them are anchored.
+            do
+            {
+                bool atLeastOne = false;
+                for( int i = sub.Count - 1; i >= 0; i-- )
+                {
+                    var candidate = sub[i];
+                    var parent = Find( roots, candidate.P );
+                    if( parent != null )
+                    {
+                        parent.Add( new XElement( XNames.Explo, new XAttribute( XNames.Name, $"{candidate.T.ToCodeString()} {candidate.N}" ) ) );
+                        sub.RemoveAt( sub.Count - 1 );
+                        atLeastOne = true;
+                    }
+                }
+                // Avoid forever loop if something's wrong in the code. This should NEVER happen.
+                Throw.CheckState( "Internal error: exploratory branch parent not found.", atLeastOne );
+            }
+            while( sub.Count > 0 );
+        }
+
+        AddExploBranches( roots, ltsName, branches, byName, null );
+
+        return new BranchNamespace( ltsName, branches.DrainToImmutable(), mainLineCount, byName );
+    }
 }

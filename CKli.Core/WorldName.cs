@@ -65,6 +65,14 @@ public partial class WorldName : IEquatable<WorldName>
     }
 
     /// <summary>
+    /// Ensure that <paramref name="name"/> starts with "<see cref="LTSName"/>/" (case sensitive)
+    /// when LTSName is not null.
+    /// </summary>
+    /// <param name="name">The name (typically a branch or folder name).</param>
+    /// <returns>The "LTSName/" prefixed name.</returns>
+    public string EnsureLTSPrefix( string name ) => EnsureLTSPrefix( _ltsName, name );
+
+    /// <summary>
     /// Tries to parse a full name of a world.
     /// </summary>
     /// <param name="fullName">The full name to parse.</param>
@@ -164,6 +172,25 @@ public partial class WorldName : IEquatable<WorldName>
     /// <param name="name">Name to test.</param>
     /// <returns>True if the name is a valid LTS name.</returns>
     public static bool IsValidLTSName( ReadOnlySpan<char> name ) => ValidLTSName().IsMatch( name );
+
+    /// <summary>
+    /// Reusable helper. Ensure that <paramref name="name"/> starts with "<paramref name="ltsName"/>/" (case sensitive)
+    /// when ltsName is not null.
+    /// </summary>
+    /// <param name="ltsName">The optional Long Term Support name.</param>
+    /// <param name="name">The name (typically a branch or folder name).</param>
+    /// <returns>The "ltsName/" prefixed name.</returns>
+    public static string EnsureLTSPrefix( string? ltsName, string name )
+    {
+        if( ltsName != null
+            && (!name.StartsWith( ltsName, StringComparison.Ordinal )
+                || name.Length <= ltsName.Length + 1
+                || name[ltsName.Length] != '/') )
+        {
+            name = $"{ltsName}/{name}";
+        }
+        return name;
+    }
 
     [GeneratedRegex( "[a-zA-Z][0-9a-zA-Z_-]+", RegexOptions.CultureInvariant )]
     private static partial Regex ValidRepoName();
