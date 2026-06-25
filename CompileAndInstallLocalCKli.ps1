@@ -138,7 +138,7 @@ try
 
         Invoke-DotNet pack `
             $ckSVersionSolution `
-            -c Release
+            -c Debug
     }
 
     Invoke-Step "Publish CK.SVersion to local feed" {
@@ -190,7 +190,7 @@ try
 
         Invoke-DotNet pack `
             $ckliSolution `
-            -c Release
+            -c Debug
     }
 
     Invoke-Step "Populate local feed" {
@@ -201,7 +201,7 @@ try
             -File `
             -Filter "*.0.0.0-0.nupkg" |
         Where-Object {
-            $_.FullName -match '[\\/]bin[\\/]Release[\\/]' `
+            $_.FullName -match '[\\/]bin[\\/]Debug[\\/]' `
             -and $_.FullName -notmatch '[\\/]Tests[\\/]'
         } |
         ForEach-Object {
