@@ -270,7 +270,7 @@ public sealed partial class BranchNamespace
     /// <param name="monitor">The monitor to emit the error.</param>
     /// <param name="branchName">The branch name to lookup.</param>
     /// <returns>The name or null on error.</returns>
-    public BranchName? Find( IActivityMonitor monitor, string branchName )
+    public BranchName? FindRequired( IActivityMonitor monitor, string branchName )
     {
         var b = Find( branchName );
         if( b == null )

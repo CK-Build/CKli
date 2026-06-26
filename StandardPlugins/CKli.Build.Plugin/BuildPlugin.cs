@@ -323,7 +323,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             monitor.Info( ScreenType.CKliScreenTag, $"Selecting --branch '{branch}'." );
         }
         // If we are not on a known branch (defined by the Branch Model), give up.
-        var branchName = _branchModel.GetValidBranchName( monitor, branch );
+        var branchName = _branchModel.BranchNamespace.FindRequired( monitor, branch );
         if( branchName == null )
         {
             return null;

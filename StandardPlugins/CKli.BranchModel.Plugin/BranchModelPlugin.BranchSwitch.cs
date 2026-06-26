@@ -38,7 +38,7 @@ public sealed partial class BranchModelPlugin
 
         bool isDevName = branchName.StartsWith( "dev/" );
         if( isDevName ) branchName = branchName.Substring( 4 );
-        var name = GetValidBranchName( monitor, branchName );
+        var name = _namespace.FindRequired( monitor, branchName );
         if( name == null ) return false;
 
         if( !GetClosestActiveBranches( monitor, repos, name, out var closestActive ) )

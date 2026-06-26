@@ -43,7 +43,7 @@ public sealed partial class BranchModelPlugin
 
         var existingGitBranch = repo.GitRepository.GetBranch( monitor, normalizedBranchName, LogLevel.None );
         // For explo branch, the checked out branch must be an opened one.
-        var parent = _namespace.Find( monitor, repo.GitStatus.CurrentBranchName );
+        var parent = _namespace.FindRequired( monitor, repo.GitStatus.CurrentBranchName );
         if( parent == null ) return false;
 
         return true;
