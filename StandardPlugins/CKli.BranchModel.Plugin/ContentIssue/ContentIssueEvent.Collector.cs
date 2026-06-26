@@ -1,8 +1,10 @@
 using CK.Core;
 using CKli.Core;
 using LibGit2Sharp;
+using Microsoft.Extensions.FileProviders;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace CKli.BranchModel.Plugin;
@@ -155,6 +157,33 @@ public sealed partial class ContentIssueEvent
             _updateFiles.Add( new EnsureBinaryFileIssue( path, content, create: false ) );
             ++_issueCount;
         }
+
+        /// <summary>
+        /// Checks the <see cref="FileInfo.Name"/> of a file that must exist against the exact case of the file name
+        /// in <paramref name="path"/> and if they differ, calls <see cref="MoveFile(NormalizedPath, NormalizedPath)"/>.
+        /// <para>
+        /// The renaming is done first: calls to <see cref="UpdateFile(NormalizedPath, Func{string})"/> are executed after the move.
+        /// </para>
+        /// </summary>
+        /// <param name="path">The file path relative to the repository root of the existing file.</param>
+        /// <param name="info">Existing file info.</param>
+        /// <returns>True if <see cref="MoveFile"/> has been called, false otherwise.</returns>
+        public bool CheckExistingFileCase( string path, IFileInfo info )
+        {
+            Throw.CheckArgument( info.Exists );
+            Throw.CheckArgument( "The existing file name must be the case-insensitive path.",
+                                  Path.GetFileName( path.AsSpan() ).Equals( info.Name, StringComparison.OrdinalIgnoreCase ) );
+            if( !Path.GetFileName( path.AsSpan() ).Equals( info.Name, StringComparison.Ordinal ) )
+            {
+                // MoveFile expects 2 different (case sensitive) paths, so we build the "bad current one".
+                var badCaseSourcePath = new NormalizedPath( path ).RemoveLastPart().AppendPart( info.Name );
+                MoveFile( badCaseSourcePath, path );
+                return true;
+            }
+            return false;
+        }
+
+
 
         internal IRenderable AppendManualDescription( IRenderable r )
         {

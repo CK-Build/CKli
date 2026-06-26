@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
+using Microsoft.Extensions.FileProviders;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -16,7 +17,6 @@ namespace CKli.CommonFiles.Plugin;
 public sealed class CommonFilesPlugin : PrimaryPluginBase
 {
     readonly BranchModelPlugin _branchModel;
-    readonly HashSet<string> _memorySet;
     NormalizedPath _commonFolder;
     List<(string SourcePath, string RelativeTargetPath, FileType Action)>? _folderContent;
 
@@ -29,7 +29,6 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         : base( primaryContext )
     {
         _branchModel = branchModel;
-        _memorySet = new HashSet<string>();
         _branchModel.ContentIssue += ContentIssueRequested;
     }
 
@@ -47,18 +46,19 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
                                     ? (_commonFolder = PrimaryPluginContext.World.Name.SharedDataFolder.AppendPart( "Common" ))
                                     : _commonFolder;
 
-    List<(string SourcePath, string RelativeTargetPath, FileType Action)> GetFolderContent( IActivityMonitor monitor ) => _folderContent ??= ReadCommonFolder( monitor, CommonFolder );
+    List<(string SourcePath, string RelativeTargetPath, FileType Action)> GetFolderContent( IActivityMonitor monitor ) => _folderContent ??= ReadCommonFolder( CommonFolder );
 
     void ContentIssueRequested( ContentIssueEvent ev )
     {
         var content = GetFolderContent( ev.Monitor );
         foreach( var item in content )
         {
+            var target = item.RelativeTargetPath.Replace( "$SolutionName$", ev.Repo.DisplayPath.LastPart );
             switch( item.Action )
             {
-                case FileType.AlwaysCopy: CopyFile( ev, item.SourcePath, item.RelativeTargetPath ); break;
-                case FileType.InitOnly: InitializeFile( ev, item.SourcePath, item.RelativeTargetPath ); break;
-                case FileType.Template: HandleFileTemplate( ev, item.SourcePath, item.RelativeTargetPath ); break;
+                case FileType.AlwaysCopy: CopyFile( ev, item.SourcePath, target ); break;
+                case FileType.InitOnly: InitializeFile( ev, item.SourcePath, target ); break;
+                case FileType.Template: HandleFileTemplate( ev, item.SourcePath, target ); break;
             }
         }
     }
@@ -70,7 +70,7 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         Template
     }
 
-    static List<(string SourcePath, string RelativeTargetPath, FileType Action)> ReadCommonFolder( IActivityMonitor monitor, NormalizedPath commonFolder )
+    static List<(string SourcePath, string RelativeTargetPath, FileType Action)> ReadCommonFolder( NormalizedPath commonFolder )
     {
         var result = new List<(string, string, FileType)>();
         var root = Path.GetFullPath( commonFolder );
@@ -132,9 +132,13 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         {
             ev.Issues.CreateFile( relativeTargetPath, () => fileContent );
         }
-        else if( !fileContent.SequenceEqual( info.ReadAsBytes() ) )
+        else
         {
-            ev.Issues.UpdateFile( relativeTargetPath, () => fileContent );
+            ev.Issues.CheckExistingFileCase( relativeTargetPath, info );
+            if( !fileContent.SequenceEqual( info.ReadAsBytes() ) )
+            {
+                ev.Issues.UpdateFile( relativeTargetPath, () => fileContent );
+            }
         }
     }
 
@@ -148,7 +152,14 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         }
         else
         {
-            ev.Monitor.Trace( $"Common file '{relativeTargetPath}' already exists, [InitOnly] left it as-is." );
+            if( ev.Issues.CheckExistingFileCase( relativeTargetPath, info ) )
+            {
+                ev.Monitor.Info( $"Common file '{relativeTargetPath}' is [InitOnly], its content is fine but its name casing must be fixed." );
+            }
+            else
+            {
+                ev.Monitor.Trace( $"Common file '{relativeTargetPath}' already exists, [InitOnly] left it as-is." );
+            }
         }
     }
 
