@@ -134,7 +134,7 @@ public sealed partial class ContentIssueEvent
                     if( _create )
                     {
                         var dir = System.IO.Path.GetDirectoryName( p );
-                        if( !Directory.Exists( p ) ) Directory.CreateDirectory( p );
+                        if( !Directory.Exists( dir ) ) Directory.CreateDirectory( dir );
                         monitor.Trace( $"Creating file '{_path}'." );
                     }
                     else
