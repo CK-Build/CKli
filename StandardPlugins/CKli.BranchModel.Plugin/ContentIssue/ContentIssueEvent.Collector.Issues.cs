@@ -130,8 +130,18 @@ public sealed partial class ContentIssueEvent
             {
                 try
                 {
-                    monitor.Trace( $"Updating file '{_path}'." );
-                    WriteFile( repo.WorkingFolder.Combine( _path ) );
+                    var p = repo.WorkingFolder.Combine( _path );
+                    if( _create )
+                    {
+                        var dir = System.IO.Path.GetDirectoryName( p );
+                        if( !Directory.Exists( p ) ) Directory.CreateDirectory( p );
+                        monitor.Trace( $"Creating file '{_path}'." );
+                    }
+                    else
+                    {
+                        monitor.Trace( $"Updating file '{_path}'." );
+                    }
+                    WriteFile( p );
                     return true;
                 }
                 catch( Exception ex )
