@@ -7,6 +7,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Data.Common;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -64,21 +65,26 @@ public sealed partial class BranchNamespace
             e.MoveNext();
             // root branch.
             var name = e.Current.BranchName;
-            if( ltsName != null ) name = ltsName + '/' + name;
+            int ltsPrefixLength = 0;
+            if( ltsName != null )
+            {
+                name = ltsName + '/' + name;
+                ltsPrefixLength = ltsName.Length + 1;
+            }
 
-            var b = new BranchName( BranchLinkType.None, name, 0, null );
+            var b = new BranchName( ltsPrefixLength, BranchLinkType.None, name, 0, null );
             result.Add( b );
             byName.Add( b.Name, b );
             while( e.MoveNext() )
             {
                 name = e.Current.BranchName;
                 if( ltsName != null ) name = ltsName + '/' + name;
-                b = new BranchName( e.Current.Link, name, b.Index + 1, b );
+                b = new BranchName( ltsPrefixLength, e.Current.Link, name, b.Index + 1, b );
                 result.Add( b );
                 byName.Add( b.Name, b );
             }
             mainLineCount = result.Count;
-            AddExploBranches( exploratories, ltsName, result, byName, parent: null );
+            AddExploBranches( ltsPrefixLength, exploratories, ltsName, result, byName, parent: null );
             branches = result.DrainToImmutable();
         }
 
@@ -144,7 +150,8 @@ public sealed partial class BranchNamespace
         _ltsName = ltsName;
     }
 
-    static void AddExploBranches( IEnumerable<XElement> exploratories,
+    static void AddExploBranches( int ltsPrefixLength,
+                                  IEnumerable<XElement> exploratories,
                                   string? ltsName,
                                   ImmutableArray<BranchName>.Builder result,
                                   Dictionary<string, BranchName> byName,
@@ -178,6 +185,7 @@ public sealed partial class BranchNamespace
             // LinkType is optional (defaults to CI).
             var h = name.AsSpan();
             h.TryMatchLinkTypeCode( out var linkType );
+            h.SkipWhiteSpaces();
             if( linkType == BranchLinkType.None ) linkType = BranchLinkType.CI;
             var hName = h;
             bool hasLTSName = ltsName != null && h.TryMatch( ltsName, StringComparison.Ordinal ) && h.TryMatch( '/' );
@@ -194,7 +202,10 @@ public sealed partial class BranchNamespace
             {
                 name = new string( hName );
                 if( !hasExplo ) name = "explo/" + name;
-                if( ltsName != null ) name = ltsName + '/' + name;
+                if( ltsName != null )
+                {
+                    name = ltsName + '/' + name;
+                }
             }
 
             if( byName.ContainsKey( name ) )
@@ -204,10 +215,10 @@ public sealed partial class BranchNamespace
                             {e}
                             """ );
             }
-            var b = new BranchName( linkType, name, result.Count, parent );
+            var b = new BranchName( ltsPrefixLength, linkType, name, result.Count, parent );
             result.Add( b );
             byName.Add( b.Name, b );
-            AddExploBranches( e.Elements( XNames.Explo ), ltsName, result, byName, b );
+            AddExploBranches( ltsPrefixLength, e.Elements( XNames.Explo ), ltsName, result, byName, b );
         }
     }
 
@@ -284,6 +295,18 @@ public sealed partial class BranchNamespace
     }
 
     /// <summary>
+    /// Finds the <paramref name="branchName"/> in this <see cref="BranchNamespace"/> or throws an <see cref="InvalidOperationException"/>.
+    /// </summary>
+    /// <param name="branchName">The branch name to lookup.</param>
+    /// <returns>The name.</returns>
+    public BranchName FindRequired( string branchName )
+    {
+        var b = Find( branchName );
+        if( b == null ) Throw.InvalidOperationException( $"Branch '{branchName}' doesn't exist." );
+        return b;
+    }
+
+    /// <summary>
     /// Creates a new namespace with a new or updated branch name.
     /// </summary>
     /// <param name="linkType">The link type.</param>
@@ -348,7 +371,7 @@ public sealed partial class BranchNamespace
                                  .Select( b => (b.LinkType, b.Name) ),
                         _branches.Skip( _mainLineCount )
                                  .Select( b => (b.LinkType, b.Name, b.Parent!.Name) )
-                                 .Append( (linkType ?? BranchLinkType.CI, branchName, (parent ?? _branches[_mainLineCount-1]).Name) ),
+                                 .Append( (linkType ?? BranchLinkType.CI, branchName, (parent ?? _branches[_mainLineCount - 1]).Name) ),
                         branchName );
     }
 
@@ -364,11 +387,11 @@ public sealed partial class BranchNamespace
 
         return Rebuild( _ltsName,
                         _root,
-                        _branches.Skip( 1 ).Take( _mainLineCount - 1 ).Where( b => b != branchName ).Select( b => (b.LinkType, b.Name)),
+                        _branches.Skip( 1 ).Take( _mainLineCount - 1 ).Where( b => b != branchName ).Select( b => (b.LinkType, b.Name) ),
                         _branches.Skip( _mainLineCount ).Where( b => b != branchName ).Select( b => (b.LinkType, b.Name, b.Parent!.Name) ) );
     }
 
-    static (BranchNamespace,BranchName) Rebuild( string? ltsName,
+    static (BranchNamespace, BranchName) Rebuild( string? ltsName,
                                                  BranchName root,
                                                  IEnumerable<(BranchLinkType T, string N)> mainLine,
                                                  IEnumerable<(BranchLinkType T, string N, string P)> exploratories,
@@ -395,8 +418,8 @@ public sealed partial class BranchNamespace
                                || name.StartsWith( ltsName )
                                   && name.Length > ltsName.Length + 1
                                   && name[ltsName.Length] == '/'
-                                  && CSVersionKindExtensions.TryParse( name.AsSpan( ltsName.Length + 1 ), out _, StringComparison.Ordinal ) );
-            var newM = new BranchName( type, name, branches.Count, previous );
+                                  && CSVersionKindExtensions.TryParse( name.AsSpan( root._ltsPrefixLength ), out _, StringComparison.Ordinal ) );
+            var newM = new BranchName( root._ltsPrefixLength, type, name, branches.Count, previous );
             previous = newM;
             branches.Add( newM );
             byName.Add( newM.Name, newM );
@@ -415,12 +438,12 @@ public sealed partial class BranchNamespace
 
         static XElement? Find( List<XElement> roots, string name )
         {
-            return roots.DescendantsAndSelf( XNames.Explo ).FirstOrDefault( e => (string?)e.Attribute(XNames.Name) == name );
+            return roots.DescendantsAndSelf( XNames.Explo ).FirstOrDefault( e => (string?)e.Attribute( XNames.Name ) == name );
         }
 
         // Populates the roots and collects sub explo branches (if any).
         List<(BranchLinkType T, string N, string P)>? sub = null;
-        foreach( var (type,name,parentName) in exploratories )
+        foreach( var (type, name, parentName) in exploratories )
         {
             var h = name.AsSpan();
             bool hasLTSName = ltsName != null && h.TryMatch( ltsName, StringComparison.Ordinal ) && h.TryMatch( '/' );
@@ -461,8 +484,53 @@ public sealed partial class BranchNamespace
             while( sub.Count > 0 );
         }
 
-        AddExploBranches( roots, ltsName, branches, byName, null );
+        AddExploBranches( root._ltsPrefixLength, roots, ltsName, branches, byName, null );
 
         return new BranchNamespace( ltsName, branches.DrainToImmutable(), mainLineCount, byName );
     }
+
+    /// <summary>
+    /// Gets the branches that correspond to the <see cref="Root"/> and <see cref="CSVersionKind"/> prereleases as a string.
+    /// </summary>
+    /// <returns>The mainline.</returns>
+    public string GetMainLine()
+    {
+        if( _mainLineCount == 1 ) return _branches[0].Name;
+        var sb = new StringBuilder( Root.Name );
+        for( int i = 1; i < _mainLineCount; i++ )
+        {
+            var b = _branches[i];
+            sb.Append( ' ' ).Append( b.LinkType.ToCodeString() ).Append( ' ' ).Append( _branches[i].Name );
+        }
+        return sb.ToString();
+    }
+
+    public IEnumerable<XElement> GetExplo()
+    {
+        int nbExplo = _branches.Length - _mainLineCount;
+        if( nbExplo == 0 ) yield break;
+
+        var current = _branches[_mainLineCount];
+        Throw.DebugAssert( current.Parent != null );
+        var c = new XElement( XNames.Explo, new XAttribute( XNames.Parent, current.Parent.Name ) );
+        yield return c;
+        for( int i = _mainLineCount; i < _branches.Length; i++ )
+        {
+            var b = _branches[i];
+            Throw.DebugAssert( b.Parent != null );
+            bool isDirectChild = b.Parent == current;
+            var newC = new XElement( XNames.Explo, new XAttribute( XNames.Name, b.Name ), isDirectChild ? null : new XAttribute( XNames.Parent, b.Parent.Name ) );
+            if( isDirectChild )
+            {
+                newC.Add( c );
+            }
+            else
+            {
+                yield return c;
+                c = newC;
+            }
+        }
+
+    } 
+
 }

@@ -99,7 +99,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
             if( packageSender == null ) return Task.FromResult( false );
 
             var state = new PublishState( world );
-            var newOne = WorldReleaseInfo.Create( buildDate, roadmap );
+            var newOne = WorldReleaseInfo.Create( monitor, buildDate, roadmap );
             state.Add( monitor, newOne );
 
             var publisher = new SimplePublisher( state, packageSender, artifactHandler, versionTag );

@@ -14,12 +14,12 @@ public enum BranchLinkType
     None,
 
     /// <summary>
-    /// Manual, no propagation at all ("✋"): the "dev/" child branch must be manually updated.
+    /// Manual, no propagation at all ("|✋"): the "dev/" child branch must be manually updated.
     /// </summary>
     Manual,
 
     /// <summary>
-    /// Restricted propagation ("|"): the "dev/" child branch is synchronized with the parent branch (a stable or a prerelease
+    /// Restricted propagation ("|>"): the "dev/" child branch is synchronized with the parent branch (a stable or a prerelease
     /// must be built on the parent branch to impact the child).
     /// <para>
     /// Commits of stable or prerelease versions are merged into the "dev/" child branch. 
@@ -56,8 +56,8 @@ public static class BranchLinkTypeExtensions
     {
         BranchLinkType.Full => "=>",
         BranchLinkType.CI => "->",
-        BranchLinkType.Release => "|",
-        BranchLinkType.Manual => "✋",
+        BranchLinkType.Release => "|>",
+        BranchLinkType.Manual => "|✋",
         _ => ""
     };
 
@@ -69,29 +69,33 @@ public static class BranchLinkTypeExtensions
     /// <returns>True on success, false on error.</returns>
     public static bool TryMatchLinkTypeCode( this ref ReadOnlySpan<char> h, out BranchLinkType t )
     {
+        var savedH = h;
         t = BranchLinkType.None;
         if( h.TryMatch( '|' ) )
         {
-            t = BranchLinkType.Release;
-        }
-        else if( h.TryMatch( '✋' ) )
-        {
-            t = BranchLinkType.Manual;
-        }
-        else
-        {
-            var savedH = h;
-            bool full = h.TryMatch( '=' );
-            if( !full && !h.TryMatch( '-' )
-                || !h.TryMatch( '>' ) )
+            if( h.TryMatch('>') )
             {
-                h = savedH;
-                return false;
+                t = BranchLinkType.Release;
+                return true;
             }
-            t = full ? BranchLinkType.Full : BranchLinkType.CI;
+            if( h.TryMatch( '✋' ) )
+            {
+                t = BranchLinkType.Manual;
+                return true;
+            }
         }
-        h.SkipWhiteSpaces();
-        return true;
+        else if( h.TryMatch( "=>" ) )
+        {
+            t = BranchLinkType.Full;
+            return true;
+        }
+        else if( h.TryMatch( "->" ) )
+        {
+            t = BranchLinkType.CI;
+            return true;
+        }
+        h = savedH;
+        return false;
     }
 
 }

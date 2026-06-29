@@ -1,6 +1,8 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
+using CKli.BranchModel.Plugin;
 using CKli.Build.Plugin;
+using CKli.Core;
 using CKli.HotZone.Plugin;
 
 using System;
@@ -58,10 +60,11 @@ sealed class WorldReleaseInfo
     /// <summary>
     /// Creates from a <see cref="Roadmap"/>.
     /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
     /// <param name="buildDate">The build date to consider.</param>
     /// <param name="roadmap">The built roadmap.</param>
     /// <returns>A new world release.</returns>
-    internal static WorldReleaseInfo Create( DateTime buildDate, Roadmap roadmap )
+    internal static WorldReleaseInfo Create( IActivityMonitor monitor, DateTime buildDate, Roadmap roadmap )
     {
         var repoInfos = new RepoPublishInfo[roadmap.SolutionPublishCount];
         int publishedLength = 0;
@@ -70,12 +73,34 @@ sealed class WorldReleaseInfo
         {
             if( s.MustPublish )
             {
-                var branchName = roadmap.IsCIBuild
-                                    ? s.Solution.Branch.BranchName.DevName
-                                    : s.Solution.Branch.BranchName.Name;
-
                 var (version, tag, content) = s.GetFinalPublishInfo();
-                var r = new RepoPublishInfo( s.Repo, branchName, i, version, tag, content );
+                // The branch that will be pushed.
+                // We use the RepoPublishInfo.BranchPushRefSpecs here to have an atomic push with all the branches manipulation at once.
+                ImmutableArray<string> pushRefSpecs = [];
+                string branchName;
+                if( roadmap.IsCIBuild )
+                {
+                    branchName = s.Solution.Branch.BranchName.DevName;
+                    // We are publishing a CI: the regular branch MAY be new to the remote when the repository is a brand new one.
+                    var regularName = s.Solution.Branch.BranchName.Name;
+                    // Defensive programming: the regular branch should exist locally but we don't want to fail here.
+                    var b = s.Repo.GitRepository.GetBranch( monitor, regularName, LogLevel.Warn );
+                    if( b != null && b.TrackedBranch == null )
+                    {
+                        // The remote branch has not been found locally: we push it.
+                        monitor.Warn( $"Branch '{regularName}' has no tracked branch. Creating branch 'origin/{regularName}'." );
+                        b = s.Repo.GitRepository.Repository.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
+                        pushRefSpecs = [$"{b.CanonicalName}:{b.CanonicalName}"];
+                    }
+                }
+                else
+                {
+                    branchName = s.Solution.Branch.BranchName.Name;
+                    // We are publishing a non-CI: the regular branch will be pushed.
+                    // We also suppress its remote "dev/" branch (that has been integrated) by the build.
+                    pushRefSpecs = [$":refs/remotes/origin/{s.Solution.Branch.BranchName.DevName}" ];
+                }
+                var r = new RepoPublishInfo( s.Repo, branchName, i, version, tag, content, pushRefSpecs );
                 repoInfos[i++] = r;
                 publishedLength += r.PublishedLength;
             }

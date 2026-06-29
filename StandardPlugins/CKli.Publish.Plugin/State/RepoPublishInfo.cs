@@ -3,6 +3,7 @@ using CKli.Core;
 
 using CKli.ArtifactHandler.Plugin;
 using LibGit2Sharp;
+using System.Collections.Immutable;
 
 namespace CKli.Publish.Plugin;
 
@@ -14,6 +15,7 @@ sealed class RepoPublishInfo
     readonly SVersion _publishVersion;
     readonly Tag _publishTag;
     readonly BuildContentInfo _buildContentInfo;
+    readonly ImmutableArray<string> _branchPushRefSpecs;
 
     /// <summary>
     /// Gets the Repo.
@@ -22,6 +24,11 @@ sealed class RepoPublishInfo
 
     /// <summary>
     /// Gets the branch name. This is a "dev/XXX" branch when <see cref="WorldReleaseInfo.IsCIBuild"/> is true.
+    /// This is a "fix/v..." branch for the fix workflow.
+    /// <para>
+    /// This branch will be pushed with all the registered <see cref="GitRepository.DeferredPushRefSpecs"/> after
+    /// the draft release has been created on the remote (see <see cref="GitHostingProvider.CreateDraftReleaseAsync"/>).
+    /// </para>
     /// </summary>
     public string BranchName => _branchName;
 
@@ -51,23 +58,31 @@ sealed class RepoPublishInfo
     /// </summary>
     public Tag PublishTag => _publishTag;
 
+    /// <summary>
+    /// Gets the <see cref="GitRepository.DeferredPushRefSpecs"/> to add before pushing <see cref="BranchName"/>.
+    /// </summary>
+    public ImmutableArray<string> BranchPushRefSpecs => _branchPushRefSpecs;
+
     internal RepoPublishInfo( Repo repo,
                               string branchName,
                               int index,
                               SVersion publishVersion,
                               Tag publishTag,
-                              BuildContentInfo buildContentInfo )
+                              BuildContentInfo buildContentInfo,
+                              ImmutableArray<string> branchPushRefSpecs )
     {
+        Throw.DebugAssert( !branchPushRefSpecs.IsDefault );
         _repo = repo;
         _branchName = branchName;
         _index = index;
         _publishVersion = publishVersion;
         _publishTag = publishTag;
         _buildContentInfo = buildContentInfo;
+        _branchPushRefSpecs = branchPushRefSpecs;
     }
 
     internal RepoPublishInfo( int index, string branchName, BuildResult result )
-        : this( result.Repo, branchName, index, result.Version, result.VersionTag, result.Content )
+        : this( result.Repo, branchName, index, result.Version, result.VersionTag, result.Content, [] )
     {
     }
 }

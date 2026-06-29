@@ -167,29 +167,9 @@ sealed partial class SimplePublisher
         var releaseId = await _hostingProvider.CreateDraftReleaseAsync( monitor, _hostedRepoPath, versionedTag, cancel ).ConfigureAwait( false );
         if( releaseId != null )
         {
-            bool isCI = repo.PublishVersion.IsCI;
             // Draft release created. Push the branch(es) now.
-            // We use the DeferredPushRefSpecs here to have an atomic push with all the branches manipulation at once.
-            if( !isCI )
-            {
-                // We are publishing a non-CI: the regular branch will be pushed below: we also
-                // suppress its remote "dev/" branch (that has been integrated) by the build.
-                r.DeferredPushRefSpecs.Add( $":refs/remotes/origin/{BranchName.ToDevBranchName( repo.BranchName )}" );
-            }
-            else
-            {
-                // We are publishing a CI: the regular branch MAY be new to the remote when the repository is a brand new one.
-                var regularName = BranchName.ToRegularBranchName( repo.BranchName );
-                // Defensive programming: the regular branch must exist locally.
-                var b = r.GetBranch( monitor, regularName, CK.Core.LogLevel.Warn );
-                if( b != null && b.TrackedBranch == null )
-                {
-                    monitor.Warn( $"Branch '{regularName}' has no tracked branch. Creating branch 'origin/{regularName}'." );
-                    b = r.Repository.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
-                    r.DeferredPushRefSpecs.Add( $"{b.CanonicalName}:{b.CanonicalName}" );
-                }
-            }
-            // Pushes the branch (and may be remove the "dev/" one or push/create the regular one).
+            r.DeferredPushRefSpecs.AddRange( repo.BranchPushRefSpecs );
+            // Pushes the branch and the deferred ref specs (this may remove the "dev/" or push/create the regular branch).
             if( !r.PushBranch( monitor, branch, autoCreateRemoteBranch: true ) )
             {
                 // TODO:

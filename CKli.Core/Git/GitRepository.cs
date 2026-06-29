@@ -194,8 +194,9 @@ public sealed partial class GitRepository : IDisposable
     /// doesn't exist locally and in the "origin" remote.
     /// <para>
     /// If the remote "origin" exists, it is created locally and tracks the origin remote branch.
-    /// This supports the "Automatic Remote Origin Branch Association Strategy": any existing local branch (refs/heads/XXX) that is currently not tracking
-    /// and for which a "origin" branch ("refs/remotes/origin/XXX") exists is automatically configured to track it.
+    /// This supports the "Automatic Remote Origin Branch Association Strategy": any existing local branch (refs/heads/XXX) that is
+    /// currently not tracking and for which a "origin" branch ("refs/remotes/origin/XXX") exists is automatically configured to
+    /// track it.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>

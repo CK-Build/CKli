@@ -1,6 +1,7 @@
 using CK.Core;
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
@@ -80,12 +81,13 @@ sealed class CKliUpdate : Command
                 // The new PowerShell Core (based on .Net) is an opt-in.
                 // FYI, the cmd approach is insane (and not portable anyway).
                 // See https://stackoverflow.com/questions/22558869/wait-for-process-to-end-in-windows-batch-file
-                var cmd = $@"Wait-Process -Id {Environment.ProcessId} -Timeout 20 -ErrorAction SilentlyContinue; {updateCmd};echo ''";
+                var cmd = $@"Wait-Process -Id {Environment.ProcessId} -Timeout 20 -ErrorAction SilentlyContinue; {updateCmd}";
                 Process.Start( new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
                     Arguments = $"-NoProfile -NoLogo -NonInteractive -ExecutionPolicy unrestricted -command {cmd}",
-                    UseShellExecute = false
+                    UseShellExecute = false,
+                    WorkingDirectory = Path.GetTempPath()
                 } );
             }
             else if( RuntimeInformation.IsOSPlatform( OSPlatform.Linux ) || RuntimeInformation.IsOSPlatform( OSPlatform.OSX ) )
@@ -98,7 +100,8 @@ sealed class CKliUpdate : Command
                 {
                     FileName = "/bin/sh",
                     UseShellExecute = false,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetTempPath()
                 };
                 // Use ArgumentList to avoid .NET's argument parsing - pass arguments directly
                 psi.ArgumentList.Add( "-c" );
