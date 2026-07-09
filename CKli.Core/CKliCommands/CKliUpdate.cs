@@ -24,7 +24,8 @@ sealed class CKliUpdate : Command
                     (["--allow-downgrade"], """
                                             Allow package downgrade.
                                             Useful to come back to the last stable version when --prerelease has been used.
-                                            """)
+                                            """),
+                    (["--dry-run,-d"], "Only display the update command without launching it."),
                 ] )
     {
     }
@@ -37,6 +38,7 @@ sealed class CKliUpdate : Command
     {
         bool prerelease = cmdLine.EatFlag( "--prerelease" );
         bool stable = cmdLine.EatFlag( "--stable" );
+        bool dryRun = cmdLine.EatFlag( "--dry-run", "-d" );
         if( prerelease && stable )
         {
             monitor.Error( "Flags --prerelease and --stable cannot be both specified." );
@@ -67,11 +69,18 @@ sealed class CKliUpdate : Command
                 : "dotnet tool update CKli -g";
         if( allowDowngrade ) updateCmd += " --allow-downgrade";
         updateCmd += " --no-http-cache";
+        if( dryRun )
+        {
+            monitor.Info( ScreenType.CKliScreenTag, $"""
+            Currently installed '{info.Version}'. The command to update this CKli instance is:
+            {updateCmd}
+            """ );
+            return ValueTask.FromResult( true );
+        }
         monitor.Info( ScreenType.CKliScreenTag, $"""
             Currently installed '{info.Version}'. Will now execute after this CKli instance ends:
             {updateCmd}
             """ );
-
 
         try
         {
