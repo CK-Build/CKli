@@ -39,8 +39,10 @@ public sealed class BranchName
 
     /// <summary>
     /// Gets the index in <see cref="BranchNamespace.Branches"/>.
-    /// This follows the same pattern as the <see cref="CKli.Core.Repo.Index"/>: the <see cref="BranchModelInfo"/> uses this
+    /// <para>
+    /// This follows the same pattern as the <see cref="Repo.Index"/>: the <see cref="BranchModelInfo"/> uses this
     /// to associate the corresponding <see cref="HotBranch"/> in each repo.
+    /// </para>
     /// </summary>
     public int Index => _index;
 
@@ -49,7 +51,7 @@ public sealed class BranchName
     public BranchName? Parent => _parent;
 
     /// <summary>
-    /// Gets the link type that describes the relationships regarding the <see cref="ParentIndex"/>.
+    /// Gets the link type that describes the relationships with the <see cref="Parent"/>.
     /// </summary>
     public BranchLinkType LinkType => _linkType;
 
@@ -63,7 +65,7 @@ public sealed class BranchName
         var p = b.Parent;
         while( p != null )
         {
-            if( p ==  b ) return true;
+            if( p == b ) return true;
             p = p.Parent;
         }
         return false;

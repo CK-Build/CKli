@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.IO;
 
 namespace CKli.BranchModel.Plugin;
 
@@ -29,7 +30,7 @@ public enum BranchLinkType
 
     /// <summary>
     /// This is the default link ("->"): the "dev/" child branch is synchronized with the "dev/" parent branch but only on built commits
-    /// (a build or build --ci must be done on the parent branch to impact the child).
+    /// (a build or build --ci must be have been done on the parent branch to impact the child).
     /// <para>
     /// All versioned commits are merged into the "dev/" child branch. 
     /// </para>
@@ -64,7 +65,7 @@ public static class BranchLinkTypeExtensions
     /// <summary>
     /// Tries to match and forward the code for a <see cref="BranchLinkType"/>.
     /// </summary>
-    /// <param name="h">The head.</param>
+    /// <param name="h">This head.</param>
     /// <param name="t">The matched type.</param>
     /// <returns>True on success, false on error.</returns>
     public static bool TryMatchLinkTypeCode( this ref ReadOnlySpan<char> h, out BranchLinkType t )
@@ -98,4 +99,55 @@ public static class BranchLinkTypeExtensions
         return false;
     }
 
+
+
+    /// <summary>
+    /// Calls <see cref="TryMatchLinkType(ref ReadOnlySpan{char}, out BranchLinkType)"/> and
+    /// throws a <see cref="InvalidDataException"/> on failure.
+    /// </summary>
+    /// <param name="s">The string to parse.</param>
+    /// <returns>The link type (except <see cref="BranchLinkType.None"/>).</returns>
+    public static BranchLinkType ParseLinkType( ReadOnlySpan<char> s )
+    {
+        var h = s;
+        return TryMatchLinkType( ref h, out var t ) && h.IsEmpty
+                ? t
+                : throw new InvalidDataException( "Expected 'Manual', 'Release', 'CI', 'Full'." );
+    }
+
+    /// <summary>
+    /// Tries to parse "Manual", "Release", "CI", "Full".
+    /// </summary>
+    /// <param name="h">This head.</param>
+    /// <param name="t">The matched type.</param>
+    /// <returns>True on success, false on error.</returns>
+    public static bool TryMatchLinkType( this ref ReadOnlySpan<char> h, out BranchLinkType t )
+    {
+        if( h.TryMatch( "ci", StringComparison.OrdinalIgnoreCase ) )
+        {
+            t = BranchLinkType.CI;
+            h = h.Slice( 2 );
+            return true;
+        }
+        if( h.TryMatch( "full", StringComparison.OrdinalIgnoreCase ) )
+        {
+            t = BranchLinkType.Full;
+            h = h.Slice( 4 );
+            return true;
+        }
+        if( h.TryMatch( "release", StringComparison.OrdinalIgnoreCase ) )
+        {
+            t = BranchLinkType.Release;
+            h = h.Slice( 7 );
+            return true;
+        }
+        if( h.TryMatch( "manual", StringComparison.OrdinalIgnoreCase ) )
+        {
+            t = BranchLinkType.Manual;
+            h = h.Slice( 6 );
+            return true;
+        }
+        t = BranchLinkType.None;
+        return false;
+  }
 }
