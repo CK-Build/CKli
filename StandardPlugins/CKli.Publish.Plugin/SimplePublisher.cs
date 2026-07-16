@@ -1,6 +1,5 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
-using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
@@ -220,6 +219,7 @@ sealed partial class SimplePublisher
         {
             _artifactHandler.DestroyLocalRelease( monitor, repo.Repo, repo.PublishVersion, repo.BuildContentInfo, removeFromNuGetGlobalCache: false );
         }
+        monitor.Info( ScreenType.CKliScreenTag, $"Published {repo.BuildContentInfo.Produced.Length} packages of '{repo.Repo.DisplayPath}/{repo.PublishVersion}'." );
         return _state.ForwardPrimaryCursor( monitor, 1 );
     }
 

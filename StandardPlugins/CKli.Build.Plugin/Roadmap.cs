@@ -14,6 +14,15 @@ namespace CKli.Build.Plugin;
 
 /// <summary>
 /// Augments a <see cref="HotGraph"/> and its <see cref="HotGraph.Solution"/> with versions and build actions.
+/// <para>
+/// This roadmap, just like the graph, cannot compute the number of final packages that will be produced, only the
+/// number of solutions. The reason is that we don't require the IsPackable MSBuild flag to be defined, we consider
+/// it true if and only if a matching name is "package referenced" by any package in the stack. We require the
+/// IsPackable to be set if and only if we find an ambiguity (2 projects with the same name in the stack and that
+/// are "package referenced"). With this approach, a new package that is not (yet) referenced across the stack is
+/// not "seen" at this level: the real build must be done and <see cref="RepoArtifactInfo.PublishToNuGetLocalFeed(IActivityMonitor, SVersion, string, out ImmutableArray{string})"/>
+/// must have been called to know the real produced packages.
+/// </para>
 /// </summary>
 public sealed partial class Roadmap
 {
