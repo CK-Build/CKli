@@ -159,6 +159,35 @@ public sealed partial class BranchLink
                     : new BranchLink( newBranch, null, _aheadName, 0, 0 );
     }
 
+
+    /// <summary>
+    /// Refreshes the link, merging the base and dev branch origin's remote branches if they exist.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="repo">The repository.</param>
+    /// <param name="mergeTrackedError">True when merging a tracked branch failed.</param>
+    /// <returns>A refreshed link or null if <see cref="Branch"/> disappeared or if <paramref name="mergeTrackedError"/> is true.</returns>
+    public BranchLink? MergeTrackedBranches( IActivityMonitor monitor, GitRepository repo, out bool mergeTrackedError )
+    {
+        Throw.CheckArgument( repo.Repository == RepositoryOf( Branch ) );
+        mergeTrackedError = false;
+        var newBranch = repo.GetBranch( monitor, _branch.FriendlyName, LogLevel.None );
+        if( newBranch == null 
+            || (newBranch.TrackedBranch != null && (mergeTrackedError = !repo.MergeTrackedBranch( monitor, ref newBranch ))) )
+        {
+            return null;
+        }
+        var newAhead = repo.GetBranch( monitor, _aheadName, LogLevel.None );
+        if( newAhead != null && newAhead.TrackedBranch != null && (mergeTrackedError = !repo.MergeTrackedBranch( monitor, ref newAhead )) )
+        {
+            return null;
+        }
+        return newAhead != null
+                    ? Create( newBranch, newAhead )
+                    : new BranchLink( newBranch, null, _aheadName, 0, 0 );
+    }
+
+
     /// <summary>
     /// Collects this link's issue if any.
     /// IssueKind.Useless is an issue here because we are collecting the issues for the issue command

@@ -211,6 +211,97 @@ public sealed class HotBranch
         var gitBranch = Repo.GitRepository.EnsureIntegratedBranch( monitor, _name.Name, closest.GitBranch.Tip );
         return gitBranch != null && Refresh( monitor );
     }
+
+
+    public bool Synchronize( IActivityMonitor monitor, ITagCommitProvider commitProvider, BranchLinkType applyLink = BranchLinkType.None )
+    {
+        Throw.CheckState( Exists );
+        // Merge the tracked branches of the regular and the dev/ if they exist.
+        var l = _link.MergeTrackedBranches( monitor, Repo.GitRepository, out var mergeTrackedError );
+        if( l == null )
+        {
+            if( !mergeTrackedError )
+            {
+                monitor.Error( $"Branch '{_name}' in '{Repo.DisplayPath}' no more exists. Unable to synchronize it." );
+            }
+            return false;
+        }
+        // Merge the regular in the dev/ if needed.
+        l = l.SynchronizeAhead( monitor, Repo.GitRepository );
+        if( l == null )
+        {
+            return false;
+        }
+        // None => this configured link type.
+        if( applyLink == BranchLinkType.None )
+        {
+            applyLink = _name.LinkType;
+        }
+        // If type is independent from parent branches, we're done.
+        if( applyLink is BranchLinkType.None or BranchLinkType.Manual )
+        {
+            _link = l;
+            _gitDevBranch = l.Ahead;
+            return true;
+        }
+        // Full: We get the closest existing branch, synchronize it (origin remotes only)
+        //       and make sure that its "dev/" (or base) branch is integrated into this
+        //       branch.
+        //       If not, the "dev/" (or base) branch is merged into this "dev/" branch.
+        Throw.DebugAssert( _name.Parent != null );
+        var parent = _info.GetRequiredClosestExistingBranch( monitor, _name.Parent );
+        if( applyLink is BranchLinkType.Full )
+        {
+            if( parent == null )
+            {
+                return false;
+            }
+            Throw.DebugAssert( parent.Exists );
+            if( !parent.Synchronize( monitor, commitProvider, BranchLinkType.None ) )
+            {
+                return false;
+            }
+            var thisBranch = _gitDevBranch ?? GitBranch;
+            var parentBranch = parent.GitDevBranch ?? parent.GitBranch;
+            var d = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( parentBranch.Tip, thisBranch.Tip );
+            if( d.AheadBy is not 0 )
+            {
+                var dev = EnsureDevBranch();
+                if( !Repo.GitRepository.MergeBranch( monitor, ref dev, parentBranch )
+                    || !Refresh( monitor ) )
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        Throw.DebugAssert( applyLink is BranchLinkType.Release or BranchLinkType.CI );
+        // We must find the commit and make sure that it is integrated in this branch.
+        Throw.DebugAssert( _name.Parent != null );
+        Throw.DebugAssert( parent != null );
+
+        var tagCommit = commitProvider.GetCommit( monitor, parent,  )
+        if( applyLink is BranchLinkType.Release )
+        {
+
+        }
+        bool hasChanged = false;
+        Branch? b = _gitDevBranch;
+        if( b != null && b.TrackedBranch != null && !Repo.GitRepository.MergeTrackedBranch( monitor, ref b ) )
+        {
+            return false;
+        }
+        b = GitBranch;
+        if( b.TrackedBranch != null && !Repo.GitRepository.MergeTrackedBranch( monitor, ref b ) )
+        {
+            return false;
+        }
+
+        // When on the root "stable" there's nothing 
+        if( _name.Parent == null ) return true;
+        return true;
+    }
+
     /// <summary>
     /// Commits into this <see cref="BranchLink"/>. Development always takes place in the "dev/" branch,
     /// only <see cref="IntegrateDevBranch(IActivityMonitor)"/> can commit in the <see cref="GitBranch"/>.

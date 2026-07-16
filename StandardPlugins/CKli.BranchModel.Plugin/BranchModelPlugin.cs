@@ -2,8 +2,8 @@ using CK.Core;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using System;
-using System.Linq;
 using System.Runtime.InteropServices;
+using System.Xml.Linq;
 
 namespace CKli.BranchModel.Plugin;
 
@@ -14,7 +14,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     readonly bool _autoFixUselessBranch;
 
     /// <summary>
-    /// This is a primary plugin.
+    /// Reads the <see cref="BranchNamespace"/> from the <see cref="PrimaryPluginContext.Configuration"/>.
     /// </summary>
     /// <param name="primaryContext">The CKli plugin context.</param>
     /// <param name="shallowSolution">The shallow solution plugin.</param>
@@ -29,6 +29,22 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         _autoFixUselessBranch = (bool?)configElement.Attribute( XNames.AutoFixUselessBranch ) ?? true;
         World.Events.Issue += IssueRequested;
         _shallowSolution = shallowSolution;
+    }
+
+    /// <summary>
+    /// Updates the configuration with an updated <paramref name="ns"/>.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="ns">The new namespace to consider.</param>
+    /// <returns>True on success, false on error.</returns>
+    bool SaveBranchNamespace( IActivityMonitor monitor, BranchNamespace ns )
+    {
+        return PrimaryPluginContext.Configuration.Edit( monitor, ( monitor, e ) =>
+        {
+            e.SetAttributeValue( XNames.MainLine, ns.GetMainLine() );
+            e.Elements( XNames.Explo ).Remove();
+            e.Add( ns.GetExplo() );
+        } );
     }
 
     void IssueRequested( IssueEvent e )
@@ -90,17 +106,20 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="repo">The repository to consider.</param>
     /// <returns>The branch information for the repository.</returns>
-    protected override BranchModelInfo Create( IActivityMonitor monitor, Repo repo )
+    protected override BranchModelInfo Create( IActivityMonitor monitor, Repo repo ) => Create( monitor, repo, _namespace, _autoFixUselessBranch );
+
+    BranchModelInfo Create( IActivityMonitor monitor, Repo repo, BranchNamespace ns, bool autoFixUselessBranch )
     {
-        var info = new BranchModelInfo( repo, _namespace, this );
+        bool isCKliIssueCommand = PrimaryPluginContext.Command is CKliIssue;
+        // We don't want to auto fix when executing "ckli issue".
+        autoFixUselessBranch &= !isCKliIssueCommand;
+        var info = new BranchModelInfo( repo, ns, this );
         var git = repo.GitRepository.Repository;
 
-        bool autoFixUselessBranch = _autoFixUselessBranch && PrimaryPluginContext.Command is not CKliIssue;
-
-        var root = HotBranch.Create( monitor, info, repo.GitRepository, _namespace.Root );
+        var root = HotBranch.Create( monitor, info, repo.GitRepository, ns.Root );
         if( root.GitBranch == null )
         {
-            if( PrimaryPluginContext.Command is not CKliIssue )
+            if( !isCKliIssueCommand )
             {
                 monitor.Warn( $"Missing '{root.BranchName}' branch in '{repo.DisplayPath}'. Use 'ckli issue' for details." );
             }
@@ -110,11 +129,11 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         }
         // We have our hot root "stable" branch.
         bool hasIssue = root.HasIssue( monitor, autoFixUselessBranch );
-        var hotBranches = new HotBranch[_namespace.Branches.Length];
+        var hotBranches = new HotBranch[ns.Branches.Length];
         hotBranches[0] = root;
         for( int i = 1; i < hotBranches.Length; ++i )
         {
-            var branchName = _namespace.Branches[i];
+            var branchName = ns.Branches[i];
             var b = HotBranch.Create( monitor, info, repo.GitRepository, branchName );
             hasIssue |= b.HasIssue( monitor, autoFixUselessBranch );
             hotBranches[i] = b;

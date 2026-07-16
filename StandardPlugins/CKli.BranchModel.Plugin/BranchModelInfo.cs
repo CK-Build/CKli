@@ -75,6 +75,35 @@ public sealed partial class BranchModelInfo : RepoInfo
         return null;
     }
 
+    /// <summary>
+    /// Gets the closest <see cref="HotBranch"/> with a non null <see cref="HotBranch.GitBranch"/> in the <see cref="Namespace"/>
+    /// that is not <see cref="HotBranch.HasOrphanDevBranch"/> or emits an error.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="name">The branch name from which the closest existing branch must be found.</param>
+    /// <returns>The branch (that may be tne <paramref name="name"/> one) or null.</returns>
+    public HotBranch? GetRequiredClosestExistingBranch( IActivityMonitor monitor, BranchName name )
+    {
+        var b = GetClosestExistingBranch( name );
+        if( b == null )
+        {
+            monitor.Error( $"Missing root '{_namespace.Root.Name}' branch in '{Repo.DisplayPath}'. Please create it or use 'ckli issue' to fix this." );
+            return null;
+        }
+        // Stops on this issue because it will introduce an ambiguity.
+        // This applies only to a "real" closest branch (by design, if b is the requested name branch, it cannot has an orphan dev
+        // branch because its GitBranch exists).
+        if( b.BranchName != name && _branches[name.Index].HasOrphanDevBranch )
+        {
+            monitor.Error( $"""
+                    Branch '{name.DevName}' in '{Repo.DisplayPath}' exists but its base '{name.Name}' branch doesn't exist.
+                    Please remove '{name.DevName}' branch or use 'ckli issue' to fix this.
+                    """ );
+            return null;
+        }
+        return b;
+    }
+
     internal ShallowSolutionPlugin ShallowSolutionPlugin => _plugin._shallowSolution;
 
     /// <inheritdoc />

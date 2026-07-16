@@ -23,7 +23,7 @@ public enum BranchLinkType
     /// Restricted propagation ("|>"): the "dev/" child branch is synchronized with the parent branch (a stable or a prerelease
     /// must be built on the parent branch to impact the child).
     /// <para>
-    /// Commits of stable or prerelease versions are merged into the "dev/" child branch. 
+    /// Commits of stable or prerelease versions are merged into the "dev/" child branch, CI builds of the parent branch are ignored. 
     /// </para>
     /// </summary>
     Release,
@@ -126,25 +126,21 @@ public static class BranchLinkTypeExtensions
         if( h.TryMatch( "ci", StringComparison.OrdinalIgnoreCase ) )
         {
             t = BranchLinkType.CI;
-            h = h.Slice( 2 );
             return true;
         }
         if( h.TryMatch( "full", StringComparison.OrdinalIgnoreCase ) )
         {
             t = BranchLinkType.Full;
-            h = h.Slice( 4 );
             return true;
         }
         if( h.TryMatch( "release", StringComparison.OrdinalIgnoreCase ) )
         {
             t = BranchLinkType.Release;
-            h = h.Slice( 7 );
             return true;
         }
         if( h.TryMatch( "manual", StringComparison.OrdinalIgnoreCase ) )
         {
             t = BranchLinkType.Manual;
-            h = h.Slice( 6 );
             return true;
         }
         t = BranchLinkType.None;
