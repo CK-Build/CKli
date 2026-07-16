@@ -81,7 +81,7 @@ public sealed partial class BranchModelInfo : RepoInfo
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="name">The branch name from which the closest existing branch must be found.</param>
-    /// <returns>The branch (that may be tne <paramref name="name"/> one) or null.</returns>
+    /// <returns>The branch (that may be the <paramref name="name"/> one) or null.</returns>
     public HotBranch? GetRequiredClosestExistingBranch( IActivityMonitor monitor, BranchName name )
     {
         var b = GetClosestExistingBranch( name );

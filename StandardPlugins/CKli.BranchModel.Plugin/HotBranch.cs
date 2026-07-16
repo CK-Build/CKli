@@ -213,7 +213,18 @@ public sealed class HotBranch
     }
 
 
-    public bool Synchronize( IActivityMonitor monitor, ITagCommitProvider commitProvider, BranchLinkType applyLink = BranchLinkType.None )
+    /// <summary>
+    /// Ensures that this <see cref="GitBranch"/> and <see cref="GitDevBranch"/> are synchronized with their
+    /// remote origin counterparts (if any) and with the <see cref="BranchModelInfo.GetClosestExistingBranch(BranchName)"/>
+    /// according to <see cref="BranchName.LinkType"/>.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="commitProvider">
+    /// Required commit information provider to support <see cref="BranchLinkType.Release"/> and <see cref="BranchLinkType.CI"/>.
+    /// </param>
+    /// <param name="applyLink">Optional link type to consider. By default, this configured <see cref="BranchName.LinkType"/> is considered.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool Synchronize( IActivityMonitor monitor, ITagCommitProvider? commitProvider, BranchLinkType applyLink = BranchLinkType.None )
     {
         Throw.CheckState( Exists );
         // Merge the tracked branches of the regular and the dev/ if they exist.
@@ -244,24 +255,25 @@ public sealed class HotBranch
             _gitDevBranch = l.Ahead;
             return true;
         }
-        // Full: We get the closest existing branch, synchronize it (origin remotes only)
-        //       and make sure that its "dev/" (or base) branch is integrated into this
-        //       branch.
-        //       If not, the "dev/" (or base) branch is merged into this "dev/" branch.
+        // We get the closest existing branch, synchronize it (origin remotes only).
         Throw.DebugAssert( _name.Parent != null );
         var parent = _info.GetRequiredClosestExistingBranch( monitor, _name.Parent );
+        if( parent == null )
+        {
+            return false;
+        }
+        Throw.DebugAssert( parent.Exists );
+        if( !parent.Synchronize( monitor, commitProvider, BranchLinkType.None ) )
+        {
+            return false;
+        }
+        // We always target the "dev/" branch if a merge must be done but the "dev/" may not exist.
+        var thisBranch = _gitDevBranch ?? GitBranch;
+
+        // Full: Make sure that the closest existing branch "dev/" (or base) branch is integrated into this branch.
+        //       If not, the "dev/" (or base) branch is merged into this "dev/" branch.
         if( applyLink is BranchLinkType.Full )
         {
-            if( parent == null )
-            {
-                return false;
-            }
-            Throw.DebugAssert( parent.Exists );
-            if( !parent.Synchronize( monitor, commitProvider, BranchLinkType.None ) )
-            {
-                return false;
-            }
-            var thisBranch = _gitDevBranch ?? GitBranch;
             var parentBranch = parent.GitDevBranch ?? parent.GitBranch;
             var d = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( parentBranch.Tip, thisBranch.Tip );
             if( d.AheadBy is not 0 )
@@ -280,25 +292,23 @@ public sealed class HotBranch
         Throw.DebugAssert( _name.Parent != null );
         Throw.DebugAssert( parent != null );
 
-        var tagCommit = commitProvider.GetCommit( monitor, parent,  )
-        if( applyLink is BranchLinkType.Release )
-        {
+        Throw.CheckNotNullArgument( "Required for BranchLinkType Release or CI.", commitProvider );
 
-        }
-        bool hasChanged = false;
-        Branch? b = _gitDevBranch;
-        if( b != null && b.TrackedBranch != null && !Repo.GitRepository.MergeTrackedBranch( monitor, ref b ) )
+        var tagCommit = commitProvider.GetCommit( monitor, parent, applyLink is BranchLinkType.CI );
+        if( tagCommit == null )
         {
             return false;
         }
-        b = GitBranch;
-        if( b.TrackedBranch != null && !Repo.GitRepository.MergeTrackedBranch( monitor, ref b ) )
+        var cd = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( tagCommit.Commit, thisBranch.Tip );
+        if( cd.AheadBy is not 0 )
         {
-            return false;
+            var dev = EnsureDevBranch();
+            if( !Repo.GitRepository.MergeBranch( monitor, ref dev, tagCommit.Commit )
+                || !Refresh( monitor ) )
+            {
+                return false;
+            }
         }
-
-        // When on the root "stable" there's nothing 
-        if( _name.Parent == null ) return true;
         return true;
     }
 

@@ -13,7 +13,7 @@ namespace CKli.VersionTag.Plugin;
 /// This is comparable but reverts the <see cref="SVersion.CompareTo(SVersion?)"/> order.
 /// </para>
 /// </summary>
-public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>
+public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, BranchModel.Plugin.ITagCommit
 {
     readonly VersionTagInfo _versionRepoInfo;
     readonly SVersion _version;

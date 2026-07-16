@@ -14,7 +14,7 @@ public sealed partial class BranchModelPlugin
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">The minimal CKli context.</param>
     /// <param name="branchName">The branch name to switch to.</param>
-    /// <param name="forceCreate">True to open an unexisting branch.</param>
+    /// <param name="create">True to open an unexisting branch.</param>
     /// <param name="all">Consider all the Repos of the current World.</param>
     /// <returns>True on success, false otherwise.</returns>
     [Description( "Switch the working folder to the specified branch, optionally creating it in the Repo." )]
@@ -24,8 +24,8 @@ public sealed partial class BranchModelPlugin
                               [Description( "Branch name to checkout." )]
                               string branchName,
                               [Description( "Create and synchronize the branch if it doesn't exist, instead of switching to the closest existing one." )]
-                              [OptionName("--force-create,-c")]
-                              bool forceCreate = false,
+                              [OptionName("--create,-c")]
+                              bool create = false,
                               [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
                               bool all = false )
     {
@@ -44,20 +44,23 @@ public sealed partial class BranchModelPlugin
         {
             var info = Get( monitor, repo );
             var b = info.Branches[name.Index];
-            if( !forceCreate || b.EnsureExists( monitor ) )
+            if( !create || b.EnsureExists( monitor ) )
             {
                 var target = b.Exists ? b : info.GetRequiredClosestExistingBranch( monitor, name );
                 if( target != null )
                 {
                     Throw.DebugAssert( target.Exists );
-                    if( isDevName && target == b && forceCreate )
+                    // If create is true, we will synchronize but the "dev/" branch may not be created
+                    // (if the BranchLinkType is manual or if there's nothing to synchronize) so we
+                    // ensure that the "dev/" branch exists.
+                    if( isDevName && target == b && create )
                     {
                         target.EnsureDevBranch();
                     }
                     // When -c is used, we Synchronize the branch with its remote and parent: this unifies
                     // the behavior regardless of the initial branch existence.
-                    Throw.DebugAssert( "forceCreate => we are on the target branch.", !forceCreate || target == b );
-                    if( forceCreate && !target.Synchronize( monitor ) )
+                    Throw.DebugAssert( "create => we are on the target branch.", !create || target == b );
+                    if( create && !target.Synchronize( monitor, _commitProvider ) )
                     {
                         success = false;
                     }

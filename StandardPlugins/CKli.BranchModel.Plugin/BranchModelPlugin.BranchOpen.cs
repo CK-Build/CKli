@@ -27,7 +27,7 @@ public sealed partial class BranchModelPlugin
         // between these 2 aspects.
 
         // First, handle the branch namespace because it is a immutable model. The namespace will be updated
-        // only if git branch manipulations below works.
+        // only if git branch manipulations/synchronizations below work.
         if( !BranchName.TryParseBranchName( monitor, branchName, out var csPrerelease ) )
         {
             return false;
@@ -78,7 +78,7 @@ public sealed partial class BranchModelPlugin
         }
         var b = info.Branches[newBranch.Index];
         if( !b.EnsureExists( monitor )
-            || !b.Synchronize( monitor ) )
+            || !b.Synchronize( monitor, _commitProvider ) )
         {
             return false;
         }

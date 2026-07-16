@@ -12,6 +12,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     readonly BranchNamespace _namespace;
     internal readonly ShallowSolutionPlugin _shallowSolution;
     readonly bool _autoFixUselessBranch;
+    ITagCommitProvider? _commitProvider;
 
     /// <summary>
     /// Reads the <see cref="BranchNamespace"/> from the <see cref="PrimaryPluginContext.Configuration"/>.
@@ -99,6 +100,19 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     /// </para>
     /// </summary>
     public event Action<ContentIssueEvent>? ContentIssue;
+
+    /// <summary>
+    /// Sets the <see cref="ITagCommitProvider"/> required to support <see cref="HotBranch.Synchronize(IActivityMonitor, ITagCommitProvider, BranchLinkType)"/>
+    /// with <see cref="BranchLinkType.Release"/> and <see cref="BranchLinkType.CI"/>.
+    /// </summary>
+    /// <param name="commitProvider">The commit provider.</param>
+    /// <remarks>
+    /// This is obviously not elegant but it is easier than making the plugin DI support abstraction injection.
+    /// </remarks>
+    public void SetTagCommitProvider( ITagCommitProvider commitProvider )
+    {
+        _commitProvider = commitProvider;
+    }
 
     /// <summary>
     /// <see cref="BranchModelInfo"/> factory.

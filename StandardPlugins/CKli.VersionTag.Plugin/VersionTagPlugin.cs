@@ -12,7 +12,7 @@ namespace CKli.VersionTag.Plugin;
 /// <summary>
 /// Handles version tags for a <see cref="Repo"/>.
 /// </summary>
-public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
+public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>, BranchModel.Plugin.ITagCommitProvider
 {
     readonly ArtifactHandlerPlugin _artifactHandlerPlugin;
     readonly bool _autoFixRemovableTag;
@@ -25,11 +25,13 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     /// <param name="primaryContext">The CKli plugin context.</param>
     /// <param name="artifactHandler">The artifact handler plugin.</param>
     public VersionTagPlugin( PrimaryPluginContext primaryContext,
-                             ArtifactHandlerPlugin artifactHandler )
+                             ArtifactHandlerPlugin artifactHandler,
+                             BranchModel.Plugin.BranchModelPlugin branchModel )
         : base( primaryContext )
     {
         World.Events.Issue += IssueRequested;
         _artifactHandlerPlugin = artifactHandler;
+        branchModel.SetTagCommitProvider( this );
         _autoFixRemovableTag = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.AutoFixRemovableTag ) ?? false;
     }
 
@@ -40,6 +42,11 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         {
             Get( monitor, r ).CollectIssues( monitor, e.ScreenType, e.Add );
         }
+    }
+
+    BranchModel.Plugin.ITagCommit? BranchModel.Plugin.ITagCommitProvider.GetCommit( IActivityMonitor monitor, BranchModel.Plugin.HotBranch branch, bool ciLinkType )
+    {
+        throw new NotImplementedException();
     }
 
     /// <summary>
@@ -888,5 +895,4 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             monitor.CloseGroup( success ? "Success." : "Failed." );
         }
     }
-
 }

@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System;
 
 namespace CKli.BranchModel.Plugin;
 
