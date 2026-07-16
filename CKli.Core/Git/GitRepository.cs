@@ -243,16 +243,16 @@ public sealed partial class GitRepository : IDisposable
                                   string branchName,
                                   LogLevel createLocalLogLevel,
                                   string repoDisplayName,
-                                  out bool localCreated )
+                                  Commit? initialTip )
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
-        localCreated = false;
-        var b = DoGetBranch( monitor, r, branchName, LogLevel.Warn, repoDisplayName: repoDisplayName );
+        var b = DoGetBranch( monitor, r, branchName, LogLevel.Warn, repoDisplayName );
         if( b == null )
         {
-            localCreated = true;
-            monitor.Log( createLocalLogLevel, $"Branch '{branchName}' does not exist. Creating purely local branch." ); ;
-            b = r.CreateBranch( branchName );
+            monitor.Log( createLocalLogLevel, $"Branch '{branchName}' in '{repoDisplayName}' does not exist. Creating purely local branch." ); ;
+            b = initialTip != null
+                    ? r.CreateBranch( branchName, initialTip )
+                    : r.CreateBranch( branchName );
         }
         return b;
     }
@@ -261,7 +261,7 @@ public sealed partial class GitRepository : IDisposable
     /// Ensures that a local branch exists. If a remote branch from the 'origin' remote is known locally
     /// it will be associated as the tracked branch.
     /// <para>
-    /// If the branch is created without a remote, it will point at the current head's commit.
+    /// If the branch is created without a remote, it will point at the <paramref name="initialTip"/> or the current head's commit.
     /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
     /// Use <see cref="Checkout(IActivityMonitor, Branch, bool, bool, bool)"/> to switch the head onto the branch.
     /// </para>
@@ -269,10 +269,45 @@ public sealed partial class GitRepository : IDisposable
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="branchName">The branch name.</param>
     /// <param name="createLocalLogLevel">Log level to log branch creation.</param>
+    /// <param name="initialTip">Optional initial commit that supersedes the current head's commit when specified.</param>
     /// <returns>The branch.</returns>
-    public Branch EnsureBranch( IActivityMonitor monitor, string branchName, LogLevel createLocalLogLevel = LogLevel.Info )
+    public Branch EnsureBranch( IActivityMonitor monitor, string branchName, LogLevel createLocalLogLevel = LogLevel.Info, Commit? initialTip = null )
     {
-        return DoEnsureBranch( monitor, _git, branchName, createLocalLogLevel, DisplayPath, out var _ );
+        return DoEnsureBranch( monitor, _git, branchName, createLocalLogLevel, DisplayPath, initialTip );
+    }
+
+    /// <summary>
+    /// First calls <see cref="EnsureBranch(IActivityMonitor, string, LogLevel, LibGit2Sharp.Commit?)"/> and then attempts
+    /// to <see cref="MergeTrackedBranch(IActivityMonitor, ref Branch, bool)"/> and calls
+    /// <see cref="MergeBranch(IActivityMonitor, ref Branch, LibGit2Sharp.Commit, bool)"/> with the <paramref name="baseCommit"/> if
+    /// it is specified.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="branchName">The branch name to ensure.</param>
+    /// <param name="createLocalLogLevel">Log level to log branch creation.</param>
+    /// <param name="baseCommit">Optional commit that must be integrated.</param>
+    /// <returns>The branch on success, null on error.</returns>
+    public Branch? EnsureIntegratedBranch( IActivityMonitor monitor,
+                                           string branchName,
+                                           Commit? baseCommit,
+                                           LogLevel createLocalLogLevel = LogLevel.Info )
+    {
+        var b = DoEnsureBranch( monitor, _git, branchName, createLocalLogLevel, DisplayPath, baseCommit );
+        if( b.TrackedBranch != null )
+        {
+            if( !MergeTrackedBranch( monitor, ref b ) )
+            {
+                return null;
+            }
+        }
+        if( baseCommit != null )
+        {
+            if( !MergeBranch( monitor, ref b, baseCommit ) )
+            {
+                return null;
+            }
+        }
+        return b;
     }
 
     /// <summary>
@@ -752,32 +787,43 @@ public sealed partial class GitRepository : IDisposable
     public bool MergeBranch( IActivityMonitor monitor, ref Branch branch, Branch other, bool withEmptyCommit = false )
     {
         Throw.CheckNotNullArgument( other );
-        if( branch.Tip.Sha == other.Tip.Sha )
+        if( other.IsCurrentRepositoryHead && !CheckCleanCommit( monitor ) )
+        {
+            return false;
+        }
+        return DoMergeBranch( monitor, ref branch, other.Tip, $"branch '{other.FriendlyName}'", withEmptyCommit );
+    }
+
+    /// <summary>
+    /// Tries to ensures that <paramref name="commit"/> is integrated in <paramref name="branch"/>. There must be no conflict.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="branch">The target branch (that will be moved on success).</param>
+    /// <param name="commit">The commit to integrate.</param>
+    /// <param name="withEmptyCommit">True to create an empty commit even if there is nothing to merge.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool MergeBranch( IActivityMonitor monitor, ref Branch branch, Commit commit, bool withEmptyCommit = false )
+    {
+        Throw.CheckNotNullArgument( commit );
+        return DoMergeBranch( monitor, ref branch, commit, $"commit '{commit.Id.Sha.AsSpan(0,7)} {commit.MessageShort}'", withEmptyCommit );
+    }
+
+    bool DoMergeBranch( IActivityMonitor monitor, ref Branch branch, Commit otherTip, string otherName, bool withEmptyCommit = false )
+    {
+        if( branch.Tip.Sha == otherTip.Sha )
         {
             return true;
         }
         bool isHead = branch.IsCurrentRepositoryHead;
-        if( isHead )
+        if( isHead && !CheckCleanCommit( monitor ) )
         {
-            if( !CheckCleanCommit( monitor ) )
-            {
-                return false;
-            }
+            return false;
         }
-        else if( other.IsCurrentRepositoryHead )
-        {
-            if( !CheckCleanCommit( monitor ) )
-            {
-                return false;
-            }
-        }
-
         var localName = branch.FriendlyName;
-        var trackedName = other.FriendlyName;
         Exception? exception = null;
         try
         {
-            var c = CreateMergeCommit( this, branch, other, trackedName, withEmptyCommit );
+            var c = CreateMergeCommit( this, branch, otherTip, otherName, withEmptyCommit );
             if( c != null )
             {
                 if( isHead )
@@ -787,9 +833,9 @@ public sealed partial class GitRepository : IDisposable
                     Commands.Checkout( _git, branch.Tip );
                 }
                 branch = _git.Branches.Add( localName, c, allowOverwrite: true );
-                if( c != other.Tip )
+                if( c != otherTip )
                 {
-                    monitor.Trace( $"Branch '{trackedName}' has been merged into '{localName}' in '{DisplayPath}'." );
+                    monitor.Trace( $"The {otherName} has been merged into '{localName}' in '{DisplayPath}'." );
                 }
                 if( isHead )
                 {
@@ -803,25 +849,24 @@ public sealed partial class GitRepository : IDisposable
             exception = ex;
         }
         monitor.Error( $"""
-            Failed merging '{trackedName}' into '{localName}' in '{DisplayPath}'.
+            Failed merging {otherName} into '{localName}' in '{DisplayPath}'.
             This must be fixed manually.
             """, exception );
         return false;
 
-
         static Commit? CreateMergeCommit( GitRepository git,
                                           Branch branch,
-                                          Branch other,
+                                          Commit otherTip,
                                           string trackedName,
                                           bool withEmptyCommit )
         {
-            bool mustMerge = branch.Tip.Tree.Sha != other.Tip.Tree.Sha;
+            bool mustMerge = branch.Tip.Tree.Sha != otherTip.Tree.Sha;
             if( !mustMerge && !withEmptyCommit )
             {
                 // No-op.
                 return branch.Tip;
             }
-            var div = git.Repository.ObjectDatabase.CalculateHistoryDivergence( branch.Tip, other.Tip );
+            var div = git.Repository.ObjectDatabase.CalculateHistoryDivergence( branch.Tip, otherTip );
             if( div?.BehindBy is 0 )
             {
                 // No-op.
@@ -830,19 +875,18 @@ public sealed partial class GitRepository : IDisposable
             if( div?.AheadBy is 0 )
             {
                 // Move "branch" to "tracked".
-                return other.Tip;
+                return otherTip;
             }
-            var result = git.Repository.ObjectDatabase.MergeCommits( branch.Tip, other.Tip, new MergeTreeOptions() { SkipReuc = true, FailOnConflict = true } );
+            var result = git.Repository.ObjectDatabase.MergeCommits( branch.Tip, otherTip, new MergeTreeOptions() { SkipReuc = true, FailOnConflict = true } );
             return result.Tree == null
                     ? null
                     : git.Repository.ObjectDatabase.CreateCommit( git.Author,
                                                                     git.Committer,
-                                                                    $"Merge branch '{trackedName}'.",
+                                                                    $"Merged {trackedName}.",
                                                                     result.Tree,
-                                                                    [branch.Tip, other.Tip],
+                                                                    [branch.Tip, otherTip],
                                                                     prettifyMessage: true );
         }
-
     }
 
     /// <summary>
@@ -1290,7 +1334,7 @@ public sealed partial class GitRepository : IDisposable
                     {
                         return false;
                     }
-                    b = DoEnsureBranch( monitor, _git, branchName, LogLevel.Warn, _displayPath, out bool localCreated );
+                    b = DoEnsureBranch( monitor, _git, branchName, LogLevel.Warn, _displayPath, null );
                     // Either the branch has been created from its remote fetched branch, or it has been created
                     // as a local branch (as there's no remote branch): in both cases, we can skip the pull.
                     skipFetchMerge = true;

@@ -187,6 +187,30 @@ public sealed class HotBranch
     /// </summary>
     public HotBranch? Parent => _name.Parent != null ? _info.Branches[_name.Parent.Index] : null;
 
+
+    /// <summary>
+    /// Ensure that the <see cref="GitBranch"/> exists: creating it from the closest existing branch
+    /// if needed.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool EnsureExists( IActivityMonitor monitor )
+    {
+        if( _link != null ) return true;
+        var closest = _info.GetRequiredClosestExistingBranch( monitor, _name );
+        if( closest == null ) return false;
+        Throw.DebugAssert( closest.Exists );
+        // The branch provided by the user doesn't exist. We create the hot branch
+        // from the closest one.
+        Throw.DebugAssert( """
+                    Nothing could have fetched or create the branch since the HotBranch has been created
+                    (GetBranch has been called - an existing remote would have created the local).
+                    """, Repo.GitRepository.GetBranch( monitor, _name.Name, CK.Core.LogLevel.None ) == null );
+        // Since the branch doesn't exist, we create it from its closest active branch regardless
+        // of any configured link type (the branch must start somewhere).
+        var gitBranch = Repo.GitRepository.EnsureIntegratedBranch( monitor, _name.Name, closest.GitBranch.Tip );
+        return gitBranch != null && Refresh( monitor );
+    }
     /// <summary>
     /// Commits into this <see cref="BranchLink"/>. Development always takes place in the "dev/" branch,
     /// only <see cref="IntegrateDevBranch(IActivityMonitor)"/> can commit in the <see cref="GitBranch"/>.

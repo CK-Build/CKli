@@ -69,8 +69,8 @@ public abstract class RepoPluginBase<T> : PluginBase
     /// <returns>The non null info or null if there are issues.</returns>
     public T? GetWithoutIssue( IActivityMonitor monitor, Repo repo, string? before = "continuing" )
     {
-        var versionInfo = Get( monitor, repo );
-        if( versionInfo.HasIssue )
+        var info = Get( monitor, repo );
+        if( info.HasIssue )
         {
             if( before != null )
             {
@@ -78,7 +78,7 @@ public abstract class RepoPluginBase<T> : PluginBase
             }
             return null;
         }
-        return versionInfo;
+        return info;
     }
 
     /// <summary>
