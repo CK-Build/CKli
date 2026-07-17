@@ -6,7 +6,7 @@ namespace CKli.BranchModel.Plugin;
 
 public sealed partial class BranchModelPlugin
 {
-    [Description( "Closes or discards a Conformant SVersion branch it it exists." )]
+    [Description( "Closes or discards a Conformant SVersion branch if it exists." )]
     [CommandPath( "branch close" )]
     public bool BranchClose( IActivityMonitor monitor,
                              CKliEnv context,

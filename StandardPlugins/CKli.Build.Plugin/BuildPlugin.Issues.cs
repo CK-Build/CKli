@@ -71,7 +71,7 @@ public sealed partial class BuildPlugin
         else
         {
             // No version tag case (only if there are no tags to rebuild).
-            if( versionTagInfo.LastStables.Count == 0 )
+            if( versionTagInfo.HotZone == null )
             {
                 Throw.DebugAssert( versionTagInfo.HotZone == null );
                 var branchModel = _branchModel.Get( monitor, versionTagInfo.Repo );

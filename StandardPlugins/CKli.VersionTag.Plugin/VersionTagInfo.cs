@@ -19,7 +19,6 @@ public sealed partial class VersionTagInfo : RepoInfo
     readonly SVersion? _infVersion;
     readonly SVersion? _supVersion;
 
-    [AllowNull] List<TagCommit> _lastStables;
     [AllowNull] Dictionary<SVersion, TagCommit> _v2C;
     [AllowNull] IReadOnlyList<Tag> _removableTags;
     HotZoneInfo? _hotZone;
@@ -35,6 +34,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     bool _hasIssue;
     // Lazy initialization.
     Dictionary<string, TagCommit>? _sha2C;
+    ImmutableArray<TagCommit> _lastStables;
     ImmutableArray<TagCommit> _lastMajorMinorStables;
 
     internal VersionTagInfo( VersionTagPlugin plugin,
@@ -48,8 +48,7 @@ public sealed partial class VersionTagInfo : RepoInfo
         _supVersion = supVersion;
     }
 
-    internal void Initialize( List<TagCommit> lastStables,
-                              HotZoneInfo? hotZone,
+    internal void Initialize( HotZoneInfo? hotZone,
                               Dictionary<SVersion, TagCommit> v2c,
                               List<Tag>? removableTags,
                               Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags,
@@ -57,7 +56,6 @@ public sealed partial class VersionTagInfo : RepoInfo
                               List<(SVersion V, Tag T)>? badDeprecatedTags,
                               List<(SVersion V, Tag T)>? lightweightOrUnreadableRegularTags )
     {
-        _lastStables = lastStables;
         _hotZone = hotZone;
         _v2C = v2c;
         _removableTags = removableTags ?? [];
@@ -105,8 +103,22 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// When this is empty, then <see cref="HotZone"/> is null and <see cref="HasIssue"/> is true: a first stable version (greater than 
     /// <see cref="InfVersion"/>) should be produced to fix this. This fix is handled by the Build plugin (if the root "stable" branch exists).
     /// </para>
+    /// <para>
+    /// This can be updated when a TagCommit is removed or inserted.
+    /// </para>
     /// </summary>
-    public IReadOnlyList<TagCommit> LastStables => _lastStables;
+    public ImmutableArray<TagCommit> LastStables
+    {
+        get
+        {
+            if( _lastStables.IsDefault )
+            {
+                _lastStables = _v2C.Values.Where( tc => tc.Version.IsStable ).Order().ToImmutableArray();
+                Throw.DebugAssert( (_lastStables.Length >  0) == (_hotZone != null) );
+            }
+            return _lastStables;
+        }
+    }
 
     /// <summary>
     /// Gets the filtered set of <see cref="LastStables"/> with the maximal <see cref="SVersion.Patch"/>.
@@ -130,7 +142,7 @@ public sealed partial class VersionTagInfo : RepoInfo
                     var b = ImmutableArray.CreateBuilder<TagCommit>();
                     b.Add( c );
                     var cV = c.Version;
-                    foreach( var tc in _lastStables )
+                    foreach( var tc in LastStables )
                     {
                         var v = tc.Version;
                         if( v.Major != cV.Major || v.Minor != cV.Minor )
@@ -148,13 +160,16 @@ public sealed partial class VersionTagInfo : RepoInfo
 
     /// <summary>
     /// Gets the hot zone information. Never null if <see cref="HasIssue"/> is false.
+    /// <para>
+    /// This is not null as soon as a <see cref="HotZoneInfo.LastStable"/> exists.
+    /// </para>
     /// </summary>
     public HotZoneInfo? HotZone => _hotZone;
 
     /// <summary>
     /// Gets a <see cref="TagCommit"/> for a version.
     /// <para>
-    /// For "ci.0" version (when <see cref="SVersion.CINumber"/> is 0, this returns the commit of the base version.
+    /// For "ci.0" version (when <see cref="SVersion.CINumber"/> is 0), this returns the commit of the base version.
     /// The found base may have a <see cref="TagCommit.CI0VersionTag"/>.
     /// </para>
     /// </summary>
@@ -312,7 +327,7 @@ public sealed partial class VersionTagInfo : RepoInfo
         // To handle exceptions, this is where the "+fake" build meta data is considered: we strictly enforce the rules
         // but a "+fake" tag on any commit circumvents the rule and de facto publicly documents the exception. 
         //
-        if( _lastStables.Count == 0 )
+        if( _hotZone == null )
         {
             // There is no stable release at all in the ]InfVersion?,SupVersion?[ range: we allow the target version
             // to be anywhere in the range.
@@ -469,8 +484,8 @@ public sealed partial class VersionTagInfo : RepoInfo
             if( version.Minor == 0 )
             {
                 // New version is "Major.0.0".
-                baseCommit = _lastStables.FirstOrDefault( tc => tc.Version.Major < version.Major
-                                                                || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
+                baseCommit = LastStables.FirstOrDefault( tc => tc.Version.Major < version.Major
+                                                               || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
                 if( baseCommit == null )
                 {
                     monitor.Error( $"""
@@ -493,8 +508,8 @@ public sealed partial class VersionTagInfo : RepoInfo
             else
             {
                 // New version is "Major.Minor.0".
-                baseCommit = _lastStables.FirstOrDefault( tc => tc.Version.Major == version.Major && tc.Version.Minor < version.Minor
-                                                                || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
+                baseCommit = LastStables.FirstOrDefault( tc => tc.Version.Major == version.Major && tc.Version.Minor < version.Minor
+                                                               || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
                 if( baseCommit == null )
                 {
                     monitor.Error( $"""
@@ -518,10 +533,10 @@ public sealed partial class VersionTagInfo : RepoInfo
         else
         {
             // New version is "Major.Minor.Patch".
-            baseCommit = _lastStables.FirstOrDefault( tc => tc.Version.Major == version.Major
-                                                            && tc.Version.Minor == version.Minor
-                                                            && tc.Version.Patch < version.Patch
-                                                            || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
+            baseCommit = LastStables.FirstOrDefault( tc => tc.Version.Major == version.Major
+                                                           && tc.Version.Minor == version.Minor
+                                                           && tc.Version.Patch < version.Patch
+                                                           || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
             if( baseCommit == null )
             {
                 monitor.Error( $"""
@@ -570,11 +585,11 @@ public sealed partial class VersionTagInfo : RepoInfo
         var newOne = new TagCommit( this, version, buildCommit, t, contentInfo, deprecatedInfo: null );
         _v2C.Add( version, newOne );
         _sha2C.Add( newOne.Sha, newOne );
-        if( version.IsStable )
+        if( version.IsStable && !_lastStables.IsDefault )
         {
             var idx = _lastStables.BinarySearch( newOne );
             Throw.DebugAssert( idx < 0 );
-            _lastStables.Insert( ~idx, newOne );
+            _lastStables = _lastStables.Insert( ~idx, newOne );
             _lastMajorMinorStables = default;
         }
         return newOne;
@@ -594,11 +609,11 @@ public sealed partial class VersionTagInfo : RepoInfo
             {
                 _sha2C.Remove( tc.Sha );
             }
-            if( version.IsStable )
+            if( version.IsStable && !_lastStables.IsDefault )
             {
                 var idx = _lastStables.BinarySearch( tc );
                 Throw.DebugAssert( idx >= 0 );
-                _lastStables.RemoveAt( idx );
+                _lastStables = _lastStables.RemoveAt( idx );
                 _lastMajorMinorStables = default;
             }
         }
