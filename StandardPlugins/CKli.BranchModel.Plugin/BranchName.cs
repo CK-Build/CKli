@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using System;
+using System.Data;
 using System.Diagnostics;
 
 namespace CKli.BranchModel.Plugin;
@@ -15,12 +16,14 @@ public sealed class BranchName : IEquatable<BranchName>
     string? _devName;
     readonly BranchName? _parent;
     readonly int _index;
+    readonly CSVersionKind _kind;
     internal readonly int _ltsPrefixLength;
     readonly BranchLinkType _linkType;
 
-    internal BranchName( int ltsPrefixLength, BranchLinkType linkType, string name, int index, BranchName? parent )
+    internal BranchName( int ltsPrefixLength, BranchLinkType linkType, string name, int index, CSVersionKind kind, BranchName? parent )
     {
         _index = index;
+        _kind = kind;
         _parent = parent;
         _ltsPrefixLength = ltsPrefixLength;
         _linkType = linkType;
@@ -69,6 +72,18 @@ public sealed class BranchName : IEquatable<BranchName>
             p = p.Parent;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Gets whether this branch corresponds to the <paramref name="version"/>.
+    /// </summary>
+    /// <param name="version">The version.</param>
+    /// <returns>True if the version corresponds to this branch name.</returns>
+    public bool Match( SVersion version )
+    {
+        return version.VersionKind is CSVersionKind.Exploratory
+                ? _name.AsSpan( _ltsPrefixLength + 6 ).Equals( version.ExploratoryName, StringComparison.Ordinal )
+                : version.VersionKind == _kind;
     }
 
     /// <summary>

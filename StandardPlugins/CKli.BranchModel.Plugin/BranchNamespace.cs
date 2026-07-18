@@ -49,7 +49,7 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
         _ltsName = ltsName;
 
         static void Create( string? ltsName,
-                            List<(string BranchName, BranchLinkType Link)> mainLine,
+                            List<(string BranchName, CSVersionKind Kind, BranchLinkType Link)> mainLine,
                             IEnumerable<XElement> exploratories,
                             out ImmutableArray<BranchName> branches,
                             out int mainLineCount,
@@ -69,14 +69,14 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                 ltsPrefixLength = ltsName.Length + 1;
             }
 
-            var b = new BranchName( ltsPrefixLength, BranchLinkType.None, name, 0, null );
+            var b = new BranchName( ltsPrefixLength, BranchLinkType.None, name, 0, CSVersionKind.Stable, null );
             result.Add( b );
             byName.Add( b.Name, b );
             while( e.MoveNext() )
             {
                 name = e.Current.BranchName;
                 if( ltsName != null ) name = ltsName + '/' + name;
-                b = new BranchName( ltsPrefixLength, e.Current.Link, name, b.Index + 1, b );
+                b = new BranchName( ltsPrefixLength, e.Current.Link, name, b.Index + 1, e.Current.Kind, b );
                 result.Add( b );
                 byName.Add( b.Name, b );
             }
@@ -85,13 +85,13 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
             branches = result.DrainToImmutable();
         }
 
-        static List<(string BranchName, BranchLinkType Link)> ParseMainLine( string? configuration )
+        static List<(string BranchName, CSVersionKind Kind, BranchLinkType Link)> ParseMainLine( string? configuration )
         {
-            var result = new List<(string BranchName, BranchLinkType Link)>();
+            var result = new List<(string BranchName, CSVersionKind Kind, BranchLinkType Link)>();
             ReadOnlySpan<char> h = configuration;
             if( !h.SkipWhiteSpaces() || h.Length == 0 )
             {
-                result.Add( (_defaultRootName, BranchLinkType.None) );
+                result.Add( (_defaultRootName, CSVersionKind.Stable, BranchLinkType.None) );
                 return result;
             }
             if( !MatchBranchSegment( ref h, out var name ) )
@@ -109,7 +109,7 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                     It is typically 'stable' or 'main'.
                     """ );
             }
-            result.Add( (new string( name ), BranchLinkType.None) );
+            result.Add( (new string( name ), CSVersionKind.Stable, BranchLinkType.None) );
 
             CSVersionKind prevKind = CSVersionKind.None;
             while( h.SkipWhiteSpaces() && h.Length > 0 )
@@ -139,7 +139,7 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                         Invalid prelease ordering in BranchModel MainLine configuration: '{prevKind.ToPrerelease()}' must appear before '{csKind.ToPrerelease()}'.
                         """ );
                 }
-                result.Add( (csKind.ToPrerelease(), linkType) );
+                result.Add( (csKind.ToPrerelease(), csKind, linkType) );
             }
             return result;
 
@@ -215,7 +215,7 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                             {e}
                             """ );
             }
-            var b = new BranchName( ltsPrefixLength, linkType, name, result.Count, parent );
+            var b = new BranchName( ltsPrefixLength, linkType, name, result.Count, CSVersionKind.Exploratory, parent );
             result.Add( b );
             byName.Add( b.Name, b );
             // Recursive call with explicit parent.
