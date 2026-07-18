@@ -1259,8 +1259,8 @@ public sealed partial class GitRepository : IDisposable
         Throw.CheckArgument( ((IBelongToARepository)baseCommit).Repository == Repository
                               && ((IBelongToARepository)target).Repository == Repository );
         // We take a 1/2 hour margin on the cut: this may handle clock drift and/or minor manual changes or adjustments.
-        var baseCommitWhen = baseCommit.Committer.When.UtcDateTime.AddMinutes( -30 );
-        if( target.Committer.When < baseCommitWhen )
+        var timeLimit = baseCommit.Committer.When.UtcDateTime.AddMinutes( -30 );
+        if( target.Committer.When.UtcDateTime < timeLimit )
         {
             monitor.Warn( $"Unable to compute commit depth in '{DisplayPath}': the target commit '{target}' is older than the base commit '{baseCommit}'." );
             return -1;

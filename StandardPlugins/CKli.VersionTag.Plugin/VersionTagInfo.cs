@@ -600,7 +600,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// Handles the <see cref="AllTagCommits"/> and <see cref="TagCommitsBySha"/>.
     /// </summary>
     /// <param name="version">The version to remove.</param>
-    /// <returns>The removed tag commit if has been removed.</returns>
+    /// <returns>The removed tag commit if it has been removed.</returns>
     internal TagCommit? RemoveTagCommit( SVersion version )
     {
         if( _v2C.Remove( version, out var tc ) )

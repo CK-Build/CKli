@@ -126,8 +126,7 @@ public sealed class CommitBuildInfo
             }
             else
             {
-                Throw.DebugAssert( "We are not on a 'ci.0' version (the commit would have been found).",
-                                   _version.CINumber != 0 );
+                Throw.DebugAssert( "We are not on a 'ci.0' version (the commit would have been found).", _version.CINumber != 0 );
                 exists = _tagInfo.AddReleaseBuildTag( _version, _buildCommit, t, contentInfo );
             }
             return (t,_version);
