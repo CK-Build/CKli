@@ -1,11 +1,15 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
+using CKli.BranchModel.Plugin;
 using CKli.Core;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Xml.Linq;
+using static CK.Core.CheckedWriteStream;
 
 namespace CKli.VersionTag.Plugin;
 
@@ -44,9 +48,172 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         }
     }
 
-    BranchModel.Plugin.ITagCommit? BranchModel.Plugin.ITagCommitProvider.GetCommit( IActivityMonitor monitor, BranchModel.Plugin.HotBranch branch, bool ciLinkType )
+    ITagCommit? ITagCommitProvider.GetCommit( IActivityMonitor monitor, HotBranch branch, bool allowCI )
     {
-        throw new NotImplementedException();
+        Throw.CheckArgument( branch.Exists );
+        var info = GetWithoutIssue( monitor, branch.Repo );
+        if( info == null )
+        {
+            return null;
+        }
+        Throw.DebugAssert( "HotZone is not null (and we have a LastStable).", !info.HasIssue );
+        var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
+        var candidates = info.HotZone.GetTagCommitTree( b.Tip );
+
+        ITagCommit? best = null;
+        int level = 0;
+        for( int i = 0; i < candidates.Count; i++ )
+        {
+            if( !TryFindBest( monitor, candidates, ref i, level, branch, allowCI, out best ) )
+            {
+                return null;
+            }
+            if( best != null )
+            {
+                return best;
+            }
+            ++level;
+        }
+        if( best == null )
+        {
+            monitor.Error( $"""
+            Unable to get versioned commit for branch '{branch.BranchName}' in '{info.Repo.DisplayPath}' ({(allowCI ? "in" : "ex")}cluding ".ci" versions) among {candidates.Count} candidates:
+            {candidates.Select( tc => tc.T.Version.ToString() ).Concatenate()}
+            """ );
+        }
+        return best;
+
+        static bool TryFindBest( IActivityMonitor monitor,
+                                 IReadOnlyList<(TagCommit T, int Level)> candidates,
+                                 ref int i,
+                                 int level,
+                                 HotBranch branch,
+                                 bool allowCI,
+                                 out ITagCommit? best )
+        {
+            Throw.DebugAssert( candidates[i].Level == level );
+            best = Filter( candidates, i, allowCI );
+            while( ++i < candidates.Count && candidates[i].Level == level )
+            {
+                var newOne = Filter( candidates, i, allowCI );
+                if( newOne == null ) continue;
+                if( best == null ) best = newOne;
+                else
+                {
+                    // Could it be that simple?
+                    //
+                    // if( best.Version < newOne.Version )
+                    // {
+                    //    best = newOne;
+                    // }
+                    //
+                    // Not really.
+                    //
+                    // Let's say that branch is the "romeo" configured with any link type other than Manual below "zulu" that also exists:
+                    // Release: "zulu |> romeo", CI:  "zulu -> romeo" or Full "zulu" => "romeo".
+                    //
+                    // The fact that branch is "romeo" here means that a "lowest" XXX branch configured with "Release" or "CI" wants
+                    // to be synchronized (XXX can be a "papa"..."alpha" or an "explo/" branch based on "romeo").
+                    //
+                    // Scenario 1:
+                    // A "1.0.1-zulu" (that only brings a fix) and a "1.1.0-romeo" (that is implies a minor enhancement) both exist.
+                    // Once synchronized, the "1.0.1-zulu" is merged into the romeo branch. A merge commit has "1.0.1-zulu" and "1.1.0-romeo"
+                    // as parents. If a build of the romeo branch is done, a new "1.1.0-romeo.1" will be created that covers the 2 other ones:
+                    // this up-to-date romeo build will be retained.
+                    // Even if no build is done, by returning the greatest version the (current) "romeo" is returned and this is perfect.
+                    //
+                    // Scenario 2 (reverts the "natural" previous order):
+                    // A "1.1.0-zulu" (zulu implies a minor enhancement) exists, romeo can be a fix or a minor: "1.1.0-romeo" or "1.0.1-romeo"
+                    // will always be lower than the zulu version (because the pre-release name).
+                    // If a build of the romeo branch is done, a new "1.1.0-romeo.1" will be created that covers the 2 other ones: this up-to-date romeo
+                    // build will be retained (because of the TagCommit/Level returned by GetTagCommitTree).
+                    // But if no build is done, returning the greatest version will retain the "zulu" version... and that is not what we want (this
+                    // code base doesn't contain the "romeo" code at all).
+                    //
+                    // Does it mean that we should always return a "romeo" version here (because we the branch is "romeo")?
+                    // Actually yes. Another option would be to raise an error here "A build of the branch 'romeo' is required before building 'XXX'."
+                    // but this may be irritating: XXX branch can still be built based on the last produced "romeo" until the developer decides
+                    // to produce a new "romeo".
+                    //
+                    // What happens when a branch is closed? (Note that when close --discard is done, there's no issue.)  
+                    // Closing "romeo": the XXX branch becomes based on "zulu" and the "romeo" branch has been integrated into "zulu".
+                    // When XXX is synchronized in this scenario, it will consider the "1.1.0-zulu" version... and this is bad!
+                    // ==> Closing means that once the subordinated branch has been merged into its base, then a build should be made
+                    //     on the base branch (to integrate the new code). 
+                    // In this case we can only raise the error "A build of the branch 'zulu' is required before building 'XXX'."
+                    // (Because continuing to return the "romeo" is obviously bad - this version doesn't "exist" anymore - and returning
+                    // the "zulu" will forget the "romeo" code that has been integrated).
+                    //
+                    // Can we easily detect the 2 scenarii? Yes!
+                    // When a version from an "alien branch" is met (a VersionKind/ExploratoryName that is not the same as the requested
+                    // branch name) then either:
+                    // - the BranchName still exists: it is a synchronization (waiting for its future unifying build).
+                    // - the BranchName doesn't exist: it is a closed branch that has been integrated, we raise the "build required" error.
+                    //
+
+                    if( branch.BranchName.Match( newOne.Version ) )
+                    {
+                        // Regular case: the branch is the one of the version.
+                        if( best.Version < newOne.Version )
+                        {
+                            best = newOne;
+                        }
+                    }
+                    else if( branch.BranchModelInfo.Namespace.Branches.Any( b => b.Match( newOne.Version ) ) )
+                    {
+                        // The version belongs to another branch that still exists.
+                        // Simply ignore it.
+                    }
+                    else
+                    {
+                        // The version belongs to a closed branch.
+                        monitor.Error( $"A build of the branch '{branch.BranchName}'  in '{branch.Repo.DisplayPath}' is required." );
+                        return false;
+                    }
+                }
+            }
+            return true;
+
+            static TagCommit? Filter( IReadOnlyList<(TagCommit T, int Level)> candidates, int i, bool allowCI )
+            {
+                var r = candidates[i].T;
+                return !allowCI && r.Version.IsCI ? null : r;
+            }
+        }
+
+    }
+
+    static bool TryGetLiftedCandidate( IActivityMonitor monitor,
+                                       Branch branch,
+                                       VersionTagInfo info,
+                                       Commit start,
+                                       bool ciBuild,
+                                       out TagCommit? result )
+    {
+        result = null;
+        foreach( var p in start.Parents )
+        {
+            var c = AsCandidate( ciBuild, info, p );
+            if( c != null )
+            {
+                if( result != null )
+                {
+                    monitor.Error( $"Build required for branch '{branch.FriendlyName}': versions '{result.Version.ParsedText}' and '{c.Version.ParsedText}' must be unified." );
+                    return false;
+                }
+                result = c;
+            }
+        }
+        return true;
+    }
+
+    static TagCommit? AsCandidate( bool ciBuild, VersionTagInfo info, Commit c )
+    {
+        if( info.TagCommitsBySha.TryGetValue( c.Sha, out var result ) && (ciBuild || !result.Version.IsCI) )
+        {
+            return result;
+        }
+        return null;
     }
 
     /// <summary>
@@ -485,7 +652,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         {
             Throw.DebugAssert( topHot == lastStable || (topHot != null && topHot.Version > lastStable.Version) );
             // The HotZoneInfo will create the required manual fix if topHot.Version >= (lastStable.Major + 1, 0, 0).
-            hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, World, repo, lastStable, topHot );
+            hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, info, lastStable, topHot );
         }
 
         // Time to work on the "ci.0" version tags.

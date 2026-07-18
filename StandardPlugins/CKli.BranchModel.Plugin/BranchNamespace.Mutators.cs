@@ -29,8 +29,8 @@ public sealed partial class BranchNamespace
                         _root,
                         _branches.Skip( 1 ).Take( _mainLineCount - 1 )
                                  .Where( b => b.Name != branchName )
-                                 .Select( b => (b.LinkType, b.Name) )
-                                 .Append( (linkType, branchName) )
+                                 .Select( b => (b.LinkType, b.VersionKind, b.Name) )
+                                 .Append( (linkType, prerelease, branchName) )
                                  .OrderByDescending( e => e.Item2 ),
                         _branches.Skip( _mainLineCount ).Select( b => (b.LinkType, b.Name, b.Parent!.Name) ),
                         branchName );
@@ -72,7 +72,7 @@ public sealed partial class BranchNamespace
             return Rebuild( _ltsName,
                             _root,
                             _branches.Skip( 1 ).Take( _mainLineCount - 1 )
-                                     .Select( b => (b.LinkType, b.Name) ),
+                                     .Select( b => (b.LinkType, b.VersionKind, b.Name) ),
                             _branches.Skip( _mainLineCount )
                                      .Where( b => b.Name != branchName )
                                      .Select( b => (b.LinkType, b.Name, b.Parent!.Name) )
@@ -83,7 +83,7 @@ public sealed partial class BranchNamespace
         return Rebuild( _ltsName,
                         _root,
                         _branches.Skip( 1 ).Take( _mainLineCount - 1 )
-                                 .Select( b => (b.LinkType, b.Name) ),
+                                 .Select( b => (b.LinkType, b.VersionKind, b.Name) ),
                         _branches.Skip( _mainLineCount )
                                  .Select( b => (b.LinkType, b.Name, b.Parent!.Name) )
                                  .Append( (linkType is BranchLinkType.None ? BranchLinkType.CI : linkType, branchName, (parent ?? _branches[_mainLineCount - 1]).Name) ),
@@ -102,7 +102,7 @@ public sealed partial class BranchNamespace
 
         return Rebuild( _ltsName,
                         _root,
-                        _branches.Skip( 1 ).Take( _mainLineCount - 1 ).Where( b => b != branchName ).Select( b => (b.LinkType, b.Name) ),
+                        _branches.Skip( 1 ).Take( _mainLineCount - 1 ).Where( b => b != branchName ).Select( b => (b.LinkType, b.VersionKind, b.Name) ),
                         _branches.Skip( _mainLineCount )
                                  .Where( b => b != branchName )
                                  .Select( b => (b.LinkType, b.Name, ((b.Parent == branchName ? b.Parent.Parent : b.Parent) ?? _root).Name) ) );
@@ -110,7 +110,7 @@ public sealed partial class BranchNamespace
 
     static (BranchNamespace, BranchName) Rebuild( string? ltsName,
                                                  BranchName root,
-                                                 IEnumerable<(BranchLinkType T, string N)> mainLine,
+                                                 IEnumerable<(BranchLinkType T, CSVersionKind K, string N)> mainLine,
                                                  IEnumerable<(BranchLinkType T, string N, string P)> exploratories,
                                                  string returnedBranchName )
     {
@@ -121,7 +121,7 @@ public sealed partial class BranchNamespace
 
     static BranchNamespace Rebuild( string? ltsName,
                                     BranchName root,
-                                    IEnumerable<(BranchLinkType T, string N)> mainLine,
+                                    IEnumerable<(BranchLinkType T, CSVersionKind K, string N)> mainLine,
                                     IEnumerable<(BranchLinkType T, string N, string P)> exploratories )
     {
         var byName = new Dictionary<string, BranchName>() { { root.Name, root } };
@@ -129,14 +129,14 @@ public sealed partial class BranchNamespace
         branches.Add( root );
         var previous = root;
         int mainLineCount = 1;
-        foreach( var (type, name) in mainLine )
+        foreach( var (type, kind, name) in mainLine )
         {
             Throw.DebugAssert( ltsName == null
                                || name.StartsWith( ltsName )
                                   && name.Length > ltsName.Length + 1
                                   && name[ltsName.Length] == '/'
                                   && CSVersionKindExtensions.TryParse( name.AsSpan( root._ltsPrefixLength ), out _, StringComparison.Ordinal ) );
-            var newM = new BranchName( root._ltsPrefixLength, type, name, branches.Count, previous );
+            var newM = new BranchName( root._ltsPrefixLength, type, name, branches.Count, kind, previous );
             previous = newM;
             branches.Add( newM );
             byName.Add( newM.Name, newM );

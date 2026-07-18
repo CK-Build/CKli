@@ -290,7 +290,7 @@ public sealed class HotBranch
         Throw.DebugAssert( applyLink is BranchLinkType.Release or BranchLinkType.CI );
         // We must find the commit and make sure that it is integrated in this branch.
         Throw.DebugAssert( _name.Parent != null );
-$
+
         Throw.CheckNotNullArgument( "Required for BranchLinkType Release or CI.", commitProvider );
 
         var tagCommit = commitProvider.GetCommit( monitor, parent, applyLink is BranchLinkType.CI );

@@ -16,14 +16,14 @@ public sealed class BranchName : IEquatable<BranchName>
     string? _devName;
     readonly BranchName? _parent;
     readonly int _index;
-    readonly CSVersionKind _kind;
+    readonly CSVersionKind _versionKind;
     internal readonly int _ltsPrefixLength;
     readonly BranchLinkType _linkType;
 
-    internal BranchName( int ltsPrefixLength, BranchLinkType linkType, string name, int index, CSVersionKind kind, BranchName? parent )
+    internal BranchName( int ltsPrefixLength, BranchLinkType linkType, string name, int index, CSVersionKind versionKind, BranchName? parent )
     {
         _index = index;
-        _kind = kind;
+        _versionKind = versionKind;
         _parent = parent;
         _ltsPrefixLength = ltsPrefixLength;
         _linkType = linkType;
@@ -59,6 +59,11 @@ public sealed class BranchName : IEquatable<BranchName>
     public BranchLinkType LinkType => _linkType;
 
     /// <summary>
+    /// Gets the <see cref="CSVersionKind"/>. Never <see cref="CSVersionKind.None"/>.
+    /// </summary>
+    public CSVersionKind VersionKind => _versionKind;
+
+    /// <summary>
     /// Gets whether a branch name is below this one.
     /// </summary>
     /// <param name="b">The potential child.</param>
@@ -83,7 +88,7 @@ public sealed class BranchName : IEquatable<BranchName>
     {
         return version.VersionKind is CSVersionKind.Exploratory
                 ? _name.AsSpan( _ltsPrefixLength + 6 ).Equals( version.ExploratoryName, StringComparison.Ordinal )
-                : version.VersionKind == _kind;
+                : version.VersionKind == _versionKind;
     }
 
     /// <summary>
