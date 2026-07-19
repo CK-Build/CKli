@@ -17,10 +17,10 @@ public sealed partial class BranchModelPlugin
                             [Description( "Branch name to open." )]
                             string branchName,
                             [Description( "Parent branch to consider instead of the currently checked out branch (applies only to 'explo/' branch)." )]
-                            string? parent )
+                            string? parent = null )
     {
-        var repo = World.GetDefinedRepo( monitor, context.CurrentDirectory );
-        if( repo == null ) return false;
+        var repos = World.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
+        if( repos == null ) return false;
 
         // The system state is... what it is.
         // We can have a git branch and/or a BranchName: we must not rely here on any kind of synchronization
@@ -45,7 +45,19 @@ public sealed partial class BranchModelPlugin
             var what = "";
             if( string.IsNullOrWhiteSpace( parent ) )
             {
-                parent = repo.GitRepository.CurrentBranchName;
+                parent = repos[0].GitRepository.CurrentBranchName;
+                for( int i = 1; i < repos.Count; i++ )
+                {
+                    Repo? repo = repos[i];
+                    if( parent != repo.GitRepository.CurrentBranchName )
+                    {
+                        monitor.Error( $"""
+                            Currently checked out branch is not the same across the repositories. The option --parent must be specified with the branch name.
+                            At least, '{repos[0].GitRepository.DisplayPath}' is on '{parent}' and '{repo.DisplayPath}' is on '{repo.GitRepository.CurrentBranchName}'.
+                            """ );
+                        return false;
+                    }
+                }
                 what = "the currently checked out branch ";
             }
             var parentBranch = _namespace.Find( parent );
@@ -69,18 +81,21 @@ public sealed partial class BranchModelPlugin
                 """ );
         }
         // To handle git branches, we create a BranchModelInfo (with the HotBranch) that is driven by the new namespace.
-        var info = Create( monitor, repo, ns, _autoFixUselessBranch );
-        if( info == null ) return false;
-        if( info.HasIssue )
+        foreach( var repo in repos )
         {
-            monitor.Error( "Please fix any issue before opening a new branch." );
-            return false;
-        }
-        var b = info.Branches[newBranch.Index];
-        if( !b.EnsureExists( monitor )
-            || !b.Synchronize( monitor, _commitProvider ) )
-        {
-            return false;
+            var info = Create( monitor, repo, ns, _autoFixUselessBranch );
+            if( info == null ) return false;
+            if( info.HasIssue )
+            {
+                monitor.Error( $"Please fix any issue in '{repo.DisplayPath}' before opening a new branch." );
+                return false;
+            }
+            var b = info.Branches[newBranch.Index];
+            // Since we explicitly open the branch here, we want the "dev/" to exist (and be checked out).
+            if( !b.EnsureExists( monitor ) ) return false;
+            b.EnsureDevBranch();
+            if( !b.Synchronize( monitor, _commitProvider ) ) return false;
+            if( !repo.GitRepository.Checkout(monitor,b.GitDevBranch) ) return false;
         }
         // Everything went fine: save the updated namespace if needed.
         return !namespaceChanged || SaveBranchNamespace( monitor, ns );

@@ -97,7 +97,7 @@ public sealed partial class BranchNamespace
     /// <returns>A new namespace.</returns>
     public BranchNamespace Remove( BranchName branchName )
     {
-        Throw.CheckArgument( "Root branch cannot be removed.", branchName.Parent != null );
+        Throw.CheckArgument( "Root branch cannot be removed.", !branchName.IsRoot );
         Throw.CheckArgument( "BranchName mismatch.", Branches[branchName.Index] == branchName );
 
         return Rebuild( _ltsName,

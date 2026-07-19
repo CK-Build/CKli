@@ -3,6 +3,7 @@ using CKli.Core;
 using System;
 using System.Data;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.BranchModel.Plugin;
 
@@ -54,7 +55,16 @@ public sealed class BranchName : IEquatable<BranchName>
     public BranchName? Parent => _parent;
 
     /// <summary>
+    /// Gets whether this is the <see cref="BranchNamespace.Root"/>.
+    /// </summary>
+    [MemberNotNullWhen(false, nameof( Parent ), nameof( _parent ) )]
+    public bool IsRoot => _parent == null;
+
+    /// <summary>
     /// Gets the link type that describes the relationships with the <see cref="Parent"/>.
+    /// <para>
+    /// This is <see cref="BranchLinkType.None"/> when <see cref="IsRoot"/> is true.
+    /// </para>
     /// </summary>
     public BranchLinkType LinkType => _linkType;
 
@@ -136,7 +146,7 @@ public sealed class BranchName : IEquatable<BranchName>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="branchName">The branch name.</param>
-    /// <param name="csPrerelease">The standard prerelease name if this is not a "explo/" branch.</param>
+    /// <param name="csPrerelease">The standard prerelease name if this is not a "explo/" branch. <see cref="CSVersionKind.None"/> otherwise.</param>
     /// <returns>Whether <paramref name="branchName"/> is syntactically valid.</returns>
     public static bool TryParseBranchName( IActivityMonitor monitor, string branchName, out CSVersionKind csPrerelease )
     {

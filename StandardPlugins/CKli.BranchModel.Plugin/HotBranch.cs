@@ -185,7 +185,7 @@ public sealed class HotBranch
     /// Gets the parent <see cref="HotBranch"/> in <see cref="BranchModelInfo.Branches"/>.
     /// Null if this is the root branch.
     /// </summary>
-    public HotBranch? Parent => _name.Parent != null ? _info.Branches[_name.Parent.Index] : null;
+    public HotBranch? Parent => _name.IsRoot ? null : _info.Branches[_name.Parent.Index];
 
 
     /// <summary>
@@ -212,6 +212,32 @@ public sealed class HotBranch
         return gitBranch != null && Refresh( monitor );
     }
 
+    /// <summary>
+    /// Close this branch. <see cref="Exists"/> must be true and this must not be the root branch.
+    /// On success <see cref="GitBranch"/> has been integrated in the closest open branch and deleted:
+    /// it becomes null and Exists is false.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public bool Close( IActivityMonitor monitor )
+    {
+        Throw.CheckState( Exists && !BranchName.IsRoot );
+        if( _link == null ) return true;
+        var closest = _info.GetRequiredClosestExistingBranch( monitor, _name );
+        if( closest == null ) return false;
+        Throw.DebugAssert( closest.Exists );
+
+        if( _gitDevBranch != null && !IntegrateDevBranch( monitor ) )
+        {
+            return false;
+        }
+        if( BranchLink.IntegrateMerge( monitor, _info.Repo.GitRepository, GitBranch, closest.GitBranch ) == null )
+        {
+            return false;
+        }
+        _link = null;
+        return closest.Refresh( monitor );
+    }
 
     /// <summary>
     /// Ensures that this <see cref="GitBranch"/> and <see cref="GitDevBranch"/> are synchronized with their
