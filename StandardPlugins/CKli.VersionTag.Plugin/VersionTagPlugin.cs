@@ -53,7 +53,12 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         var info = GetWithoutIssue( monitor, branch.Repo );
         if( info == null ) return null;
         Throw.DebugAssert( "HotZone is not null (and we have a LastStable).", !info.HasIssue );
-        return info.HotZone.GetLastBuild( monitor, branch, allowCI, allowFallback: false );
+        var tc = info.HotZone.GetLastBuild( monitor, branch, allowCI, allowFallback: false );
+        if( tc != null && allowCI && !tc.Version.IsCI && tc.CI0VersionTag != null ) 
+        {
+            return ITagCommit.Create( tc.Repo, SVersion.Parse( tc.CI0VersionTag.FriendlyName ), tc.Commit );
+        }
+        return tc;
     }
 
     /// <summary>

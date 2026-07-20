@@ -88,7 +88,7 @@ public sealed partial class VersionTagInfo
         /// <param name="maxLevel">Optional maximal level to retrieve.</param>
         /// <param name="maxCount">Optional maximal number of commits to retrieve (regardless of the level).</param>
         /// <returns>The versioned tagged commits with their 0-based level.</returns>
-        public IReadOnlyList<(TagCommit T, int Level)> GetTagCommitTree( Commit start, int maxLevel = -1, int maxCount = 0 )
+        public IReadOnlyList<(TagCommit T, int Level)> CreateTagCommitTree( Commit start, int maxLevel = -1, int maxCount = 0 )
         {
             // Why are we NOT using:
             //
@@ -185,20 +185,18 @@ public sealed partial class VersionTagInfo
         /// and is, by design, always available.
         /// </param>
         /// <returns>The commit on success, null on error or when no versioned commit can be found.</returns>
-        public ITagCommit? GetLastBuild( IActivityMonitor monitor,
-                                         HotBranch branch,
-                                         bool allowCI,
-                                         bool allowFallback,
-                                         LogLevel notFoundErrorLevel = LogLevel.Error )
+        public TagCommit? GetLastBuild( IActivityMonitor monitor,
+                                        HotBranch branch,
+                                        bool allowCI,
+                                        bool allowFallback,
+                                        LogLevel notFoundErrorLevel = LogLevel.Error )
         {
             Throw.CheckArgument( branch.Exists );
-            var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
-            var candidates = GetTagCommitTree( b.Tip );
 
             if( !DoGetLastBuild( branch,
-                                 candidates,
                                  allowCI,
                                  allowFallback,
+                                 out var candidates,
                                  out var buildRequired,
                                  out var lastBuild ) )
             {
@@ -207,6 +205,7 @@ public sealed partial class VersionTagInfo
             }
             if( lastBuild == null && monitor.ShouldLogLine( notFoundErrorLevel, null, out var traits ) )
             {
+                var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
                 var header = $"Unable to get versioned commit for branch '{branch.BranchName}' in '{_info.Repo.DisplayPath}' ({(allowCI ? "in" : "ex")}cluding \".ci\" versions).";
                 var fromTo = $"between '{b.Tip.Id.Sha.AsSpan( 0, 7 )} {b.Tip.MessageShort}' and '{LastStable.Commit.Id.Sha.AsSpan( 0, 7 )} {LastStable.Commit.MessageShort}'";
                 if( candidates.Count > 0 )
@@ -240,21 +239,25 @@ public sealed partial class VersionTagInfo
         public bool TryGetLastBuild( HotBranch branch,
                                      bool allowCI,
                                      [NotNullWhen( false )] out BranchName? buildRequired,
-                                     [NotNullWhen(true)] out ITagCommit? lastBuild )
+                                     [NotNullWhen(true)] out TagCommit? lastBuild )
         {
             Throw.CheckArgument( branch.Exists );
             var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
-            var candidates = GetTagCommitTree( b.Tip );
-            return DoGetLastBuild( branch, candidates, allowCI, allowFallback: true, out buildRequired, out lastBuild );
+            var candidates = CreateTagCommitTree( b.Tip );
+            return DoGetLastBuild( branch, allowCI, allowFallback: true, out _, out buildRequired, out lastBuild );
         }
 
-        static bool DoGetLastBuild( HotBranch branch,
-                                     IReadOnlyList<(TagCommit T, int Level)> candidates,
-                                     bool allowCI,
-                                     bool allowFallback,
-                                     [NotNullWhen( false )] out BranchName? buildRequired,
-                                     out ITagCommit? lastBuild )
+        bool DoGetLastBuild( HotBranch branch,
+                             bool allowCI,
+                             bool allowFallback,
+                             out IReadOnlyList<(TagCommit T, int Level)> candidates,
+                             [NotNullWhen( false )] out BranchName? buildRequired,
+                             out TagCommit? lastBuild )
         {
+            Throw.DebugAssert( branch.Exists );
+            var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
+            candidates = CreateTagCommitTree( b.Tip );
+
             lastBuild = null;
             var branchName = branch.BranchName;
 
@@ -279,7 +282,7 @@ public sealed partial class VersionTagInfo
                                      BranchName branchName,
                                      bool allowCI,
                                      [NotNullWhen( false )] out BranchName? buildRequired,
-                                     out ITagCommit? lastBuild )
+                                     out TagCommit? lastBuild )
             {
                 buildRequired = null;
                 lastBuild = null;
@@ -305,7 +308,7 @@ public sealed partial class VersionTagInfo
                                                 int level,
                                                 bool allowCI,
                                                 [NotNullWhen(false)]out BranchName? buildRequired,
-                                                out ITagCommit? lastBuild )
+                                                out TagCommit? lastBuild )
                 {
                     Throw.DebugAssert( candidates[i].Level == level );
                     lastBuild = Filter( candidates, i, allowCI );
@@ -397,19 +400,10 @@ public sealed partial class VersionTagInfo
                     buildRequired = null;
                     return true;
 
-                    static ITagCommit? Filter( IReadOnlyList<(TagCommit T, int Level)> candidates, int i, bool allowCI )
+                    static TagCommit? Filter( IReadOnlyList<(TagCommit T, int Level)> candidates, int i, bool allowCI )
                     {
                         var r = candidates[i].T;
-                        if( allowCI )
-                        {
-                            if( r.Version.IsCI ) return r;
-                            if( r.CI0VersionTag != null )
-                            {
-                                return ITagCommit.Create( r.Repo, SVersion.Parse( r.CI0VersionTag.FriendlyName ), r.Commit );
-                            }
-                            return r;
-                        }
-                        return r.Version.IsCI ? null : r;
+                        return allowCI || !r.Version.IsCI ? r : null;
                     }
                 }
 
