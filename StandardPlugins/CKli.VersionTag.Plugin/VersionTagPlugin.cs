@@ -53,7 +53,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         var info = GetWithoutIssue( monitor, branch.Repo );
         if( info == null ) return null;
         Throw.DebugAssert( "HotZone is not null (and we have a LastStable).", !info.HasIssue );
-        return info.HotZone.GetTagCommit( monitor, branch, allowCI, allowFallback: false );
+        return info.HotZone.GetLastBuild( monitor, branch, allowCI, allowFallback: false );
     }
 
     /// <summary>

@@ -4,6 +4,7 @@ using CKli.Core;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using LogLevel = CK.Core.LogLevel;
 
@@ -76,7 +77,7 @@ public sealed partial class VersionTagInfo
         public TagCommit LastStable => _lastStable;
 
         /// <summary>
-        /// Gets the reachable <see cref="TagCommit"/> from the <paramref name="start"/> up to <see cref="LastStable"/>
+        /// Gets all the reachable <see cref="TagCommit"/> from the <paramref name="start"/> up to <see cref="LastStable"/>
         /// with their 0-based increasing level from the first tagged commit found.
         /// <para>
         /// This is a breadth-first traversal. Some consecutive levels may be the same: in that case, the ambiguity must
@@ -167,23 +168,24 @@ public sealed partial class VersionTagInfo
         }
 
         /// <summary>
-        /// Gets the versioned commit from a hot branch up to <see cref="LastStable"/>.
+        /// Gets the top most versioned commit (the "last build") from a hot branch down to <see cref="LastStable"/>.
         /// <see cref="HotBranch.Exists"/> must be true (this doesn't call <see cref="BranchModelInfo.GetClosestExistingBranch(BranchName)"/>).
         /// <para>
         /// This can always return null and emit a "Build required" error. The returned version may be a "+deprecated" or a "+fake" (this
-        /// must be handled by the caller).
+        /// must be handled by the caller) or may be null when <paramref name="allowFallback"/> is false.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="branch">The branch (that must exist).</param>
+        /// <param name="branch">The branch to lookup (for which the <see cref="HotBranch.GitBranch"/> must exist).</param>
         /// <param name="allowCI">Whether CI versions can be returned.</param>
         /// <param name="allowFallback">Whether versions from parent branches (up to the stable root) can be returned.</param>
         /// <param name="notFoundErrorLevel">
         /// Log level to use when no versioned commit can be found.
-        /// This cannot happen if <paramref name="allowFallback"/> is true: the <see cref="LastStable"/> is the ultimate fallback.
+        /// This cannot happen if <paramref name="allowFallback"/> is true: the <see cref="LastStable"/> is the ultimate fallback
+        /// and is, by design, always available.
         /// </param>
         /// <returns>The commit on success, null on error or when no versioned commit can be found.</returns>
-        public ITagCommit? GetTagCommit( IActivityMonitor monitor,
+        public ITagCommit? GetLastBuild( IActivityMonitor monitor,
                                          HotBranch branch,
                                          bool allowCI,
                                          bool allowFallback,
@@ -193,61 +195,102 @@ public sealed partial class VersionTagInfo
             var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
             var candidates = GetTagCommitTree( b.Tip );
 
-            ITagCommit? best = null;
+            if( !DoGetLastBuild( branch,
+                                 candidates,
+                                 allowCI,
+                                 allowFallback,
+                                 out var buildRequired,
+                                 out var lastBuild ) )
+            {
+                monitor.Error( $"A build of the branch '{buildRequired}' in '{branch.Repo.DisplayPath}' is required." );
+                return null;
+            }
+            if( lastBuild == null && monitor.ShouldLogLine( notFoundErrorLevel, null, out var traits ) )
+            {
+                var header = $"Unable to get versioned commit for branch '{branch.BranchName}' in '{_info.Repo.DisplayPath}' ({(allowCI ? "in" : "ex")}cluding \".ci\" versions).";
+                var fromTo = $"between '{b.Tip.Id.Sha.AsSpan( 0, 7 )} {b.Tip.MessageShort}' and '{LastStable.Commit.Id.Sha.AsSpan( 0, 7 )} {LastStable.Commit.MessageShort}'";
+                if( candidates.Count > 0 )
+                {
+                    monitor.UnfilteredLog( notFoundErrorLevel | LogLevel.IsFiltered, traits, $"""
+                                {header}
+                                Considering {candidates.Count} candidates {fromTo}:
+                                {candidates.Select( tc => tc.T.Version.ToString() ).Concatenate()}
+                                """, error: null );
+                }
+                else
+                {
+                    monitor.UnfilteredLog( notFoundErrorLevel | LogLevel.IsFiltered, traits, $"""
+                                {header}
+                                There is no versioned commit {fromTo}.
+                                """, error: null );
+                }
+            }
+            return lastBuild;
+        }
+
+        /// <summary>
+        /// Gets the top most versioned commit (the "last build") from a hot branch down to <see cref="LastStable"/>.
+        /// <see cref="HotBranch.Exists"/> must be true (this doesn't call <see cref="BranchModelInfo.GetClosestExistingBranch(BranchName)"/>).
+        /// </summary>
+        /// <param name="branch">The branch to lookup (for which the <see cref="HotBranch.GitBranch"/> must exist).</param>
+        /// <param name="allowCI">Whether CI versions can be returned.</param>
+        /// <param name="buildRequired">On failure, contains the branch name that must be built to resolve an ambiguous last build.</param>
+        /// <param name="lastBuild">On success, the last build commit of the branch.</param>
+        /// <returns>True on success, false if </returns>
+        public bool TryGetLastBuild( HotBranch branch,
+                                     bool allowCI,
+                                     [NotNullWhen( false )] out BranchName? buildRequired,
+                                     [NotNullWhen(true)] out ITagCommit? lastBuild )
+        {
+            Throw.CheckArgument( branch.Exists );
+            var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
+            var candidates = GetTagCommitTree( b.Tip );
+            return DoGetLastBuild( branch, candidates, allowCI, allowFallback: true, out buildRequired, out lastBuild );
+        }
+
+        static bool DoGetLastBuild( HotBranch branch,
+                                     IReadOnlyList<(TagCommit T, int Level)> candidates,
+                                     bool allowCI,
+                                     bool allowFallback,
+                                     [NotNullWhen( false )] out BranchName? buildRequired,
+                                     out ITagCommit? lastBuild )
+        {
+            lastBuild = null;
             var branchName = branch.BranchName;
 
             retry:
-            if( !TryFindBest( monitor, branch.BranchModelInfo, candidates, branchName, allowCI, out best ) )
+            if( !TryFindBest( branch.BranchModelInfo, candidates, branchName, allowCI, out buildRequired, out lastBuild ) )
             {
-                return null;
+                return false;
             }
-            if( best == null )
+            if( lastBuild == null )
             {
                 if( allowFallback && (branchName = branchName.Parent) != null )
                 {
                     goto retry;
                 }
                 Throw.DebugAssert( "We should have found the LastStable.", !allowFallback );
-                if( monitor.ShouldLogLine( notFoundErrorLevel, null, out var traits ) )
-                {
-                    var header = $"Unable to get versioned commit for branch '{branch.BranchName}' in '{_info.Repo.DisplayPath}' ({(allowCI ? "in" : "ex")}cluding \".ci\" versions).";
-                    var fromTo = $"between '{b.Tip.Id.Sha.AsSpan( 0, 7 )} {b.Tip.MessageShort}' and '{LastStable.Commit.Id.Sha.AsSpan( 0, 7 )} {LastStable.Commit.MessageShort}'";
-                    if( candidates.Count > 0 )
-                    {
-                        monitor.UnfilteredLog( notFoundErrorLevel|LogLevel.IsFiltered, traits, $"""
-                                    {header}
-                                    Considering {candidates.Count} candidates {fromTo}:
-                                    {candidates.Select( tc => tc.T.Version.ToString() ).Concatenate()}
-                                    """, error: null );
-                    }
-                    else
-                    {
-                        monitor.UnfilteredLog( notFoundErrorLevel | LogLevel.IsFiltered, traits, $"""
-                                    {header}
-                                    There is no versioned commit {fromTo}.
-                                    """, error: null );
-                    }
-                }
-                return null;
+                return true;
             }
-            return best;
+            return true;
 
-            static bool TryFindBest( IActivityMonitor monitor,
-                                     BranchModelInfo info,
+            static bool TryFindBest( BranchModelInfo info,
                                      IReadOnlyList<(TagCommit T, int Level)> candidates,
                                      BranchName branchName,
                                      bool allowCI,
-                                     out ITagCommit? best )
+                                     [NotNullWhen( false )] out BranchName? buildRequired,
+                                     out ITagCommit? lastBuild )
             {
-                best = null;
+                buildRequired = null;
+                lastBuild = null;
                 int level = 0;
                 for( int i = 0; i < candidates.Count; i++ )
                 {
-                    if( !TryFindBestInLevel( monitor, info, candidates, branchName, ref i, level, allowCI, out best ) )
+                    if( !TryFindBestInLevel( info, candidates, branchName, ref i, level, allowCI, out buildRequired, out lastBuild ) )
                     {
                         return false;
                     }
-                    if( best != null )
+                    if( lastBuild != null )
                     {
                         return true;
                     }
@@ -255,17 +298,17 @@ public sealed partial class VersionTagInfo
                 }
                 return true;
 
-                static bool TryFindBestInLevel( IActivityMonitor monitor,
-                                                BranchModelInfo modelInfo,
+                static bool TryFindBestInLevel( BranchModelInfo modelInfo,
                                                 IReadOnlyList<(TagCommit T, int Level)> candidates,
                                                 BranchName branchName,
                                                 ref int i,
                                                 int level,
                                                 bool allowCI,
-                                                out ITagCommit? best )
+                                                [NotNullWhen(false)]out BranchName? buildRequired,
+                                                out ITagCommit? lastBuild )
                 {
                     Throw.DebugAssert( candidates[i].Level == level );
-                    best = Filter( candidates, i, allowCI );
+                    lastBuild = Filter( candidates, i, allowCI );
                     while( ++i < candidates.Count && candidates[i].Level == level )
                     {
                         var newOne = Filter( candidates, i, allowCI );
@@ -325,9 +368,9 @@ public sealed partial class VersionTagInfo
                         if( branchName.Match( newOne.Version ) )
                         {
                             // Regular case: the branch is the one of the version.
-                            if( best == null || best.Version < newOne.Version )
+                            if( lastBuild == null || lastBuild.Version < newOne.Version )
                             {
-                                best = newOne;
+                                lastBuild = newOne;
                             }
                         }
                         else
@@ -346,11 +389,12 @@ public sealed partial class VersionTagInfo
                             else
                             {
                                 // The version belongs to a closed branch.
-                                monitor.Error( $"A build of the branch '{branchName}' in '{modelInfo.Repo.DisplayPath}' is required." );
+                                buildRequired = branchName;
                                 return false;
                             }
                         }
                     }
+                    buildRequired = null;
                     return true;
 
                     static ITagCommit? Filter( IReadOnlyList<(TagCommit T, int Level)> candidates, int i, bool allowCI )
@@ -372,7 +416,6 @@ public sealed partial class VersionTagInfo
 
             }
         }
-
     }
 
 }
