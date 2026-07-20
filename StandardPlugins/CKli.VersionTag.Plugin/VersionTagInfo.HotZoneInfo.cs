@@ -1,8 +1,11 @@
 using CK.Core;
+using CKli.BranchModel.Plugin;
 using CKli.Core;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using LogLevel = CK.Core.LogLevel;
 
 
 namespace CKli.VersionTag.Plugin;
@@ -160,6 +163,213 @@ public sealed partial class VersionTagInfo
                     return level + 1;
                 }
                 return level;
+            }
+        }
+
+        /// <summary>
+        /// Gets the versioned commit from a hot branch up to <see cref="LastStable"/>.
+        /// <see cref="HotBranch.Exists"/> must be true (this doesn't call <see cref="BranchModelInfo.GetClosestExistingBranch(BranchName)"/>).
+        /// <para>
+        /// This can always return null and emit a "Build required" error. The returned version may be a "+deprecated" or a "+fake" (this
+        /// must be handled by the caller).
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="branch">The branch (that must exist).</param>
+        /// <param name="allowCI">Whether CI versions can be returned.</param>
+        /// <param name="allowFallback">Whether versions from parent branches (up to the stable root) can be returned.</param>
+        /// <param name="notFoundErrorLevel">
+        /// Log level to use when no versioned commit can be found.
+        /// This cannot happen if <paramref name="allowFallback"/> is true: the <see cref="LastStable"/> is the ultimate fallback.
+        /// </param>
+        /// <returns>The commit on success, null on error or when no versioned commit can be found.</returns>
+        public ITagCommit? GetTagCommit( IActivityMonitor monitor,
+                                         HotBranch branch,
+                                         bool allowCI,
+                                         bool allowFallback,
+                                         LogLevel notFoundErrorLevel = LogLevel.Error )
+        {
+            Throw.CheckArgument( branch.Exists );
+            var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
+            var candidates = GetTagCommitTree( b.Tip );
+
+            ITagCommit? best = null;
+            var branchName = branch.BranchName;
+
+            retry:
+            if( !TryFindBest( monitor, branch.BranchModelInfo, candidates, branchName, allowCI, out best ) )
+            {
+                return null;
+            }
+            if( best == null )
+            {
+                if( allowFallback && (branchName = branchName.Parent) != null )
+                {
+                    goto retry;
+                }
+                Throw.DebugAssert( "We should have found the LastStable.", !allowFallback );
+                if( monitor.ShouldLogLine( notFoundErrorLevel, null, out var traits ) )
+                {
+                    var header = $"Unable to get versioned commit for branch '{branch.BranchName}' in '{_info.Repo.DisplayPath}' ({(allowCI ? "in" : "ex")}cluding \".ci\" versions).";
+                    var fromTo = $"between '{b.Tip.Id.Sha.AsSpan( 0, 7 )} {b.Tip.MessageShort}' and '{LastStable.Commit.Id.Sha.AsSpan( 0, 7 )} {LastStable.Commit.MessageShort}'";
+                    if( candidates.Count > 0 )
+                    {
+                        monitor.UnfilteredLog( notFoundErrorLevel|LogLevel.IsFiltered, traits, $"""
+                                    {header}
+                                    Considering {candidates.Count} candidates {fromTo}:
+                                    {candidates.Select( tc => tc.T.Version.ToString() ).Concatenate()}
+                                    """, error: null );
+                    }
+                    else
+                    {
+                        monitor.UnfilteredLog( notFoundErrorLevel | LogLevel.IsFiltered, traits, $"""
+                                    {header}
+                                    There is no versioned commit {fromTo}.
+                                    """, error: null );
+                    }
+                }
+                return null;
+            }
+            return best;
+
+            static bool TryFindBest( IActivityMonitor monitor,
+                                     BranchModelInfo info,
+                                     IReadOnlyList<(TagCommit T, int Level)> candidates,
+                                     BranchName branchName,
+                                     bool allowCI,
+                                     out ITagCommit? best )
+            {
+                best = null;
+                int level = 0;
+                for( int i = 0; i < candidates.Count; i++ )
+                {
+                    if( !TryFindBestInLevel( monitor, info, candidates, branchName, ref i, level, allowCI, out best ) )
+                    {
+                        return false;
+                    }
+                    if( best != null )
+                    {
+                        return true;
+                    }
+                    ++level;
+                }
+                return true;
+
+                static bool TryFindBestInLevel( IActivityMonitor monitor,
+                                                BranchModelInfo modelInfo,
+                                                IReadOnlyList<(TagCommit T, int Level)> candidates,
+                                                BranchName branchName,
+                                                ref int i,
+                                                int level,
+                                                bool allowCI,
+                                                out ITagCommit? best )
+                {
+                    Throw.DebugAssert( candidates[i].Level == level );
+                    best = Filter( candidates, i, allowCI );
+                    while( ++i < candidates.Count && candidates[i].Level == level )
+                    {
+                        var newOne = Filter( candidates, i, allowCI );
+                        if( newOne == null ) continue;
+
+                        // Could it be that simple?
+                        //
+                        // if( best == null || best.Version < newOne.Version )
+                        // {
+                        //    best = newOne;
+                        // }
+                        //
+                        // Not really.
+                        //
+                        // Let's say that branch is the "romeo" configured with any link type other than Manual below "zulu" that also exists:
+                        // Release: "zulu |> romeo", CI:  "zulu -> romeo" or Full "zulu" => "romeo".
+                        //
+                        // The fact that branch is "romeo" here means that a "lowest" XXX branch configured with "Release" or "CI" wants
+                        // to be synchronized (XXX can be "papa"..."alpha" or an "explo/" branch based on "romeo").
+                        //
+                        // Scenario 1:
+                        // A "1.0.1-zulu" (that only brings a fix) and a "1.1.0-romeo" (that implies a minor enhancement) both exist.
+                        // Once synchronized, the "1.0.1-zulu" is merged into the romeo branch. A merge commit has "1.0.1-zulu" and "1.1.0-romeo"
+                        // as parents. If a build of the romeo branch is done, a new "1.1.0-romeo.1" will be created that covers the 2 other ones:
+                        // this up-to-date romeo build will be retained.
+                        // Even if no build is done, by returning the greatest version the (current) "romeo" is returned and this is perfect.
+                        //
+                        // Scenario 2 (reverts the "natural" previous order):
+                        // A "1.1.0-zulu" (zulu implies a minor enhancement) exists, romeo with a fix or a minor: "1.1.0-romeo" or "1.0.1-romeo"
+                        // will always be lower than the zulu version (because the pre-release name).
+                        // If a build of the romeo branch is done, a new "1.1.0-romeo.1" will be created that covers the 2 other ones: this up-to-date romeo
+                        // build will be retained (because of the TagCommit/Level returned by GetTagCommitTree).
+                        // But if no build is done, returning the greatest version will retain the "zulu" version... and that is not what we want (this
+                        // code base doesn't contain the "romeo" code at all).
+                        //
+                        // Does it mean that we should always return a "romeo" version here (because the branch is "romeo")?
+                        // Actually yes. Another option would be to raise an error here "A build of the branch 'romeo' is required before building 'XXX'."
+                        // but this may be irritating: XXX branch can still be built based on the last produced "romeo" until the developer decides
+                        // to produce a new "romeo".
+                        //
+                        // What happens when a branch is closed? (Note that when close --discard is done, there's no issue.)  
+                        // Closing "romeo": the XXX branch becomes based on "zulu" and the "romeo" branch has been integrated into "zulu".
+                        // When XXX is synchronized in this scenario, it will consider the "1.1.0-zulu" version... and this is bad!
+                        // ==> Closing means that once the subordinated branch has been merged into its base, then a build should be made
+                        //     on the base branch (to integrate the new code). 
+                        // In this case we can only raise the error "A build of the branch 'zulu' is required before building 'XXX'."
+                        // (Because continuing to return the "romeo" is obviously bad - this version doesn't "exist" anymore - and returning
+                        // the "zulu" will forget the "romeo" code that has been integrated).
+                        //
+                        // Can we easily detect the 2 scenarii? Yes!
+                        // When a version from an "alien branch" is met (a VersionKind/ExploratoryName that is not the same as the requested
+                        // branch name) then either:
+                        // - the BranchName still exists: it is a synchronization (waiting for its future unifying build).
+                        // - the BranchName doesn't exist: it is a closed branch that has been integrated, we raise the "build required" error.
+                        //
+
+                        if( branchName.Match( newOne.Version ) )
+                        {
+                            // Regular case: the branch is the one of the version.
+                            if( best == null || best.Version < newOne.Version )
+                            {
+                                best = newOne;
+                            }
+                        }
+                        else
+                        {
+                            // Is it useful to determine whether the matching branch is "above" (in the case of a sync) or
+                            // "below" (in the case of a merge)?
+                            // No. Because branches can be reopened. What matters here is that a version cannot logically exists because its
+                            // branch is dead. A branch that has been closed and reopened doesn't change anything: the branch exists, it
+                            // must be ignored here. 
+                            //
+                            if( modelInfo.Namespace.Branches.Any( b => b.Match( newOne.Version ) ) )
+                            {
+                                // The version belongs to another branch that still exists.
+                                // Simply ignore it.
+                            }
+                            else
+                            {
+                                // The version belongs to a closed branch.
+                                monitor.Error( $"A build of the branch '{branchName}' in '{modelInfo.Repo.DisplayPath}' is required." );
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+
+                    static ITagCommit? Filter( IReadOnlyList<(TagCommit T, int Level)> candidates, int i, bool allowCI )
+                    {
+                        var r = candidates[i].T;
+                        if( allowCI )
+                        {
+                            if( r.Version.IsCI ) return r;
+                            if( r.CI0VersionTag != null )
+                            {
+                                return ITagCommit.Create( r.Repo, SVersion.Parse( r.CI0VersionTag.FriendlyName ), r.Commit );
+                            }
+                            return r;
+                        }
+                        return r.Version.IsCI ? null : r;
+                    }
+                }
+
+
             }
         }
 
