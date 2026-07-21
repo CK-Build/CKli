@@ -24,7 +24,7 @@ public sealed partial class HotGraph
     {
         readonly HotGraph _graph;
         readonly Repo _repo;
-        readonly HotBranch _actual;
+        readonly HotBranch _branch;
         readonly List<Solution> _directRequirements;
         readonly HashSet<Solution> _allRequirements;
         readonly List<PackageInstance> _externalDependencies;
@@ -41,14 +41,14 @@ public sealed partial class HotGraph
 
         internal Solution( HotGraph graph,
                            Repo repo,
-                           HotBranch actual,
+                           HotBranch closestBranch,
                            GitSolution solution,
                            bool isPivot,
                            bool isDevSolution )
         {
             _graph = graph;
             _repo = repo;
-            _actual = actual;
+            _branch = closestBranch;
             _solution = solution;
             _isPivot = isPivot;
             _directRequirements = new List<Solution>();
@@ -85,9 +85,9 @@ public sealed partial class HotGraph
 
         /// <summary>
         /// Gets the branch name from which this <see cref="GitSolution"/> has been read: it is the closest
-        /// active branch from the <see cref="HotGraph.BranchName"/>: its <see cref="HotBranch.GitBranch"/> is necessarily not null.
+        /// opened branch from the <see cref="HotGraph.BranchName"/>: its <see cref="HotBranch.GitBranch"/> is necessarily not null.
         /// </summary>
-        public HotBranch Branch => _actual;
+        public HotBranch Branch => _branch;
 
         /// <summary>
         /// Gets the build rank. From 0 (the first solutions to build) to <see cref="HotGraph.MaxRank"/>.
@@ -146,7 +146,7 @@ public sealed partial class HotGraph
         /// <summary>
         /// Gets whether this solution can be <see cref="IsDevSolution"/>: this <see cref="HotBranch"/> is the <see cref="HotGraph.BranchName"/>.
         /// </summary>
-        public bool CanBeDevSolution => _actual.BranchName == _graph.BranchName;
+        public bool CanBeDevSolution => _branch.BranchName == _graph.BranchName;
 
         /// <summary>
         /// Gets the index of this solution in <see cref="HotGraph.OrderedSolutions"/>.
@@ -179,6 +179,7 @@ public sealed partial class HotGraph
                 // The SolutionVersionInfo depends on the currentTip.
                 // We store this commit's sha in the SolutionVersionInfo: IsDirty uses it.
                 var currentTip = _solution.GitBranch.Tip;
+
                 var baseTagCommit = vInfo.HotZone.LastStable;
                 var commitsLog = Repo.GitRepository.Repository.Commits.QueryBy( new CommitFilter()
                 {
@@ -205,17 +206,7 @@ public sealed partial class HotGraph
                         }
                     }
                 }
-                // Temporary: this works for "stable" only scenario. With multiple
-                // hot branches this will be more complicated.
-                //
-                // Note: TagCommit.CompareTo reverts the SVersion.CompareTo order.
-                //
-                var lastAnyBuild = tagCommitsFromBaseBuild.Min() ?? baseTagCommit;
-                if( lastAnyBuild.BuildContentInfo == null )
-                {
-                    monitor.Warn( $"Last any build tag for '{_solution}' is '{lastAnyBuild.Version.ParsedText}'. It requires a build." );
-                }
-                _versionInfo = new SolutionVersionInfo( this, vInfo, currentTip.Sha, lastAnyBuild, commitsFromBaseBuild, tagCommitsFromBaseBuild );
+                _versionInfo = new SolutionVersionInfo( this, vInfo, currentTip.Sha, commitsFromBaseBuild, vInfo.HotZone.CreateTagCommitTree( currentTip ) );
             }
             return _versionInfo;
         }
@@ -333,6 +324,6 @@ public sealed partial class HotGraph
         /// Returns the repository and branch name.
         /// </summary>
         /// <returns>The logical path of this solution.</returns>
-        public override string ToString() => _toString ??= $"{_solution.Repo.DisplayPath} ({_actual})";
+        public override string ToString() => _toString ??= $"{_solution.Repo.DisplayPath} ({_branch})";
     }
 }

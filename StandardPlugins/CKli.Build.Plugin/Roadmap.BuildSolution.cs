@@ -115,6 +115,7 @@ public sealed partial class Roadmap
             // If build is not required here, we check the lastBuild version.
             // The last build tag may be a +fake or a +deprecated: we decide to always trigger a build in such cases:
             // ==> These edge cases are not "skippable".
+
             _lastBuild = _versionInfo.GetLastBuild( _roadmap.IsCIBuild );
             if( _lastBuild.VersionMustBuild )
             {

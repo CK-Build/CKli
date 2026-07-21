@@ -215,32 +215,32 @@ public sealed partial class HotGraph
         return success;
     }
 
-    internal bool AddSolution( IActivityMonitor monitor, Repo repo, HotBranch actual, bool isPivot, ref bool isDevSolution )
+    internal bool AddSolution( IActivityMonitor monitor, Repo repo, HotBranch closestBranch, bool isPivot, ref bool isDevSolution )
     {
         Throw.DebugAssert( _solutions[repo.Index] == null );
-        Throw.DebugAssert( actual.GitBranch != null );
-        Throw.DebugAssert( "IsDevActive => We are on the theoretical graph branch.", !isDevSolution || actual.BranchName == _branchName );
+        Throw.DebugAssert( closestBranch.GitBranch != null );
+        Throw.DebugAssert( "isDevSolution => We are on the theoretical graph branch.", !isDevSolution || closestBranch.BranchName == _branchName );
 
         // Read the .slnx from the "dev/" or the regular branch. 
-        var shallow = _shallowSolution.GetShallowSolution( monitor, repo, (isDevSolution ? actual.GitDevBranch : null) ?? actual.GitBranch );
+        var shallow = _shallowSolution.GetShallowSolution( monitor, repo, (isDevSolution ? closestBranch.GitDevBranch : null) ?? closestBranch.GitBranch );
         if( shallow == null )
         {
             // Unable to read the solution from the initial branch. But we can save the situation if
             // the branch was the regular one: the "dev/" may contain a valid solution.
-            if( !isDevSolution && actual.GitDevBranch != null )
+            if( !isDevSolution && closestBranch.GitDevBranch != null )
             {
-                shallow = _shallowSolution.GetShallowSolution( monitor, repo, actual.GitDevBranch );
+                shallow = _shallowSolution.GetShallowSolution( monitor, repo, closestBranch.GitDevBranch );
             }
             if( shallow == null )
             {
                 // Sorry, no luck.
                 return false;
             }
-            Throw.DebugAssert( actual.GitDevBranch != null );
-            monitor.Info( ScreenType.CKliScreenTag, $"Considering solution in branch '{actual.GitDevBranch.FriendlyName}' that can be read without errors." );
+            Throw.DebugAssert( closestBranch.GitDevBranch != null );
+            monitor.Info( ScreenType.CKliScreenTag, $"Considering solution in branch '{closestBranch.GitDevBranch.FriendlyName}' that can be read without errors." );
             isDevSolution = true;
         }
-        var s = new Solution( this, repo, actual, shallow, isPivot, isDevSolution );
+        var s = new Solution( this, repo, closestBranch, shallow, isPivot, isDevSolution );
         _solutions[repo.Index] = s;
         _orderedSolutions[repo.Index] = s;
         return RegisterProjects( monitor, s, shallow );

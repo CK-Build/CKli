@@ -15,32 +15,35 @@ public sealed partial class HotGraph
     /// Captures version related information for a <see cref="Solution"/>.
     /// Exposed by <see cref="Solution.VersionInfo"/> but initialized by a successful call to <see cref="HotGraph.GetPackageUpdater(IActivityMonitor)"/>.
     /// Requires that <see cref="VersionTagPlugin"/> has no issue.
+    /// <para>
+    /// This tracks branches that must be built 
+    /// </para>
     /// </summary>
     public sealed class SolutionVersionInfo
     {
         readonly Solution _solution;
         readonly VersionTagInfo _info;
+        readonly HashSet<HotBranch> _requiredBuildCollector;
         readonly string _builtTipSha;
-        readonly TagCommit _lastAnyBuild;
         readonly IReadOnlyList<Commit> _commitsFromBaseBuild;
-        readonly IReadOnlyList<TagCommit> _tagCommitsFromBaseBuild;
+        readonly IReadOnlyList<(TagCommit T, int Level)> _tagCommitTree;
         TagCommit? _lastBuildInCI;
         TagCommit? _lastBuildInNonCI;
 
         internal SolutionVersionInfo( Solution solution,
                                       VersionTagInfo info,
+                                      HashSet<HotBranch> requiredBuildCollector,
                                       string builtTipSha,
-                                      TagCommit lastAnyBuild,
                                       List<Commit> commitsFromBaseBuild,
-                                      List<TagCommit> tagCommitsFromBaseBuild )
+                                      IReadOnlyList<(TagCommit T, int Level)> tagCommitTree )
         {
             Throw.DebugAssert( info.HotZone != null && info.HotZone.HotZoneIssue == null );
             _solution = solution;
             _info = info;
+            _requiredBuildCollector = requiredBuildCollector;
             _builtTipSha = builtTipSha;
-            _lastAnyBuild = lastAnyBuild;
             _commitsFromBaseBuild = commitsFromBaseBuild;
-            _tagCommitsFromBaseBuild = tagCommitsFromBaseBuild;
+            _tagCommitTree = tagCommitTree;
         }
 
 
@@ -163,11 +166,27 @@ public sealed partial class HotGraph
         }
 
         /// <summary>
-        /// Gets <see cref="LastBuildInCI"/> or <see cref="LastBuildInNonCI"/>.
+        /// Gets the last built version to consider in the regular <see cref="Solution.Branch"/> or its "dev/" branch.
         /// </summary>
         /// <param name="ciBuild">Whether we are in a CI build context.</param>
         /// <returns>The CI or non CI last build.</returns>
-        public BuiltVersion GetLastBuild( bool ciBuild ) => ciBuild ? LastBuildInCI : LastBuildInNonCI;
+        public BuiltVersion GetLastBuild( bool ciBuild )
+        {
+            if( ciBuild )
+            {
+                if( _lastBuildInCI == null )
+                {
+                    Throw.DebugAssert( !_info.HasIssue );
+                    if( !_info.HotZone.TryGetLastBuild( _solution.Branch, ciBuild, out var buildRequired, out _lastBuildInCI ) )
+                    {
+                        _requiredBuildCollector.Add( _solution.Branch );
+                        _lastBuildInCI = _info.HotZone.LastStable;
+                    }
+                }
+                return new BuiltVersion( this, _lastBuildInCI );
+            }
+            return ciBuild ? LastBuildInCI : LastBuildInNonCI;
+        }
 
         /// <summary>
         /// Gets all the commits from <see cref="GitSolution"/>'s git branch's tip down to <see cref="BaseBuild"/>.

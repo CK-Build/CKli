@@ -14,8 +14,8 @@ public sealed partial class HotGraph
     /// <summary>
     /// Exposes different <see cref="IPackageMapping"/> that must be used to update package dependencies in the <see cref="Graph"/>.
     /// <para>
-    /// This is obtained by <see cref="HotGraph.GetPackageUpdater(IActivityMonitor)"/>. Requires that <see cref="CKli.VersionTag.Plugin.VersionTagPlugin"/>
-    /// has no issue.
+    /// This is obtained by <see cref="HotGraph.GetPackageUpdater(IActivityMonitor)"/>.
+    /// Requires that <see cref="CKli.VersionTag.Plugin.VersionTagPlugin"/> has no issue.
     /// </para>
     /// </summary>
     public sealed class PackageUpdater
@@ -139,21 +139,14 @@ public sealed partial class HotGraph
                 if( _p2s.TryGetValue( packageId, out var s ) )
                 {
                     var sv = _versions[s.Repo.Index];
-                    if( _ciBuild )
+                    var v = sv.GetLastBuild( _ciBuild );
+                    if( v.VersionMustBuild )
                     {
-                        var v = sv.LastBuildInCI;
-                        if( v.VersionMustBuild )
-                        {
-                            return null;
-                        }
-                        return v.TagCommit.CI0VersionTag != null
-                                ? v.TagCommit.Version.SetCINumber( 0 )
-                                : v.TagCommit.Version;
+                        return null;
                     }
-                    var last = sv.LastBuildInNonCI;
-                    return last.VersionMustBuild
-                            ? null
-                            : last.TagCommit.Version;
+                    return _ciBuild && v.TagCommit.CI0VersionTag != null
+                            ? v.TagCommit.Version.SetCINumber( 0 )
+                            : v.TagCommit.Version;
                 }
                 return null;
             }

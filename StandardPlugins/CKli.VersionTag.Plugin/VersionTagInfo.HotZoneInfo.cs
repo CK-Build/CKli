@@ -191,7 +191,7 @@ public sealed partial class VersionTagInfo
                                         bool allowFallback,
                                         LogLevel notFoundErrorLevel = LogLevel.Error )
         {
-            Throw.CheckArgument( branch.Exists );
+            Throw.CheckArgument( branch.Exists && branch.Repo == _info.Repo );
 
             if( !DoGetLastBuild( branch,
                                  allowCI,
@@ -241,7 +241,7 @@ public sealed partial class VersionTagInfo
                                      [NotNullWhen( false )] out BranchName? buildRequired,
                                      [NotNullWhen(true)] out TagCommit? lastBuild )
         {
-            Throw.CheckArgument( branch.Exists );
+            Throw.CheckArgument( branch.Exists && branch.Repo == _info.Repo );
             var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
             var candidates = CreateTagCommitTree( b.Tip );
             return DoGetLastBuild( branch, allowCI, allowFallback: true, out _, out buildRequired, out lastBuild );
@@ -311,6 +311,7 @@ public sealed partial class VersionTagInfo
                                                 out TagCommit? lastBuild )
                 {
                     Throw.DebugAssert( candidates[i].Level == level );
+                    buildRequired = null;
                     lastBuild = Filter( candidates, i, allowCI );
                     while( ++i < candidates.Count && candidates[i].Level == level )
                     {
@@ -382,7 +383,7 @@ public sealed partial class VersionTagInfo
                             // "below" (in the case of a merge)?
                             // No. Because branches can be reopened. What matters here is that a version cannot logically exists because its
                             // branch is dead. A branch that has been closed and reopened doesn't change anything: the branch exists, it
-                            // must be ignored here. 
+                            // must be ignored here.
                             //
                             if( modelInfo.Namespace.Branches.Any( b => b.Match( newOne.Version ) ) )
                             {
@@ -392,10 +393,18 @@ public sealed partial class VersionTagInfo
                             else
                             {
                                 // The version belongs to a closed branch.
+                                // We don't return false here. Instead we wait to know if this level contains a branch version.
+                                // If this "closed branch version" appears at the same level as the potential last build, then we
+                                // want the "build required" state because this last build MUST be rebuilt.
+                                // Otherwise (no branch version at this level), 
                                 buildRequired = branchName;
-                                return false;
                             }
                         }
+                    }
+                    if( lastBuild != null && buildRequired != null )
+                    {
+                        lastBuild = null;
+                        return false;
                     }
                     buildRequired = null;
                     return true;
