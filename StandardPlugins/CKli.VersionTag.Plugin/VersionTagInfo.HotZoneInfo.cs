@@ -88,7 +88,7 @@ public sealed partial class VersionTagInfo
         /// <param name="maxLevel">Optional maximal level to retrieve.</param>
         /// <param name="maxCount">Optional maximal number of commits to retrieve (regardless of the level).</param>
         /// <returns>The versioned tagged commits with their 0-based level.</returns>
-        public IReadOnlyList<(TagCommit T, int Level)> CreateTagCommitTree( Commit start, int maxLevel = -1, int maxCount = 0 )
+        public IReadOnlyList<(TagCommit T, int Level)> CreateTagCommitTreeContent( Commit start, int maxLevel = -1, int maxCount = 0 )
         {
             // Why are we NOT using:
             //
@@ -106,7 +106,7 @@ public sealed partial class VersionTagInfo
             //  3) the TagCommit version (if it exists) must be greater to the LastStable otherwise we stop the walk.
             //
             // The fact is that the following code can produce TagCommits that don't have LastStable in their ancestors. This 
-            // means that the LastStable has not been full "synchronization point" in the graph, that some branches have not been
+            // means that the LastStable is not a "full synchronization point" in the graph, that some branches have not been
             // resynchronized on it before being merged in our "start" commit history. This is where 2) and 3) above kicks in:
             // too old commits and versions older than LastStable are rejected.
             // 
@@ -243,7 +243,7 @@ public sealed partial class VersionTagInfo
         {
             Throw.CheckArgument( branch.Exists && branch.Repo == _info.Repo );
             var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
-            var candidates = CreateTagCommitTree( b.Tip );
+            var candidates = CreateTagCommitTreeContent( b.Tip );
             return DoGetLastBuild( branch, allowCI, allowFallback: true, out _, out buildRequired, out lastBuild );
         }
 
@@ -256,7 +256,7 @@ public sealed partial class VersionTagInfo
         {
             Throw.DebugAssert( branch.Exists );
             var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
-            candidates = CreateTagCommitTree( b.Tip );
+            candidates = CreateTagCommitTreeContent( b.Tip );
 
             lastBuild = null;
             var branchName = branch.BranchName;

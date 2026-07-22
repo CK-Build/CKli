@@ -206,7 +206,7 @@ public sealed partial class HotGraph
                         }
                     }
                 }
-                _versionInfo = new SolutionVersionInfo( this, vInfo, currentTip.Sha, commitsFromBaseBuild, vInfo.HotZone.CreateTagCommitTree( currentTip ) );
+                _versionInfo = new SolutionVersionInfo( this, vInfo, currentTip.Sha, commitsFromBaseBuild, vInfo.HotZone.CreateTagCommitTreeContent( currentTip ) );
             }
             return _versionInfo;
         }
