@@ -168,7 +168,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             tag = tagCommit.Tag;
             tagContent = tagCommit.BuildContentInfo;
             // Because we remove the TagCommit here, we should delete the tag before the artifacts.
-            vInfo.RemoveTagCommit( version );
+            vInfo.RemoveTagCommit( monitor, version );
         }
         else
         {

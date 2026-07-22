@@ -22,6 +22,7 @@ public sealed partial class VersionTagInfo
         readonly TagCommit _topHot;
         readonly TagCommit _lastStable;
         readonly World.Issue? _hotZoneIssue;
+        Dictionary<string, TagCommitTree?>? _commitTrees;
 
         HotZoneInfo( VersionTagInfo info, TagCommit lastStable, TagCommit topHot, World.Issue? hotZoneIssue )
         {
@@ -107,9 +108,10 @@ public sealed partial class VersionTagInfo
             //
             // The fact is that the following code can produce TagCommits that don't have LastStable in their ancestors. This 
             // means that the LastStable is not a "full synchronization point" in the graph, that some branches have not been
-            // resynchronized on it before being merged in our "start" commit history. This is where 2) and 3) above kicks in:
+            // resynchronized on it before being merged in our "tip" commit history. This is where 2) and 3) above kicks in:
             // too old commits and versions older than LastStable are rejected.
-            // 
+            // => There shouldn't be any TagCommits like this. But if there are, we "save" them.
+            //
             var timeLimit = _lastStable.Commit.Committer.When.UtcDateTime.AddMinutes( -30 );
             var collector = new List<(TagCommit, int)>();
             var commitSeen = new HashSet<string>();
@@ -165,6 +167,118 @@ public sealed partial class VersionTagInfo
                 }
                 return level;
             }
+        }
+
+        /// <summary>
+        /// Gets the <see cref="TagCommitTree"/> for the given commit.
+        /// </summary>
+        /// <param name="tip">The starting commit that should have <see cref="LastStable"/> in its parents.</param>
+        /// <returns>The tree or null if <see cref="LastStable"/> is not reachable from <paramref name="tip"/>.</returns>
+        public TagCommitTree? GetTagCommitTree( Commit tip )
+        {
+            if( _commitTrees != null )
+            {
+                if( _commitTrees.TryGetValue( tip.Sha, out var cached ) )
+                {
+                    return cached;
+                }
+            }
+            else
+            {
+                _commitTrees = new Dictionary<string, TagCommitTree?>();
+            }
+            var t = CreateTagCommitTree( tip );
+            _commitTrees.Add( tip.Sha, t );
+            return CreateTagCommitTree( tip );
+        }
+
+        TagCommitTree? CreateTagCommitTree( Commit tip )
+        {
+            // Why are we NOT using:
+            //
+            // _info.Repo.GitRepository.Repository.Commits.QueryBy( new CommitFilter() { IncludeReachableFrom = tip, ExcludeReachableFrom = _lastStable } );
+            //
+            // ...to obtain the set of commits and then use it as a filter?
+            //
+            // 1 - Because if a path from tip doesn't contain LastStable (when an "old" commit has been merged), we'll get all the commits
+            //     to the very first one.
+            // 2 - Because libgit2 (as well as git, see https://git-scm.com/docs/git-rev-list#Documentation/git-rev-list.txt-Defaultmode) prunes
+            //     the graph based on the Content SHA (TREESAME): when playing with "empty commits", we take the risk to miss parents.
+            //
+            // So we use the Parents and 3 mechanisms help us shorten the walk:
+            //  1) when LastStable is met, this stops the walk.
+            //  2) the time between the LastStable and the commit is checked (with half an hour margin): a too old commit stops the walk.
+            //     The margin handles clock drift and/or minor manual changes or adjustments.
+            //  3) the TagCommit version (if it exists) must be greater to the LastStable otherwise we stop the walk.
+            //
+            // The fact is that the following code can produce TagCommits that don't have LastStable in their ancestors.
+            // This is where 2) and 3) above kicks in: too old commits and versions older than LastStable are rejected.
+            // => There shouldn't be any TagCommits like this. But if there are, we "save" them.
+            //
+            var timeLimit = _lastStable.Commit.Committer.When.UtcDateTime.AddMinutes( -30 );
+            var collector = new List<(TagCommit, int)>();
+            var commitSeen = new HashSet<string>();
+
+            var stack = new Stack<(Commit, int)>();
+            stack.Push( (tip, 0) );
+            int zeroLevelCount = 0;
+            do
+            {
+                var (c, l) = stack.Pop();
+                int nextL = Collect( _info, commitSeen, timeLimit, _lastStable, c, l, collector, ref zeroLevelCount );
+                if( nextL >= 0 )
+                {
+                    foreach( var p in c.Parents )
+                    {
+                        stack.Push( (p, nextL) );
+                    }
+                }
+            }
+            while( stack.Count > 0 );
+
+            Throw.DebugAssert( collector.Count == 0 || (zeroLevelCount > 0 && collector.Select( x => x.Item2 ).IsSortedLarge()) );
+
+            return collector.Count == 0
+                    ? null
+                    : new TagCommitTree( this, tip, collector, zeroLevelCount );
+
+            static int Collect( VersionTagInfo info,
+                                 HashSet<string> commitSeen,
+                                 DateTime timeLimit,
+                                 TagCommit lastStable,
+                                 Commit c,
+                                 int level,
+                                 List<(TagCommit, int)> collector,
+                                 ref int zeroLevelCount )
+            {
+                if( c.Sha == lastStable.Sha )
+                {
+                    collector.Add( (lastStable, level) );
+                    return -1;
+                }
+                if( c.Committer.When.UtcDateTime < timeLimit || !commitSeen.Add( c.Sha ) )
+                {
+                    return -1;
+                }
+                if( info.TagCommitsBySha.TryGetValue( c.Sha, out var tc ) )
+                {
+                    if( lastStable.Version < tc.Version
+                        || (lastStable.IsFakeVersion && !lastStable.Version.IsStableRoughBaseOf( tc.Version )) )
+                    {
+                        return -1;
+                    }
+                    collector.Add( (tc, level) );
+                    if( level == 0 ) ++zeroLevelCount;
+                    return level + 1;
+                }
+                return level;
+            }
+        }
+
+        internal bool OnTagCommitRemoved( TagCommit tc )
+        {
+            _commitTrees?.Clear();
+            return tc != _lastStable;
         }
 
         /// <summary>

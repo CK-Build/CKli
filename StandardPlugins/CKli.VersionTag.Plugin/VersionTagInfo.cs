@@ -598,10 +598,14 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <summary>
     /// Removes the tag commit (not the Git tag from the repository).
     /// Handles the <see cref="AllTagCommits"/> and <see cref="TagCommitsBySha"/>.
+    /// <para>
+    /// If the removed version is the <see cref="HotZoneInfo.LastStable"/>, the <see cref="HotZone"/> is set to null.
+    /// </para>
     /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
     /// <param name="version">The version to remove.</param>
     /// <returns>The removed tag commit if it has been removed.</returns>
-    internal TagCommit? RemoveTagCommit( SVersion version )
+    internal TagCommit? RemoveTagCommit( IActivityMonitor monitor, SVersion version )
     {
         if( _v2C.Remove( version, out var tc ) )
         {
@@ -615,6 +619,11 @@ public sealed partial class VersionTagInfo : RepoInfo
                 Throw.DebugAssert( idx >= 0 );
                 _lastStables = _lastStables.RemoveAt( idx );
                 _lastMajorMinorStables = default;
+                if( _hotZone != null && !_hotZone.OnTagCommitRemoved( tc ) )
+                {
+                    monitor.Info( $"Removed {tc} that is the current LastStable in '{Repo.DisplayPath}': the HotZone has been disabled." );
+                    _hotZone = null;
+                }
             }
         }
         return tc;
