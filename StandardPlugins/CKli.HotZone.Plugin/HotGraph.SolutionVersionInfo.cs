@@ -23,26 +23,18 @@ public sealed partial class HotGraph
     {
         readonly Solution _solution;
         readonly VersionTagInfo _info;
-        readonly HashSet<HotBranch> _requiredBuildCollector;
         readonly string _builtTipSha;
-        readonly IReadOnlyList<Commit> _commitsFromBaseBuild;
-        readonly IReadOnlyList<(TagCommit T, int Level)> _tagCommitTree;
-        TagCommit? _lastBuildInCI;
-        TagCommit? _lastBuildInNonCI;
+        readonly TagCommitTree _tagCommitTree;
 
         internal SolutionVersionInfo( Solution solution,
                                       VersionTagInfo info,
-                                      HashSet<HotBranch> requiredBuildCollector,
                                       string builtTipSha,
-                                      List<Commit> commitsFromBaseBuild,
-                                      IReadOnlyList<(TagCommit T, int Level)> tagCommitTree )
+                                      TagCommitTree tagCommitTree )
         {
             Throw.DebugAssert( info.HotZone != null && info.HotZone.HotZoneIssue == null );
             _solution = solution;
             _info = info;
-            _requiredBuildCollector = requiredBuildCollector;
             _builtTipSha = builtTipSha;
-            _commitsFromBaseBuild = commitsFromBaseBuild;
             _tagCommitTree = tagCommitTree;
         }
 
@@ -126,44 +118,15 @@ public sealed partial class HotGraph
         public VersionTagInfo VersionTagInfo => _info;
 
         /// <summary>
+        /// Gets the <see cref="TagCommitTree"/> for this <see cref="GitSolution.GitBranch"/>.
+        /// </summary>
+        public TagCommitTree TagCommitTree => _tagCommitTree;
+
+        /// <summary>
         /// Gets the base commit that is the <see cref="VersionTagInfo.HotZoneInfo.LastStable"/>.
         /// Can be "+fake" or "+deprecated".
         /// </summary>
-        public TagCommit BaseBuild => _info.HotZone!.LastStable;
-
-        /// <summary>
-        /// Gets the last built version to consider in the <see cref="Solution.Branch"/> and CI build context.
-        /// </summary>
-        public BuiltVersion LastBuildInCI
-        {
-            get
-            {
-                if( _lastBuildInCI == null )
-                {
-                    // Note: TagCommit.CompareTo reverts the SVersion.CompareTo order.
-                    //       Using Min() here gives us the greatest version.
-                    _lastBuildInCI = _tagCommitsFromBaseBuild.Min() ?? BaseBuild;
-                }
-                return new BuiltVersion( this, _lastBuildInCI );
-            }
-        }
-
-        /// <summary>
-        /// Gets the last built version to consider in the regular <see cref="Solution.Branch"/>.
-        /// </summary>
-        public BuiltVersion LastBuildInNonCI
-        {
-            get
-            {
-                if( _lastBuildInNonCI == null )
-                {
-                    Throw.CheckState( "Currently, only 'stable' branch is supported.", _solution.Branch.BranchName.Index == 0 );
-                    // In the "stable" branch, the last commit is by design the BaseBuild.
-                    _lastBuildInNonCI = BaseBuild;
-                }
-                return new BuiltVersion( this, _lastBuildInNonCI );
-            }
-        }
+        public TagCommit BaseBuild => _tagCommitTree.LastStable;
 
         /// <summary>
         /// Gets the last built version to consider in the regular <see cref="Solution.Branch"/> or its "dev/" branch.
@@ -172,31 +135,9 @@ public sealed partial class HotGraph
         /// <returns>The CI or non CI last build.</returns>
         public BuiltVersion GetLastBuild( bool ciBuild )
         {
-            if( ciBuild )
-            {
-                if( _lastBuildInCI == null )
-                {
-                    Throw.DebugAssert( !_info.HasIssue );
-                    if( !_info.HotZone.TryGetLastBuild( _solution.Branch, ciBuild, out var buildRequired, out _lastBuildInCI ) )
-                    {
-                        _requiredBuildCollector.Add( _solution.Branch );
-                        _lastBuildInCI = _info.HotZone.LastStable;
-                    }
-                }
-                return new BuiltVersion( this, _lastBuildInCI );
-            }
-            return ciBuild ? LastBuildInCI : LastBuildInNonCI;
+           return new BuiltVersion( this, _tagCommitTree.GetBestBuildFor( _solution.Branch.BranchName, ciBuild ).Commit );
         }
 
-        /// <summary>
-        /// Gets all the commits from <see cref="GitSolution"/>'s git branch's tip down to <see cref="BaseBuild"/>.
-        /// </summary>
-        public IReadOnlyList<Commit> CommitsFromBaseBuild => _commitsFromBaseBuild;
-
-        /// <summary>
-        /// Gets the <see cref="CommitsFromBaseBuild"/> joined with <see cref="VersionTagInfo.TagCommitsBySha"/>.
-        /// </summary>
-        public IReadOnlyList<TagCommit> TagCommitsFromBaseBuild => _tagCommitsFromBaseBuild;
 
     }
 }

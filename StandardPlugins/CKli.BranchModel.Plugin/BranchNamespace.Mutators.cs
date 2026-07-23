@@ -22,7 +22,7 @@ public sealed partial class BranchNamespace
     {
         Throw.CheckArgument( prerelease is >= CSVersionKind.Alpha and <= CSVersionKind.Zulu );
 
-        var branchName = prerelease.ToPrerelease();
+        var branchName = prerelease.ToBranchName();
         if( _ltsName != null ) branchName = _ltsName + '/' + branchName;
 
         return Rebuild( _ltsName,

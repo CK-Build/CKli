@@ -1,11 +1,14 @@
 using CK.Core;
 using CKli.BranchModel.Plugin;
+using CKli.Core;
 using LibGit2Sharp;
+using NuGet.Protocol.Core.Types;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace CKli.VersionTag.Plugin;
 
@@ -29,7 +32,7 @@ namespace CKli.VersionTag.Plugin;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class TagCommitTree
+public sealed partial class TagCommitTree
 {
     readonly Commit _tip;
     readonly List<(TagCommit, int)> _content;
@@ -41,6 +44,7 @@ public sealed class TagCommitTree
 
     internal TagCommitTree( VersionTagInfo.HotZoneInfo hotZone, Commit tip, List<(TagCommit, int)> content, int zeroLevelCount )
     {
+        Throw.DebugAssert( content.Count > 0 && content[^1].Item1 == hotZone.LastStable );
         _hotZone = hotZone;
         _tip = tip;
         _content = content;
@@ -128,7 +132,7 @@ public sealed class TagCommitTree
     /// <param name="branch">The branch name.</param>
     /// <param name="allowCI">Whether CI version are allowed.</param>
     /// <returns>The versioned tag commit and the final branch.</returns>
-    public (TagCommit C, BranchName Branch) GetLastBuildWithFallback( BranchName branch, bool allowCI )
+    public (TagCommit Commit, BranchName Branch) GetLastBuildWithFallback( BranchName branch, bool allowCI )
     {
         var b = branch;
         for( ; ; )
@@ -217,15 +221,148 @@ public sealed class TagCommitTree
         }
     }
 
+    /// <summary>
+    /// Computes the next version for a branch name based on its last build if it exists.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="vChange">
+    /// The current known version change to apply. This can be upgraded by the content of this tree (past released versions
+    /// and conventional commit messages content).
+    /// </param>
+    /// <param name="branch">The target branch for which the next version must be produced.</param>
+    /// <param name="ciBuild">Whether a CI version must be produced.</param>
+    /// <param name="mustAddCommit">
+    /// Whether a new commit will be created: this increments the <see cref="SVersion.CINumber"/>, this applies
+    /// only if <paramref name="ciBuild"/> is true.
+    /// </param>
+    /// <returns></returns>
+    public SVersion? ComputeTargetVersion( IActivityMonitor monitor,
+                                           ref SVersionChange vChange,
+                                           BranchName branch,
+                                           bool ciBuild,
+                                           bool mustAddCommit )
+    {
+        if( vChange < SVersionChange.Major )
+        {
+            var c = GetVersionChange();
+            if( c > vChange ) vChange = c;
+            // Ultimately use Patch.
+            if( vChange == SVersionChange.None ) vChange = SVersionChange.Patch;
+        }
+        var v = LastStable.Version.SetNextVersionNumbers( vChange );
+        if( !branch.IsRoot )
+        {
+            v = v.SetBranchName( branch.Name );
+            // Determine the PrereleaseNumber.
+            int prereleaseNumber = 0;
+            // Are there any previous release with this branch name?
+            var lastBuild = GetLastBuild( branch, ciBuild );
+            if( lastBuild != null )
+            {
+                // If yes, then our prerelease number must be incremented
+                // unless we are in CI.
+                prereleaseNumber = lastBuild.Version.PrereleaseNumber;
+                if( !ciBuild ) ++prereleaseNumber;
+            }
+            // If no release on this branch exist, the prereleaseNumber 0 is
+            // the first one.
+            v = v.SetPrereleaseNumber( prereleaseNumber );
+        }
+        // Determine the CI number.
+        if( ciBuild )
+        {
+            int ciNumber = LastStable.Repo.GitRepository.ComputeCommitDepth( monitor, LastStable.Commit, _tip );
+            if( ciNumber < 0 )
+            {
+                monitor.Error( $"Unable to compute commit depth from branch '{_tip.Sha.AsSpan(0,7)} {_tip.MessageShort}' to the base {LastStable}." );
+                return null;
+            }
+            if( mustAddCommit ) ++ciNumber;
+            v = v.SetCINumber( ciNumber, impactStablePatchNumber: false );
+        }
+        return v;
+    }
+
+    /// <summary>
+    /// Computes the <see cref="SVersionChange"/> between <see cref="Tip"/> and <see cref="LastStable"/>.
+    /// <para>
+    /// This can be <see cref="SVersionChange.None"/> if the Tip's and LastStable's Git tree are the same
+    /// and there is no tag commits.
+    /// </para>
+    /// </summary>
+    /// <returns>The version change.</returns>
     public SVersionChange GetVersionChange()
     {
         if( _versionChange is null )
         {
-            foreach( var x in _content )
+            SVersionChange vChange = SVersionChange.None;
+            if( _tip.Sha != LastStable.Commit.Sha || _content.Count != 1 )
             {
-                if( x.Item1.Version )
+                // First, use the tags. If LastStable is a +fake we cannot conclude anything.
+                if( !LastStable.IsFakeVersion )
+                {
+                    foreach( var x in _content )
+                    {
+                        var c = LastStable.Version.FromNextVersion( x.Item1.Version );
+                        if( c > vChange )
+                        {
+                            vChange = c;
+                            if( vChange == SVersionChange.Major ) break;
+                        }
+                    }
+                }
+                if( vChange != SVersionChange.Major )
+                {
+                    foreach( var commit in HeadCommits )
+                    {
+                        var c = DetectVersionChange( commit, noNone: true );
+                        if( c > vChange )
+                        {
+                            vChange = c;
+                            if( vChange == SVersionChange.Major ) break;
+                        }
+                    }
+                }
             }
+            _versionChange = vChange;
         }
         return _versionChange.Value;
+
+        static SVersionChange DetectVersionChange( Commit c, bool noNone = true )
+        {
+            var message = c.Message;
+            // Loosely following the spec here. For us, any appearance of the
+            // BREAKING CHANGE anywhere is enough (because of the upper case).
+            if( message.Contains( "BREAKING CHANGE", StringComparison.Ordinal )
+                || message.Contains( "BREAKING-CHANGE", StringComparison.Ordinal ) )
+            {
+                return SVersionChange.Major;
+            }
+
+            var m = ConventionalCommitHeader().Match( message );
+            if( m.Success )
+            {
+                // The ! after the type/scope.
+                if( m.Groups[3].ValueSpan.Length > 0 )
+                {
+                    return SVersionChange.Major;
+                }
+                var type = m.Groups[1].ValueSpan;
+                return type switch
+                {
+                    "feat" => SVersionChange.Minor,
+                    "merge" or "none" => noNone ? SVersionChange.Patch : SVersionChange.None,
+                    _ => SVersionChange.Patch
+                };
+            }
+            // Consider that merge commits are None.
+            return !noNone && c.Parents.Count() > 1
+                    ? SVersionChange.None
+                    : SVersionChange.Patch;
+        }
+
     }
+
+    [GeneratedRegex( @"^(?<1>\w+)(?:\((?<2>[^()]+)\))?(?<3>!)?:", RegexOptions.CultureInvariant )]
+    private static partial Regex ConventionalCommitHeader();
 }

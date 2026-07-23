@@ -28,7 +28,7 @@ public sealed partial class Roadmap
     {
         readonly BuildSolution _solution;
         readonly MustBuildReason _buildReason;
-        readonly VersionChange _versionChange;
+        readonly SVersionChange _versionChange;
         readonly SVersion _targetVersion;
         readonly PackageMapper? _uUpdates;
         readonly PackageMapper? _cUpdates;
@@ -41,7 +41,7 @@ public sealed partial class Roadmap
 
         internal BuildInfo( BuildSolution solution,
                             MustBuildReason buildReason,
-                            VersionChange versionChange,
+                            SVersionChange versionChange,
                             SVersion targetVersion,
                             BuildSolution[]? directRequirements,
                             PackageMapper? uUpdates,
@@ -61,7 +61,7 @@ public sealed partial class Roadmap
             _buildTaskLock = new Lock();
 
             Throw.DebugAssert( "When we must build then version change s at least Patch.",
-                               buildReason == MustBuildReason.None || versionChange >= VersionChange.Patch );
+                               buildReason == MustBuildReason.None || versionChange >= SVersionChange.Patch );
 
             Throw.DebugAssert( "Currently the version can never be a +fake (the +fake is not skippable).", !_targetVersion.HasFakeMetadata );
 
@@ -84,7 +84,7 @@ public sealed partial class Roadmap
         /// <summary>
         /// Gets the version change level.
         /// </summary>
-        public VersionChange VersionChange => _versionChange;
+        public SVersionChange VersionChange => _versionChange;
 
         /// <summary>
         /// Gets the version that must be produced.

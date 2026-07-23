@@ -32,7 +32,7 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
     /// <param name="ltsName">Optional <see cref="WorldName.LTSName"/>.</param>
     /// <param name="sMainLine">
     /// Main branches line starts with the root branch name followed by the
-    /// opened <see cref="BranchLinkType"/><see cref="CSVersionKindExtensions.ToPrerelease(CSVersionKind)"/>.
+    /// opened <see cref="BranchLinkType"/><see cref="CSVersionKindExtensions.ToBranchName(CSVersionKind)"/>.
     /// </param>
     /// <param name="exploratories">Opened exploratory branches.</param>
     public BranchNamespace( string? ltsName,
@@ -136,10 +136,10 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                 if( prevKind >= csKind )
                 {
                     throw new CKException( $"""
-                        Invalid prelease ordering in BranchModel MainLine configuration: '{prevKind.ToPrerelease()}' must appear before '{csKind.ToPrerelease()}'.
+                        Invalid prelease ordering in BranchModel MainLine configuration: '{prevKind.ToBranchName()}' must appear before '{csKind.ToBranchName()}'.
                         """ );
                 }
-                result.Add( (csKind.ToPrerelease(), csKind, linkType) );
+                result.Add( (csKind.ToBranchName(), csKind, linkType) );
             }
             return result;
 

@@ -84,6 +84,34 @@ function Get-PackageVersion
     return $reference.Version
 }
 
+function Remove-GlobalNuGetPackage
+{
+    param(
+        [string] $PackageId,
+        [string] $Version
+    )
+
+    $globalPackages = (& dotnet nuget locals global-packages --list)
+
+    if( $LASTEXITCODE -ne 0 )
+    {
+        throw "Unable to locate the NuGet global packages folder."
+    }
+
+    $globalPackages = ($globalPackages -split ':',2)[1].Trim()
+
+    $packagePath = Join-Path `
+        (Join-Path $globalPackages $PackageId.ToLowerInvariant()) `
+        $Version
+
+    if( Test-Path $packagePath )
+    {
+        Write-Host "Removing $PackageId/$Version from the NuGet global cache."
+
+        Remove-Item $packagePath -Recurse -Force
+    }
+}
+
 function New-LocalNuGetConfig
 {
     param(
@@ -161,7 +189,11 @@ try
             $package.FullName `
             (Join-Path $localFeed $package.Name) `
             -Force
-    }
+
+        Remove-GlobalNuGetPackage `
+            -PackageId "CK.SVersion" `
+            -Version $version*
+  }
 
     Invoke-Step "Force CK.SVersion version" {
 
@@ -267,13 +299,13 @@ try
 }
 finally
 {
-    Invoke-Step "Restore CKli.Core original package reference" {
+    # Invoke-Step "Restore CKli.Core original package reference" {
 
-        Set-PackageVersion `
-            -ProjectPath $ckliCoreProject `
-            -PackageId "CK.SVersion" `
-            -Version $originalCKSVersion
-    }
+    #     Set-PackageVersion `
+    #         -ProjectPath $ckliCoreProject `
+    #         -PackageId "CK.SVersion" `
+    #         -Version $originalCKSVersion
+    # }
 
     if( Test-Path $localFeed )
     {

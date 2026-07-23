@@ -80,7 +80,7 @@ public sealed partial class Roadmap
             // If upstreams are built, always build.
             if( !InitializeUpstreams( monitor,
                                       out BuildSolution[] directRequirements,
-                                      out VersionChange vChange,
+                                      out SVersionChange vChange,
                                       out bool mustBuildFromUpstreams ) )
             {
                 return false;
@@ -163,8 +163,9 @@ public sealed partial class Roadmap
                             """ );
                         return false;
                     }
-                    Throw.DebugAssert( "Fake version triggered MustBuildReason.FakeVersion.", !_lastBuild.TagCommit.IsFakeVersion );
                     var vTarget = _lastBuild.TagCommit.Version;
+                    Throw.DebugAssert( "Fake version triggered MustBuildReason.FakeVersion.",
+                                       !_versionInfo.BaseBuild.Version.HasFakeMetadata && !vTarget.HasFakeMetadata );
                     // If we are in --ci.0 mode and considered the non skippable conditions and we are here (MustBuildReason.None),
                     // then the version to consider must be the ci.0 version (not the non-CI build version associated to the TagCommit).
                     // This ci.0 version necessarily exists otherwise the UpdateSkippableBuildReason would have returned the "CI0" reason.
@@ -176,7 +177,7 @@ public sealed partial class Roadmap
                     }
                     // We compute the version change not for us (this solution will not be built) but for
                     // the downstream solutions to correctly propagate the change level (here it may be None).
-                    vChange = ComputeVersionChange( _versionInfo.BaseBuild.Version, vTarget, targetIsFake: false );
+                    vChange = _versionInfo.BaseBuild.Version.FromNextVersion( vTarget );
                     _buildInfo = new BuildInfo( this,
                                                 MustBuildReason.None,
                                                 vChange,
@@ -198,9 +199,12 @@ public sealed partial class Roadmap
             //
             // If we are building from the upstreams or the dependencies must be updated, then we need one more
             // commit to update the dependencies.
-            SVersion? targetVersion = ComputeTargetVersion( monitor,
-                                                            ref vChange,
-                                                            mustAddCommit: (buildReason & (MustBuildReason.UpstreamBuild | MustBuildReason.DependencyUpdate)) != 0 );
+            bool mustAddCommit = (buildReason & (MustBuildReason.UpstreamBuild | MustBuildReason.DependencyUpdate)) != 0;
+            SVersion? targetVersion = _versionInfo.TagCommitTree.ComputeTargetVersion( monitor,
+                                                                                       ref vChange,
+                                                                                       _roadmap.Graph.BranchName,
+                                                                                       _roadmap._ciBuildMode != CIBuildMode.None,
+                                                                                       mustAddCommit );
             if( targetVersion == null )
             {
                 return false;
@@ -255,11 +259,11 @@ public sealed partial class Roadmap
 
         bool InitializeUpstreams( IActivityMonitor monitor,
                                   out BuildSolution[] directRequirements,
-                                  out VersionChange maxVersionChange,
+                                  out SVersionChange maxVersionChange,
                                   out bool mustBuild )
         {
             var solutionRequirements = _solution.DirectRequirements;
-            maxVersionChange = VersionChange.None;
+            maxVersionChange = SVersionChange.None;
             mustBuild = false;
             directRequirements = new BuildSolution[solutionRequirements.Count];
             int idxReq = 0;
@@ -284,282 +288,6 @@ public sealed partial class Roadmap
             return true;
         }
 
-        static VersionChange ComputeVersionChange( SVersion vBase, SVersion vTarget, bool targetIsFake )
-        {
-            // Fake based CI versions can be "artificial": they can be the <fake>--ci.X (no major/minor/patch increment).
-            // See SVersionExtensions.IsStableRoughBaseOf.
-            Throw.DebugAssert( vBase <= vTarget || (vBase.HasFakeMetadata && vTarget.IsCI) );
-
-            // And when it is the case, we consider this a non change.
-            if( vBase.HasFakeMetadata ) return VersionChange.None;
-
-            VersionChange c;
-            if( vBase.Major == vTarget.Major )
-            {
-                if( vBase.Minor == vTarget.Minor )
-                {
-                    Throw.DebugAssert( "Either we are on the last stable release or a prerelease of the next patch.",
-                                        targetIsFake || (vBase == vTarget || vBase.Patch == vTarget.Patch - 1) );
-                    c = vBase.Patch == vTarget.Patch
-                            ? VersionChange.None
-                            :  VersionChange.Patch;
-                }
-                else
-                {
-                    Throw.DebugAssert( targetIsFake || (vBase.Minor == vTarget.Minor - 1 && vTarget.Patch == 0) );
-                    c = VersionChange.Minor;
-                }
-            }
-            else
-            {
-                Throw.DebugAssert( targetIsFake || (vBase.Major == vTarget.Major - 1 && vTarget.Minor == 0 && vTarget.Patch == 0) );
-                c = VersionChange.Major;
-            }
-            return c;
-        }
-
-        SVersion? ComputeTargetVersion( IActivityMonitor monitor,
-                                       ref VersionChange vChange,
-                                       bool mustAddCommit )
-        {
-            bool isPrerelease = _roadmap._graph.BranchName.Index != 0;
-            SVersion baseVersion = _versionInfo.BaseBuild.Version;
-            int prereleaseNumber = -1;
-            int prereleaseFixNumber = 0;
-            char prereleaseChar = (char)0;
-            if( isPrerelease )
-            {
-                prereleaseChar = _roadmap._graph.BranchName.Name[0];
-            }
-            if( vChange != VersionChange.Major )
-            {
-                // Tries to detect a Major change.
-                // If on a prerelease branch (not on the root "stable"), we compute the "prerelease and fix number" by
-                // keeping the highest among existing versions for this prerelease in the hot commits.
-                foreach( var tc in _versionInfo.TagCommitsFromBaseBuild )
-                {
-                    var existingChange = ComputeVersionChange( _versionInfo.BaseBuild.Version, tc.Version, tc.IsFakeVersion );
-                    if( vChange < existingChange )
-                    {
-                        vChange = existingChange;
-                        if( !isPrerelease && vChange == VersionChange.Major )
-                        {
-                            // If we are handling regular versions, we don't need the commits, we can
-                            // stop right now.
-                            break;
-                        }
-                    }
-                    // Handling prerelease: compute the "prerelease and fix number".
-                    if( isPrerelease )
-                    {
-                        var prerelease = tc.Version.Prerelease.AsSpan();
-                        // If the prerelease string cannot be parsed, this is a warning and we ignore the version.
-                        if( prerelease.TryMatch( prereleaseChar )
-                            && ParsePreleaseSuffix( monitor, tc.Version, prerelease, out var preNum, out var fixNum, out bool isCI ) )
-                        {
-                            if( prereleaseNumber < preNum )
-                            {
-                                prereleaseNumber = preNum;
-                                prereleaseFixNumber = fixNum;
-                            }
-                            else if( prereleaseNumber == preNum )
-                            {
-                                if( prereleaseFixNumber < fixNum )
-                                {
-                                    prereleaseFixNumber = fixNum;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // If the tag version lookup failed to find a major change, then takes the slow path:
-                // consider the commit messages.
-                if( vChange != VersionChange.Major )
-                {
-                    foreach( var c in _versionInfo.CommitsFromBaseBuild )
-                    {
-                        var detectedChange = DetectVersionChange( c, noNone: true );
-                        if( vChange < detectedChange )
-                        {
-                            vChange = detectedChange;
-                            if( vChange == VersionChange.Major )
-                            {
-                                break;
-                            }
-                        }
-                    }
-
-                    // Ultimately use Patch.
-                    if( vChange == VersionChange.None ) vChange = VersionChange.Patch;
-                }
-            }
-            // Ite missa est: we can now compute the target version.
-            SVersion? targetVersion;
-            if( _roadmap.IsCIBuild )
-            {
-                int buildNumber = Repo.GitRepository.ComputeCommitDepth( monitor, _versionInfo.BaseBuild.Commit, _versionInfo.GitSolution.GitBranch.Tip );
-                if( buildNumber < 0 )
-                {
-                    monitor.Error( $"Unable to compute commit depth from branch '{_versionInfo.GitSolution.GitBranch.FriendlyName}' to the base {_versionInfo.BaseBuild}." );
-                    return null;
-                }
-                if( mustAddCommit ) ++buildNumber;
-
-                if( isPrerelease )
-                {
-                    Throw.DebugAssert( prereleaseChar != '\0' );
-                    if( prereleaseNumber == -1 ) prereleaseNumber = 0;
-                    string suffix = prereleaseChar + '.' + prereleaseNumber.ToString( CultureInfo.InvariantCulture )
-                                    + '.' + prereleaseFixNumber.ToString( CultureInfo.InvariantCulture )
-                                    + ".ci." + buildNumber.ToString( CultureInfo.InvariantCulture );
-                    targetVersion = NextVersion( vChange, baseVersion, suffix );
-                }
-                else
-                {
-                    // Double dash trick here.
-                    var ciSuffix = "-ci." + buildNumber.ToString( CultureInfo.InvariantCulture );
-                    targetVersion = NextVersion( vChange, baseVersion, ciSuffix );
-                }
-            }
-            else
-            {
-                if( isPrerelease )
-                {
-                    Throw.DebugAssert( prereleaseChar != '\0' );
-                    string suffix;
-                    if( prereleaseNumber == -1 )
-                    {
-                        suffix = prereleaseChar.ToString();
-                    }
-                    else
-                    {
-                        if( vChange <= VersionChange.Patch )
-                        {
-                            ++prereleaseFixNumber;
-                        }
-                        else
-                        {
-                            ++prereleaseNumber;
-                            prereleaseFixNumber = 0;
-                        }
-                        suffix = prereleaseChar + '.' + prereleaseNumber.ToString( CultureInfo.InvariantCulture );
-                        if( prereleaseFixNumber > 0 )
-                        {
-                            suffix += '.' + prereleaseFixNumber.ToString( CultureInfo.InvariantCulture );
-                        }
-                    }
-                    targetVersion = NextVersion( vChange, baseVersion, suffix );
-                }
-                else
-                {
-                    targetVersion = NextVersion( vChange, baseVersion, null );
-                }
-            }
-
-            return targetVersion;
-
-
-            static VersionChange DetectVersionChange( Commit c, bool noNone )
-            {
-                var message = c.Message;
-                // Loosely following the spec here. For us, any appearance of the
-                // BREAKING CHANGE anywhere is enough (because of the upper case).
-                if( message.Contains( "BREAKING CHANGE", StringComparison.Ordinal )
-                    || message.Contains( "BREAKING-CHANGE", StringComparison.Ordinal ) )
-                {
-                    return VersionChange.Major;
-                }
-
-                var m = ConventionalCommitHeader().Match( message );
-                if( m.Success )
-                {
-                    // The ! after the type/scope.
-                    if( m.Groups[3].ValueSpan.Length > 0 )
-                    {
-                        return VersionChange.Major;
-                    }
-                    var type = m.Groups[1].ValueSpan;
-                    return type switch
-                    {
-                        "feat" => VersionChange.Minor,
-                        "merge" or "none" => noNone ? VersionChange.Patch : VersionChange.None,
-                        _ => VersionChange.Patch
-                    };
-                }
-                // Consider that merge commits are None.
-                return !noNone && c.Parents.Count() > 1
-                        ? VersionChange.None
-                        : VersionChange.Patch;
-            }
-
-            static bool ParsePreleaseSuffix( IActivityMonitor monitor,
-                                             SVersion version,
-                                             ReadOnlySpan<char> p,
-                                             out ushort preNum,
-                                             out ushort fixNum,
-                                             out bool isCi )
-            {
-                // A simple "-a" prerelease:
-                preNum = 0;
-                fixNum = 0;
-                isCi = false;
-                if( p.Length == 0 )
-                {
-                    return true;
-                }
-                // We MUST have a ".NUM" here.
-                if( !p.TryMatch( '.' ) || !p.TryMatchInteger( out preNum ) )
-                {
-                    monitor.Warn( $"Invalid prerelease version pattern '{version}' (expecting '.<number>' suffix for prerelease number), got: '{p}'." );
-                    return false;
-                }
-                // If the text ends here, we are on a numbered prerelease "-a.1" (the "-a.0" doesn't really
-                // exist but it corresponds to the simple "-a" prerelease, so we accept this silently).
-                if( p.Length == 0 )
-                {
-                    return true;
-                }
-                // If there's more, then again we MUST have a ".NUM" here.
-                if( !p.TryMatch( '.' ) || !p.TryMatchInteger( out fixNum ) )
-                {
-                    monitor.Warn( $"Invalid prerelease version pattern '{version}' (expecting '.<number>' suffix for prerelease fix number), got: '{p}'." );
-                    return false;
-                }
-                // If the text ends here, we are on a patch prerelease "-a.1.2" (the "-a.X.0" doesn't really
-                // exist but it corresponds to a "-a.X" numbered prerelease, so we accept this silently).
-                if( p.Length == 0 )
-                {
-                    return true;
-                }
-                // If there's more, then this necessarily is a ".ci.NUM" suffix.
-                if( !p.TryMatch( ".ci." ) || !p.TryMatchInteger( out ushort buildNumber ) )
-                {
-                    monitor.Warn( $"Invalid prerelease version pattern '{version}' (expecting '.ci.<build number>' suffix), got: '{p}'." );
-                    return false;
-                }
-                isCi = true;
-                return true;
-            }
-
-            static SVersion NextVersion( VersionChange vChange, SVersion baseVersion, string? suffix )
-            {
-                // The VersionChange that has been computed may be None.
-                // On "+fake" version, we honor this "None": the target version is the "+fake" version (unchanged except the build metadata).
-                // This allows a "v1.0.0+fake" to produce prereleases (like "v1.0.0-a") and/or ci builds (like "v1.0.0--ci.18")
-                // until a non-ci build is done that will produce the "v1.0.0" version.
-                // For regular base version, there's no "None": "Patch" is assumed.
-                return vChange switch
-                {
-                    VersionChange.Major => baseVersion.Major == 0
-                                            ? SVersion.Create( 0, baseVersion.Minor + 1, 0, suffix )
-                                            : SVersion.Create( baseVersion.Major + 1, 0, 0, suffix ),
-                    VersionChange.Minor => SVersion.Create( baseVersion.Major, baseVersion.Minor + 1, 0, suffix ),
-                    _ when baseVersion.HasFakeMetadata => SVersion.Create( baseVersion.Major, baseVersion.Minor, baseVersion.Patch, suffix ),
-                    _ => SVersion.Create( baseVersion.Major, baseVersion.Minor, baseVersion.Patch + 1, suffix )
-                };
-            }
-        }
 #endregion /Initialize
 
         internal bool ConcludeInitialization( IActivityMonitor monitor,

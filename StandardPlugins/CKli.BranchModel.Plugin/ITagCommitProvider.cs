@@ -11,9 +11,7 @@ namespace CKli.BranchModel.Plugin;
 public interface ITagCommitProvider
 {
     /// <summary>
-    /// Tries to get the current commit for a branch. On success, the commit is unambiguous: if more
-    /// than a single versioned commit appears in the branch's parent commits, a build of the branch
-    /// is required and this is an error.
+    /// Tries to get the current commit for a branch.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="branch">The branch to consider. <see cref="HotBranch.Exists"/> is necessarily true.</param>

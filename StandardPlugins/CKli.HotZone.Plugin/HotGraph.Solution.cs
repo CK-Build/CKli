@@ -179,34 +179,11 @@ public sealed partial class HotGraph
                 // The SolutionVersionInfo depends on the currentTip.
                 // We store this commit's sha in the SolutionVersionInfo: IsDirty uses it.
                 var currentTip = _solution.GitBranch.Tip;
-
-                var baseTagCommit = vInfo.HotZone.LastStable;
-                var commitsLog = Repo.GitRepository.Repository.Commits.QueryBy( new CommitFilter()
+                var tagCommitTree = vInfo.HotZone.GetRequiredTagCommitTree( monitor, _solution.GitBranch );
+                if( tagCommitTree != null )
                 {
-                    IncludeReachableFrom = currentTip,
-                    ExcludeReachableFrom = baseTagCommit.Commit,
-                    SortBy = CommitSortStrategies.Time
-                } );
-                var commitsFromBaseBuild = commitsLog.ToList();
-
-                var tagCommitsFromBaseBuild = new List<TagCommit>();
-                foreach( var c in commitsFromBaseBuild )
-                {
-                    var tc = vInfo.TagCommitsBySha.GetValueOrDefault( c.Sha );
-                    if( tc != null )
-                    {
-                        var v = tc.Version;
-                        if( !baseTagCommit.IsFakeVersion && v < baseTagCommit.Version )
-                        {
-                            monitor.Warn( $"Ignoring {tc} in '{_solution}' as it is lower than the last version '{baseTagCommit.Version.ParsedText}'." );
-                        }
-                        else
-                        {
-                            tagCommitsFromBaseBuild.Add( tc );
-                        }
-                    }
+                    _versionInfo = new SolutionVersionInfo( this, vInfo, currentTip.Sha, tagCommitTree );
                 }
-                _versionInfo = new SolutionVersionInfo( this, vInfo, currentTip.Sha, commitsFromBaseBuild, vInfo.HotZone.CreateTagCommitTreeContent( currentTip ) );
             }
             return _versionInfo;
         }

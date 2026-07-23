@@ -52,9 +52,15 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     {
         var info = GetWithoutIssue( monitor, branch.Repo );
         if( info == null ) return null;
+
         Throw.DebugAssert( "HotZone is not null (and we have a LastStable).", !info.HasIssue );
-        var tc = info.HotZone.GetLastBuild( monitor, branch, allowCI, allowFallback: false );
-        if( tc != null && allowCI && !tc.Version.IsCI && tc.CI0VersionTag != null ) 
+        Throw.DebugAssert( "The branch exists.", branch.Exists );
+
+        var b = (allowCI ? branch.GitDevBranch : null) ?? branch.GitBranch;
+        var t = info.HotZone.GetRequiredTagCommitTree( monitor, b );
+        if( t == null ) return null;
+        var tc = t.GetLastBuildWithFallback( branch.BranchName, allowCI ).Commit;
+        if( allowCI && !tc.Version.IsCI && tc.CI0VersionTag != null ) 
         {
             return ITagCommit.Create( tc.Repo, SVersion.Parse( tc.CI0VersionTag.FriendlyName ), tc.Commit );
         }
