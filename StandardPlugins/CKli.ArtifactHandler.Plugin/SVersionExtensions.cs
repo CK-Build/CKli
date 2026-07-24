@@ -1,4 +1,5 @@
 using CK.Core;
+using NuGet.Protocol.Core.Types;
 using System;
 
 namespace CKli;
@@ -35,44 +36,24 @@ public static class SVersionExtensions
     }
 
     /// <summary>
-    /// Computes the <see cref="SVersionChange"/> from this version to <paramref name="next"/>
-    /// (this <see cref="SVersion.HasFakeMetadata"/> must be false otherwise a <see cref="InvalidOperationException"/> is thrown) 
-    /// <para>
-    /// The next version must also not be fake and it must a valid next version with a single increment
-    /// of major, minor or patch (or have the same major, minor and patch) otherwise a <see cref="ArgumentException"/> is thrown.
-    /// </para>
+    /// Adds an error log on failure of <see cref="SVersion.IsPreviousVersionNumbersOf(SVersion, out SVersionChange)"/>.
     /// </summary>
     /// <param name="thisVersion">This version.</param>
+    /// <param name="monitor">The monitor to signal a failure.</param>
     /// <param name="next">The next version.</param>
-    /// <returns>The version change between this and the next one.</returns>
-    public static SVersionChange FromNextVersion( this SVersion thisVersion, SVersion next )
+    /// <param name="change">The version change between this and the next one.</param>
+    /// <returns>
+    /// True if next follows this version with the <paramref name="change"/> (that can be <see cref="SVersionChange.None"/>
+    /// if the Major, Minor and Patch numbers are equal), false otherwise.
+    /// </returns>
+    public static bool IsPreviousVersionNumbersOf( this SVersion thisVersion, IActivityMonitor monitor, SVersion next, out SVersionChange change )
     {
-        Throw.CheckState( !thisVersion.HasFakeMetadata );
-        Throw.CheckArgument( !next.HasFakeMetadata );
-        Throw.CheckArgument( thisVersion <= next );
-
-        SVersionChange c;
-        if( thisVersion.Major == next.Major )
+        if( !thisVersion.IsPreviousVersionNumbersOf( next, out change ) )
         {
-            if( thisVersion.Minor == next.Minor )
-            {
-                Throw.CheckArgument( thisVersion == next || thisVersion.Patch == next.Patch - 1 );
-                c = thisVersion.Patch == next.Patch
-                        ? SVersionChange.None
-                        : SVersionChange.Patch;
-            }
-            else
-            {
-                Throw.CheckArgument( thisVersion.Minor == next.Minor - 1 && next.Patch == 0 );
-                c = SVersionChange.Minor;
-            }
+            monitor.Error( ActivityMonitor.Tags.ToBeInvestigated, $"The version '{next}' doesn't follow version '{thisVersion}'." );
+            return false;
         }
-        else
-        {
-            Throw.CheckArgument( thisVersion.Major == next.Major - 1 && next.Minor == 0 && next.Patch == 0 );
-            c = SVersionChange.Major;
-        }
-        return c;
+        return true;
     }
 
 }

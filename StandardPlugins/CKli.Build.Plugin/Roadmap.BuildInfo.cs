@@ -60,7 +60,7 @@ public sealed partial class Roadmap
                                     : [];
             _buildTaskLock = new Lock();
 
-            Throw.DebugAssert( "When we must build then version change s at least Patch.",
+            Throw.DebugAssert( "When we must build then version changes at least Patch.",
                                buildReason == MustBuildReason.None || versionChange >= SVersionChange.Patch );
 
             Throw.DebugAssert( "Currently the version can never be a +fake (the +fake is not skippable).", !_targetVersion.HasFakeMetadata );

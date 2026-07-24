@@ -77,6 +77,7 @@ public sealed partial class Roadmap
 
             MustBuildReason buildReason = MustBuildReason.None;
 
+            using var _ = monitor.OpenTrace( $"Initializing Roadmap BuildSolution '{_solution}'." );
             // If upstreams are built, always build.
             if( !InitializeUpstreams( monitor,
                                       out BuildSolution[] directRequirements,
@@ -163,9 +164,9 @@ public sealed partial class Roadmap
                             """ );
                         return false;
                     }
+                    // The version target is the last built one.
                     var vTarget = _lastBuild.TagCommit.Version;
-                    Throw.DebugAssert( "Fake version triggered MustBuildReason.FakeVersion.",
-                                       !_versionInfo.BaseBuild.Version.HasFakeMetadata && !vTarget.HasFakeMetadata );
+                    Throw.DebugAssert( "Fake version triggered MustBuildReason.FakeVersion.", !vTarget.HasFakeMetadata );
                     // If we are in --ci.0 mode and considered the non skippable conditions and we are here (MustBuildReason.None),
                     // then the version to consider must be the ci.0 version (not the non-CI build version associated to the TagCommit).
                     // This ci.0 version necessarily exists otherwise the UpdateSkippableBuildReason would have returned the "CI0" reason.
@@ -177,7 +178,15 @@ public sealed partial class Roadmap
                     }
                     // We compute the version change not for us (this solution will not be built) but for
                     // the downstream solutions to correctly propagate the change level (here it may be None).
-                    vChange = _versionInfo.BaseBuild.Version.FromNextVersion( vTarget );
+                    // If the LastStable is a +fake, we consider no impact (there's no code change if we are here).
+                    // In practice, commits should appear above the fake LastStable with their conventional commit
+                    // messages that can introduce breaking and feature changes.
+                    // IsPreviousVersionNumbersOf doesn't care of +fake version metadata and returns None when the
+                    // Major.Minor.Patch are equal: we have nothing special to do.
+                    if( !_versionInfo.BaseBuild.Version.IsPreviousVersionNumbersOf( monitor, vTarget, out vChange ) )
+                    {
+                        return false;
+                    }
                     _buildInfo = new BuildInfo( this,
                                                 MustBuildReason.None,
                                                 vChange,

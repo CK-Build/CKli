@@ -9,6 +9,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text.RegularExpressions;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace CKli.VersionTag.Plugin;
 
@@ -36,20 +37,17 @@ public sealed partial class TagCommitTree
 {
     readonly Commit _tip;
     readonly List<(TagCommit, int)> _content;
-    readonly int _zeroLevelCount;
+    readonly List<Commit> _headCommits;
     readonly VersionTagInfo.HotZoneInfo _hotZone;
-    readonly ImmutableArray<TagCommit> _topTagCommits;
-    HashSet<Commit>? _headCommits;
     SVersionChange? _versionChange;
 
-    internal TagCommitTree( VersionTagInfo.HotZoneInfo hotZone, Commit tip, List<(TagCommit, int)> content, int zeroLevelCount )
+    internal TagCommitTree( VersionTagInfo.HotZoneInfo hotZone, Commit tip, List<(TagCommit, int)> content, List<Commit> headCommits )
     {
         Throw.DebugAssert( content.Count > 0 && content[^1].Item1 == hotZone.LastStable );
         _hotZone = hotZone;
         _tip = tip;
         _content = content;
-        _zeroLevelCount = zeroLevelCount;
-        _topTagCommits = ImmutableArray.CreateRange( content.Select( x => x.Item1 ).Take( zeroLevelCount ) );
+        _headCommits = headCommits;
     }
 
     /// <summary>
@@ -67,49 +65,6 @@ public sealed partial class TagCommitTree
     /// The last one is necessarily <see cref="LastStable"/>.
     /// </summary>
     public IReadOnlyList<(TagCommit, int)> Content => _content;
-
-    /// <summary>
-    /// Gets the level 0 <see cref="TagCommit"/> in <see cref="Content"/>.
-    /// </summary>
-    public ImmutableArray<TagCommit> TopTagCommits => _topTagCommits;
-
-    /// <summary>
-    /// Gets all the commits from <see cref="Tip"/> (included) to the <see cref="TopTagCommits"/> (excluded).
-    /// This is empty if Tip appears in the TopTagCommits.
-    /// </summary>
-    public IReadOnlySet<Commit> HeadCommits
-    {
-        get
-        {
-            if( _headCommits == null )
-            {
-                _headCommits = new HashSet<Commit>();
-                var stops = new Commit[_zeroLevelCount];
-                for( int i = 0; i < _zeroLevelCount; ++i ) stops[i] = _topTagCommits[i].Commit;
-                if( AddParents( stops, _tip, _headCommits ) ) _headCommits.Add( _tip );
-                Throw.DebugAssert( _headCommits.Count == 0 || _headCommits.Contains( _tip ) );
-            }
-            return _headCommits;
-
-            static bool AddParents( Commit[] stops, Commit c, HashSet<Commit> heads )
-            {
-                bool hasStop = false;
-                foreach( var p in c.Parents )
-                {
-                    if( Array.IndexOf( stops, p ) >= 0 )
-                    {
-                        hasStop = true;
-                    }
-                    else if( AddParents( stops, p, heads ) )
-                    {
-                        heads.Add( p );
-                        hasStop = true;
-                    }
-                }
-                return hasStop;
-            }
-        }
-    }
 
     /// <summary>
     /// Gets the last build from a <see cref="BranchName"/> or null if not found.
@@ -159,13 +114,14 @@ public sealed partial class TagCommitTree
         TagCommit? c = null;
         BranchName? b = null;
         int level = 0;
-        for( int i = 0; i < _content.Count; i++ )
+        int i = 0;
+        while( i < _content.Count )
         {
             (c, b) = BestInLevel( _content, branch, ref i, level, allowCI );
             if( c != null ) break;
             ++level;
         }
-        Throw.DebugAssert( "We eventually reach LastStable.", c != null && b != null );
+        Throw.DebugAssert( "We eventually reached LastStable.", c != null && b != null );
         return (c, b);
 
 
@@ -192,9 +148,8 @@ public sealed partial class TagCommitTree
                     bestB = newB;
                     bestC = newC;
                 }
-                ++i;
             }
-            while( i < content.Count && content[i].Level == level );
+            while( ++i < content.Count && content[i].Level == level );
             return (bestC,bestB);
 
             static TagCommit? Filter( IReadOnlyList<(TagCommit T, int Level)> candidates, int i, bool allowCI )
@@ -227,29 +182,47 @@ public sealed partial class TagCommitTree
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="vChange">
     /// The current known version change to apply. This can be upgraded by the content of this tree (past released versions
-    /// and conventional commit messages content).
+    /// and conventional commit messages content). Final value is at least <see cref="SVersionChange.Patch"/>.
     /// </param>
     /// <param name="branch">The target branch for which the next version must be produced.</param>
     /// <param name="ciBuild">Whether a CI version must be produced.</param>
     /// <param name="mustAddCommit">
-    /// Whether a new commit will be created: this increments the <see cref="SVersion.CINumber"/>, this applies
-    /// only if <paramref name="ciBuild"/> is true.
+    /// Whether a new commit will be created: this increments the <see cref="SVersion.CINumber"/> (applies only
+    /// if <paramref name="ciBuild"/> is true).
     /// </param>
-    /// <returns></returns>
+    /// <returns>The version to create or null on error.</returns>
     public SVersion? ComputeTargetVersion( IActivityMonitor monitor,
                                            ref SVersionChange vChange,
                                            BranchName branch,
                                            bool ciBuild,
                                            bool mustAddCommit )
     {
-        if( vChange < SVersionChange.Major )
+        // Initial version to use: if we are on a +fake (like 1.5.4+fake, a +fake can only be a stable version), then
+        // we eventually want to produce v1.5.4 (not v1.5.5, v1.6.0 or v2.0.0) the initial version is the fake one,
+        // not the next one: vChange is useless for +fake!
+        SVersion v = LastStable.Version;
+        Throw.DebugAssert( "Starting from the stable: no prerelease suffix to cleanup.", v.Prerelease.Length == 0 );
+        if( v.HasFakeMetadata )
         {
-            var c = GetVersionChange();
-            if( c > vChange ) vChange = c;
-            // Ultimately use Patch.
+            // Since we build, we consider a minimal Patch change.
             if( vChange == SVersionChange.None ) vChange = SVersionChange.Patch;
         }
-        var v = LastStable.Version.SetNextVersionNumbers( vChange );
+        else
+        {
+            if( vChange < SVersionChange.Major )
+            {
+                var c = GetVersionChange();
+                if( c > vChange ) vChange = c;
+                // Ultimately use Patch.
+                if( vChange == SVersionChange.None ) vChange = SVersionChange.Patch;
+            }
+            v = v.SetNextVersionNumbers( vChange );
+        }
+        // The LastStable version may HasFakeMetadata but may also HasDeprecatedMetadata: we always 
+        // clear the metadata (it's a nop when there's no metadata).
+        v = v.SetBuildMetaData( null );
+        // Now that we have the Major.Minor.Patch, let's add the branch name and its potential
+        // prerelease number (if not on the root).
         if( !branch.IsRoot )
         {
             v = v.SetBranchName( branch.Name );
@@ -268,7 +241,7 @@ public sealed partial class TagCommitTree
             // the first one.
             v = v.SetPrereleaseNumber( prereleaseNumber );
         }
-        // Determine the CI number.
+        // Finalize with the CI number if required.
         if( ciBuild )
         {
             int ciNumber = LastStable.Repo.GitRepository.ComputeCommitDepth( monitor, LastStable.Commit, _tip );
@@ -298,22 +271,28 @@ public sealed partial class TagCommitTree
             SVersionChange vChange = SVersionChange.None;
             if( _tip.Sha != LastStable.Commit.Sha || _content.Count != 1 )
             {
-                // First, use the tags. If LastStable is a +fake we cannot conclude anything.
-                if( !LastStable.IsFakeVersion )
+                // First, use the tags.
+                var last = LastStable.Version;
+                foreach( var x in _content )
                 {
-                    foreach( var x in _content )
+                    if( !last.IsPreviousVersionNumbersOf( x.Item1.Version, out var c ) )
                     {
-                        var c = LastStable.Version.FromNextVersion( x.Item1.Version );
-                        if( c > vChange )
-                        {
-                            vChange = c;
-                            if( vChange == SVersionChange.Major ) break;
-                        }
+                        Throw.CKException( $"The '{x.Item1}' doesn't follow LasStable version '{last}'." );
+                    }
+                    if( c > vChange )
+                    {
+                        vChange = c;
+                        if( vChange == SVersionChange.Major ) break;
                     }
                 }
+                // If no major change so far, we must analyze the commit's messages.
+                // We consider the Tip's ancestors up to any TagCommit. The commits that have
+                // a TagCommit are ignored: either they are the top ones from the hot zone and their
+                // version changes have been computed above, or they are paths that lead to older
+                // versions than the LastStable.
                 if( vChange != SVersionChange.Major )
                 {
-                    foreach( var commit in HeadCommits )
+                    foreach( var commit in _headCommits )
                     {
                         var c = DetectVersionChange( commit, noNone: true );
                         if( c > vChange )

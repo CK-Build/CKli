@@ -207,7 +207,7 @@ public sealed partial class VersionTagInfo
             }
             var t = CreateTagCommitTree( tip );
             _commitTrees.Add( tip.Sha, t );
-            return CreateTagCommitTree( tip );
+            return t;
         }
 
         TagCommitTree? CreateTagCommitTree( Commit tip )
@@ -223,27 +223,31 @@ public sealed partial class VersionTagInfo
             // 2 - Because libgit2 (as well as git, see https://git-scm.com/docs/git-rev-list#Documentation/git-rev-list.txt-Defaultmode) prunes
             //     the graph based on the Content SHA (TREESAME): when playing with "empty commits", we take the risk to miss parents.
             //
-            // So we use the Parents and 3 mechanisms help us shorten the walk:
+            // So we use the Parents and 2 mechanisms help us shorten the walk:
             //  1) when LastStable is met, this stops the walk.
-            //  2) the time between the LastStable and the commit is checked (with half an hour margin): a too old commit stops the walk.
-            //     The margin handles clock drift and/or minor manual changes or adjustments.
-            //  3) the TagCommit version (if it exists) must be greater to the LastStable otherwise we stop the walk.
+            //  2) when the TagCommit version (if it exists) is lower than the LastStable we stop the walk.
             //
-            // The fact is that the following code can produce TagCommits that don't have LastStable in their ancestors.
-            // This is where 2) and 3) above kicks in: too old commits and versions older than LastStable are rejected.
-            // => There shouldn't be any TagCommits like this. But if there are, we "save" them.
+            // We walk until a TagCommit is found and if it's in the hot zone (i.e. greater than LastStable) collect it and
+            // continue until the LastStable is met (and finalize the collection with the LastStable).
+            // TagCommits not in the hot zone (lower than LastStable) are lost because there is no interest to keep them even
+            // for TagCommitTree.GetVersionChange implementation: if no hot zone TagCommits introduce a Major change, we need
+            // to re-walk the graph from Tip to any TagCommit (hot zone or not) to analyze their commit messages.
             //
-            var timeLimit = _lastStable.Commit.Committer.When.UtcDateTime.AddMinutes( -30 );
+            // To avoid another walk for TagCommitTree.GetVersionChange, we capture the "head commits here": it only costs
+            // a List<Commit>.
+            //
             var collector = new List<(TagCommit, int)>();
+            // This avoids reprocessing the same commit (through merge commits).
             var commitSeen = new HashSet<string>();
+            // The commits from Tip to any TagCommits.
+            var headCommits = new List<Commit>();
 
             var stack = new Stack<(Commit, int)>();
             stack.Push( (tip, 0) );
-            int zeroLevelCount = 0;
             do
             {
                 var (c, l) = stack.Pop();
-                int nextL = Collect( _info, commitSeen, timeLimit, _lastStable, c, l, collector, ref zeroLevelCount );
+                int nextL = Collect( _info, commitSeen, _lastStable, c, l, collector, headCommits );
                 if( nextL >= 0 )
                 {
                     foreach( var p in c.Parents )
@@ -254,41 +258,42 @@ public sealed partial class VersionTagInfo
             }
             while( stack.Count > 0 );
 
-            Throw.DebugAssert( collector.Count == 0 || (zeroLevelCount > 0 && collector.Select( x => x.Item2 ).IsSortedLarge()) );
+            Throw.DebugAssert( collector.Count == 0 || collector.Select( x => x.Item2 ).IsSortedLarge() );
 
             return collector.Count == 0
                     ? null
-                    : new TagCommitTree( this, tip, collector, zeroLevelCount );
+                    : new TagCommitTree( this, tip, collector, headCommits );
 
             static int Collect( VersionTagInfo info,
                                  HashSet<string> commitSeen,
-                                 DateTime timeLimit,
                                  TagCommit lastStable,
                                  Commit c,
                                  int level,
                                  List<(TagCommit, int)> collector,
-                                 ref int zeroLevelCount )
+                                 List<Commit> headCommits )
             {
                 if( c.Sha == lastStable.Sha )
                 {
                     collector.Add( (lastStable, level) );
                     return -1;
                 }
-                if( c.Committer.When.UtcDateTime < timeLimit || !commitSeen.Add( c.Sha ) )
+                if( !commitSeen.Add( c.Sha ) )
                 {
                     return -1;
                 }
                 if( info.TagCommitsBySha.TryGetValue( c.Sha, out var tc ) )
                 {
-                    if( lastStable.Version < tc.Version
-                        || (lastStable.IsFakeVersion && !lastStable.Version.IsStableRoughBaseOf( tc.Version )) )
+                    // The tagged version must be greater than the last stable but we handle
+                    // the +fake case thanks to the relaxed IsStableRoughBaseOf condition.
+                    if( tc.Version > lastStable.Version
+                        || (lastStable.IsFakeVersion && lastStable.Version.IsStableRoughBaseOf( tc.Version )) )
                     {
-                        return -1;
+                        collector.Add( (tc, level) );
+                        return level + 1;
                     }
-                    collector.Add( (tc, level) );
-                    if( level == 0 ) ++zeroLevelCount;
-                    return level + 1;
+                    return -1;
                 }
+                if( level == 0 ) headCommits.Add( c );
                 return level;
             }
         }
