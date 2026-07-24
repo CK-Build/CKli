@@ -11,7 +11,6 @@ namespace CKli.Core;
 /// </summary>
 public static partial class NuGetHelper
 {
-
     /// <summary>
     /// Helper that removes a NuGet source or (re)configures it.
     /// When set, the source is moved to the first position in both &lt;packageSources&gt; and &lt;packageSourceMapping&gt;.
@@ -103,11 +102,11 @@ public static partial class NuGetHelper
         var canaryPath = Path.Combine( localFolderPath, "ck.canarypackage/1.0.0" );
         if( !Directory.Exists( canaryPath ) )
         {
-            var canarySource = Path.Combine( Cache.GlobalCachePath, "ck.canarypackage/1.0.0" );
+            var canarySource = Path.Combine( Cache.GetGlobalCachePath( monitor ), "ck.canarypackage/1.0.0" );
             if( !Directory.Exists( canarySource ) )
             {
                 monitor.Error( $"""
-                    Cannot find 'ck.canarypackage/1.0.0' installed NuGet package in '{Cache.GlobalCachePath}'.
+                    Cannot find 'ck.canarypackage/1.0.0' installed NuGet package in '{Cache.GetGlobalCachePath( monitor )}'.
                     This package is installed with CKli.Core and has no reason to be missing.
                     """ );
                 return false;

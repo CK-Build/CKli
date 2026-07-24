@@ -84,12 +84,12 @@ public sealed class NuGetDependencyCache
     public bool GetRequired( IActivityMonitor monitor,
                              string packageId,
                              SVersion version,
-                             [NotNullWhen(true)]out PackageInstance.WithDependencies? package )
+                             [NotNullWhen( true )] out PackageInstance.WithDependencies? package )
     {
         if( Get( monitor, packageId, version, out package ) )
         {
             if( package != null ) return true;
-            monitor.Error( $"Unable to find '{packageId}@{version}' in NuGet global cache (path: {NuGetHelper.Cache.GlobalCachePath})." );
+            monitor.Error( $"Unable to find '{packageId}@{version}' in NuGet global cache (path: {NuGetHelper.Cache.GetGlobalCachePath( monitor )})." );
         }
         return false;
     }
@@ -107,7 +107,7 @@ public sealed class NuGetDependencyCache
         if( !_altLookup.TryGetValue( (packageId, version), out package ) )
         {
             packageId = packageId.ToLowerInvariant();
-            var path = Path.Combine( NuGetHelper.Cache.GlobalCachePath, packageId, version.ToString(), packageId ) + ".nuspec";
+            var path = Path.Combine( NuGetHelper.Cache.GetGlobalCachePath( monitor), packageId, version.ToString(), packageId ) + ".nuspec";
             if( File.Exists( path ) )
             {
                 var dependencies = ImmutableArray.CreateBuilder<PackageInstance.WithDependencies>();

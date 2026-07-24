@@ -27,6 +27,9 @@ public sealed class RepoArtifactInfo : RepoInfo
 
     /// <summary>
     /// Moves the ".nupkg" in <paramref name="buildOutputPath"/> folder to the NuGet local feed.
+    /// <para>
+    /// This calls <see cref="NuGetHelper.Cache.RemovePackage(IActivityMonitor, string, SVersion?)"/> for each published package.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="version">The built version.</param>
@@ -89,8 +92,8 @@ public sealed class RepoArtifactInfo : RepoInfo
             }
             // Here is the current "deal" with NuGet:
             // Each time we generate a local package that replaces an already existing one, we clear
-            // it from the global cache. This allows the built package, if it is added at least once
-            // in any subsequent build to be available (for instance to tune tests Remotes).
+            // it from the global cache. If we don't do this, dotnet restore happily find the package instance
+            // in its global cache and doesn't update the actual package dependency.
             string packageId = new string( artifactName );
             var target = $"{localFeedNuGetPath}/{fileName}";
             if( File.Exists( target ) )
