@@ -12,5 +12,6 @@ public static class XNames
     public static readonly XName SupVersion = XNamespace.None + "SupVersion";
     public static readonly XName Version = XNamespace.None + "Version";
     public static readonly XName AutoFixRemovableTag = XNamespace.None + "AutoFixRemovableTag";
+    public static readonly XName RemoveUselessFakeTag = XNamespace.None + "RemoveUselessFakeTag";
     public static XName Name => CKli.Core.XNames.Name;
 }

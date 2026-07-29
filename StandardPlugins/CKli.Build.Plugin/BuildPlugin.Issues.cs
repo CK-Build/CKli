@@ -84,8 +84,8 @@ public sealed partial class BuildPlugin
                                                       versionTagInfo,
                                                       "Missing initial version.",
                                                       screenType.Text( $"""
-                                                      This can be fixed by creating a '{vInit}' on '{branchModel.Root.BranchName}' branch.
-                                                      """ ),
+                                                          This can be fixed by creating a '{vInit}' on '{branchModel.Root.BranchName}' branch.
+                                                          """ ),
                                                       branchModel.Root,
                                                       vInit ) );
                 }
@@ -156,6 +156,7 @@ public sealed partial class BuildPlugin
         public NoVersionTagIssue( BuildPlugin buildPlugin, VersionTagInfo versionTagInfo, string title, IRenderable body, HotBranch root, string vInit )
             : base( title, body, versionTagInfo.Repo )
         {
+            Throw.DebugAssert( vInit.EndsWith( "+fake" ) );
             _buildPlugin = buildPlugin;
             _versionTagInfo = versionTagInfo;
             _root = root;

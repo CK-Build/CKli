@@ -43,7 +43,7 @@ public sealed partial class TagCommitTree
 
     internal TagCommitTree( VersionTagInfo.HotZoneInfo hotZone, Commit tip, List<(TagCommit, int)> content, List<Commit> headCommits )
     {
-        Throw.DebugAssert( content.Count > 0 && content[^1].Item1 == hotZone.LastStable );
+        Throw.DebugAssert( content.Count > 0 && content[^1].Item1 == hotZone.LastPublishedStable );
         _hotZone = hotZone;
         _tip = tip;
         _content = content;
@@ -56,9 +56,9 @@ public sealed partial class TagCommitTree
     public Commit Tip => _tip;
 
     /// <summary>
-    /// Gets the <see cref="VersionTagInfo.HotZoneInfo.LastStable"/>.
+    /// Gets the <see cref="VersionTagInfo.HotZoneInfo.LastPublishedStable"/>.
     /// </summary>
-    public TagCommit LastStable => _hotZone.LastStable;
+    public TagCommit LastStable => _hotZone.LastPublishedStable;
 
     /// <summary>
     /// Gets the versioned tag commits with their 0-based increasing level from the first one.
@@ -70,11 +70,14 @@ public sealed partial class TagCommitTree
     /// Gets the last build from a <see cref="BranchName"/> or null if not found.
     /// </summary>
     /// <param name="branch">The branch name.</param>
-    /// <param name="allowCI">Whether CI version are allowed.</param>
+    /// <param name="allowCI">Whether CI versions are allowed.</param>
+    /// <param name="allowLocal">Whether <see cref="SVersionExtensions.IsLocal(SVersion)"/> versions must be considered.</param>
     /// <returns>The versioned tag commit or null if not found.</returns>
-    public TagCommit? GetLastBuild( BranchName branch, bool allowCI )
+    public TagCommit? GetLastBuild( BranchName branch, bool allowCI, bool allowLocal )
     {
-        return _content.Select( x => x.Item1 ).FirstOrDefault( tc => (allowCI || !tc.Version.IsCI ) && branch.Match( tc.Version ) );
+        return _content.Select( x => x.Item1 ).FirstOrDefault( tc => (allowCI || !tc.Version.IsCI )
+                                                                     && (allowLocal || !tc.Version.IsLocal())
+                                                                     && branch.Match( tc.Version ) );
     }
 
     /// <summary>
@@ -190,24 +193,37 @@ public sealed partial class TagCommitTree
     /// Whether a new commit will be created: this increments the <see cref="SVersion.CINumber"/> (applies only
     /// if <paramref name="ciBuild"/> is true).
     /// </param>
+    /// <param name="allowLocal">Whether <see cref="SVersionExtensions.IsLocal(SVersion)"/> versions must be considered.</param>
     /// <returns>The version to create or null on error.</returns>
     public SVersion? ComputeTargetVersion( IActivityMonitor monitor,
                                            ref SVersionChange vChange,
                                            BranchName branch,
                                            bool ciBuild,
-                                           bool mustAddCommit )
+                                           bool mustAddCommit,
+                                           bool allowLocal )
     {
         // Initial version to use: if we are on a +fake (like 1.5.4+fake, a +fake can only be a stable version), then
         // we eventually want to produce v1.5.4 (not v1.5.5, v1.6.0 or v2.0.0) the initial version is the fake one,
         // not the next one: vChange is useless for +fake!
         SVersion v = LastStable.Version;
         Throw.DebugAssert( "Starting from the stable: no prerelease suffix to cleanup.", v.Prerelease.Length == 0 );
+        bool applyVersionIncrement = true;
         if( v.HasFakeMetadata )
         {
             // Since we build, we consider a minimal Patch change.
             if( vChange == SVersionChange.None ) vChange = SVersionChange.Patch;
+            // If We are on the +fake that is the InfVersion for the repository,
+            // the we must adjust the behavior.
+            // Inf is not Min: versions must be strictly greater than InfVersion, so
+            // we consider the +fake as a "real" previous version and apply the
+            // increment as usual.
+            var infVersion = _hotZone.VersionTagInfo.InfVersion;
+            applyVersionIncrement = infVersion != null
+                                    && infVersion.Major == v.Major
+                                    && infVersion.Minor == v.Minor
+                                    && infVersion.Patch == v.Patch;
         }
-        else
+        if( applyVersionIncrement )
         {
             if( vChange < SVersionChange.Major )
             {
@@ -229,7 +245,7 @@ public sealed partial class TagCommitTree
             // Determine the PrereleaseNumber.
             int prereleaseNumber = 0;
             // Are there any previous release with this branch name?
-            var lastBuild = GetLastBuild( branch, ciBuild );
+            var lastBuild = GetLastBuild( branch, ciBuild, allowLocal );
             if( lastBuild != null )
             {
                 // If yes, then our prerelease number must be incremented
@@ -237,8 +253,7 @@ public sealed partial class TagCommitTree
                 prereleaseNumber = lastBuild.Version.PrereleaseNumber;
                 if( !ciBuild ) ++prereleaseNumber;
             }
-            // If no release on this branch exist, the prereleaseNumber 0 is
-            // the first one.
+            // If no release on this branch exist, the prereleaseNumber is 0 (the first one).
             v = v.SetPrereleaseNumber( prereleaseNumber );
         }
         // Finalize with the CI number if required.

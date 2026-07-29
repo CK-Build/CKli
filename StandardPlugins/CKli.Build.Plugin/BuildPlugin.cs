@@ -384,6 +384,16 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         return true;
     }
 
+    public enum ForceRebuildMode
+    {
+        /// <summary>
+        /// No force rebuild is made.
+        /// </summary>
+        None,
+        Local,
+        Published
+    }
+
     async Task<BuildResult?> CoreBuildAsync( IActivityMonitor monitor,
                                              CKliEnv context,
                                              VersionTagInfo versionInfo,
@@ -396,6 +406,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         var repoBuilder = _repoBuilder.Get( monitor, versionInfo.Repo );
         // Should we run the tests?
         runTest ??= !repoBuilder.HasTestRun( monitor, buildCommit );
+
+        VersionTagInfo.RebuildMode rebuild = VersionTagInfo.RebuildMode.None;
 
         // If we can avoid the build (because forceRebuild is false), we skip the build only if the tag has not been deleted:
         // this supports a "natural" force rebuild for the user by deleting the version tag.
@@ -419,11 +431,16 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                     }
                 }
             }
-            forceRebuild = true;
+            rebuild = VersionTagInfo.RebuildMode.AllowRebuildCommitAndCheckPrevious;
+            // On success, we will create a new BuildResult with a "local/" version.
+            targetVersion = targetVersion.SetParsedPrefix( "local/" );
         }
-        // On success, we will create a new BuildResult with a "local/" version.
-        targetVersion = targetVersion.SetParsedPrefix( "local/" );
-        var buildInfo = versionInfo.TryGetCommitBuildInfo( monitor, buildCommit, targetVersion, allowRebuild: forceRebuild );
+        else
+        {
+            // Explicit force rebuild: we reproduce the "local/" or not: we don't set
+            // the parsed prefix: the version is unchanged.
+        }
+        var buildInfo = versionInfo.TryGetCommitBuildInfo( monitor, buildCommit, targetVersion, rebuild );
         if( buildInfo == null )
         {
             return null;

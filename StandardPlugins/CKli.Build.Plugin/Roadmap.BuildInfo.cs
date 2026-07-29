@@ -147,7 +147,7 @@ public sealed partial class Roadmap
                 }
             }
             // Building requirements succeed: running this build.
-            _buildResult = await builder.BuildAsync( this ).ConfigureAwait( false );
+            _buildResult = await builder.ParallelBuildAsync( this ).ConfigureAwait( false );
             return _buildResult;
         }
 

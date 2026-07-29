@@ -213,7 +213,8 @@ public sealed partial class Roadmap
                                                                                        ref vChange,
                                                                                        _roadmap.Graph.BranchName,
                                                                                        _roadmap._ciBuildMode != CIBuildMode.None,
-                                                                                       mustAddCommit );
+                                                                                       mustAddCommit,
+                                                                                       allowLocal: false );
             if( targetVersion == null )
             {
                 return false;
@@ -323,7 +324,7 @@ public sealed partial class Roadmap
                 // even if this happens in an upstream of a Pivot, we must trigger the build of this solution.
                 // However, this looks more like an issue that can be detected at the VersionTagInfo level, when "ckli issue" is
                 // executed (not preemptively), so we error here and ask the user to use "ckli issue". This avoid the "_mustPublish"
-                // to appear in the Initialize step and scopes it only here, in the ConcludeInitialization step.
+                // to appear in the Initialize step and scopes it only here in the ConcludeInitialization step.
                 //
                 _mustPublish = CurrentVersion.IsLocal();
                 if( _mustPublish )
@@ -366,7 +367,7 @@ public sealed partial class Roadmap
         public HotGraph.SolutionVersionInfo VersionInfo => _versionInfo;
 
         /// <summary>
-        /// Gets the base version (the <see cref="VersionTagInfo.HotZoneInfo.LastStable"/> version).
+        /// Gets the base version (the <see cref="VersionTagInfo.HotZoneInfo.LastPublishedStable"/> version).
         /// </summary>
         public SVersion BaseVersion => _versionInfo.BaseBuild.Version;
 
@@ -427,22 +428,20 @@ public sealed partial class Roadmap
 
             var statusAndName = RepoName( head.Screen, Repo, MustBuild, BuildInfo == null );
             r = r.AddRight( statusAndName );
-            var currentVersion = $"v{CurrentVersion}";
+            bool localCurrentVersion = CurrentVersion.IsLocal();
             if( MustBuild )
             {
-                Throw.DebugAssert( "An error has been emitted if a MustBuild target version has already been published.",
-                                   _mustPublish );
+                Throw.DebugAssert( "An error has been emitted if a MustBuild target version has already been published.", _mustPublish );
                 Throw.DebugAssert( BuildInfo.BuildReason != MustBuildReason.None );
 
-                r = r.AddRight( head.Screen.Text( currentVersion, ConsoleColor.Blue ),
-                                head.Screen.Text( $"→ v{BuildInfo.TargetVersion} 🡡", ConsoleColor.Green ).Box( marginLeft: 1, marginRight: 1 ),
+                r = r.AddRight( head.Screen.Text( $"v{CurrentVersion}", ConsoleColor.Blue, effect: localCurrentVersion ? TextEffect.Strikethrough : TextEffect.Ignore ),
+                                head.Screen.Text( $"→ 🡡/v{BuildInfo.TargetVersion}", ConsoleColor.Green ).Box( marginLeft: 1, marginRight: 1 ),
                                 BuildInfo.RenderBuildReason( head.Screen, ref stats ) );
             }
             else
             {
-                r = r.AddRight( !_mustPublish
-                                    ? head.Screen.Text( currentVersion, ConsoleColor.DarkBlue )
-                                    : head.Screen.Text( $"{currentVersion} 🡡", ConsoleColor.Blue ) );
+                var currentVersion = localCurrentVersion ? $"🡡/v{CurrentVersion}" : $"v{CurrentVersion}";
+                r = r.AddRight( head.Screen.Text( currentVersion, _mustPublish ? ConsoleColor.Blue : ConsoleColor.DarkBlue ) );
             }
             return r;
 

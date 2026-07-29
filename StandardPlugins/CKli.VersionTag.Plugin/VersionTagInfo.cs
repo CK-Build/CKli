@@ -98,10 +98,12 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// Gets the last stable versions from the last stable one to the oldest one.
     /// <para>
     /// <see cref="TagCommit.IsRegularVersion"/> may be false ("+fake" and "+deprecated" appear here).
+    /// No "local/" version appears if a published version exists.
+    /// A "+fake" version appears in this list only if there is no corresponding published nor "local/" version.
+    /// When a "local/" version exists, it exposes the potential <see cref="TagCommit.FakeVersion"/>.
     /// </para>
     /// <para>
-    /// When this is empty, then <see cref="HotZone"/> is null and <see cref="HasIssue"/> is true: a first stable version (greater than 
-    /// <see cref="InfVersion"/>) should be produced to fix this. This fix is handled by the Build plugin (if the root "stable" branch exists).
+    /// When this is empty, then <see cref="HotZone"/> is null and <see cref="HasIssue"/> is true.
     /// </para>
     /// <para>
     /// This can be updated when a TagCommit is removed or inserted.
@@ -132,7 +134,7 @@ public sealed partial class VersionTagInfo : RepoInfo
         {
             if( _lastMajorMinorStables.IsDefault )
             {
-                var c = _hotZone?.LastStable;
+                var c = _hotZone?.LastPublishedStable;
                 if( c == null )
                 {
                     _lastMajorMinorStables = [];
@@ -161,7 +163,12 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <summary>
     /// Gets the hot zone information. Never null if <see cref="HasIssue"/> is false.
     /// <para>
-    /// This is not null as soon as a <see cref="HotZoneInfo.LastStable"/> exists.
+    /// This is not null as soon as a <see cref="HotZoneInfo.LastPublishedStable"/> exists.
+    /// When null, a first stable version (greater than <see cref="InfVersion"/>) should be produced.
+    /// This fix is handled by the Build plugin (if the root "stable" branch exists) that sets the <see cref="InfVersion"/>+fake tag on
+    /// the "stable" branch's tip.
+    /// This is done only if there are no <see cref="LightweightOrUnreadableRegularTags"/> (because if a tag can be successfully
+    /// rebuilt, then a LastStable will exist).
     /// </para>
     /// </summary>
     public HotZoneInfo? HotZone => _hotZone;
@@ -295,63 +302,54 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <param name="version">The target version. This is necessarily a "local/" prefixed version.</param>
     /// <param name="allowRebuild">True if the user allows a rebuild of an already built commit.</param>
     /// <returns>The commit build info on success, null on error.</returns>
-    public CommitBuildInfo? TryGetCommitBuildInfo( IActivityMonitor monitor, Commit buildCommit, SVersion version, bool allowRebuild )
+    public CommitBuildInfo? TryGetCommitBuildInfo( IActivityMonitor monitor, Commit buildCommit, SVersion version, RebuildMode rebuild )
     {
-        Throw.CheckArgument( version.ParsedPrefix == "local/" );
+        Throw.CheckArgument( "Published version => rebuild commit", !version.IsLocal() || (rebuild & RebuildMode.AllowRebuildCommit)!=0 );
         // Preconditions for any commit.
-        if( !CanBuildAnyCommit( monitor, buildCommit, version, allowRebuild, out bool isRebuild ) )
+        if( !CanBuildAnyCommit( monitor, buildCommit, version, rebuild, out bool isRebuild ) )
         {
             return null;
         }
-        // Here isRebuild is true when the commit with the version has been found AND allowRebuild is true.
-        if( isRebuild )
+        if( rebuild is RebuildMode.None || (rebuild & RebuildMode.CheckPreviousVersion) != 0 )
         {
-            return new CommitBuildInfo( this, version, buildCommit, isRebuild );
-        }
-        // However, when allowRebuild is true, we don't want to fail here because the topology is not valid:
-        // we must be able to rebuild versions in order to reach a "valid topology" state...
-        // So, here, when allowRebuild is true, we blindly allow the operation.
-        // => This may change in the future (with a new parameter?)...
-        if( allowRebuild )
-        {
-            return new CommitBuildInfo( this, version, buildCommit, true );
-        }
-
-        // We are not rebuilding (the version doesn't exist).
-        // Considering the existing versions, whatever the build process is, there are some invariants
-        // that must be respected.
-        // - There must be no gaps between major.minor.patch increments.
-        // - Whatever the version is (stable, pre or post release - the ones with the -- trick), the immediate
-        //   previous stable release must exist and appear in the commit parents.
-        //
-        // To handle exceptions, this is where the "+fake" build meta data is considered: we strictly enforce the rules
-        // but a "+fake" tag on any commit circumvents the rule and de facto publicly documents the exception. 
-        //
-        if( _hotZone == null )
-        {
-            // There is no stable release at all in the ]InfVersion?,SupVersion?[ range: we allow the target version
-            // to be anywhere in the range.
-            return new CommitBuildInfo( this, version, buildCommit, false );
-        }
-        TagCommit? baseCommit = FindBaseCommitByVersion( monitor, buildCommit, version );
-        if( baseCommit == null )
-        {
-            return null;
-        }
-        var div = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( buildCommit, baseCommit.Commit );
-        if( div.CommonAncestor.Sha != baseCommit.Commit.Sha )
-        {
-            monitor.Error( $"""
+            // Considering the existing versions, whatever the build process is, there are some invariants
+            // that must be respected.
+            // - There must be no gaps between major.minor.patch increments.
+            // - Whatever the version is (stable, pre or post release - the ones with the -- trick), the immediate
+            //   previous stable release must exist and appear in the commit parents.
+            //
+            // To handle exceptions, this is where the "+fake" build meta data is considered: we strictly enforce the rules
+            // but a "+fake" tag on any commit circumvents the rule and de facto publicly documents the exception. 
+            //
+            // When there is no stable release at all in the ]InfVersion?,SupVersion?[ range: we allow the target
+            // version to be anywhere in the range.
+            if( _hotZone != null )
+            {
+                TagCommit? baseCommit = FindBaseCommitByVersion( monitor, buildCommit, version );
+                if( baseCommit == null )
+                {
+                    return null;
+                }
+                var div = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( buildCommit, baseCommit.Commit );
+                if( div.CommonAncestor.Sha != baseCommit.Commit.Sha )
+                {
+                    monitor.Error( $"""
                     Invalid Commit/Version topology in '{Repo.DisplayPath}'.
 
                     To build the version 'v{version}', the commit '{buildCommit.Sha}' must be a parent of commit '{baseCommit.Sha}' with version 'v{baseCommit.Version}' built on {baseCommit.Commit.Committer.When}.
                     """ );
-            return null;
+                    return null;
+                }
+            }
         }
-        return new CommitBuildInfo( this, version, buildCommit, false );
+        return new CommitBuildInfo( this,
+                                    version,
+                                    buildCommit,
+                                    isRebuild && (rebuild & RebuildMode.AllowRebuildCommit) != 0,
+                                    isRebuild && (rebuild & RebuildMode.AllowRebuildVersion) != 0 );
     }
 
-    bool CanBuildAnyCommit( IActivityMonitor monitor, Commit buildCommit, SVersion version, bool allowRebuild, out bool isRebuild )
+    bool CanBuildAnyCommit( IActivityMonitor monitor, Commit buildCommit, SVersion version, RebuildMode rebuild, out bool isRebuild )
     {
         isRebuild = false;
         if( !CheckNoTagConflicts( monitor ) )
@@ -380,20 +378,18 @@ public sealed partial class VersionTagInfo : RepoInfo
                 return false;
             }
             // The version has already been produced. The buildCommit must be the same as the original version
-            // and allowBuild must be true.
-            if( exists.Commit.Sha != buildCommit.Sha )
+            // and allowRebuild must be true.
+            if( exists.Commit.Sha != buildCommit.Sha && (rebuild & RebuildMode.AllowRebuildVersion) == 0 )
             {
                 monitor.Error( ActivityMonitor.Tags.ToBeInvestigated, $"""
                     Invalid build commit '{buildCommit.Sha}' for version 'v{version}' in '{Repo.DisplayPath}'.
                     This version has already been produced by commit '{exists.Sha}' on {exists.Commit.Committer.When}.
 
-                    This is an error of the Build process itself: the build process must check that the version has not
-                    already been released. If it's the case and a rebuild is allowed, it must consider the original build
-                    commit rather than another commit (that may have the same code base).
+                    This is an error of the Build process itself: AllowRebuildVersion must be explicitly ste.
                     """ );
                 return false;
             }
-            if( !allowRebuild )
+            if( (rebuild & (RebuildMode.AllowRebuildVersion|RebuildMode.AllowRebuildCommit)) == 0 )
             {
                 // This should have been handled by the builder before calling TryGetCommitBuildInfo: this is a security.
                 monitor.Error( $"""
@@ -575,7 +571,9 @@ public sealed partial class VersionTagInfo : RepoInfo
 
     internal TagCommit AddReleaseBuildTag( SVersion version, Commit buildCommit, Tag t, BuildContentInfo contentInfo )
     {
-        Throw.DebugAssert( "New version is local.", version.ParsedPrefix == "local/" );
+        // We may be here on a "local/" version or not. Nominal case is "local/" (we are building through the Roadmap
+        // or the FixWorkflow) but when rebuilding LightweightOrUnreadableRegularTags, there's no TagCommit for
+        // the bad tag. 
         Throw.DebugAssert( "The 'ci.0' is on an existing TagCommit.", version.CINumber != 0 );
         Throw.DebugAssert( !_v2C.ContainsKey( version ) );
         Throw.DebugAssert( _sha2C != null );
@@ -599,7 +597,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// Removes the tag commit (not the Git tag from the repository).
     /// Handles the <see cref="AllTagCommits"/> and <see cref="TagCommitsBySha"/>.
     /// <para>
-    /// If the removed version is the <see cref="HotZoneInfo.LastStable"/>, the <see cref="HotZone"/> is set to null.
+    /// If the removed version is the <see cref="HotZoneInfo.LastPublishedStable"/>, the <see cref="HotZone"/> is set to null.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>

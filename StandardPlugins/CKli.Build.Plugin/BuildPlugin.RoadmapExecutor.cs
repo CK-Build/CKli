@@ -41,6 +41,12 @@ public sealed partial class BuildPlugin
             _channel = Channel.CreateUnbounded<object>( new UnboundedChannelOptions() { SingleReader = true } );
         }
 
+        /// <summary>
+        /// Entry point of the build: routes between single build by directly calling <see cref="DoBuildAsync"/>
+        /// or parallel build with <see cref="RunLoopAsync"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>The array of build result on success or null on error.</returns>
         internal async Task<BuildResult[]?> BuildAsync( IActivityMonitor monitor )
         {
             Throw.DebugAssert( _roadmap.SolutionBuildCount > 0 );
@@ -190,7 +196,7 @@ public sealed partial class BuildPlugin
             }
         }
 
-        internal async Task<BuildResult?> BuildAsync( Roadmap.BuildInfo buildInfo )
+        internal async Task<BuildResult?> ParallelBuildAsync( Roadmap.BuildInfo buildInfo )
         {
             Throw.DebugAssert( !_singleBuild );
             // Acquires a monitor.
@@ -240,13 +246,13 @@ public sealed partial class BuildPlugin
                                                             commit,
                                                             build.TargetVersion,
                                                             _runTest,
-                                                            forceRebuild: false ).ConfigureAwait( false );
+                                                            forceRebuild: !build.TargetVersion.IsCI ).ConfigureAwait( false );
             Throw.DebugAssert( result == null || result.Content.Produced.All( p => _roadmap.PackageMapping.GetMappedVersion( p, build.Solution.CurrentVersion ) == result.Version ) );
             // On error, we ensure that we let the repository on the "dev/" branch (this applies to non CI
             // build - in CI build we already are on the "dev/" branch).
             if( result == null && !_roadmap.IsCIBuild )
             {
-                // The files are exactly the same by design (hard reset has already been done by CoeBuild, no need to handle untracked & ignored files).
+                // The files are exactly the same by design (hard reset has already been done by CoreBuild, no need to handle untracked & ignored files).
                 build.Solution.Repo.GitRepository.Checkout( monitor, build.Solution.Solution.Branch.EnsureDevBranch(), deleteUntracked: false );
             }
             return result;

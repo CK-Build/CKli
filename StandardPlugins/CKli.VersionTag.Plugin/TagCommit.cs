@@ -24,6 +24,7 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     string? _message;
     BuildContentInfo? _buildContentInfo;
     DeprecatedTagInfo? _deprecatedInfo;
+    TagCommit? _fakeVersion;
 
     internal TagCommit( VersionTagInfo repoInfo, SVersion version, Commit commit, Tag tag, BuildContentInfo? contentInfo, DeprecatedTagInfo? deprecatedInfo )
     {
@@ -35,6 +36,12 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
         _buildContentInfo = contentInfo;
         _deprecatedInfo = deprecatedInfo;
         _sha = commit.Sha;
+    }
+
+    internal void SetFake( TagCommit fake )
+    {
+        Throw.DebugAssert( fake.IsFakeVersion && fake.Version == _version && IsLocal && _fakeVersion == null );
+        _fakeVersion = fake;
     }
 
     /// <summary>
@@ -63,6 +70,11 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     /// </summary>
     [MemberNotNullWhen( false, nameof( BuildContentInfo ) )]
     public bool IsFakeVersion => _version.HasFakeMetadata;
+
+    /// <summary>
+    /// Gets whether this version is a "local/" one.
+    /// </summary>
+    public bool IsLocal => _version.IsLocal();
 
     /// <summary>
     /// Gets whether this version tag is "+deprecated" one. <see cref="DeprecatedInfo"/> is necessarily not null.
@@ -94,6 +106,12 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     /// </para>
     /// </summary>
     public Tag? CI0VersionTag => _ci0Tag;
+
+    /// <summary>
+    /// Gets the +fake commit for this <see cref="Version"/> if it exists.
+    /// This is available only when <see cref="IsLocal"/> is true.
+    /// </summary>
+    public TagCommit? FakeVersion => _fakeVersion;
 
     /// <summary>
     /// Gets the tag's message if this <see cref="Tag"/> is an Annotated tag. Null otherwise.

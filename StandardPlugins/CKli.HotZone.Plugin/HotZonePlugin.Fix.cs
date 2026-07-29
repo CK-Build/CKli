@@ -88,7 +88,7 @@ public sealed partial class HotZonePlugin
                             : $"Unable to find any version to fix for 'v{major}'." );
             return false;
         }
-        if( toFix == versionInfo.HotZone.LastStable )
+        if( toFix == versionInfo.HotZone.LastPublishedStable )
         {
             monitor.Error( $"""
                 The version to fix 'v{toFix.Version}' is the current last stable version.
