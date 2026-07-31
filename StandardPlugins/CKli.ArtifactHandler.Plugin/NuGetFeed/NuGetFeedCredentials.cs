@@ -44,6 +44,21 @@ public sealed class NuGetFeedCredentials
     [MemberNotNullWhen( false, nameof( UserNameKey ) )]
     public bool IsAPIKey => _userNameKey == null;
 
+    /// <summary>
+    /// Gets the &lt;add key="Username" value="<see cref="UserNameKey"/>" /&gt; element.
+    /// </summary>
+    /// <returns>The &lt;packageSourceCredentials&gt; element.</returns>
+    public XElement ToNuGetUsernameElement() => new XElement( NuGetHelper.XNames.Add,
+                                                         new XAttribute( NuGetHelper.XNames.Key, "Username" ),
+                                                         new XAttribute( NuGetHelper.XNames.Value, _userNameKey ?? "" ) );
+
+    /// <summary>
+    /// Gets the &lt;add key=ClearTextPassword value="<see cref="SecretKey"/>" /&gt; element.
+    /// </summary>
+    /// <returns>The &lt;packageSourceCredentials&gt; element.</returns>
+    public XElement ToNuGetClearTextPasswordElement() => new XElement( NuGetHelper.XNames.Add,
+                                                                  new XAttribute( NuGetHelper.XNames.Key, "ClearTextPassword" ),
+                                                                  new XAttribute( NuGetHelper.XNames.Value, _secretKey ) );
     internal static NuGetFeedCredentials? Create( XElement? e )
     {
         if( e == null ) return null;

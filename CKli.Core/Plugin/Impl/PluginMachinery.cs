@@ -350,7 +350,7 @@ public sealed partial class PluginMachinery
             }
             if( mustRecompile )
             {
-                d.SaveWithoutXmlDeclaration( DirectoryPackageProps );
+                d.SafeSave( DirectoryPackageProps );
             }
 
             // Handling CKli.Testing version in 'Tests/Plugins.Tests/Plugins.Tests.csproj' if it exists.
@@ -387,7 +387,7 @@ public sealed partial class PluginMachinery
                           To use Version="{ckliVersion}".
                           """ );
                         ckliTesting.SetAttributeValue( "Version", ckliVersion );
-                        testsCSProj.SaveWithoutXmlDeclaration( PluginTestsCSProjFilePath );
+                        testsCSProj.SafeSave( PluginTestsCSProjFilePath );
                         mustRecompile = true;
                     }
                 }
@@ -454,25 +454,6 @@ public sealed partial class PluginMachinery
                 mustRecompile = true;
             }
             return true;
-        }
-    }
-
-    void CreateSolution( IActivityMonitor monitor )
-    {
-        using( monitor.OpenInfo( $"Creating '{Name}' solution." ) )
-        {
-            Directory.CreateDirectory( Root );
-            File.WriteAllText( SlnxPath, DefaultSlnFile );
-            Directory.CreateDirectory( CKliPluginsFolder );
-            File.WriteAllText( DirectoryBuildProps, string.Format( DefaultDirectoryBuildPropsPattern, Name ) );
-            File.WriteAllText( DirectoryPackageProps, DefaultDirectoryPackageProps );
-            File.WriteAllText( CKliPluginsCSProj, DefaultCKliPluginsCSProj );
-            File.WriteAllText( CKliPluginsFile, DefaultCKliPluginsFile );
-            File.WriteAllText( NuGetConfigFile, DefaultNuGetConfigFile );
-            if( _nuGetConfigFileHook != null )
-            {
-                Throw.CheckState( ApplyNuGetConfigFileHook( monitor, NuGetConfigFile ) );
-            }
         }
     }
 
@@ -708,7 +689,7 @@ public sealed partial class PluginMachinery
         {
             var d = XDocument.Load( nuGetConfigFile, LoadOptions.PreserveWhitespace );
             _nuGetConfigFileHook( monitor, d );
-            d.SaveWithoutXmlDeclaration( nuGetConfigFile );
+            d.SafeSave( nuGetConfigFile );
             return true;
         }
         catch( Exception ex )

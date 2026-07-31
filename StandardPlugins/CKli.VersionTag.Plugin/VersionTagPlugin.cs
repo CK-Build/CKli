@@ -538,6 +538,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         }
         else
         {
+            Throw.DebugAssert( topHot != null );
             // The HotZoneInfo will create the required manual fix if topHot.Version >= (lastStable.Major + 1, 0, 0).
             hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, info, lastPublishedStable, topHot );
         }

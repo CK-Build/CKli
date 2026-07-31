@@ -17,53 +17,47 @@ public static partial class NuGetHelper
     /// See <see href="https://learn.microsoft.com/en-us/nuget/consume-packages/package-source-mapping#enable-by-manually-editing-nugetconfig"/>. 
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="nugetConfigFile">The configuration xml file.</param>
+    /// <param name="root">The &lt;configuration&gt; root of the <c>nuget.config</c> file.</param>
     /// <param name="name">The name of the source.</param>
     /// <param name="sourceUrl">The source url. Null to remove it.</param>
     /// <param name="patterns">Optional patterns. When empty, "*" is used.</param>
     /// <returns>True on success, false otherwise.</returns>
     public static bool SetOrRemoveNuGetSource( IActivityMonitor monitor,
-                                               XDocument nugetConfigFile,
+                                               XElement root,
                                                string name,
                                                string? sourceUrl,
                                                params string[] patterns )
     {
-        if( nugetConfigFile.Root?.Name.LocalName != "configuration" )
-        {
-            monitor.Error( $"Missing <configuration> root element in:{Environment.NewLine}{nugetConfigFile}" );
-            return false;
-        }
-        var root = nugetConfigFile.Root;
-        var packageSources = root.Elements( "packageSources" ).FirstOrDefault();
+        var packageSources = root.Elements( XNames.PackageSources ).FirstOrDefault();
         if( packageSources == null )
         {
-            monitor.Error( $"Unable to find <packageSources> element in:{Environment.NewLine}{nugetConfigFile}" );
+            monitor.Error( $"Unable to find <packageSources> element in:{Environment.NewLine}{root}" );
             return false;
         }
         // Fix missing mapping first.
-        var mappings = root.Elements( "packageSourceMapping" ).FirstOrDefault();
+        var mappings = root.Elements( XNames.PackageSourceMapping ).FirstOrDefault();
         if( mappings == null )
         {
-            mappings = new XElement( "packageSourceMapping",
-                                     packageSources.Elements( "add" ).Attributes( "key" )
-                                        .Select( k => new XElement( "packageSource", new XAttribute( "key", k.Value ),
-                                                        new XElement( "package", new XAttribute( "pattern", "*" ) ) ) ) );
+            mappings = new XElement( XNames.PackageSourceMapping,
+                                     packageSources.Elements( XNames.Add ).Attributes( XNames.Key )
+                                        .Select( k => new XElement( XNames.PackageSource, new XAttribute( XNames.Key, k.Value ),
+                                                        new XElement( XNames.Package, new XAttribute( XNames.Pattern, "*" ) ) ) ) );
             root.Add( mappings );
-            monitor.Trace( $"Missing <packageSourceMapping>, it is now fixed:{Environment.NewLine}{nugetConfigFile}" );
+            monitor.Trace( $"Missing <packageSourceMapping>, it is now fixed:{Environment.NewLine}{root}" );
         }
         // First, removes.
-        var existing = packageSources.Elements( "add" ).FirstOrDefault( e => StringComparer.OrdinalIgnoreCase.Equals( name, (string?)e.Attribute( "key" ) ) );
+        var existing = packageSources.Elements( XNames.Add ).FirstOrDefault( e => StringComparer.OrdinalIgnoreCase.Equals( name, (string?)e.Attribute( XNames.Key ) ) );
         if( existing != null )
         {
             existing.Remove();
-            existing = mappings.Elements( "packageSource" ).FirstOrDefault( e => StringComparer.OrdinalIgnoreCase.Equals( name, (string?)e.Attribute( "key" ) ) );
+            existing = mappings.Elements( XNames.PackageSource ).FirstOrDefault( e => StringComparer.OrdinalIgnoreCase.Equals( name, (string?)e.Attribute( XNames.Key ) ) );
             existing?.Remove();
         }
         if( sourceUrl != null )
         {
             // Adds the source itself... but not before the </clear> elements!
-            var newOne = new XElement( "add", new XAttribute( "key", name ), new XAttribute( "value", sourceUrl ) );
-            var clear = packageSources.Elements( "clear" ).LastOrDefault();
+            var newOne = new XElement( XNames.Add, new XAttribute( XNames.Key, name ), new XAttribute( XNames.Value, sourceUrl ) );
+            var clear = packageSources.Elements( XNames.Clear ).LastOrDefault();
             if( clear != null )
             {
                 clear.AddAfterSelf( newOne );
@@ -74,10 +68,64 @@ public static partial class NuGetHelper
             }
             // And its mappings in first position.
             if( patterns.Length == 0 ) patterns = ["*"];
-            mappings.AddFirst( new XElement( "packageSource", new XAttribute( "key", name ),
-                                    patterns.Select( p => new XElement( "package", new XAttribute( "pattern", p ) ) ) ) );
+            mappings.AddFirst( new XElement( XNames.PackageSource, new XAttribute( XNames.Key, name ),
+                                    patterns.Select( p => new XElement( XNames.Package, new XAttribute( XNames.Pattern, p ) ) ) ) );
         }
         return true;
+    }
+
+    /// <summary>
+    /// Gets the &lt;configuration&gt; root element, checking its name.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="nugetConfigFile">The <c>nuget.config</c> document.</param>
+    /// <returns>The configuration root or null on error.</returns>
+    public static XElement? GetConfigurationRoot( IActivityMonitor monitor, XDocument nugetConfigFile )
+    {
+        if( nugetConfigFile.Root?.Name.LocalName != "configuration" )
+        {
+            monitor.Error( $"Missing <configuration> root element in:{Environment.NewLine}{nugetConfigFile}" );
+            return null;
+        }
+        return nugetConfigFile.Root;
+    }
+
+    /// <summary>
+    /// Reads the &lt;configuration&gt; root element from a file, checking its name.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="nugetConfigFilePath">The <c>nuget.config</c> file path.</param>
+    /// <returns>The configuration root or null on error.</returns>
+    public static XElement? GetConfigurationRoot( IActivityMonitor monitor, string nugetConfigFilePath )
+    {
+        try
+        {
+            return GetConfigurationRoot( monitor, XDocument.Load( nugetConfigFilePath ) );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While loading '{nugetConfigFilePath}'.", ex );
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Reads the &lt;configuration&gt; root element from a stream, checking its name.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="s">A read stream on a <c>nuget.config</c> content.</param>
+    /// <returns>The configuration root or null on error.</returns>
+    public static XElement? GetConfigurationRoot( IActivityMonitor monitor, Stream s )
+    {
+        try
+        {
+            return GetConfigurationRoot( monitor, XDocument.Load( s ) );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While loading stream.", ex );
+            return null;
+        }
     }
 
     /// <summary>

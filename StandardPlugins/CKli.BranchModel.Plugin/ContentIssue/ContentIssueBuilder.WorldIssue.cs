@@ -12,8 +12,8 @@ public sealed partial class ContentIssueBuilder
         readonly List<ContentIssueEvent.Collector> _branchIssues;
 
         public WorldIssue( string title,
-                      IRenderable body,
-                      List<ContentIssueEvent.Collector> branchIssues )
+                           IRenderable body,
+                           List<ContentIssueEvent.Collector> branchIssues )
             : base( title, body, branchIssues[0].Branch.Repo )
         {
             _branchIssues = branchIssues;

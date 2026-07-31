@@ -330,8 +330,8 @@ public sealed partial class VersionTagInfo : RepoInfo
                 {
                     return null;
                 }
-                var div = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( buildCommit, baseCommit.Commit );
-                if( div.CommonAncestor.Sha != baseCommit.Commit.Sha )
+                var div = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( baseCommit.Commit, buildCommit );
+                if( div.AheadBy is not 0 )
                 {
                     monitor.Error( $"""
                     Invalid Commit/Version topology in '{Repo.DisplayPath}'.
@@ -385,7 +385,7 @@ public sealed partial class VersionTagInfo : RepoInfo
                     Invalid build commit '{buildCommit.Sha}' for version 'v{version}' in '{Repo.DisplayPath}'.
                     This version has already been produced by commit '{exists.Sha}' on {exists.Commit.Committer.When}.
 
-                    This is an error of the Build process itself: AllowRebuildVersion must be explicitly ste.
+                    This is an error of the Build process itself: AllowRebuildVersion must be explicitly set.
                     """ );
                 return false;
             }
@@ -427,7 +427,7 @@ public sealed partial class VersionTagInfo : RepoInfo
             // would require the TagCommitsBySha to be a Dictionary<string,List<TagCommit>>).
             //
             // There is only 2 cases where it makes sense to produce 2 versions from the same commit:
-            // - When a CI version (reps. prerelease) has been created and, without any change in the code, a
+            // - When a CI version (resp. prerelease) has been created and, without any change in the code, a
             //   non-CI (resp. stable or "less prerelease") version must be produced.
             //   This is quite rare as it implies that no dependency updates must be made in the code: this scenario
             //   applies to "rank 0" repositories that have no dependencies to any other repositories in the stack (no

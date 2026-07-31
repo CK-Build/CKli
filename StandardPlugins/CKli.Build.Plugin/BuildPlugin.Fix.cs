@@ -108,11 +108,18 @@ public sealed partial class BuildPlugin
         context.Screen.Display( display );
         if( _onFixBuild.HasHandlers )
         {
-            var e = new FixBuildEventArgs( monitor, workflow, results, publish );
-            if( !await _onFixBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) )
+            using( monitor.OpenTrace( $"Raising FixBuild event." ) )
             {
-                return false;
+                var e = new FixBuildEventArgs( monitor, workflow, results, publish );
+                if( !await _onFixBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) )
+                {
+                    return false;
+                }
             }
+        }
+        else
+        {
+            monitor.OpenInfo( $"No listener to the FixBuild event." );
         }
         return true;
 
@@ -159,14 +166,27 @@ public sealed partial class BuildPlugin
             // The target version already has the incremented Patch number.
             targetVersion = targetVersion.SetCINumber( commitDepth, impactStablePatchNumber: false );
         }
+        else
+        {
+            // We are ready to build or rebuild the target.
+            // We have nothing to do when rebuilding: the previous "local/" if it exists, will be
+            // moved (the "rolling local build" feature).
+            // But when a "fix build --ci" has been done right before, a "--ci" version tag may
+            // exist on the same commit we are building. Because this is not allowed, we must
+            // handle this case.
+            // We decide to be rather aggressive here by cleaning any CI builds (or deprecate them
+            // if they have been published... No! this won't work! One cannot rebuild a +deprecated!)
+            //
+            // TODO!!!
+        }
 
         var result = await CoreBuildAsync( monitor,
-                                            context,
-                                            versionInfo,
-                                            target.Repo.GitRepository.Repository.Head.Tip,
-                                            targetVersion,
-                                            runTest,
-                                            forceRebuild: rebuild ).ConfigureAwait( false );
+                                           context,
+                                           versionInfo,
+                                           target.Repo.GitRepository.Repository.Head.Tip,
+                                           targetVersion.SetParsedPrefix( "local/" ),
+                                           runTest,
+                                           forceRebuild: rebuild ).ConfigureAwait( false );
         if( result == null )
         {
             return false;

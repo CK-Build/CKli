@@ -183,8 +183,8 @@ sealed partial class PluginMachinery
                     return false;
                 }
                 File.WriteAllText( _machinery.CKliPluginsFile, _ckliPluginsFileText );
-                _csProj.SaveWithoutXmlDeclaration( _machinery.CKliPluginsCSProj );
-                _directoryPackages.SaveWithoutXmlDeclaration( _machinery.DirectoryPackageProps );
+                _csProj.SafeSave( _machinery.CKliPluginsCSProj );
+                _directoryPackages.SafeSave( _machinery.DirectoryPackageProps );
                 return true;
             }
             catch( Exception ex )

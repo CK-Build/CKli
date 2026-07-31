@@ -88,10 +88,10 @@ public sealed partial class HotZonePlugin
                             : $"Unable to find any version to fix for 'v{major}'." );
             return false;
         }
-        if( toFix == versionInfo.HotZone.LastPublishedStable )
+        if( toFix.Version >= versionInfo.HotZone.LastPublishedStable.Version )
         {
             monitor.Error( $"""
-                The version to fix 'v{toFix.Version}' is the current last stable version.
+                The version to fix 'v{toFix.Version}' is in the "hot zone" (the last published stable version is 'v{versionInfo.HotZone.LastPublishedStable.Version}').
                 Use the regular workflow with 'ckli build/publish' commands to produce a fix.
                 """ );
             return false;

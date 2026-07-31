@@ -77,7 +77,7 @@ public sealed class MutableSolution
                 }
                 foreach( var p in projectFiles )
                 {
-                    XmlHelper.SaveWithoutXmlDeclaration( p.Project.Document!, _repo.WorkingFolder.Combine( p.Path ) );
+                    XmlHelper.SafeSave( p.Project.Document!, _repo.WorkingFolder.Combine( p.Path ) );
                 }
             }
         }

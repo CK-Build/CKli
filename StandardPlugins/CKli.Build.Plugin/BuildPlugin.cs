@@ -272,11 +272,18 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         // it's up to the listeners to handle this (roadmap.SolutionBuildCount and SolutionPublishCount can be 0).
         if( _onRoadmapBuild.HasHandlers )
         {
-            var e = new RoadmapBuildEventArgs( monitor, roadmap );
-            if( !await _onRoadmapBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) || !e.Success )
+            using( monitor.OpenTrace( $"Raising RoadmapBuild event." ) )
             {
-                return false;
+                var e = new RoadmapBuildEventArgs( monitor, roadmap );
+                if( !await _onRoadmapBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) || !e.Success )
+                {
+                    return false;
+                }
             }
+        }
+        else
+        {
+            monitor.OpenInfo( $"No listener to the RoadmapBuild event." );
         }
         return true;
     }
@@ -439,6 +446,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             // Explicit force rebuild: we reproduce the "local/" or not: we don't set
             // the parsed prefix: the version is unchanged.
+            rebuild = VersionTagInfo.RebuildMode.AllowRebuildCommit | VersionTagInfo.RebuildMode.AllowRebuildVersion | VersionTagInfo.RebuildMode.CheckPreviousVersion;
         }
         var buildInfo = versionInfo.TryGetCommitBuildInfo( monitor, buildCommit, targetVersion, rebuild );
         if( buildInfo == null )

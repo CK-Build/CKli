@@ -51,7 +51,7 @@ public sealed partial class World
             // Silently skip any (stupid) change.
             newDefinition.Name = ltsName;
         }
-        XmlHelper.SaveWithoutXmlDeclaration( newDefFile, newFileDesc );
+        XmlHelper.SafeSave( newDefFile, newFileDesc );
 
         var source = new DirectoryInfo( _stackRepository.StackWorkingFolder.AppendPart( PluginMachinery.CKliPluginsFolderName ) );
         var target = new DirectoryInfo( newRoot.AppendPart( PluginMachinery.CKliPluginsFolderName ) );

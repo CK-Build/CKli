@@ -289,16 +289,21 @@ public sealed class MigrationPlugin : PrimaryPluginBase
         var d = XDocument.Load( slnxPath );
         d.Root!.Descendants( "File" ).Where( e => e.Attribute( "Path" )?.Value == "RepositoryInfo.xml"
                                                  || e.Attribute( "Path" )?.Value == "Common/SharedKey.snk" ).Remove();
-        XmlHelper.SaveWithoutXmlDeclaration( d, slnxPath );
+        XmlHelper.SafeSave( d, slnxPath );
 
         var nugetConfigPath = repo.WorkingFolder.AppendPart( "nuget.config" );
         if( File.Exists( nugetConfigPath ) )
         {
-            var nuget = XDocument.Load( nugetConfigPath );
+            var nuget = NuGetHelper.GetConfigurationRoot( monitor, nugetConfigPath );
+            if( nuget == null ) return false;
+
             // This doesn't remove the "local-feed" (that shouldn't exist) but initializes
             // the <packageSourceMapping> from the existing <packageSources>.
-            NuGetHelper.SetOrRemoveNuGetSource( monitor, nuget, "local-feed", null );
-            XmlHelper.SaveWithoutXmlDeclaration( nuget, nugetConfigPath );
+            if( !NuGetHelper.SetOrRemoveNuGetSource( monitor, nuget, "local-feed", null ) )
+            {
+                return false;
+            }
+            XmlHelper.SafeSave( nuget.Document!, nugetConfigPath );
         }
 
         // Loads and saves the .csproj, .props and .targets to "normalize" them (no Xml declaration, no BOM)
@@ -310,7 +315,7 @@ public sealed class MigrationPlugin : PrimaryPluginBase
             {
                 try
                 {
-                    XmlHelper.SaveWithoutXmlDeclaration( XDocument.Load( f, LoadOptions.PreserveWhitespace ), f );
+                    XmlHelper.SafeSave( XDocument.Load( f, LoadOptions.PreserveWhitespace ), f );
                 }
                 catch { }
             }

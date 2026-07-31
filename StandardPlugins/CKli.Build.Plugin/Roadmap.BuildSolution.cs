@@ -434,7 +434,8 @@ public sealed partial class Roadmap
                 Throw.DebugAssert( "An error has been emitted if a MustBuild target version has already been published.", _mustPublish );
                 Throw.DebugAssert( BuildInfo.BuildReason != MustBuildReason.None );
 
-                r = r.AddRight( head.Screen.Text( $"v{CurrentVersion}", ConsoleColor.Blue, effect: localCurrentVersion ? TextEffect.Strikethrough : TextEffect.Ignore ),
+                r = r.AddRight( head.Screen.Text( localCurrentVersion ? $"-{CurrentVersion}-" : $"v{CurrentVersion}", ConsoleColor.Blue,
+                                                  effect: localCurrentVersion ? TextEffect.Strikethrough : TextEffect.Ignore ),
                                 head.Screen.Text( $"→ 🡡/v{BuildInfo.TargetVersion}", ConsoleColor.Green ).Box( marginLeft: 1, marginRight: 1 ),
                                 BuildInfo.RenderBuildReason( head.Screen, ref stats ) );
             }

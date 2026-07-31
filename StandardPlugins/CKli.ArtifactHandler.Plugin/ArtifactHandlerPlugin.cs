@@ -58,10 +58,25 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
                 ev.Issues.CreateFile( n, defaultConfig.ToString );
             }
         }
-        else if( nInfo.Name != n )
+        else
         {
-            Throw.DebugAssert( nInfo.Name.Equals( n, StringComparison.OrdinalIgnoreCase ) );
-            ev.Issues.MoveFile( nInfo.Name, n );
+            if( nInfo.Name != n )
+            {
+                Throw.DebugAssert( nInfo.Name.Equals( n, StringComparison.OrdinalIgnoreCase ) );
+                ev.Issues.MoveFile( nInfo.Name, n );
+            }
+            using( var s = nInfo.CreateReadStream() )
+            {
+                var root = NuGetHelper.GetConfigurationRoot( ev.Monitor, s );
+                if( root != null )
+                {
+                    if( ApplyConfiguredNuGetFeeds( ev.Monitor, root, out var actions )
+                        && actions != null )
+                    {
+                        ev.Issues.UpdateFile( n, () => root.ToString() );
+                    }
+                }
+            }
         }
     }
 
@@ -124,6 +139,126 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
     }
 
     /// <summary>
+    /// Applies the <see cref="NuGetFeed"/> configurations to a <c>nuget.config</c> file.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="root">The &lt;configuration&gt; root of the <c>nuget.config</c> file.</param>
+    /// <param name="actions">Outputs the required updates if any. Null if the <paramref name="root"/> is up to date.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    public bool ApplyConfiguredNuGetFeeds( IActivityMonitor monitor, XElement root, out List<string>? actions )
+    {
+        actions = null;
+        if( !GetConfiguredNuGetFeeds( monitor, out var feeds ) )
+        {
+            return false;
+        }
+        var addSources = root.Elements( NuGetHelper.XNames.PackageSources ).Elements( NuGetHelper.XNames.Add ).ToList();
+        var mappings = root.Elements( NuGetHelper.XNames.PackageSourceMapping ).Elements( NuGetHelper.XNames.PackageSource ).ToList();
+        var creds = root.Element( NuGetHelper.XNames.PackageSourceCredentials );
+        foreach( var f in feeds )
+        {
+            bool mustEnsureSource = false;
+            var s = addSources.FirstOrDefault( a => (string?)a.Attribute( NuGetHelper.XNames.Key ) == f.Name );
+            if( s == null )
+            {
+                actions ??= [];
+                actions.Add( $"Source '{f.Name}' is missing." );
+                mustEnsureSource = true;
+            }
+            else
+            {
+                var url = (string?)s.Attribute( NuGetHelper.XNames.Value );
+                if( url != f.Url )
+                {
+                    actions ??= [];
+                    actions.Add( $"Source '{f.Name}' must reference '{f.Url}', not '{url}'." );
+                    mustEnsureSource = true;
+                }
+                var m = mappings.FirstOrDefault( a => (string?)a.Attribute( NuGetHelper.XNames.Key ) == f.Name );
+                if( m == null )
+                {
+                    actions ??= [];
+                    actions.Add( $"Source mapping for '{f.Name}' is missing." );
+                    mustEnsureSource = true;
+                }
+            }
+            var credName = XNamespace.None + f.Name.Replace( " ", "_x0020_" );
+            if( f.FakeReadCredentials != null )
+            {
+                bool mustAdd = false;
+                if( creds == null )
+                {
+                    actions ??= [];
+                    actions.Add( $"Missing required <packageSourceCredentials> element." );
+                    creds = new XElement( NuGetHelper.XNames.PackageSourceCredentials );
+                    root.Add( creds );
+                    actions.Add( $"Missing fake read credentials for '{f.Name}'." );
+                    mustAdd = true;
+                }
+                else 
+                {
+                    var eCred = creds.Element( credName );
+                    if( eCred == null )
+                    {
+                        actions ??= [];
+                        actions.Add( $"Missing fake read credentials for '{f.Name}'." );
+                        mustAdd = true;
+                    }
+                    else
+                    {
+                        bool hasUsername = false;
+                        bool hasPwd = false;
+                        foreach( var e in eCred.Elements( NuGetHelper.XNames.Add ) )
+                        {
+                            var key = (string?)e.Attribute( NuGetHelper.XNames.Key );
+                            if( key == "Username" )
+                            {
+                                hasUsername = (string?)e.Attribute( NuGetHelper.XNames.Value ) == (f.FakeReadCredentials.UserNameKey ?? "");
+                            }
+                            else if( key == "ClearTextPassword" )
+                            {
+                                hasPwd = (string?)e.Attribute( NuGetHelper.XNames.Value ) == f.FakeReadCredentials.SecretKey;
+                            }
+                        }
+                        if( !hasUsername || !hasPwd )
+                        {
+                            actions ??= [];
+                            actions.Add( $"Fake read credentials for '{f.Name}' must be updated." );
+                            eCred.Elements( NuGetHelper.XNames.Add )
+                                 .Where( a => (string?)a.Attribute( NuGetHelper.XNames.Key ) is "Username" or "ClearTextPassword" )
+                                 .Remove();
+                            mustAdd = true;
+                        }
+                    }
+                }
+                if( mustAdd )
+                {
+                    creds.Add( new XElement( credName,
+                                              f.FakeReadCredentials.ToNuGetUsernameElement(),
+                                              f.FakeReadCredentials.ToNuGetClearTextPasswordElement() ) );
+                }
+            }
+            else if( creds != null )
+            {
+                var eCred = creds.Element( credName );
+                if( eCred != null )
+                {
+                    actions ??= [];
+                    actions.Add( $"Credentials for '{f.Name}' must be removed." );
+                    eCred.Remove();
+                }
+            }
+
+            if( mustEnsureSource )
+            {
+                NuGetHelper.SetOrRemoveNuGetSource( monitor, root, f.Name, f.Url );
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Gets the content of a <c>nuget.config</c> file based on the configured feeds
     /// (see <see cref="GetConfiguredNuGetFeeds(IActivityMonitor, out ImmutableArray{NuGetFeed})"/>).
     /// </summary>
@@ -137,28 +272,28 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
             {
                 return null;
             }
-            var root = new XElement( "configuration",
-                            new XElement( "packageSources",
-                                    new XElement( "clear" ),
-                                    feeds.Select( f => new XElement( "add", new XAttribute( "key", f.Name ), new XAttribute( "value", f.Url ) ) ) ),
-                            new XElement( "packageSourceMapping",
-                                    feeds.Select( f => new XElement( "packageSource", new XAttribute( "key", f.Name ),
-                                                            new XElement( "package", new XAttribute( "pattern", "*" ) ) ) ) ),
+            var root = new XElement( NuGetHelper.XNames.Configuration,
+                            new XElement( NuGetHelper.XNames.PackageSources,
+                                    new XElement( NuGetHelper.XNames.Clear ),
+                                    feeds.Select( f => new XElement( NuGetHelper.XNames.Add,
+                                                                        new XAttribute( NuGetHelper.XNames.Key, f.Name ),
+                                                                        new XAttribute( NuGetHelper.XNames.Value, f.Url ) ) ) ),
+                            new XElement( NuGetHelper.XNames.PackageSourceMapping,
+                                    feeds.Select( f => new XElement( NuGetHelper.XNames.PackageSource,
+                                                            new XAttribute( NuGetHelper.XNames.Key, f.Name ),
+                                                            new XElement( NuGetHelper.XNames.Package,
+                                                                    new XAttribute( NuGetHelper.XNames.Pattern, "*" ) ) ) ) ),
                             GetPackageSourceCredentials( feeds ) );
 
             static XElement? GetPackageSourceCredentials( ImmutableArray<NuGetFeed> feeds )
             {
                 if( feeds.Any( f => f.FakeReadCredentials != null ) )
                 {
-                    return new XElement( "packageSourceCredentials",
+                    return new XElement( NuGetHelper.XNames.PackageSourceCredentials,
                                          feeds.Where( f => f.FakeReadCredentials != null )
                                               .Select( f => new XElement( f.Name.Replace( " ", "_x0020_" ),
-                                                                 new XElement( "add",
-                                                                    new XAttribute( "key", "Username" ),
-                                                                    new XAttribute( "value", f.FakeReadCredentials!.UserNameKey ?? "" ) ),
-                                                                 new XElement( "add",
-                                                                    new XAttribute( "key", "ClearTextPassword" ),
-                                                                    new XAttribute( "value", f.FakeReadCredentials!.SecretKey ) ) ) ) );
+                                                                 f.FakeReadCredentials!.ToNuGetUsernameElement(),
+                                                                 f.FakeReadCredentials!.ToNuGetClearTextPasswordElement() ) ) );
                 }
                 return null;
             }

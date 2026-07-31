@@ -22,12 +22,14 @@ namespace CKli.Build.Plugin;
 public class RepoBuilder : RepoInfo
 {
     readonly RepositoryBuilderPlugin _repositoryBuilder;
+    readonly ArtifactHandlerPlugin _artifactHandler;
     readonly RepoArtifactInfo _repoArtifact;
 
-    public RepoBuilder( Repo repo, RepositoryBuilderPlugin repositoryBuilder, RepoArtifactInfo repoArtifact )
+    public RepoBuilder( Repo repo, RepositoryBuilderPlugin repositoryBuilder, ArtifactHandlerPlugin artifactHandler, RepoArtifactInfo repoArtifact )
         : base( repo )
     {
         _repositoryBuilder = repositoryBuilder;
+        _artifactHandler = artifactHandler;
         _repoArtifact = repoArtifact;
     }
 
@@ -62,8 +64,7 @@ public class RepoBuilder : RepoInfo
                                                 CommitBuildInfo buildInfo,
                                                 bool runTest )
     {
-        Throw.CheckState( "Repository must not be dirty when calling build.",
-                          !Repo.GitRepository.GetSimpleStatusInfo().IsDirty );
+        Throw.CheckState( "Repository must not be dirty when calling build.", !Repo.GitRepository.GetSimpleStatusInfo().IsDirty );
         Throw.CheckArgument( buildInfo.Repo == Repo );
 
         // Calling "dotnet build --source <localFeed>" fails with:
@@ -76,11 +77,31 @@ public class RepoBuilder : RepoInfo
         // with all the existing sources plus the one we add).
         //
         monitor.Trace( "Add the local feed to the 'nuget.config' file." );
-        var localFeed = _repoArtifact.LocalFeedNuGetPath;
         var nugetConfigPath = Repo.WorkingFolder.AppendPart( "nuget.config" );
-        var nugetConfig = XDocument.Load( nugetConfigPath );
-        NuGetHelper.SetOrRemoveNuGetSource( monitor, nugetConfig, "local-feed", localFeed );
-        XmlHelper.SaveWithoutXmlDeclaration( nugetConfig, nugetConfigPath, SaveOptions.DisableFormatting );
+
+        var configRoot = NuGetHelper.GetConfigurationRoot( monitor, nugetConfigPath );
+        if( configRoot == null ) return null;
+
+        var localFeed = _repoArtifact.LocalFeedNuGetPath;
+        if( !NuGetHelper.SetOrRemoveNuGetSource( monitor, configRoot, "local-feed", localFeed ) )
+        {
+            return null;
+        }
+
+        if( !_artifactHandler.ApplyConfiguredNuGetFeeds( monitor, configRoot, out var actions ) )
+        {
+            return null;
+        }
+
+        if( actions != null )
+        {
+            monitor.Warn( $"""
+                The 'nuget.config' file must be updated ({nugetConfigPath}):
+                {actions.Concatenate( Environment.NewLine )}
+                """ );
+        }
+        XmlHelper.SafeSave( configRoot, nugetConfigPath, SaveOptions.DisableFormatting );
+
         // We ResetHard the repository after the build.
         bool resetHardDone = false;
 

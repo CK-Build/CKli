@@ -41,14 +41,14 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     protected override RepoBuilder Create( IActivityMonitor monitor, Repo repo )
     {
         _shaTestRunCache ??= new LocalStringCache( repo.World.Name, "TestRun.Sha" );
-        return new RepoBuilder( repo, this, _artifactHandler.Get( monitor, repo ) );
+        return new RepoBuilder( repo, this, _artifactHandler, _artifactHandler.Get( monitor, repo ) );
     }
 
     internal async Task<bool> RaiseOnCoreBuildAsync( IActivityMonitor monitor, CommitBuildInfo buildInfo )
     {
         if( _onCoreBuild.HasHandlers )
         {
-            using( monitor.OpenInfo( "Raising OnCoreBuild event." ) )
+            using( monitor.OpenInfo( "Raising CoreBuild event." ) )
             {
                 bool eventError = false;
                 using( monitor.OnError( () => eventError = true ) )
@@ -62,6 +62,10 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
                     }
                 }
             }
+        }
+        else
+        {
+            monitor.OpenInfo( $"No listener to the CoreBuild event." );
         }
         return true;
     }
