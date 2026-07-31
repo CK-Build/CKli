@@ -36,7 +36,7 @@ public class NuGetHelperTests
     [Test]
     public void NuGetDependencyCache_tests()
     {
-        var last = NuGetHelper.Cache.GetAvailableVersions( "ck.TESTING.nunit" ).Max();
+        var last = NuGetHelper.Cache.GetAvailableVersions( TestHelper.Monitor, "ck.TESTING.nunit" ).Max();
         last.ShouldNotBeNull();
 
         var cache = new NuGetDependencyCache();

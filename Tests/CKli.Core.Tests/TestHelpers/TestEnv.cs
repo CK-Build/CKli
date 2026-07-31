@@ -35,7 +35,7 @@ static partial class TestEnv
     [OneTimeTearDown]
     public static void TearDownEnv()
     {
-        _packagedDirectoryPackagesProps?.SaveWithoutXmlDeclaration( _packagedPluginsPath.AppendPart( "Directory.Packages.props" ) );
+        _packagedDirectoryPackagesProps?.SafeSave( _packagedPluginsPath.AppendPart( "Directory.Packages.props" ) );
     }
 
     static void Initialize()
@@ -60,7 +60,7 @@ static partial class TestEnv
         PluginMachinery.NuGetConfigFileHook = ( monitor, nuGetXmlDoc ) =>
         {
             NuGetHelper.SetOrRemoveNuGetSource( monitor,
-                                                nuGetXmlDoc,
+                                                nuGetXmlDoc.Root!,
                                                 "test-override",
                                                 _nugetSourcePath,
                                                 "CKli.Core", "CKli.Plugins.Core", "CKli.*.Plugin" )
@@ -286,7 +286,7 @@ static partial class TestEnv
                  .First( e => e.Attribute( "Include" )?.Value == "CKli.Plugins.Core" )
                  .SetAttributeValue( "Version", _cKliPluginsCoreVersion );
 
-            clone.SaveWithoutXmlDeclaration( pathDirectoryPackages );
+            clone.SafeSave( pathDirectoryPackages );
         }
 
         // Clear any cached version of the new package.
