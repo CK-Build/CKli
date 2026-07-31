@@ -301,11 +301,11 @@ finally
 {
     # Invoke-Step "Restore CKli.Core original package reference" {
 
-    #     Set-PackageVersion `
-    #         -ProjectPath $ckliCoreProject `
-    #         -PackageId "CK.SVersion" `
-    #         -Version $originalCKSVersion
-    # }
+        Set-PackageVersion `
+             -ProjectPath $ckliCoreProject `
+             -PackageId "CK.SVersion" `
+             -Version $originalCKSVersion
+    }
 
     if( Test-Path $localFeed )
     {
