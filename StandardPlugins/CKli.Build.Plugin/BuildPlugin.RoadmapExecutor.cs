@@ -289,7 +289,7 @@ public sealed partial class BuildPlugin
                     // when everything went right.
                     //// Whether the "dev/" branch exists or not, IF a git push occurs, then remove
                     //// the remote branch.
-                    //gitRepository.DeferredPushRefSpecs.Add( $":refs/remotes/origin/{b.BranchName.DevName}" );
+                    //gitRepository.DeferredPushRefSpecs.Add( $":refs/heads/{b.BranchName.DevName}" );
 
                     workingBranch = b.GitBranch;
                 }

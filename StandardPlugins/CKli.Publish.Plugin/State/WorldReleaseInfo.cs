@@ -96,7 +96,7 @@ sealed class WorldReleaseInfo
                     branchName = s.Solution.Branch.BranchName.Name;
                     // We are publishing a non-CI: the regular branch will be pushed.
                     // We also suppress its remote "dev/" branch (that has been integrated) by the build.
-                    pushRefSpecs = [$":refs/remotes/origin/{s.Solution.Branch.BranchName.DevName}" ];
+                    pushRefSpecs = [$":refs/heads/{s.Solution.Branch.BranchName.DevName}" ];
                 }
                 var r = new RepoPublishInfo( s.Repo, branchName, i, version, tag, content, pushRefSpecs );
                 repoInfos[i++] = r;
