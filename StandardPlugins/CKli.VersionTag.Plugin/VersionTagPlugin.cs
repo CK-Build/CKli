@@ -6,6 +6,7 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CKli.VersionTag.Plugin;
@@ -16,6 +17,7 @@ namespace CKli.VersionTag.Plugin;
 public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>, BranchModel.Plugin.ITagCommitProvider
 {
     readonly ArtifactHandlerPlugin _artifactHandlerPlugin;
+    readonly BranchModelPlugin _branchModel;
     readonly bool _autoFixRemovableTag;
     readonly bool _removeUselessFakeTag;
     ReleaseDatabase? _releaseDatabase;
@@ -33,6 +35,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     {
         World.Events.Issue += IssueRequested;
         _artifactHandlerPlugin = artifactHandler;
+        _branchModel = branchModel;
         branchModel.SetTagCommitProvider( this );
         _autoFixRemovableTag = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.AutoFixRemovableTag ) ?? false;
         _removeUselessFakeTag = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.RemoveUselessFakeTag ) ?? false;
@@ -144,7 +147,10 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     /// False to let the package in the NuGet global cache (if it exists).
     /// The global cache is "%userprofile%\.nuget\packages" on windows and "~/.nuget/packages" on Mac/Linux.
     /// </param>
-    /// <returns>True on success, false on error: the "local/v<paramref name="version"/>" tag is not found and  or the assets cannot be properly deleted.</returns>
+    /// <returns>
+    /// True on success, false on error: the <paramref name="version"/> is a published tag or a +fake or +deprecated one, or
+    /// the assets cannot be properly deleted.
+    /// </returns>
     public bool DestroyLocalRelease( IActivityMonitor monitor, Repo repo, SVersion version, bool removeFromNuGetGlobalCache = true )
     {
         Throw.CheckArgument( version.IsCSVersion && version.BuildMetaData.Length == 0 );
@@ -160,18 +166,28 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 monitor.Trace( $"Version tag 'local/v{version}' not found. Skipped DestroyLocalRelease." );
                 return true;
             }
-            if( !tagCommit.Version.IsLocal() )
+            // Use the right tag.
+            tag = version.CINumber == 0 ? tagCommit.CI0VersionTag : tagCommit.Tag;
+            if( tag == null )
             {
-                monitor.Error( $"DestroyLocalRelease failed: tag '{tagCommit.Tag.FriendlyName}' is not 'local/'." );
+                monitor.Error( ActivityMonitor.Tags.ToBeInvestigated, $"""Internal version mismatch: "--ci.0" '{version}' found but its TagCommit.CI0VersionTag is null.""" );
                 return false;
             }
-            if( !tagCommit.IsRegularVersion )
+            if( !tag.CanonicalName.StartsWith("refs/tags/local/", StringComparison.Ordinal ) )
             {
-                monitor.Error( $"DestroyLocalRelease failed: tag '{tagCommit.Tag.FriendlyName}' must not be +fake or +deprecated." );
+                monitor.Error( $"DestroyLocalRelease failed: tag '{tag.FriendlyName}' is not 'local/'." );
                 return false;
             }
-            tag = tagCommit.Tag;
+            if( version.CINumber != 0 && !tagCommit.IsRegularVersion )
+            {
+                Throw.DebugAssert( tag == tagCommit.Tag );
+                monitor.Error( $"DestroyLocalRelease failed: tag '{tag.FriendlyName}' must not be +fake or +deprecated." );
+                return false;
+            }
             tagContent = tagCommit.BuildContentInfo;
+
+            // TODO: THIS IS NULL IF we have a "ci.0" on a "+fake" commit!
+
             // Because we remove the TagCommit here, we should delete the tag before the artifacts.
             vInfo.RemoveTagCommit( monitor, version );
         }

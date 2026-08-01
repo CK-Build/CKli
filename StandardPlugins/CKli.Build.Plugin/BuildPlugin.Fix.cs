@@ -147,18 +147,49 @@ public sealed partial class BuildPlugin
     {
         var versionInfo = _versionTags.Get( monitor, target.Repo );
 
-        var updated = new PackageMapper();
+        // We are ready to build or rebuild the target.
+        // We have nothing to do when rebuilding: the previous "local/" if it exists, will be
+        // moved (the "rolling local build" feature).
+        // But when a "fix build --ci" has been done right before, a "--ci" version tag may
+        // exist on the same commit we are building. Because this is not allowed, we must
+        // handle this case.
+        // There's 2 approaches:
+        //  - Aggressive: Cleaning any CI builds (or deprecate the published ones).
+        //                Because one cannot rebuild a deprecated (and this is a good feature),
+        //                the deprecation must be a "hard delete" (no +deprecated tag)...
+        //                That is NOT the spirit so far: published artefacts must be deprecated.
+        //  - Gentle: Adding an empty commit when needed (when a CI tag exists).
+        //
+        //  Synthesis: If a "local/" CI build exists, we destroy the release (suppressing the tag
+        //             and any artefacts).
+        //             If a published CI build exists, create an empty commit to carry the release.
+
+        var updates = new PackageMapper();
         if( !CheckoutFixTargetBranch( monitor, target, versionInfo, out var toFix, out int commitDepth )
-            || !_solutionPlugin.UpdatePackages( monitor, target.Repo, packageMapping, updated )
-            || !CommitUpdatedPackages( monitor, updated, target, out bool hasNewCommit ) )
+            || !_solutionPlugin.UpdatePackages( monitor, target.Repo, packageMapping, updates )
+            || !CommitUpdatedPackages( monitor, updates, target, out bool hasNewCommit ) )
         {
             return false;
         }
         Throw.DebugAssert( toFix.BuildContentInfo != null );
 
+        var commitToBuild = target.Repo.GitRepository.Repository.Head.Tip;
         if( hasNewCommit )
         {
             commitDepth++;
+            // A commit has been created by CommitUpdatedPackages.
+        }
+        else
+        {
+            // No new commit: we must handle the potential CI build.
+            if( versionInfo.TagCommitsBySha.TryGetValue( commitToBuild.Sha, out var exists )
+                && (exists.CI0VersionTag != null || exists.Version.IsCI) )
+            {
+                if( exists.IsLocal )
+                {
+                    _versionTags.DestroyLocalRelease( monitor, target.Repo, exists.Version, removeFromNuGetGlobalCache: false );
+                }
+            }
         }
         var targetVersion = target.TargetVersion;
         if( isCIBuild )
@@ -168,18 +199,8 @@ public sealed partial class BuildPlugin
         }
         else
         {
-            // We are ready to build or rebuild the target.
-            // We have nothing to do when rebuilding: the previous "local/" if it exists, will be
-            // moved (the "rolling local build" feature).
-            // But when a "fix build --ci" has been done right before, a "--ci" version tag may
-            // exist on the same commit we are building. Because this is not allowed, we must
-            // handle this case.
-            // We decide to be rather aggressive here by cleaning any CI builds (or deprecate them
-            // if they have been published... No! this won't work! One cannot rebuild a +deprecated!)
-            //
-            // TODO!!!
-        }
 
+        }
         var result = await CoreBuildAsync( monitor,
                                            context,
                                            versionInfo,
