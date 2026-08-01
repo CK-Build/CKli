@@ -299,7 +299,7 @@ try
 }
 finally
 {
-    # Invoke-Step "Restore CKli.Core original package reference" {
+    Invoke-Step "Restore CKli.Core original package reference" {
 
         Set-PackageVersion `
              -ProjectPath $ckliCoreProject `
