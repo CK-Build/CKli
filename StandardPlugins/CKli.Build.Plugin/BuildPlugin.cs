@@ -283,7 +283,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         }
         else
         {
-            monitor.OpenInfo( $"No listener to the RoadmapBuild event." );
+            monitor.Info( $"No listener to the RoadmapBuild event." );
         }
         return true;
     }

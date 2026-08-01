@@ -65,7 +65,7 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
         }
         else
         {
-            monitor.OpenInfo( $"No listener to the CoreBuild event." );
+            monitor.Info( $"No listener to the CoreBuild event." );
         }
         return true;
     }

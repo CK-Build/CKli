@@ -548,9 +548,12 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         VersionTagInfo.HotZoneInfo? hotZone = null;
         if( lastPublishedStable == null )
         {
-            // No hot zone.
-            // The build plugin will handle this.
-            monitor.Warn( $"No initial version found in '{repo.DisplayPath}'." );
+            if( !isExecutingIssue )
+            {
+                // No hot zone.
+                // The build plugin will handle this.
+                monitor.Warn( $"No initial version found in '{repo.DisplayPath}'." );
+            }
         }
         else
         {

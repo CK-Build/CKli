@@ -119,7 +119,7 @@ public sealed partial class BuildPlugin
         }
         else
         {
-            monitor.OpenInfo( $"No listener to the FixBuild event." );
+            monitor.Info( $"No listener to the FixBuild event." );
         }
         return true;
 
