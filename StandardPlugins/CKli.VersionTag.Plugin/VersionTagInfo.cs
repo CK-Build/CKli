@@ -236,6 +236,30 @@ public sealed partial class VersionTagInfo : RepoInfo
     public IEnumerable<TagCommit> AllTagCommits => _v2C.Values;
 
     /// <summary>
+    /// Enumerates all the versions with the <see cref="Tag"/> that declares them and their associated <see cref="TagCommit"/>.
+    /// <list type="bullet">
+    ///     <item>The <see cref="TagCommit.Version"/>, <see cref="TagCommit.Version"/> and the TagCommit itself for each item of <see cref="AllTagCommits"/>.</item>
+    ///     <item>The parsed version of the <see cref="TagCommit.CI0VersionTag"/> if it is not null.</item>
+    ///     <item>
+    ///     The version and tag of the <see cref="TagCommit.FakeVersion"/> if it is not null.
+    ///     This FakeVersion (only appears on true <see cref="TagCommit.IsLocal"/>) doesn't appear in the <see cref="AllTagCommits"/>.
+    ///     </item>
+    /// </list>
+    /// </summary>
+    public IEnumerable<(SVersion Version, Tag Tag, TagCommit Commit)> AllVersions
+    {
+        get
+        {
+            foreach( var tc in _v2C.Values )
+            {
+                yield return (tc.Version, tc.Tag,tc);
+                if( tc.CI0VersionTag != null ) yield return (SVersion.Parse( tc.CI0VersionTag.FriendlyName ), tc.CI0VersionTag, tc);
+                if( tc.FakeVersion != null ) yield return (tc.FakeVersion.Version, tc.FakeVersion.Tag, tc.FakeVersion);
+            }
+        }
+    }
+
+    /// <summary>
     /// Gets the tags that can be removed (at least locally).
     /// </summary>
     public IReadOnlyList<Tag> RemovableTags => _removableTags;
