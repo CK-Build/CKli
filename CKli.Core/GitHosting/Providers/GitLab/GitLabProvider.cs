@@ -318,6 +318,66 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         return Task.FromResult( true );
     }
 
+    protected override async Task<(bool Success, PublishedReleaseInfo? Info)> GetReleaseAsync( IActivityMonitor monitor,
+                                                                                               HttpClient client,
+                                                                                               NormalizedPath repoPath,
+                                                                                               string releaseId,
+                                                                                               CancellationToken cancellation )
+    {
+        var projectPath = HttpUtility.UrlEncode( repoPath );
+        var encodedTag = Uri.EscapeDataString( releaseId );
+        using var response = await client.GetAsync( $"projects/{projectPath}/releases/{encodedTag}", cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            return (false, null);
+        }
+        if( response.StatusCode == HttpStatusCode.NotFound )
+        {
+            return (true, null);
+        }
+        Throw.DebugAssert( response.IsSuccessStatusCode );
+        try
+        {
+            var r = await response.Content.ReadFromJsonAsync<JsonElement>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
+            var tag = r.TryGetProperty( "tag_name", out var tp ) && tp.ValueKind == JsonValueKind.String ? tp.GetString() ?? "" : "";
+            DateTime? releasedAt = null;
+            if( r.TryGetProperty( "released_at", out var rp ) && rp.ValueKind != JsonValueKind.Null ) releasedAt = rp.GetDateTime();
+            string description = r.TryGetProperty( "description", out var d ) && d.ValueKind != JsonValueKind.Null ? d.GetString() ?? "" : "";
+            var assets = new List<string>();
+            if( r.TryGetProperty( "assets", out var ap ) && ap.ValueKind == JsonValueKind.Object && ap.TryGetProperty( "links", out var links ) && links.ValueKind == JsonValueKind.Array )
+            {
+                foreach( var l in links.EnumerateArray() )
+                {
+                    if( l.TryGetProperty( "name", out var n ) && n.ValueKind == JsonValueKind.String ) assets.Add( n.GetString()! );
+                }
+            }
+            return (true, PublishedReleaseInfo.Create( monitor, tag, isPublished: true, releasedAt, description, tag, assets ));
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While parsing release response.", ex );
+            return (false, null);
+        }
+    }
+
+    protected override async Task<bool> DeleteReleaseAsync( IActivityMonitor monitor,
+                                                            HttpClient client,
+                                                            NormalizedPath repoPath,
+                                                            string releaseId,
+                                                            CancellationToken cancellation )
+    {
+        var projectPath = HttpUtility.UrlEncode( repoPath );
+        var encodedTag = Uri.EscapeDataString( releaseId );
+        using var response = await client.DeleteAsync( $"projects/{projectPath}/releases/{encodedTag}", cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error );
+            return false;
+        }
+        return true;
+    }
+
     static async Task<GitLabProject?> ReadGitLabProjectAsync( IActivityMonitor monitor,
                                                               HttpResponseMessage response,
                                                               CancellationToken cancellation )

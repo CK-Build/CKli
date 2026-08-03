@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core.GitHosting.Providers;
 
@@ -75,7 +76,7 @@ sealed class FileSystemProvider : GitHostingProvider
                                                                        string defaultBranchName,
                                                                        CancellationToken cancellation = default )
     {
-        return Task.FromResult<HostedRepositoryInfo?>( CreateRepository( monitor, repoPath, defaultBranchName ) );
+        return Task.FromResult( CreateRepository( monitor, repoPath, defaultBranchName ) );
     }
 
     HostedRepositoryInfo? CreateRepository( IActivityMonitor monitor, NormalizedPath repoPath, string defaultBranchName )
@@ -152,9 +153,8 @@ sealed class FileSystemProvider : GitHostingProvider
     {
         try
         {
-            if( !Directory.Exists( repoPath ) )
+            if( !CheckReleasePaths( monitor, repoPath, null, releaseMustExist: false ) )
             {
-                monitor.Error( $"Invalid File System repository path '{repoPath}'." );
                 return Task.FromResult<List<PublishedReleaseInfo>?>( null );
             }
             var result = new List<PublishedReleaseInfo>();
@@ -171,18 +171,17 @@ sealed class FileSystemProvider : GitHostingProvider
                 int skip = (pageNumber - 1) * countPerPage;
                 for( int i = skip; i < Math.Min( dirs.Length, skip + countPerPage ); i++ )
                 {
-                    var releaseDir = dirs[i];
-                    Throw.DebugAssert( releaseDir[^1] != Path.DirectorySeparatorChar );
-                    var name = Path.GetFileName( releaseDir );
+                    NormalizedPath releaseDir = dirs[i];
+                    var name = releaseDir.LastPart;
                     Throw.DebugAssert( name != null );
                     result.Add( new PublishedReleaseInfo
                     {
                         Version = SVersion.Parse( name ),
-                        ReleaseId = name,
+                        ReleaseId = releaseDir,
                         CreatedAt = Directory.GetCreationTimeUtc( releaseDir ),
                         IsPublished = true,
                         Description = "",
-                        Assets = Directory.GetFiles( releaseDir ).Select( p => p.Substring( releaseDir.Length + 1 ) ).ToList(),
+                        Assets = Directory.GetFiles( releaseDir ).Select( p => p.Substring( releaseDir.Path.Length + 1 ) ).ToList(),
                     } );
                 }
             }
@@ -200,9 +199,8 @@ sealed class FileSystemProvider : GitHostingProvider
     {
         try
         {
-            if( !Directory.Exists( repoPath ) )
+            if( !CheckReleasePaths( monitor, repoPath, null, releaseMustExist: false ) )
             {
-                monitor.Error( $"Invalid File System repository path '{repoPath}'." );
                 return Task.FromResult<string?>( null );
             }
             var releases = repoPath.AppendPart( "Releases" );
@@ -225,22 +223,124 @@ sealed class FileSystemProvider : GitHostingProvider
 
     public override Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,
                                                      NormalizedPath repoPath,
-                                                     string releaseIdentifier,
+                                                     string releaseId,
                                                      NormalizedPath filePath,
                                                      string? fileName = null,
                                                      CancellationToken cancellation = default )
     {
+        if( !CheckReleasePaths( monitor, repoPath, releaseId, releaseMustExist: true ) )
+        {
+            return Task.FromResult( false );
+        }
         try
         {
             fileName ??= filePath.LastPart;
-            var target = Path.Combine( releaseIdentifier, fileName );
+            var target = Path.Combine( releaseId, fileName );
             File.Copy( filePath, target );
             return Task.FromResult( true );
         }
         catch( Exception ex )
         {
-            monitor.Error( $"While adding an asset to the draft release in '{releaseIdentifier}'.", ex );
+            monitor.Error( $"While adding an asset to the draft release in '{releaseId}'.", ex );
             return Task.FromResult( false );
         }
+    }
+
+    public override Task<(bool Success, PublishedReleaseInfo? Info)> GetReleaseAsync( IActivityMonitor monitor,
+                                                                                      NormalizedPath repoPath,
+                                                                                      string releaseId,
+                                                                                      LogLevel notFoundLevel = LogLevel.Trace,
+                                                                                      CancellationToken cancellation = default )
+    {
+        try
+        {
+            if( !CheckReleasePaths( monitor, repoPath, releaseId, releaseMustExist: false ) )
+            {
+                return Task.FromResult( (false, (PublishedReleaseInfo?)null) );
+            }
+            if( !Directory.Exists( releaseId ) )
+            {
+                monitor.Log( notFoundLevel, $"Release identifier '{releaseId}' doesn't exist." );
+                return Task.FromResult( (true, (PublishedReleaseInfo?)null) ); ;
+            }
+            var name = Path.GetFileName( releaseId );
+            var assets = Directory.GetFiles( releaseId ).Select( p => Path.GetFileName( p ) ?? p ).ToList();
+            var info = new PublishedReleaseInfo
+            {
+                Version = SVersion.Parse( name ),
+                ReleaseId = releaseId,
+                CreatedAt = Directory.GetCreationTimeUtc( releaseId ),
+                IsPublished = false,
+                Description = "",
+                Assets = assets,
+            };
+            return Task.FromResult( (true, info) )!;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While getting release '{releaseId}'.", ex );
+            return Task.FromResult( (false, (PublishedReleaseInfo?)null) );
+        }
+    }
+
+    public override Task<bool> DeleteReleaseAsync( IActivityMonitor monitor,
+                                                   NormalizedPath repoPath,
+                                                   string releaseId,
+                                                   CancellationToken cancellation = default )
+    {
+        try
+        {
+            if( !CheckReleasePaths( monitor, repoPath, releaseId, releaseMustExist: false ) )
+            {
+                return Task.FromResult( false );
+            }
+            if( !Directory.Exists( releaseId ) )
+            {
+                // Idempotent: deleting a non-existing release is a no-op.
+                monitor.Trace( $"Delete succeeds: release doesn't exist at '{releaseId}'." );
+                return Task.FromResult( true );
+            }
+
+            return Task.FromResult( FileHelper.DeleteFolder( monitor, releaseId ) );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While deleting release '{releaseId}'.", ex );
+            return Task.FromResult( false );
+        }
+    }
+
+
+    static bool CheckReleasePaths( IActivityMonitor monitor,
+                                   NormalizedPath repoPath,
+                                   string? releaseId,
+                                   bool releaseMustExist )
+    {
+        if( !Directory.Exists( repoPath ) )
+        {
+            monitor.Error( $"Invalid File System repository path '{repoPath}'." );
+            return false;
+        }
+        if( releaseId != null )
+        {
+            var releasesDir = repoPath.AppendPart( "Releases" );
+            if( releaseId.Length <= releasesDir.Path.Length + 2
+                || releaseId[releasesDir.Path.Length] != NormalizedPath.DirectorySeparatorChar
+                || !releaseId.StartsWith( releasesDir, StringComparison.OrdinalIgnoreCase ) )
+            {
+                monitor.Error( $"""
+                                Release identifier must be inside the repository Releases folder:'.
+                                Releases folder: '{releasesDir}'.
+                                Release identifier: '{releaseId}'.
+                                """ );
+                return false;
+            }
+            if( releaseMustExist && !Directory.Exists( releaseId ) )
+            {
+                monitor.Error( $"Release identifier '{releaseId}' doesn't exist." );
+                return false;
+            }
+        }
+        return true;
     }
 }

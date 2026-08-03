@@ -93,6 +93,8 @@ public class CommonProviderTests
         p.IsDefaultPublic.ShouldBeTrue();
         info.IsPrivate.ShouldBe( !p.IsDefaultPublic );
 
+        await TestReleasesAsync( p, testRepoName );
+
         await DeleteTestRepoCreateAsync( p, testRepoName ).ConfigureAwait( false );
 
         // Creating a private (or public) repository.
@@ -121,7 +123,42 @@ public class CommonProviderTests
             }
             return info;
         }
+
+        static async Task TestReleasesAsync( GitHostingProvider p, string testRepoName )
+        {
+            var releases = await p.GetReleaseListAsync( TestHelper.Monitor, testRepoName, 1, 100 );
+            releases.ShouldNotBeNull().ShouldBeEmpty();
+
+            var releaseId = await p.CreateDraftReleaseAsync( TestHelper.Monitor, testRepoName, "v1.0.0" );
+            releaseId.ShouldNotBeNull();
+            var filePath = TestHelper.TestProjectFolder.AppendPart( "README.md" );
+            (await p.AddReleaseAssetAsync( TestHelper.Monitor, testRepoName, releaseId, filePath, "TestFile.txt" )).ShouldBeTrue();
+            releases = await p.GetReleaseListAsync( TestHelper.Monitor, testRepoName, 1, 100 );
+            releases.ShouldNotBeNull().Count.ShouldBe( 1 );
+            CheckTestRelease( releases[0], releaseId );
+
+            var (success, releaseInfo) = await p.GetReleaseAsync( TestHelper.Monitor, testRepoName, releaseId );
+            success.ShouldBeTrue();
+            CheckTestRelease( releaseInfo.ShouldNotBeNull(), releaseId );
+
+            (await p.DeleteReleaseAsync( TestHelper.Monitor, testRepoName, releaseId )).ShouldBeTrue();
+            // Idempotence.
+            (await p.DeleteReleaseAsync( TestHelper.Monitor, testRepoName, releaseId )).ShouldBeTrue();
+
+            (success, releaseInfo) = await p.GetReleaseAsync( TestHelper.Monitor, testRepoName, releaseId );
+            success.ShouldBeTrue();
+            releaseInfo.ShouldBeNull();
+
+            static void CheckTestRelease( PublishedReleaseInfo i, string expectedReleaseId )
+            {
+                i.Version.ToString().ShouldBe( "1.0.0" );
+                i.Assets.ShouldNotBeEmpty();
+                i.Assets[0].ShouldBe( "TestFile.txt" );
+                i.ReleaseId.ShouldBe( expectedReleaseId );
+            }
+        }
     }
+
     static async Task ArchivingReposAsync( GitHostingProvider p, string testRepoName )
     {
         // Cleanup any previous run.

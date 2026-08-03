@@ -265,6 +265,66 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         return true;
     }
 
+    protected override async Task<(bool Success, PublishedReleaseInfo? Info)> GetReleaseAsync( IActivityMonitor monitor,
+                                                                                               HttpClient client,
+                                                                                               NormalizedPath repoPath,
+                                                                                               string releaseId,
+                                                                                               CancellationToken cancellation )
+    {
+        using var response = await client.GetAsync( $"repos/{repoPath}/releases/{releaseId}", cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            return (false, null);
+        }
+        if( response.StatusCode == HttpStatusCode.NotFound )
+        {
+            return (true, null);
+        }
+        Throw.DebugAssert( response.IsSuccessStatusCode );
+        try
+        {
+            var r = await response.Content.ReadFromJsonAsync<JsonElement>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
+            var tag = r.TryGetProperty( "tag_name", out var tp ) && tp.ValueKind == JsonValueKind.String ? tp.GetString() ?? "" : "";
+            DateTime? createdAt = null;
+            if( r.TryGetProperty( "created_at", out var cp ) && cp.ValueKind != JsonValueKind.Null ) createdAt = cp.GetDateTime();
+            string description = r.TryGetProperty( "description", out var d ) && d.ValueKind != JsonValueKind.Null ? d.GetString() ?? "" : "";
+            var assets = new List<string>();
+            if( r.TryGetProperty( "assets", out var ap ) && ap.ValueKind == JsonValueKind.Array )
+            {
+                foreach( var a in ap.EnumerateArray() )
+                {
+                    if( a.TryGetProperty( "name", out var n ) && n.ValueKind == JsonValueKind.String )
+                    {
+                        assets.Add( n.GetString()! );
+                    }
+                }
+            }
+            // Gitea release id is the numeric id, but we use the provided releaseId as ReleaseId.
+            return (true, PublishedReleaseInfo.Create( monitor, tag, isPublished: true, createdAt, description, releaseId, assets ));
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While parsing release response.", ex );
+            return (false, null);
+        }
+    }
+
+    protected override async Task<bool> DeleteReleaseAsync( IActivityMonitor monitor,
+                                                            HttpClient client,
+                                                            NormalizedPath repoPath,
+                                                            string releaseId,
+                                                            CancellationToken cancellation )
+    {
+        using var response = await client.DeleteAsync( $"repos/{repoPath}/releases/{releaseId}", cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error );
+            return false;
+        }
+        return true;
+    }
+
     static async Task<GiteaRepositoryInfo?> ReadGiteaRepositoryInfoAsync( IActivityMonitor monitor,
                                                                         HttpResponseMessage response,
                                                                         CancellationToken cancellation )

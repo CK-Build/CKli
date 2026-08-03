@@ -209,6 +209,77 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                          CancellationToken cancellation );
 
     /// <inheritdoc />
+    public sealed override async Task<(bool Success, PublishedReleaseInfo? Info)> GetReleaseAsync( IActivityMonitor monitor,
+                                                                                                   NormalizedPath repoPath,
+                                                                                                   string releaseId,
+                                                                                                   LogLevel notFoundLogLevel = LogLevel.Trace,
+                                                                                                   CancellationToken cancellation = default )
+    {
+        using var _ = monitor.OpenInfo( $"Reading release '{releaseId}' for '{repoPath}' on '{BaseUrl}'." );
+        if( !EnsureReadAccess( monitor, ref repoPath, out var client, cancellation ) )
+        {
+            return (false,null);
+        }
+        try
+        {
+            return await GetReleaseAsync( monitor, client, repoPath, releaseId, cancellation ).ConfigureAwait( false );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( ex );
+            return (false, null);
+        }
+        finally
+        {
+            client.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Provider-specific single-release read implementation using an HttpClient.
+    /// </summary>
+    protected abstract Task<(bool Success, PublishedReleaseInfo? Info)> GetReleaseAsync( IActivityMonitor monitor,
+                                                                                         HttpClient client,
+                                                                                         NormalizedPath repoPath,
+                                                                                         string releaseId,
+                                                                                         CancellationToken cancellation );
+
+    /// <inheritdoc />
+    public sealed override async Task<bool> DeleteReleaseAsync( IActivityMonitor monitor,
+                                                                NormalizedPath repoPath,
+                                                                string releaseId,
+                                                                CancellationToken cancellation = default )
+    {
+        using var _ = monitor.OpenInfo( $"Deleting release '{releaseId}' for '{repoPath}' on '{BaseUrl}'." );
+        if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
+        {
+            return false;
+        }
+        try
+        {
+            return await DeleteReleaseAsync( monitor, client, repoPath, releaseId, cancellation ).ConfigureAwait( false );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( ex );
+            return false;
+        }
+        finally
+        {
+            client.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Provider-specific single-release deletion implementation using an HttpClient.
+    /// </summary>
+    protected abstract Task<bool> DeleteReleaseAsync( IActivityMonitor monitor,
+                                                      HttpClient client,
+                                                      NormalizedPath repoPath,
+                                                      string releaseId,
+                                                      CancellationToken cancellation );
+
+    /// <inheritdoc />
     public sealed override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
                                                                         NormalizedPath repoPath,
                                                                         string versionedTag,

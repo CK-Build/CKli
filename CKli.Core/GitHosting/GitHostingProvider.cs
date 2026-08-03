@@ -132,13 +132,46 @@ public abstract partial class GitHostingProvider
     /// <param name="repoPath">The repository path in this provider.</param>
     /// <param name="pageNumber">The 1-based page number to retrieve.</param>
     /// <param name="countPerPage">Number of items per page.</param>
-    /// <param name="cancellation">Cancellation token.</param>
+    /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>List of published releases, or null on error.</returns>
     public abstract Task<List<PublishedReleaseInfo>?> GetReleaseListAsync( IActivityMonitor monitor,
                                                                            NormalizedPath repoPath,
-                                                                           int pageNumber,
-                                                                           int countPerPage,
+                                                                           int pageNumber = 1,
+                                                                           int countPerPage = 100,
                                                                            CancellationToken cancellation = default );
+
+    /// <summary>
+    /// Gets the <see cref="PublishedReleaseInfo"/> of a given <paramref name="releaseId"/>.
+    /// <para>
+    /// This returns null if the release doesn't exist but <paramref name="notFoundLevel"/> enables
+    /// to to 
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The activity monitor.</param>
+    /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="releaseId">The release identifier.</param>
+    /// <param name="notFoundLevel">The log level to use when the release doesn't exist.</param>
+    /// <param name="cancellation">Optional cancellation token.</param>
+    /// <returns>Whether the call succeed and the published release info if found, null otherwise or on error.</returns>
+    public abstract Task<(bool Success, PublishedReleaseInfo? Info)> GetReleaseAsync( IActivityMonitor monitor,
+                                                                                      NormalizedPath repoPath,
+                                                                                      string releaseId,
+                                                                                      LogLevel notFoundLevel = LogLevel.Trace,
+                                                                                      CancellationToken cancellation = default );
+
+    /// <summary>
+    /// Deletes a <see cref="PublishedReleaseInfo"/>. This must be idempotent (deleting an unexisting release is a no-op).
+    /// </summary>
+    /// <param name="monitor">The activity monitor.</param>
+    /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="releaseId">The release identifier.</param>
+    /// <param name="cancellation">Optional cancellation token.</param>
+    /// <returns>True on success (or if the release didn't exist), false on error.</returns>
+    public abstract Task<bool> DeleteReleaseAsync( IActivityMonitor monitor,
+                                                   NormalizedPath repoPath,
+                                                   string releaseId,
+                                                   CancellationToken cancellation = default );
+
     /// <summary>
     /// Creates a release on the specified <paramref name="versionedTag"/> that must exist in remote (the tag must have
     /// already been pushed).

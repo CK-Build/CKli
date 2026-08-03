@@ -2,6 +2,7 @@ using CKli.Core.GitHosting.Providers;
 using NUnit.Framework;
 using Shouldly;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 
@@ -52,5 +53,18 @@ public class GitHubProviderTests
 
         var info2 = await p.GetRepositoryInfoAsync( TestHelper.Monitor, "ck-build/ckli", mustExist: true );
         info2.ShouldBe( info );
+    }
+
+    [Test]
+    public async Task get_CKli_ReleaseList_Async()
+    {
+        var p = GetGitHubCKliProvider();
+
+        var releases = await p.GetReleaseListAsync( TestHelper.Monitor, "CK-Build/CKli", 1, 100 );
+        releases.ShouldNotBeNull().ShouldNotBeEmpty();
+        var v = releases.Single( i => i.Version.ToString() == "0.10.3" );
+        v.CreatedAt.ShouldBe( DateTime.Parse( "2026/06/29T09:11:04" ) );
+        v.IsPublished.ShouldBeTrue();
+        v.Assets.ShouldBeEmpty();
     }
 }
