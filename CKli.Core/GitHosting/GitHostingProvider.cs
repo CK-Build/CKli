@@ -10,7 +10,7 @@ namespace CKli.Core;
 /// <summary>
 /// Provides Git hosting API operations. This is a base class for all hosting providers.
 /// <para>
-/// File system (with LibGit2Sharp), GitHub, GitLab and Gitea support is currently available.
+/// File system (with LibGit2Sharp), GitHub, GitLab and Gitea support are currently available.
 /// </para>
 /// </summary>
 [DebuggerDisplay( "{ToString(),nq}" )]
