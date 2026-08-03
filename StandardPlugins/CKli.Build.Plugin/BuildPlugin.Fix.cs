@@ -78,8 +78,7 @@ public sealed partial class BuildPlugin
             return false;
         }
         var bResults = ImmutableArray.CreateBuilder<BuildResult>( workflow.Targets.Length );
-        var packageMapper = new PackageMapper();
-        var packageMapping = new FixPackageMapper( packageMapper );
+        var packageMapping = new FixPackageMapper();
         foreach( var target in workflow.Targets )
         {
             using( monitor.OpenInfo( $"Building n°{target.Index} - {target.Repo.DisplayPath}" ) )
@@ -90,7 +89,6 @@ public sealed partial class BuildPlugin
                                                    rebuild,
                                                    isCIBuild,
                                                    bResults,
-                                                   packageMapper,
                                                    packageMapping,
                                                    target ).ConfigureAwait( false ) )
                 {
@@ -141,7 +139,6 @@ public sealed partial class BuildPlugin
                                              bool rebuild,
                                              bool isCIBuild,
                                              ImmutableArray<BuildResult>.Builder bResults,
-                                             PackageMapper packageMapper,
                                              FixPackageMapper packageMapping,
                                              FixWorkflow.TargetRepo target )
     {
@@ -228,7 +225,7 @@ public sealed partial class BuildPlugin
         // Adds the new produced packages to the updates map.
         foreach( var p in result.Content.Produced )
         {
-            packageMapper.Add( p, target.ToFixVersion, targetVersion );
+            packageMapping.Add( p, target.ToFixVersion, targetVersion );
         }
         Throw.DebugAssert( bResults.Count == target.Index );
         bResults.Add( result );

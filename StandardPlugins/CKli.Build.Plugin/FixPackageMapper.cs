@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.ShallowSolution.Plugin;
+using System;
 
 
 namespace CKli.Build.Plugin;
@@ -12,26 +13,31 @@ sealed class FixPackageMapper : IPackageMapping
 {
     readonly PackageMapper _mapper;
 
-    public FixPackageMapper( PackageMapper mapper )
+    public FixPackageMapper()
     {
-        _mapper = mapper;
+        _mapper = new PackageMapper();
     }
 
-    /// <inheritdoc />
+    public void Add( string packageId, SVersion toFixVersion, SVersion targetVersion )
+    {
+        _mapper.Add( packageId, toFixVersion, targetVersion );
+    }
+
     public bool IsEmpty => _mapper.IsEmpty;
 
-    /// <inheritdoc/>
     public bool HasMapping( string packageId ) => _mapper.HasMapping( packageId );
 
     public SVersion? GetMappedVersion( string packageId, SVersion from )
     {
         var v = _mapper.GetMappedVersion( packageId, from );
-        if( v == null && from.IsPrerelease && from.Patch > 0 )
+        if( v == null && from.Patch > 0 )
         {
             var fromSource = SVersion.Create( from.Major, from.Minor, from.Patch - 1 );
             return _mapper.GetMappedVersion( packageId, fromSource );
         }
         return v;
     }
+
+    public override string ToString() => _mapper.ToString();
 
 }

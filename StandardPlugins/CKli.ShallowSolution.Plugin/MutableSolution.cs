@@ -156,10 +156,10 @@ public sealed class MutableSolution
                     else
                     {
                         monitor.Warn( $"""
-                        Unhandled version in:
+                        Unhandled version in file '{path}':
                         {e}
-                        The package '{packageId}'' version map is: {map.ToString()}.
-                        In file '{path}'.
+                        The package '{packageId}' version map is:
+                        {map.ToString()}.
                         """ );
                     }
                 }
