@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -125,6 +126,20 @@ public abstract partial class GitHostingProvider
                                                        CancellationToken cancellation = default );
 
     /// <summary>
+    /// Gets the releases for the specified repository.
+    /// </summary>
+    /// <param name="monitor">The activity monitor.</param>
+    /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="pageNumber">The 1-based page number to retrieve.</param>
+    /// <param name="countPerPage">Number of items per page.</param>
+    /// <param name="cancellation">Cancellation token.</param>
+    /// <returns>List of published releases, or null on error.</returns>
+    public abstract Task<List<PublishedReleaseInfo>?> GetReleaseListAsync( IActivityMonitor monitor,
+                                                                           NormalizedPath repoPath,
+                                                                           int pageNumber,
+                                                                           int countPerPage,
+                                                                           CancellationToken cancellation = default );
+    /// <summary>
     /// Creates a release on the specified <paramref name="versionedTag"/> that must exist in remote (the tag must have
     /// already been pushed).
     /// <para>
@@ -132,12 +147,19 @@ public abstract partial class GitHostingProvider
     /// is considered mutable (<see cref="AddReleaseAssetsAsync(IActivityMonitor, NormalizedPath, string, NormalizedPath, CancellationToken)"/>
     /// can be called on the returned release identifier).
     /// </para>
+    /// <para>
+    /// This must fail (and an error must be logged) when the release (identified by the <paramref name="versionedTag"/>) already exists.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
     /// <param name="versionedTag">The versioned tag. It must exist in the repository (no control is made).</param>
     /// <param name="cancellation">Cancellation token.</param>
-    /// <returns>On success, a non null release identifier that must be used to associate asset files to the release. Null on error.</returns>
+    /// <returns>
+    /// On success, a non null release identifier that must be used to associate asset files to the release, get the <see cref="PublishedReleaseInfo"/>
+    /// or delete the release.
+    /// Null on error.
+    /// </returns>
     public abstract Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
                                                            NormalizedPath repoPath,
                                                            string versionedTag,

@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -248,6 +249,84 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
             return false;
         }
         return true;
+    }
+
+    protected override async Task<List<PublishedReleaseInfo>?> GetReleaseListAsync( IActivityMonitor monitor,
+                                                                                    HttpClient client,
+                                                                                    NormalizedPath repoPath,
+                                                                                    int pageNumber,
+                                                                                    int countPerPage,
+                                                                                    CancellationToken cancellation )
+    {
+        List<PublishedReleaseInfo>? result = null;
+        var url = $"repos/{repoPath}/releases?page={pageNumber}&per_page={countPerPage}";
+        using var response = await client.GetAsync( url, cancellation ).ConfigureAwait( false );
+        if( response.IsSuccessStatusCode )
+        {
+            var releases = await response.Content.ReadFromJsonAsync<JsonElement[]>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
+            if( releases != null )
+            {
+                result = new List<PublishedReleaseInfo>( releases.Length );
+                foreach( var r in releases )
+                {
+                    try
+                    {
+                        var tag = r.TryGetProperty( "tag_name", out var tp ) && tp.ValueKind == JsonValueKind.String
+                                    ? tp.GetString() ?? ""
+                                    : "";
+                        bool draft = r.TryGetProperty( "draft", out var pd ) && pd.ValueKind == JsonValueKind.True;
+                        DateTime? createdAt = null;
+                        if( r.TryGetProperty( "created_at", out var cp ) && cp.ValueKind != JsonValueKind.Null )
+                        {
+                            // JsonElement.GetDateTime will parse RFC3339 timestamps.
+                            createdAt = cp.GetDateTime();
+                        }
+                        string description = r.TryGetProperty( "body", out var bd ) && bd.ValueKind != JsonValueKind.Null
+                                                ? bd.GetString() ?? ""
+                                                : "";
+                        string releaseId;
+                        if( r.TryGetProperty( "id", out var idp ) )
+                        {
+                            // Prefer a string representation of the id.
+                            releaseId = idp.ValueKind == JsonValueKind.Number ? idp.GetInt64().ToString() : idp.ToString();
+                        }
+                        else
+                        {
+                            releaseId = tag;
+                        }
+                        var assets = new List<string>();
+                        if( r.TryGetProperty( "assets", out var ap ) && ap.ValueKind == JsonValueKind.Array )
+                        {
+                            foreach( var a in ap.EnumerateArray() )
+                            {
+                                if( a.TryGetProperty( "name", out var an ) && an.ValueKind == JsonValueKind.String )
+                                {
+                                    var n = an.GetString();
+                                    if( n != null ) assets.Add( n );
+                                }
+                            }
+                        }
+
+                        var info = PublishedReleaseInfo.Create( monitor, tag, !draft, createdAt, description, releaseId, assets );
+                        if( info != null )
+                        {
+                            result?.Add( info );
+                        }
+                    }
+                    catch( Exception ex )
+                    {
+                        monitor.Error( $"While parsing '{r}'.", ex );
+                        result = null;
+                    }
+                }
+            }
+        }
+        if( result == null )
+        {
+            // Log error and return null to indicate failure.
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+        }
+        return result;
     }
 
     static async Task<GitHubRepositoryInfo?> ReadGitHubRepositoryInfoAsync( IActivityMonitor monitor,

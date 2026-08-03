@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -11,8 +12,6 @@ using System.Threading.Tasks;
 using System.Web;
 
 namespace CKli.Core.GitHosting.Providers;
-
-#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
 /// <summary>
 /// GitLab hosting provider implementation.
@@ -215,6 +214,63 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
             return null;
         }
         return releaseInfo.TagName;
+    }
+
+    protected override async Task<List<PublishedReleaseInfo>?> GetReleaseListAsync( IActivityMonitor monitor,
+                                                                                    HttpClient client,
+                                                                                    NormalizedPath repoPath,
+                                                                                    int pageNumber,
+                                                                                    int countPerPage,
+                                                                                    CancellationToken cancellation )
+    {
+        List<PublishedReleaseInfo>? result = null;
+        var projectPath = HttpUtility.UrlEncode( repoPath );
+        var url = $"projects/{projectPath}/releases?page={pageNumber}&per_page={countPerPage}";
+        using var response = await client.GetAsync( url, cancellation ).ConfigureAwait( false );
+        if( response.IsSuccessStatusCode )
+        {
+            var releases = await response.Content.ReadFromJsonAsync<JsonElement[]>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
+            if( releases != null )
+            {
+                result = new List<PublishedReleaseInfo>( releases.Length );
+                foreach( var r in releases )
+                {
+                    try
+                    {
+                        var tag = r.GetProperty( "tag_name" ).GetString() ?? "";
+                        DateTime? releasedAt = null;
+                        if( r.TryGetProperty( "released_at", out var rp ) && rp.ValueKind != JsonValueKind.Null ) releasedAt = rp.GetDateTime();
+                        string description = r.TryGetProperty( "description", out var d ) && d.ValueKind != JsonValueKind.Null ? d.GetString() ?? "" : "";
+                        var assets = new List<string>();
+                        // GitLab may include assets.links array.
+                        if( r.TryGetProperty( "assets", out var ap ) && ap.ValueKind == JsonValueKind.Object && ap.TryGetProperty( "links", out var links ) && links.ValueKind == JsonValueKind.Array )
+                        {
+                            foreach( var l in links.EnumerateArray() )
+                            {
+                                if( l.TryGetProperty( "name", out var n ) && n.ValueKind == JsonValueKind.String ) assets.Add( n.GetString()! );
+                            }
+                        }
+
+                        var info = PublishedReleaseInfo.Create( monitor, tag, isPublished: false, releasedAt, description, tag, assets );
+                        if( info != null )
+                        {
+                            result?.Add( info );
+                        }
+                    }
+                    catch( Exception ex )
+                    {
+                        monitor.Error( $"While parsing '{r}'.", ex );
+                        result = null;
+                    }
+                }
+            }
+        }
+        if( result == null )
+        {
+            // Log error and return null to indicate failure.
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+        }
+        return result;
     }
 
     protected override async Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,

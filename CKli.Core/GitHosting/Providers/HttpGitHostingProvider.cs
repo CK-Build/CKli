@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Net.Http;
@@ -241,6 +242,45 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                               NormalizedPath repoPath,
                                                               string versionedTag,
                                                               CancellationToken cancellation );
+
+    /// <summary>
+    /// Public entry point: ensure read access then call provider-specific implementation using HttpClient.
+    /// </summary>
+    public sealed override async Task<List<PublishedReleaseInfo>?> GetReleaseListAsync( IActivityMonitor monitor,
+                                                                                        NormalizedPath repoPath,
+                                                                                        int pageNumber,
+                                                                                        int countPerPage,
+                                                                                        CancellationToken cancellation = default )
+    {
+        using var _ = monitor.OpenInfo( $"Reading published releases for '{repoPath}' on '{BaseUrl}'." );
+        if( !EnsureReadAccess( monitor, ref repoPath, out var client, cancellation ) )
+        {
+            return null;
+        }
+        try
+        {
+            return await GetReleaseListAsync( monitor, client, repoPath, pageNumber, countPerPage, cancellation ).ConfigureAwait( false );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( ex );
+            return null;
+        }
+        finally
+        {
+            client.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Provider-specific implementation that calls the hosting REST API using an HttpClient.
+    /// </summary>
+    protected abstract Task<List<PublishedReleaseInfo>?> GetReleaseListAsync( IActivityMonitor monitor,
+                                                                              HttpClient client,
+                                                                              NormalizedPath repoPath,
+                                                                              int pageNumber,
+                                                                              int countPerPage,
+                                                                              CancellationToken cancellation );
 
     /// <inheritdoc />
     public sealed override async Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,

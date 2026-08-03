@@ -1,6 +1,7 @@
 using CK.Core;
 using LibGit2Sharp;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -143,6 +144,58 @@ sealed class FileSystemProvider : GitHostingProvider
         return Task.FromException<bool>( new NotSupportedException( ProviderType ) );
     }
 
+    public override Task<List<PublishedReleaseInfo>?> GetReleaseListAsync( IActivityMonitor monitor,
+                                                                        NormalizedPath repoPath,
+                                                                        int pageNumber,
+                                                                        int countPerPage,
+                                                                        CancellationToken cancellation = default )
+    {
+        try
+        {
+            if( !Directory.Exists( repoPath ) )
+            {
+                monitor.Error( $"Invalid File System repository path '{repoPath}'." );
+                return Task.FromResult<List<PublishedReleaseInfo>?>( null );
+            }
+            var result = new List<PublishedReleaseInfo>();
+            var releases = repoPath.AppendPart( "Releases" );
+            if( Directory.Exists( releases ) )
+            {
+                var dirs = Directory.GetDirectories( releases );
+                // Order by name descending (recent tags first) — providers may implement other ordering.
+                Array.Sort( dirs );
+                Array.Reverse( dirs );
+                // Normalize paging parameters
+                if( pageNumber < 1 ) pageNumber = 1;
+                if( countPerPage <= 0 ) countPerPage = dirs.Length;
+                int skip = (pageNumber - 1) * countPerPage;
+                for( int i = skip; i < Math.Min( dirs.Length, skip + countPerPage ); i++ )
+                {
+                    var releaseDir = dirs[i];
+                    Throw.DebugAssert( releaseDir[^1] != Path.DirectorySeparatorChar );
+                    var name = Path.GetFileName( releaseDir );
+                    Throw.DebugAssert( name != null );
+                    result.Add( new PublishedReleaseInfo
+                    {
+                        Version = SVersion.Parse( name ),
+                        ReleaseId = name,
+                        CreatedAt = Directory.GetCreationTimeUtc( releaseDir ),
+                        IsPublished = true,
+                        Description = "",
+                        Assets = Directory.GetFiles( releaseDir ).Select( p => p.Substring( releaseDir.Length + 1 ) ).ToList(),
+                    } );
+                }
+            }
+            return Task.FromResult<List<PublishedReleaseInfo>?>( result );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While listing releases for '{repoPath}'.", ex );
+            return Task.FromResult<List<PublishedReleaseInfo>?>( null );
+        }
+    }
+
+
     public override Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor, NormalizedPath repoPath, string versionedTag, CancellationToken cancellation = default )
     {
         try
@@ -155,6 +208,11 @@ sealed class FileSystemProvider : GitHostingProvider
             var releases = repoPath.AppendPart( "Releases" );
             Directory.CreateDirectory( releases );
             var releaseFolder = releases.AppendPart( versionedTag );
+            if( Directory.Exists( releaseFolder) )
+            {
+                monitor.Error( $"Release '{versionedTag}' already exists at '{repoPath}'." );
+                return Task.FromResult<string?>( null );
+            }
             Directory.CreateDirectory( releaseFolder );
             return Task.FromResult<string?>( releaseFolder.Path );
         }

@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -159,6 +160,63 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
             return null;
         }
         return releaseInfo.Id.ToString();
+    }
+
+    protected override async Task<List<PublishedReleaseInfo>?> GetReleaseListAsync( IActivityMonitor monitor,
+                                                                                    HttpClient client,
+                                                                                    NormalizedPath repoPath,
+                                                                                    int pageNumber,
+                                                                                    int countPerPage,
+                                                                                    CancellationToken cancellation )
+    {
+        List<PublishedReleaseInfo>? result = null;
+        var url = $"repos/{repoPath}/releases?page={pageNumber}&limit={countPerPage}";
+        using var response = await client.GetAsync( url, cancellation ).ConfigureAwait( false );
+        if( response.IsSuccessStatusCode )
+        {
+            var releases = await response.Content.ReadFromJsonAsync<JsonElement[]>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
+            if( releases != null )
+            {
+                result = new List<PublishedReleaseInfo>( releases.Length );
+                foreach( var r in releases )
+                {
+                    try
+                    {
+                        var tag = r.GetProperty( "tag_name" ).GetString() ?? "";
+                        DateTime? createdAt = null;
+                        if( r.TryGetProperty( "created_at", out var cp ) && cp.ValueKind != JsonValueKind.Null ) createdAt = cp.GetDateTime();
+                        string description = r.TryGetProperty( "description", out var d ) && d.ValueKind != JsonValueKind.Null ? d.GetString() ?? "" : "";
+                        var assets = new List<string>();
+                        if( r.TryGetProperty( "assets", out var ap ) && ap.ValueKind == JsonValueKind.Array )
+                        {
+                            foreach( var a in ap.EnumerateArray() )
+                            {
+                                if( a.TryGetProperty( "name", out var n ) && n.ValueKind == JsonValueKind.String )
+                                {
+                                    assets.Add( n.GetString()! );
+                                }
+                            }
+                        }
+                        var info = PublishedReleaseInfo.Create( monitor, tag, isPublished: false, createdAt, description, tag, assets );
+                        if( info != null )
+                        {
+                            result?.Add( info );
+                        }
+                    }
+                    catch( Exception ex )
+                    {
+                        monitor.Error( $"While parsing '{r}'.", ex );
+                        result = null;
+                    }
+                }
+            }
+        }
+        if( result == null )
+        {
+            // Log error and return null to indicate failure.
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+        }
+        return result;
     }
 
     protected override async Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,
