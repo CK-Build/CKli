@@ -41,7 +41,7 @@ public sealed partial class GitRepository
     /// Deletes any number of local tags (empty <paramref name="tagNames"/> is a no-op).
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="tagNames">The tag names. They can be canonic (start with "refs/tags/") or regular.</param>
+    /// <param name="tagNames">The tag names. They can be canonic (start with "refs/tags/") or regular (friendly name).</param>
     /// <returns>True on success, false on error.</returns>
     public bool DeleteLocalTags( IActivityMonitor monitor, IEnumerable<string> tagNames )
     {

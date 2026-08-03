@@ -171,10 +171,9 @@ sealed partial class SimplePublisher
             // Pushes the branch and the deferred ref specs (this may remove the "dev/" or push/create the regular branch).
             if( !r.PushBranch( monitor, branch, autoCreateRemoteBranch: true ) )
             {
-                // TODO:
                 // Compensate!
                 // Delete the draft release.
-                // await _hostingProvider.DeleteDraftReleaseAsync( monitor, _hostedRepoPath, releaseId, cancel ).ConfigureAwait( false );
+                await _hostingProvider.DeleteReleaseAsync( monitor, _hostedRepoPath, releaseId, cancel ).ConfigureAwait( false );
                 return null;
             }
         }

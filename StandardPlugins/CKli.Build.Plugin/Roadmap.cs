@@ -79,8 +79,9 @@ public sealed partial class Roadmap
                                      bool mustPublish )
     {
 
-        // TODO: Refactor this... But this will introduce a mutable roadmap (just like the graph).
-        //       Current implementation is not elegant but may be simpler & safer than its mutable version.
+        // Refactor this?...
+        // This will introduce a mutable roadmap (just like the graph can be "extended" by new "dev/" solutions).
+        // Current implementation is not elegant but may be simpler & safer than its mutable version.
         Roadmap? roadmap;
         bool hasChanged;
         do

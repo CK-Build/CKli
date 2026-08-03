@@ -1,5 +1,7 @@
 using CK.Core;
 using CKli.Core;
+using LibGit2Sharp;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace CKli.VersionTag.Plugin;
@@ -10,19 +12,20 @@ public sealed partial class VersionTagPlugin
     [CommandPath( "version bump" )]
     public bool VersionBump( IActivityMonitor monitor,
                              CKliEnv context,
-                             [Description("The new starting version. Must be a stable Major.Minor.Patch (no -prelease nor +metadata suffix).")]
+                             [Description( "The new starting version. Must be a stable Major.Minor.Patch (no -prelease nor +metadata suffix) " +
+                                           "greater than the greatest published version.")]
                              string version )
     {
         var repo = World.GetDefinedRepo( monitor, context.CurrentDirectory );
         if( repo == null ) return false;
 
-        var v = SVersion.ParseNoThrow( version );
-        if( !v.IsValid )
+        var futureFake = SVersion.ParseNoThrow( version );
+        if( !futureFake.IsValid )
         {
-            monitor.Error( v.ErrorMessage );
+            monitor.Error( futureFake.ErrorMessage );
             return false;
         }
-        if( v.IsPrerelease || v.BuildMetaData.Length > 0 )
+        if( futureFake.IsPrerelease || futureFake.BuildMetaData.Length > 0 )
         {
             monitor.Error( """The version must be a stable Major.Minor.Patch (no -prelease nor +metadata suffix).""" );
             return false;
@@ -36,34 +39,32 @@ public sealed partial class VersionTagPlugin
         var branch = branchInfo.Root.GitDevBranch ?? branchInfo.Root.GitBranch;
         
         var versionInfo = Get( monitor, repo );
-        if( versionInfo.SupVersion != null && v >= versionInfo.SupVersion )
+        if( versionInfo.SupVersion != null && futureFake >= versionInfo.SupVersion )
         {
             monitor.Error( $"""Provided version must be lower than configured SupVersion="{versionInfo.SupVersion.ParsedText}".""" );
             return false;
         }
-        if( versionInfo.InfVersion != null && v <= versionInfo.InfVersion )
+        if( versionInfo.InfVersion != null && futureFake <= versionInfo.InfVersion )
         {
             monitor.Error( $"""Provided version must be greater than configured InfVersion="{versionInfo.InfVersion.ParsedText}".""" );
             return false;
         }
         //
-        // Ignore +fake (even if they are published by design). What matters are only non fake published version (regular or deprecated). 
+        // Ignore +fake (even if they are published by design).
+        // What matters are only non fake published version (regular or deprecated). 
         var maxVersion = versionInfo.AllVersions.Select( tc => tc.Version ).Where( v => !v.HasFakeMetadata && !v.IsLocal() ).Max();
-        if( v <= maxVersion )
+        if( futureFake <= maxVersion )
         {
             monitor.Error( $"""Provided version must be greater than the current maximal version "{maxVersion.ParsedText}".""" );
             return false;
         }
-        monitor.Error( $"""Not yet implemented.""" );
-        return false;
-
+        bool success = true;
         // We remove all the "local/" versions.
         var cleanupLocals = versionInfo.AllVersions.Select( tc => tc.Version ).Where( v => v.IsLocal() ).ToList();
         if( cleanupLocals.Count > 0 )
         {
             using( monitor.OpenInfo( $"""Destroying {cleanupLocals.Count} "local/" versions: {cleanupLocals.Select( v => v.ParsedText ).Concatenate()}.""" ) )
             {
-                bool success = true;
                 foreach( var local in cleanupLocals )
                 {
                     success &= DestroyLocalRelease( monitor, repo, local );
@@ -71,17 +72,79 @@ public sealed partial class VersionTagPlugin
             }
         }
         // We remove all the fake versions that are equal or greater to the new version.
-        // Note that fake version 
-        var cleanupFake = versionInfo.AllVersions.Where( tc => tc.Version.HasFakeMetadata && tc.Version >= v ).ToList();
+        var cleanupFake = versionInfo.AllVersions.Where( tc => tc.Version.HasFakeMetadata && tc.Version >= futureFake ).ToList();
         if( cleanupFake.Count > 0 )
         {
-            using( monitor.OpenInfo( $"""Destroying {cleanupFake.Count} +fake versions: {cleanupFake.Select( v => v.Version.ParsedText ).Concatenate()}.""" ) )
-            {
-                foreach( var (fakeVersion,tag,tc) in cleanupFake )
-                {
+            bool pushInvalidTags = true;
+            success = RemoveFakeVersions( monitor, repo, cleanupFake, pushInvalidTags );
+        }
 
+        if( !success )
+        {
+            monitor.Warn( $"Error occurred but the 'v{futureFake}+invalid' is nevertheless created on '{branch}'." );
+        }
+        repo.GitRepository.Repository.Tags.Add( $"v{futureFake}+invalid", branch.Tip, allowOverwrite: false );
+        return true;
+
+        static bool RemoveFakeVersions( IActivityMonitor monitor,
+                                        Repo repo,
+                                        List<(SVersion Version, Tag Tag, TagCommit Commit)> cleanupFake,
+                                        bool pushInvalidTags )
+        {
+            bool success = true;
+            if( !repo.GitRepository.GetRemoteTags( monitor, out GitTagInfo? remoteTags ) )
+            {
+                success = false;
+            }
+            else
+            {
+                using( monitor.OpenInfo( $"Removing {cleanupFake.Count} +fake versions." ) )
+                {
+                    List<string>? tagToDelete = null;
+                    List<TagInfo>? tagToInvalid = null;
+                    foreach( var fake in cleanupFake )
+                    {
+                        var tagName = fake.Tag.CanonicalName;
+                        if( remoteTags.IndexedTags.TryGetValue( tagName, out var tagInfo ) )
+                        {
+                            tagToInvalid ??= new List<TagInfo>();
+                            tagToInvalid.Add( tagInfo );
+                        }
+                        else
+                        {
+                            tagToDelete ??= new List<string>();
+                            tagToDelete.Add( tagName );
+                        }
+                    }
+                    if( tagToDelete != null )
+                    {
+                        monitor.Info( $"Deleting {tagToDelete.Count} local tags: {tagToDelete.Concatenate()}." );
+                        success &= repo.GitRepository.DeleteLocalTags( monitor, tagToDelete );
+                    }
+                    if( tagToInvalid != null )
+                    {
+                        using( monitor.OpenInfo( $"Creating {tagToInvalid.Count} +invalid tags." ) )
+                        {
+                            var names = new List<string>();
+                            foreach( var i in tagToInvalid )
+                            {
+                                var name = i.CanonicalName + "+invalid";
+                                // The +invalid tag must not exist otherwise we won't have found the version.
+                                // => Use allowOverwrite: false.
+                                repo.GitRepository.Repository.Tags.Add( name, i.Commit, allowOverwrite: false );
+                                names.Add( name );
+                            }
+                            if( pushInvalidTags )
+                            {
+                                success &= repo.GitRepository.PushTags( monitor, names );
+                            }
+                            success &= repo.GitRepository.DeleteLocalTags( monitor, tagToInvalid.Select( i => i.CanonicalName ) );
+                        }
+                    }
                 }
             }
+
+            return success;
         }
     }
 
