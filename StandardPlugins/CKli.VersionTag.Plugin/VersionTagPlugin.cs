@@ -61,9 +61,9 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         var t = info.HotZone.GetRequiredTagCommitTree( monitor, b );
         if( t == null ) return null;
         var tc = t.GetLastBuildWithFallback( branch.BranchName, allowCI ).Commit;
-        if( allowCI && !tc.Version.IsCI && tc.CI0VersionTag != null ) 
+        if( allowCI && !tc.Version.IsCI && tc.CI0Version != null ) 
         {
-            return ITagCommit.Create( tc.Repo, SVersion.Parse( tc.CI0VersionTag.FriendlyName ), tc.Commit );
+            return ITagCommit.Create( tc.Repo, tc.CI0Version, tc.Commit );
         }
         return tc;
     }
@@ -580,15 +580,15 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         // Associate the --ci.0 tag to its base.
                         if( tBase.CI0VersionTag != null )
                         {
+                            Throw.DebugAssert( tBase.CI0Version != null );
                             // The 2 tags can only differ by their "local/" prefix.
                             // We keep the published, and add the "local/" to the removable tags.
-                            Throw.DebugAssert( tBase.CI0VersionTag.CanonicalName.StartsWith( "refs/tags/local/", StringComparison.Ordinal )
-                                                != t.CanonicalName.StartsWith( "refs/tags/local/", StringComparison.Ordinal ) );
+                            Throw.DebugAssert( tBase.CI0Version.IsLocal() != v.IsLocal() );
                             removableTags ??= new List<Tag>();
-                            if( tBase.CI0VersionTag.CanonicalName.StartsWith( "refs/tags/local/", StringComparison.Ordinal ) )
+                            if( tBase.CI0Version.IsLocal() )
                             {
                                 removableTags.Add( tBase.CI0VersionTag );
-                                tBase.SetCI0VersionTag( t );
+                                tBase.SetCI0VersionTag( t, v );
                             }
                             else
                             {
@@ -597,7 +597,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         }
                         else
                         {
-                            tBase.SetCI0VersionTag( t );
+                            tBase.SetCI0VersionTag( t, v );
                         }
                     }
                 }

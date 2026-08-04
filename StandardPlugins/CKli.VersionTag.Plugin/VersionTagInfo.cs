@@ -177,8 +177,9 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <summary>
     /// Gets a <see cref="TagCommit"/> for a version.
     /// <para>
-    /// For "ci.0" version (when <see cref="SVersion.CINumber"/> is 0), this returns the commit of the base version.
-    /// The found base may have a <see cref="TagCommit.CI0VersionTag"/>.
+    /// For "ci.0" version (when <see cref="SVersion.CINumber"/> is 0), this returns the commit of the base version
+    /// if it exists.
+    /// The found base may have a <see cref="TagCommit.CI0Version"/>.
     /// </para>
     /// </summary>
     /// <param name="version">The version to find.</param>
@@ -192,12 +193,7 @@ public sealed partial class VersionTagInfo : RepoInfo
         if( version.CINumber == 0 )
         {
             var vBase = version.SetCINumber( -1, impactStablePatchNumber: false );
-            if( _v2C.TryGetValue( vBase, out tc ) && tc.IsFakeVersion )
-            {
-                return tc;
-            }
-            vBase = version.SetCINumber( -1, impactStablePatchNumber: true );
-            if( _v2C.TryGetValue( vBase, out tc ) && !tc.IsFakeVersion )
+            if( _v2C.TryGetValue( vBase, out tc ) )
             {
                 return tc;
             }
@@ -209,7 +205,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// Gets a <see cref="TagCommit"/> for a version.
     /// <para>
     /// For "ci.0" version (when <see cref="SVersion.CINumber"/> is 0, this locates the commit of the base version.
-    /// The found base may have a <see cref="TagCommit.CI0VersionTag"/>.
+    /// The found base may have a <see cref="TagCommit.CI0Version"/>.
     /// </para>
     /// </summary>
     /// <param name="version">The version to find.</param>
@@ -244,8 +240,11 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <summary>
     /// Enumerates all the versions with the <see cref="Tag"/> that declares them and their associated <see cref="TagCommit"/>.
     /// <list type="bullet">
-    ///     <item>The <see cref="TagCommit.Version"/>, <see cref="TagCommit.Version"/> and the TagCommit itself for each item of <see cref="AllTagCommits"/>.</item>
-    ///     <item>The parsed version of the <see cref="TagCommit.CI0VersionTag"/> if it is not null.</item>
+    ///     <item>
+    ///     The <see cref="TagCommit.Version"/>, <see cref="TagCommit.Version"/> and the TagCommit itself for each item
+    ///     of <see cref="AllTagCommits"/>.
+    ///     </item>
+    ///     <item>The <see cref="TagCommit.CI0Version"/> if it is not null.</item>
     ///     <item>
     ///     The version and tag of the <see cref="TagCommit.FakeVersion"/> if it is not null.
     ///     This FakeVersion (only appears on true <see cref="TagCommit.IsLocal"/>) doesn't appear in the <see cref="AllTagCommits"/>.
@@ -258,12 +257,8 @@ public sealed partial class VersionTagInfo : RepoInfo
         {
             foreach( var tc in _v2C.Values )
             {
-                yield return (tc.Version, tc.Tag,tc);
-                if( tc.CI0VersionTag != null ) yield return (SVersion.Parse( tc.CI0VersionTag.FriendlyName,
-                                                                             allowPrefix: true,
-                                                                             mustBeCSVersion: true ),
-                                                             tc.CI0VersionTag,
-                                                             tc);
+                yield return (tc.Version, tc.Tag, tc);
+                if( tc.CI0Version != null ) yield return (tc.CI0Version, tc.CI0VersionTag!, tc);
                 if( tc.FakeVersion != null ) yield return (tc.FakeVersion.Version, tc.FakeVersion.Tag, tc.FakeVersion);
             }
         }
@@ -389,30 +384,44 @@ public sealed partial class VersionTagInfo : RepoInfo
             monitor.Trace( $"Version tag 'local/v{version}' not found. Skipped DestroyLocalRelease." );
             return true;
         }
-        // Use the right tag.
-        var tag = version.CINumber == 0 ? tagCommit.CI0VersionTag : tagCommit.Tag;
-        if( tag == null )
+        // Use the right (tag,version).
+        Tag tag;
+        SVersion v;
+        if( version.CINumber == 0 )
         {
-            monitor.Error( ActivityMonitor.Tags.ToBeInvestigated, $"""Internal version mismatch: "--ci.0" '{version}' found but its TagCommit.CI0VersionTag is null.""" );
-            return false;
+            if( tagCommit.CI0VersionTag == null )
+            {
+                monitor.Error( ActivityMonitor.Tags.ToBeInvestigated, $"""Internal version mismatch: "--ci.0" '{version}' found but its TagCommit.CI0VersionTag is null.""" );
+                return false;
+            }
+            tag = tagCommit.CI0VersionTag;
+            v = tagCommit.CI0Version!;
         }
-        if( !tag.CanonicalName.StartsWith( "refs/tags/local/", StringComparison.Ordinal ) )
+        else
+        {
+            tag = tagCommit.Tag;
+            v = tagCommit.Version;
+        }
+        if( !v.IsLocal() )
         {
             monitor.Error( $"Existing versioned tag '{tag.FriendlyName}' is not 'local/'. Skipped DestroyLocalRelease." );
             return true;
         }
-        if( version.CINumber != 0 && !tagCommit.IsRegularVersion )
+        if( v.HasFakeMetadata || v.HasDeprecatedMetadata )
         {
             Throw.DebugAssert( tag == tagCommit.Tag );
             monitor.Error( $"DestroyLocalRelease failed: tag '{tag.FriendlyName}' must not be +fake or +deprecated." );
             return false;
         }
-        var tagContent = tagCommit.BuildContentInfo;
+        BuildContentInfo? tagContent = tagCommit.BuildContentInfo;
 
-        // TODO: tagContent! THIS IS NULL IF we have a "ci.0" on a "+fake" commit!
+        Throw.DebugAssert( """
+            If we are on the ci.0, then we have the BuildContentInfo of the ci.0.
+            If we are on the TagCommit, then it is not Fake (filtered above), so we have a content.
+            """, tagCommit.BuildContentInfo != null );
 
         RemoveTagCommit( monitor, version );
-        return _versionTagPlugin.DoDestroyLocalRelease( monitor, base.Repo, tag, version, tagContent, removeFromNuGetGlobalCache );
+        return _versionTagPlugin.DoDestroyLocalRelease( monitor, base.Repo, tag, version, tagCommit.BuildContentInfo, removeFromNuGetGlobalCache );
     }
 
 

@@ -141,7 +141,7 @@ public sealed class CommitBuildInfo
                 {
                     // "--ci.0" case: we must be on the same original non-CI build commit.
                     Throw.DebugAssert( "We are on the base version commit.", exists.Commit.Sha == _buildCommit.Sha );
-                    exists.SetCI0VersionTag( t );
+                    exists.SetCI0VersionTag( t, _version );
                 }
                 else
                 {

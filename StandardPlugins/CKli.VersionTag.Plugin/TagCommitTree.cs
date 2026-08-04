@@ -205,35 +205,10 @@ public sealed partial class TagCommitTree
         // Initial version to use: if we are on a +fake (like 1.5.4+fake, a +fake can only be a stable version), then
         // we eventually want to produce v1.5.4 (not v1.5.5, v1.6.0 or v2.0.0) the initial version is the fake one,
         // not the next one: vChange is useless for +fake!
+
         SVersion v = LastStable.Version;
         Throw.DebugAssert( "Starting from the stable: no prerelease suffix to cleanup.", v.Prerelease.Length == 0 );
-        bool applyVersionIncrement = true;
-        bool lastStableIsFake = v.HasFakeMetadata;
-        if( lastStableIsFake )
-        {
-            // Since we build, we consider a minimal Patch change.
-            if( vChange == SVersionChange.None ) vChange = SVersionChange.Patch;
-            // If We are on the +fake that is the InfVersion for the repository,
-            // the we must adjust the behavior.
-            // Inf is not Min: versions must be strictly greater than InfVersion, so
-            // we consider the +fake as a "real" previous version and apply the
-            // increment as usual.
-            //
-            // Note that we handle the special "minimal prerelease suffix" that is "0":
-            // X.Y.Z-0 is lower than any other X.Y.Z versions, and because we'll never
-            // generate a "-0" prerelease, the Infimum is satisfied even if we don't
-            // increment the patch.
-            // This .."-0" is what the Long Term Support feature uses when creating a LTS
-            // world. All this is only "convention based" but works for us...
-            //
-            var infVersion = _hotZone.VersionTagInfo.InfVersion;
-            applyVersionIncrement = infVersion != null
-                                    && infVersion.Prerelease != "0"
-                                    && infVersion.Major == v.Major
-                                    && infVersion.Minor == v.Minor
-                                    && infVersion.Patch == v.Patch;
-        }
-        if( applyVersionIncrement )
+        if( !v.HasFakeMetadata )
         {
             if( vChange < SVersionChange.Major )
             {

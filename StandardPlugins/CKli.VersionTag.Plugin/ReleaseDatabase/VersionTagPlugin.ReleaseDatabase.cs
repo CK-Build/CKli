@@ -124,17 +124,20 @@ public sealed partial class VersionTagPlugin
                     var r = vInfo.Repo;
                     foreach( TagCommit tc in vInfo.AllTagCommits )
                     {
-                        // Ignore +fake but handle +deprecated.
-                        if( tc.BuildContentInfo != null )
+                        // Filters out +fake without CI0VersionTag.
+                        if( tc.BuildContentInfo == null ) continue;
+                        if( !tc.IsFakeVersion )
                         {
-                            var v = tc.Version;
                             foreach( var id in tc.BuildContentInfo.Produced )
                             {
-                                AddPackage( index, r, v, id );
-                                if( tc.CI0VersionTag != null )
-                                {
-                                    AddPackage( index, r, v.SetCINumber( 0, impactStablePatchNumber: false ), id );
-                                }
+                                AddPackage( index, r, tc.Version, id );
+                            }
+                        }
+                        if( tc.CI0Version != null )
+                        {
+                            foreach( var id in tc.BuildContentInfo.Produced )
+                            {
+                                AddPackage( index, r, tc.CI0Version, id );
                             }
                         }
                     }

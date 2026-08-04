@@ -21,6 +21,7 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     readonly string _sha;
     Tag _tag;
     Tag? _ci0Tag;
+    SVersion? _ci0Version;
     string? _message;
     BuildContentInfo? _buildContentInfo;
     DeprecatedTagInfo? _deprecatedInfo;
@@ -113,6 +114,11 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     public Tag? CI0VersionTag => _ci0Tag;
 
     /// <summary>
+    /// Gets the the "--ci.0" or ".ci.0" parsed <see cref="CI0VersionTag"/>.
+    /// </summary>
+    public SVersion? CI0Version => _ci0Version;
+
+    /// <summary>
     /// Gets the +fake commit for this <see cref="Version"/> if it exists.
     /// This is available only when <see cref="IsLocal"/> is true.
     /// </summary>
@@ -124,7 +130,7 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     public string? TagMessage => _message ??= _tag.Annotation?.Message;
 
     /// <summary>
-    /// Gets the build content info if <see cref="IsFakeVersion"/> is false. Null otherwise.
+    /// Gets the build content info. Null if <see cref="IsFakeVersion"/> is true and <see cref="CI0Version"/> is null.
     /// </summary>
     public BuildContentInfo? BuildContentInfo => _buildContentInfo;
 
@@ -156,13 +162,13 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     /// <returns></returns>
     public override string ToString() => $"Tag '{Repo.DisplayPath}/{_version.ParsedText}' references Commit '{_sha}'";
 
-    internal void SetCI0VersionTag( Tag tag )
+    internal void SetCI0VersionTag( Tag tag, SVersion v )
     {
+        Throw.DebugAssert( v.ParsedText == tag.FriendlyName );
         Throw.DebugAssert( tag != null && tag.IsAnnotated && BuildContentInfo.TryParse( tag.Annotation.Message, out _ ) );
-        Throw.DebugAssert( SVersion.Parse( tag.FriendlyName, allowPrefix:true, mustBeCSVersion: true ).CINumber == 0
-                           && SVersion.Parse( tag.FriendlyName, allowPrefix: true, mustBeCSVersion: true )
-                                      .SetCINumber( -1, impactStablePatchNumber: !_version.HasFakeMetadata ) == _version );
+        Throw.DebugAssert( v.CINumber == 0 && v.SetCINumber( -1, impactStablePatchNumber: false ) == _version );
         _ci0Tag = tag;
+        _ci0Version = v;
         // If we have no content info (because we are a +fake), then we acquire the content info from the
         // --ci.0 tag.
         if( _buildContentInfo == null )
