@@ -26,7 +26,12 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     DeprecatedTagInfo? _deprecatedInfo;
     TagCommit? _fakeVersion;
 
-    internal TagCommit( VersionTagInfo repoInfo, SVersion version, Commit commit, Tag tag, BuildContentInfo? contentInfo, DeprecatedTagInfo? deprecatedInfo )
+    internal TagCommit( VersionTagInfo repoInfo,
+                        SVersion version,
+                        Commit commit,
+                        Tag tag,
+                        BuildContentInfo? contentInfo,
+                        DeprecatedTagInfo? deprecatedInfo )
     {
         Throw.DebugAssert( "Only fake version can have no content info.", version.HasFakeMetadata == (contentInfo == null) );
         _versionRepoInfo = repoInfo;
@@ -155,8 +160,16 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     {
         Throw.DebugAssert( tag != null && tag.IsAnnotated && BuildContentInfo.TryParse( tag.Annotation.Message, out _ ) );
         Throw.DebugAssert( SVersion.Parse( tag.FriendlyName, allowPrefix:true, mustBeCSVersion: true ).CINumber == 0
-                           && SVersion.Parse( tag.FriendlyName, allowPrefix: true, mustBeCSVersion: true ).SetCINumber( -1 ) == _version );
+                           && SVersion.Parse( tag.FriendlyName, allowPrefix: true, mustBeCSVersion: true )
+                                      .SetCINumber( -1, impactStablePatchNumber: !_version.HasFakeMetadata ) == _version );
         _ci0Tag = tag;
+        // If we have no content info (because we are a +fake), then we acquire the content info from the
+        // --ci.0 tag.
+        if( _buildContentInfo == null )
+        {
+            // This necessarily succeeds (DebugAssert above).
+            _ = BuildContentInfo.TryParse( tag.Annotation.Message, out _buildContentInfo );
+        }
     }
 
     internal void UpdateVersionTag( Tag t )

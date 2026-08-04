@@ -133,7 +133,7 @@ public sealed partial class VersionTagPlugin
                                 AddPackage( index, r, v, id );
                                 if( tc.CI0VersionTag != null )
                                 {
-                                    AddPackage( index, r, v.SetCINumber( 0 ), id );
+                                    AddPackage( index, r, v.SetCINumber( 0, impactStablePatchNumber: false ), id );
                                 }
                             }
                         }

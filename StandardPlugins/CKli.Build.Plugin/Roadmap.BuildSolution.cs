@@ -173,7 +173,7 @@ public sealed partial class Roadmap
                     if( _roadmap._ciBuildMode == CIBuildMode.CIForce && !canSkip && !vTarget.IsCI )
                     {
                         Throw.DebugAssert( _lastBuild.TagCommit.CI0VersionTag != null );
-                        vTarget = vTarget.SetCINumber( 0 );
+                        vTarget = vTarget.SetCINumber( 0, impactStablePatchNumber: !_lastBuild.TagCommit.IsFakeVersion );
                         Throw.DebugAssert( _lastBuild.TagCommit.CI0VersionTag.CanonicalName.EndsWith( vTarget.ToString(), StringComparison.Ordinal ) );
                     }
                     // We compute the version change not for us (this solution will not be built) but for

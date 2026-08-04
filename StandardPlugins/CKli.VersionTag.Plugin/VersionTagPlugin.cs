@@ -6,7 +6,6 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CKli.VersionTag.Plugin;
@@ -148,7 +147,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     /// The global cache is "%userprofile%\.nuget\packages" on windows and "~/.nuget/packages" on Mac/Linux.
     /// </param>
     /// <returns>
-    /// True on success, false on error: the <paramref name="version"/> is a published tag or a +fake or +deprecated one, or
+    /// True on success, false on error: the <paramref name="version"/> is +fake or +deprecated one, or
     /// the assets cannot be properly deleted.
     /// </returns>
     public bool DestroyLocalRelease( IActivityMonitor monitor, Repo repo, SVersion version, bool removeFromNuGetGlobalCache = true )
@@ -159,58 +158,34 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         BuildContentInfo? tagContent = null;
         if( HasRepoInfoBeenCreated( repo ) )
         {
-            var vInfo = Get( monitor, repo );
-            var tagCommit = Get( monitor, repo ).GetTagCommit( version );
-            if( tagCommit == null )
-            {
-                monitor.Trace( $"Version tag 'local/v{version}' not found. Skipped DestroyLocalRelease." );
-                return true;
-            }
-            // Use the right tag.
-            tag = version.CINumber == 0 ? tagCommit.CI0VersionTag : tagCommit.Tag;
-            if( tag == null )
-            {
-                monitor.Error( ActivityMonitor.Tags.ToBeInvestigated, $"""Internal version mismatch: "--ci.0" '{version}' found but its TagCommit.CI0VersionTag is null.""" );
-                return false;
-            }
-            if( !tag.CanonicalName.StartsWith("refs/tags/local/", StringComparison.Ordinal ) )
-            {
-                monitor.Error( $"DestroyLocalRelease failed: tag '{tag.FriendlyName}' is not 'local/'." );
-                return false;
-            }
-            if( version.CINumber != 0 && !tagCommit.IsRegularVersion )
-            {
-                Throw.DebugAssert( tag == tagCommit.Tag );
-                monitor.Error( $"DestroyLocalRelease failed: tag '{tag.FriendlyName}' must not be +fake or +deprecated." );
-                return false;
-            }
-            tagContent = tagCommit.BuildContentInfo;
-
-            // TODO: THIS IS NULL IF we have a "ci.0" on a "+fake" commit!
-
-            // Because we remove the TagCommit here, we should delete the tag before the artifacts.
-            vInfo.RemoveTagCommit( monitor, version );
+            return Get( monitor, repo ).DestroyLocalRelease( monitor, version, removeFromNuGetGlobalCache );
         }
-        else
+        var tagName = $"refs/tags/local/v{version}";
+        tag = repo.GitRepository.Repository.Tags[tagName];
+        if( tag == null )
         {
-            var tagName = $"refs/tags/local/v{version}";
-            tag = repo.GitRepository.Repository.Tags[tagName];
-            if( tag == null )
-            {
-                monitor.Trace( $"Tag '{tagName}' already deleted. Skipped DestroyLocalRelease." );
-                return true;
-            }
-            var message = tag.Annotation?.Message;
-            if( !BuildContentInfo.TryParse( message, out tagContent ) )
-            {
-                monitor.Error( $"""
-                    DestroyLocalRelease failed, unable to parse '{tag.FriendlyName}' content:
-                    {message}
-                    """ );
-                return false;
-            }
-
+            monitor.Trace( $"Tag '{tagName}' already deleted. Skipped DestroyLocalRelease." );
+            return true;
         }
+        var message = tag.Annotation?.Message;
+        if( !BuildContentInfo.TryParse( message, out tagContent ) )
+        {
+            monitor.Error( $"""
+                DestroyLocalRelease failed, unable to parse '{tag.FriendlyName}' content:
+                {message}
+                """ );
+            return false;
+        }
+        return DoDestroyLocalRelease( monitor, repo, tag, version, tagContent, removeFromNuGetGlobalCache );
+    }
+
+    internal bool DoDestroyLocalRelease( IActivityMonitor monitor,
+                                         Repo repo,
+                                         Tag tag,
+                                         SVersion version,
+                                         BuildContentInfo tagContent,
+                                         bool removeFromNuGetGlobalCache )
+    {
         // Ignore errors: we try to remove everything we can.
         repo.GitRepository.DeleteLocalTags( monitor, [tag.CanonicalName] );
         return _artifactHandlerPlugin.DestroyLocalRelease( monitor, repo, version, tagContent, removeFromNuGetGlobalCache );
@@ -574,11 +549,35 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     ci0VersionTags.RemoveAt( i-- );
                     continue;
                 }
-                var vBase = v.SetCINumber( -1 );
-                if( v2c.TryGetValue( vBase, out var tBase ) )
+                // --ci.0 can be on the +fake with the same Major.Minor.Patch
+                // or on a non fake with a previous patch number.
+                var vBase = v.SetCINumber( -1, impactStablePatchNumber: false );
+                if( (!v2c.TryGetValue( vBase, out var tBase ) || !tBase.IsFakeVersion) && v.Patch > 0 )
                 {
-                    if( tBase.Commit.Sha == t.Target.Sha )
+                    vBase = v.SetCINumber( -1, impactStablePatchNumber: true );
+                    if( v2c.TryGetValue( vBase, out tBase ) && tBase.IsFakeVersion ) 
                     {
+                        tBase = null;
+                    }
+                }
+                // If we cannot find the base commit, we may emit an issue... But since this is --ci.0 versions
+                // that are rather special (and should be rare), we prefer forget this tag: we add it to the removables.
+                if( tBase == null )
+                {
+                    removableTags ??= new List<Tag>();
+                    removableTags.Add( t );
+                }
+                else
+                {
+                    // The basic definition of a --ci.0 is to be on the exact same commit as its base!
+                    if( tBase.Commit.Sha != t.Target.Sha )
+                    {
+                        tagConflicts ??= new List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>();
+                        tagConflicts.Add( ((v, t), (tBase.Version, tBase.Tag), TagConflict.CI0VersionOnOtherCommit) );
+                    }
+                    else
+                    {
+                        // Associate the --ci.0 tag to its base.
                         if( tBase.CI0VersionTag != null )
                         {
                             // The 2 tags can only differ by their "local/" prefix.
@@ -601,16 +600,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                             tBase.SetCI0VersionTag( t );
                         }
                     }
-                    else
-                    {
-                        tagConflicts ??= new List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>();
-                        tagConflicts.Add( ((v, t), (tBase.Version, tBase.Tag), TagConflict.CI0VersionOnOtherCommit) );
-                    }
-                }
-                else
-                {
-                    removableTags ??= new List<Tag>();
-                    removableTags.Add( t );
                 }
             }
         }

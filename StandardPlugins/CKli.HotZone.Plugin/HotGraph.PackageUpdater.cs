@@ -145,7 +145,7 @@ public sealed partial class HotGraph
                         return null;
                     }
                     return _ciBuild && v.TagCommit.CI0VersionTag != null
-                            ? v.TagCommit.Version.SetCINumber( 0 )
+                            ? SVersion.Parse( v.TagCommit.CI0VersionTag.FriendlyName, allowPrefix: true, mustBeCSVersion: true )
                             : v.TagCommit.Version;
                 }
                 return null;

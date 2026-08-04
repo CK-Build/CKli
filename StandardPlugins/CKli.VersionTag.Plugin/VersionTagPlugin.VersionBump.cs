@@ -58,19 +58,11 @@ public sealed partial class VersionTagPlugin
             monitor.Error( $"""Provided version must be greater than the current maximal version "{maxVersion.ParsedText}".""" );
             return false;
         }
-        bool success = true;
-        // We remove all the "local/" versions.
-        var cleanupLocals = versionInfo.AllVersions.Select( tc => tc.Version ).Where( v => v.IsLocal() ).ToList();
-        if( cleanupLocals.Count > 0 )
-        {
-            using( monitor.OpenInfo( $"""Destroying {cleanupLocals.Count} "local/" versions: {cleanupLocals.Select( v => v.ParsedText ).Concatenate()}.""" ) )
-            {
-                foreach( var local in cleanupLocals )
-                {
-                    success &= DestroyLocalRelease( monitor, repo, local );
-                }
-            }
-        }
+
+        // We remove all the "local/" versions but keep the nuget cache.
+        // This is to preserve anu current use of them (versions are removed from the cache each time they are (re)built).
+        bool success = versionInfo.DestroyLocalReleases( monitor, filter: null, removeFromNuGetGlobalCache: false );
+
         // We remove all the fake versions that are equal or greater to the new version.
         var cleanupFake = versionInfo.AllVersions.Where( tc => tc.Version.HasFakeMetadata && tc.Version >= futureFake ).ToList();
         if( cleanupFake.Count > 0 )
@@ -83,7 +75,7 @@ public sealed partial class VersionTagPlugin
         {
             monitor.Warn( $"Error occurred but the 'v{futureFake}+invalid' is nevertheless created on '{branch}'." );
         }
-        repo.GitRepository.Repository.Tags.Add( $"v{futureFake}+invalid", branch.Tip, allowOverwrite: false );
+        repo.GitRepository.Repository.Tags.Add( $"v{futureFake}+fake", branch.Tip, allowOverwrite: false );
         return true;
 
         static bool RemoveFakeVersions( IActivityMonitor monitor,

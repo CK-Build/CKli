@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using LibGit2Sharp;
+using NuGet.Protocol.Core.Types;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -190,8 +191,13 @@ public sealed partial class VersionTagInfo : RepoInfo
         }
         if( version.CINumber == 0 )
         {
-            var vBase = version.SetCINumber( -1 );
-            if( _v2C.TryGetValue( vBase, out tc ) )
+            var vBase = version.SetCINumber( -1, impactStablePatchNumber: false );
+            if( _v2C.TryGetValue( vBase, out tc ) && tc.IsFakeVersion )
+            {
+                return tc;
+            }
+            vBase = version.SetCINumber( -1, impactStablePatchNumber: true );
+            if( _v2C.TryGetValue( vBase, out tc ) && !tc.IsFakeVersion )
             {
                 return tc;
             }
@@ -253,7 +259,11 @@ public sealed partial class VersionTagInfo : RepoInfo
             foreach( var tc in _v2C.Values )
             {
                 yield return (tc.Version, tc.Tag,tc);
-                if( tc.CI0VersionTag != null ) yield return (SVersion.Parse( tc.CI0VersionTag.FriendlyName ), tc.CI0VersionTag, tc);
+                if( tc.CI0VersionTag != null ) yield return (SVersion.Parse( tc.CI0VersionTag.FriendlyName,
+                                                                             allowPrefix: true,
+                                                                             mustBeCSVersion: true ),
+                                                             tc.CI0VersionTag,
+                                                             tc);
                 if( tc.FakeVersion != null ) yield return (tc.FakeVersion.Version, tc.FakeVersion.Tag, tc.FakeVersion);
             }
         }
@@ -317,6 +327,94 @@ public sealed partial class VersionTagInfo : RepoInfo
         }
         return null;
     }
+
+    /// <summary>
+    /// Destroys all "local/" releases for which <paramref name="filter"/> returns true.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="filter">Optional filter.</param>
+    /// <param name="removeFromNuGetGlobalCache">
+    /// False to let the packages in the NuGet global cache (if they exists).
+    /// The global cache is "%userprofile%\.nuget\packages" on windows and "~/.nuget/packages" on Mac/Linux.
+    /// </param>
+    /// <returns>
+    /// True on success, false on error (one of the assets cannot be properly deleted).
+    /// </returns>
+    public bool DestroyLocalReleases( IActivityMonitor monitor, Func<SVersion, bool>? filter, bool removeFromNuGetGlobalCache = true )
+    {
+        bool success = true;
+        var cleanupLocals = AllVersions.Select( tc => tc.Version )
+                                       .Where( v => v.IsLocal() && v.BuildMetaData.Length == 0 && (filter == null || filter( v )) )
+                                       .ToList();
+        if( cleanupLocals.Count > 0 )
+        {
+            using( monitor.OpenInfo( $"""
+                Destroying {cleanupLocals.Count} "local/" versions in '{Repo.DisplayPath}':
+                {cleanupLocals.Select( v => v.ParsedText ).Concatenate()}.
+                """ ) )
+            {
+                foreach( var local in cleanupLocals )
+                {
+                    success &= DestroyLocalRelease( monitor, local, removeFromNuGetGlobalCache );
+                }
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Destroys a "local/" released version. The version tag is deleted, any artifacts are removed.
+    /// <para>
+    /// This is idempotent (if the "local/" version tag doesn't exist, nothing is done).
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="version">
+    /// The "local/" release to destroy.
+    /// <see cref="SVersion.IsCSVersion"/> must be true and <see cref="SVersion.BuildMetaData"/> must be empty.
+    /// </param>
+    /// <param name="removeFromNuGetGlobalCache">
+    /// False to let the package in the NuGet global cache (if it exists).
+    /// The global cache is "%userprofile%\.nuget\packages" on windows and "~/.nuget/packages" on Mac/Linux.
+    /// </param>
+    /// <returns>
+    /// True on success, false on error: the <paramref name="version"/> is a +fake or +deprecated one, or
+    /// the assets cannot be properly deleted.
+    /// </returns>
+    public bool DestroyLocalRelease( IActivityMonitor monitor, SVersion version, bool removeFromNuGetGlobalCache = true )
+    {
+        var tagCommit = GetTagCommit( version );
+        if( tagCommit == null )
+        {
+            monitor.Trace( $"Version tag 'local/v{version}' not found. Skipped DestroyLocalRelease." );
+            return true;
+        }
+        // Use the right tag.
+        var tag = version.CINumber == 0 ? tagCommit.CI0VersionTag : tagCommit.Tag;
+        if( tag == null )
+        {
+            monitor.Error( ActivityMonitor.Tags.ToBeInvestigated, $"""Internal version mismatch: "--ci.0" '{version}' found but its TagCommit.CI0VersionTag is null.""" );
+            return false;
+        }
+        if( !tag.CanonicalName.StartsWith( "refs/tags/local/", StringComparison.Ordinal ) )
+        {
+            monitor.Error( $"Existing versioned tag '{tag.FriendlyName}' is not 'local/'. Skipped DestroyLocalRelease." );
+            return true;
+        }
+        if( version.CINumber != 0 && !tagCommit.IsRegularVersion )
+        {
+            Throw.DebugAssert( tag == tagCommit.Tag );
+            monitor.Error( $"DestroyLocalRelease failed: tag '{tag.FriendlyName}' must not be +fake or +deprecated." );
+            return false;
+        }
+        var tagContent = tagCommit.BuildContentInfo;
+
+        // TODO: tagContent! THIS IS NULL IF we have a "ci.0" on a "+fake" commit!
+
+        RemoveTagCommit( monitor, version );
+        return _versionTagPlugin.DoDestroyLocalRelease( monitor, base.Repo, tag, version, tagContent, removeFromNuGetGlobalCache );
+    }
+
 
     /// <summary>
     /// Used by build: this checks that the <paramref name="buildCommit"/> can be built with <paramref name="version"/>.
@@ -466,7 +564,10 @@ public sealed partial class VersionTagInfo : RepoInfo
             //   However we handle this without the empty commit in order to have a true 0-based commit depth for CI builds. 
             //
 
-            bool validCI0 = version.CINumber == 0 && version.SetCINumber( -1 ) == already.Version;
+            bool validCI0 = version.CINumber == 0
+                            && ((version.SetCINumber( -1, impactStablePatchNumber: false ) == already.Version && already.IsFakeVersion is true)
+                               ||
+                               (version.SetCINumber( -1, impactStablePatchNumber: true ) == already.Version && already.IsFakeVersion is false));
             if( !validCI0 )
             {
                 monitor.Error( $"""

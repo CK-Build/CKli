@@ -94,6 +94,7 @@ public sealed class CommitBuildInfo
                                                        CKliEnv context,
                                                        BuildContentInfo contentInfo )
     {
+        // When rebuilding, the _version is not "local/".
         var vPublishedTag = $"v{_version}";
         var vLocalTag = $"local/{vPublishedTag}";
         var vTag = _version.IsLocal() ? vLocalTag : vPublishedTag;
@@ -104,7 +105,8 @@ public sealed class CommitBuildInfo
                 """ );
         try
         {
-            // Our _version is "local/" but the version tag may already exist with or without "local/" prefix.
+            // Creates the tag (with or without "local/" prefix). If this exact tag is on another
+            // commit, it is moved (allowOverwrite: true).
             var git = _tagInfo.Repo.GitRepository.Repository;
             var t = git.Tags.Add( vTag,
                                   _buildCommit,
@@ -112,8 +114,22 @@ public sealed class CommitBuildInfo
                                   contentInfo.ToString(),
                                   allowOverwrite: true );
 
+            //    TODO: investigate whether TagCommits' updates are actually needed...
             if( _tagInfo.TryGetTagCommit( _version, out var exists ) )
             {
+                // A TagCommit exists with the version.
+                // - ci.0 case: update the TagCommit with the new ci.0 tag.
+                // - other cases:
+                // If the existing tag is not exactly the same (but is not a +fake), we remove the tag (this removes a "published"
+                // tag if it exists) and then we update the TagCommit:
+                //   - If on the same commit, the TagCommit's tag is set to the new one.
+                //   - If on a different commit, we remove the TagCommit and recreate a new one on the buildCommit.
+                //
+                // => This is NOT perfect in terms of TagCommits but we don't really care: once built, the VersionTagInfo
+                //    is not used anymore. The really important aspect here is to update the "real" git tags,
+                //    not to maintain the TagCommits' state.
+
+
                 Throw.DebugAssert( "We must not be able to rebuild a +deprecated commit.", !exists.IsDeprecatedVersion );
                 Throw.DebugAssert( """
                                    When rebuilding an existing version, the build commit must be the same, except if:
@@ -132,9 +148,10 @@ public sealed class CommitBuildInfo
                     // We don't want to remove a +fake git tag (this one coexists with its regular counterparts).
                     if( !exists.IsFakeVersion && exists.Tag.CanonicalName != t.CanonicalName )
                     {
-                        // Removes the other, different, tag (may be on the same commit or not).
+                        // Removes the other ("local/" vs. published), tag (may be on the same commit or not).
                         git.Tags.Remove( exists.Tag.CanonicalName );
                     }
+                    // 
                     if( exists.Commit.Sha == _buildCommit.Sha )
                     {
                         exists.UpdateVersionTag( t );
@@ -149,8 +166,15 @@ public sealed class CommitBuildInfo
             else
             {
                 Throw.DebugAssert( "We are not on a 'ci.0' version (the commit would have been found).", _version.CINumber != 0 );
-                exists = _tagInfo.AddReleaseBuildTag( _version, _buildCommit, t, contentInfo );
+                _tagInfo.AddReleaseBuildTag( _version, _buildCommit, t, contentInfo );
             }
+
+            // Destroys any other (previous!) local releases with the same branch name and:
+            // - always if they are CI (because whatever we just built, it is "better" than an old CI).
+            // - if they are not CI, then we destroy them only if we just built a new non-CI version.
+            _tagInfo.DestroyLocalReleases( monitor, v => v != _version
+                                                         && v.BranchName == _version.BranchName
+                                                         && (v.IsCI || !_version.IsCI) );
             return (t,_version);
         }
         catch( Exception ex )

@@ -208,7 +208,8 @@ public sealed partial class TagCommitTree
         SVersion v = LastStable.Version;
         Throw.DebugAssert( "Starting from the stable: no prerelease suffix to cleanup.", v.Prerelease.Length == 0 );
         bool applyVersionIncrement = true;
-        if( v.HasFakeMetadata )
+        bool lastStableIsFake = v.HasFakeMetadata;
+        if( lastStableIsFake )
         {
             // Since we build, we consider a minimal Patch change.
             if( vChange == SVersionChange.None ) vChange = SVersionChange.Patch;
@@ -217,8 +218,17 @@ public sealed partial class TagCommitTree
             // Inf is not Min: versions must be strictly greater than InfVersion, so
             // we consider the +fake as a "real" previous version and apply the
             // increment as usual.
+            //
+            // Note that we handle the special "minimal prerelease suffix" that is "0":
+            // X.Y.Z-0 is lower than any other X.Y.Z versions, and because we'll never
+            // generate a "-0" prerelease, the Infimum is satisfied even if we don't
+            // increment the patch.
+            // This .."-0" is what the Long Term Support feature uses when creating a LTS
+            // world. All this is only "convention based" but works for us...
+            //
             var infVersion = _hotZone.VersionTagInfo.InfVersion;
             applyVersionIncrement = infVersion != null
+                                    && infVersion.Prerelease != "0"
                                     && infVersion.Major == v.Major
                                     && infVersion.Minor == v.Minor
                                     && infVersion.Patch == v.Patch;
@@ -266,6 +276,7 @@ public sealed partial class TagCommitTree
                 return null;
             }
             if( mustAddCommit ) ++ciNumber;
+            // The patch increment (or not) has already been handled at the start of this method.
             v = v.SetCINumber( ciNumber, impactStablePatchNumber: false );
         }
         return v;
