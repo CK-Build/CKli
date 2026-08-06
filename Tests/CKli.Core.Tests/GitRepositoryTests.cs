@@ -113,7 +113,7 @@ public partial class GitRepositoryTests
             Branch initial = bob.Repository.Branches.Add( "test-2", bobMaster.Tip );
             bob.Checkout( TestHelper.Monitor, initial ).ShouldBeTrue();
             File.WriteAllText( bob.WorkingFolder.AppendPart( "SomeOther.txt" ), "Hop!" );
-            bob.Commit( TestHelper.Monitor, "Bob's commit on 'test-2'." ).ShouldBe( CommitResult.Commited );
+            bob.Commit( TestHelper.Monitor, "Bob's commit on 'test-2'." ).ShouldBe( CommitResult.Committed );
 
             // Caution with the references!
             initial.Tip.Tree["SomeOther.txt"].ShouldBeNull();
@@ -155,7 +155,7 @@ public partial class GitRepositoryTests
             Branch initial = bob.Repository.Branches.Add( "test-3", bob.Repository.Head.Tip );
             bob.Checkout( TestHelper.Monitor, initial ).ShouldBeTrue();
             File.WriteAllText( bob.WorkingFolder.AppendPart( "SomeOther.txt" ), "Hop!" );
-            bob.Commit( TestHelper.Monitor, "Bob's commit on 'test-3'." ).ShouldBe( CommitResult.Commited );
+            bob.Commit( TestHelper.Monitor, "Bob's commit on 'test-3'." ).ShouldBe( CommitResult.Committed );
             initial = bob.Repository.Head;
 
             // Same as above block but we stay on the "test-3" branch.
@@ -257,7 +257,7 @@ public partial class GitRepositoryTests
         timBranch.IsTracking.ShouldBe( !fetchFirst || noFetchPrune, "prune => no more tracking (and of course we should have fetched above)." );
         tim.Checkout( TestHelper.Monitor, timBranch ).ShouldBeTrue();
         File.WriteAllText( tim.WorkingFolder.AppendPart( "SomeWork.txt" ), "Hop!" );
-        tim.Commit( TestHelper.Monitor, "For me, test-1 exists." ).ShouldBe( CommitResult.Commited );
+        tim.Commit( TestHelper.Monitor, "For me, test-1 exists." ).ShouldBe( CommitResult.Committed );
 
         if( !fetchFirst )
         {
@@ -286,7 +286,7 @@ public partial class GitRepositoryTests
         bobBranch.IsTracking.ShouldBeFalse();
         bob.Checkout( TestHelper.Monitor, bobBranch ).ShouldBeTrue();
         File.WriteAllText( bob.WorkingFolder.AppendPart( "BobWork.txt" ), "Hop!" );
-        bob.Commit( TestHelper.Monitor, "Bob's working." ).ShouldBe( CommitResult.Commited );
+        bob.Commit( TestHelper.Monitor, "Bob's working." ).ShouldBe( CommitResult.Committed );
         bobBranch.IsTracking.ShouldBeFalse();
 
         // Bob "ckli pull": there's no conflict here but a merged commit is created.
@@ -314,7 +314,7 @@ public partial class GitRepositoryTests
         r.Checkout( TestHelper.Monitor, b ).ShouldBeTrue();
         r.CurrentBranchName.ShouldBe( bName );
         File.WriteAllText( r.WorkingFolder.AppendPart( $"Some{i}.txt" ), "Hello World!" );
-        r.Commit( TestHelper.Monitor, $"Commit n°{i}." ).ShouldBe( CommitResult.Commited );
+        r.Commit( TestHelper.Monitor, $"Commit n°{i}." ).ShouldBe( CommitResult.Committed );
         r.PushBranch( TestHelper.Monitor, b, autoCreateRemoteBranch: true ).ShouldBeTrue();
     }
 
@@ -338,7 +338,7 @@ public partial class GitRepositoryTests
 
         local.CurrentBranchName.ShouldBe( "main" );
         local.Repository.Head.Tip.Sha.ShouldBe( initialRemoteTip.Sha );
-        local.Commit( TestHelper.Monitor, "Just for fun.", CommitBehavior.CreateEmptyCommit ).ShouldBe( CommitResult.Commited );
+        local.Commit( TestHelper.Monitor, "Just for fun.", CommitBehavior.CreateEmptyCommit ).ShouldBe( CommitResult.Committed );
         local.PushBranch( TestHelper.Monitor, local.Repository.Head, autoCreateRemoteBranch: false );
 
         remote.Repository.Head.Tip.Sha.ShouldNotBe( initialRemoteTip.Sha );
