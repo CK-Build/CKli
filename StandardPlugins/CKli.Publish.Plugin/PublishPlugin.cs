@@ -37,7 +37,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
     {
         if( e.ShouldPublish )
         {
-            if( !await PublishAsync( monitor, World, _artifactHandler, _versionTag, e.BuildDate, e.FixWorkflow, e.Results, cancel ) )
+            if( !await PublishAsync( monitor, World, _artifactHandler, _versionTag, e.BuildDate, e.FixWorkflow, e.IsCIBuild, e.Results, cancel ) )
             {
                 e.SetFailed();
             }
@@ -49,11 +49,12 @@ public sealed class PublishPlugin : PrimaryPluginBase
                                               VersionTagPlugin versionTag,
                                               DateTime buildDate,
                                               FixWorkflow fixWorkflow,
+                                              bool ciBuild,
                                               ImmutableArray<BuildResult> results,
                                               CancellationToken cancel )
         {
             // A fix is on the stable branch.
-            var packageSender = PackageSender.Create( monitor, prereleaseName: "", ciBuild: false, artifactHandler, world.StackRepository.SecretsStore );
+            var packageSender = PackageSender.Create( monitor, prereleaseName: "", ciBuild: ciBuild, artifactHandler, world.StackRepository.SecretsStore );
             if( packageSender == null ) return false;
 
             var state = new PublishState( world );
@@ -63,7 +64,10 @@ public sealed class PublishPlugin : PrimaryPluginBase
             var publisher = new SimplePublisher( state, packageSender, artifactHandler, versionTag );
             if( await publisher.RunAsync( monitor, cancel ) )
             {
-                FixWorkflow.DeleteCurrent( monitor, world );
+                if( !ciBuild )
+                {
+                    FixWorkflow.DeleteCurrent( monitor, world );
+                }
                 return true;
             }
             return false;

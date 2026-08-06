@@ -108,7 +108,7 @@ public sealed partial class BuildPlugin
         {
             using( monitor.OpenTrace( $"Raising FixBuild event." ) )
             {
-                var e = new FixBuildEventArgs( monitor, workflow, results, publish );
+                var e = new FixBuildEventArgs( monitor, workflow, isCIBuild, results, publish );
                 if( !await _onFixBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) )
                 {
                     return false;

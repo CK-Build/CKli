@@ -12,11 +12,13 @@ public sealed class FixBuildEventArgs : BuildBaseEventArgs
 {
     readonly FixWorkflow _fix;
     readonly ImmutableArray<BuildResult> _results;
+    readonly bool _isCIBuild;
 
-    internal FixBuildEventArgs( IActivityMonitor monitor, FixWorkflow fix, ImmutableArray<BuildResult> results, bool shouldPublish )
+    internal FixBuildEventArgs( IActivityMonitor monitor, FixWorkflow fix, bool isCIBuild, ImmutableArray<BuildResult> results, bool shouldPublish )
         : base( monitor, shouldPublish )
     {
         _fix = fix;
+        _isCIBuild = isCIBuild;
         _results = results;
     }
 
@@ -30,4 +32,8 @@ public sealed class FixBuildEventArgs : BuildBaseEventArgs
     /// </summary>
     public ImmutableArray<BuildResult> Results => _results;
 
+    /// <summary>
+    /// Gets whether the build is a CI build.
+    /// </summary>
+    public bool IsCIBuild => _isCIBuild;
 }

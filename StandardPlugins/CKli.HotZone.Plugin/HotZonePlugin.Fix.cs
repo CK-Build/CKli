@@ -453,35 +453,31 @@ public sealed partial class HotZonePlugin
                     }
                 }
             }
-            // Provide an empty commit to the developer so that the branch is not on the existing versioned commit.
-            if( bFix == null || bFix.Tip.Sha == toFix.Commit.Sha )
+            bFix ??= repo.GitRepository.EnsureIntegratedBranch( monitor, branchName, toFix.Commit );
+            if( bFix == null )
             {
-                bFix = repo.GitRepository.EnsureIntegratedBranch( monitor, branchName, toFix.Commit );
-                if( bFix == null )
+                return null;
+            }
+            if( withEmptyCommit || bFix.Tip.Sha == toFix.Commit.Sha )
+            {
+                var message = $"Starting '{branchName}' (this commit can be amended).";
+                if( bFix.IsCurrentRepositoryHead )
                 {
-                    return null;
+                    if( repo.GitRepository.Commit( monitor, message, CommitBehavior.CreateEmptyCommit ) != CommitResult.Committed )
+                    {
+                        return null;
+                    }
                 }
-                if( withEmptyCommit && bFix.Tip.Sha == toFix.Commit.Sha )
+                else
                 {
-                    var message = $"Starting '{branchName}' (this commit can be amended).";
-                    if( bFix.IsCurrentRepositoryHead )
-                    {
-                        if( repo.GitRepository.Commit( monitor, message, CommitBehavior.CreateEmptyCommit ) != CommitResult.Committed )
-                        {
-                            return null;
-                        }
-                    }
-                    else
-                    {
-                        var r = repo.GitRepository.Repository;
-                        var c = r.ObjectDatabase.CreateCommit( toFix.Commit.Author,
-                                                               context.Committer,
-                                                               message,
-                                                               toFix.Commit.Tree,
-                                                               [toFix.Commit],
-                                                               prettifyMessage: false );
-                        bFix = r.Branches.Add( branchName, c, allowOverwrite: true );
-                    }
+                    var r = repo.GitRepository.Repository;
+                    var c = r.ObjectDatabase.CreateCommit( toFix.Commit.Author,
+                                                            context.Committer,
+                                                            message,
+                                                            toFix.Commit.Tree,
+                                                            [toFix.Commit],
+                                                            prettifyMessage: false );
+                    bFix = r.Branches.Add( branchName, c, allowOverwrite: true );
                 }
             }
 
