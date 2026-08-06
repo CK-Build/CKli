@@ -366,7 +366,7 @@ public sealed partial class Roadmap
         public HotGraph.SolutionVersionInfo VersionInfo => _versionInfo;
 
         /// <summary>
-        /// Gets the base version (the <see cref="VersionTagInfo.HotZoneInfo.LastPublishedStable"/> version).
+        /// Gets the base version (the <see cref="VersionTagInfo.HotZoneInfo.LastStable"/> version).
         /// </summary>
         public SVersion BaseVersion => _versionInfo.BaseBuild.Version;
 
@@ -433,7 +433,8 @@ public sealed partial class Roadmap
                 Throw.DebugAssert( "An error has been emitted if a MustBuild target version has already been published.", _mustPublish );
                 Throw.DebugAssert( BuildInfo.BuildReason != MustBuildReason.None );
 
-                r = r.AddRight( head.Screen.Text( localCurrentVersion ? $"-{CurrentVersion}-" : $"v{CurrentVersion}", ConsoleColor.Blue,
+                r = r.AddRight( head.Screen.Text( localCurrentVersion ? $"v{CurrentVersion}-" : $"v{CurrentVersion}",
+                                                  ConsoleColor.Blue,
                                                   effect: localCurrentVersion ? TextEffect.Strikethrough : TextEffect.Ignore ),
                                 head.Screen.Text( $"→ 🡡/v{BuildInfo.TargetVersion}", ConsoleColor.Green ).Box( marginLeft: 1, marginRight: 1 ),
                                 BuildInfo.RenderBuildReason( head.Screen, ref stats ) );

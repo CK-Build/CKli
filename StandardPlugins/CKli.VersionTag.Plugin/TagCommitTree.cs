@@ -43,7 +43,7 @@ public sealed partial class TagCommitTree
 
     internal TagCommitTree( VersionTagInfo.HotZoneInfo hotZone, Commit tip, List<(TagCommit, int)> content, List<Commit> headCommits )
     {
-        Throw.DebugAssert( content.Count > 0 && content[^1].Item1 == hotZone.LastPublishedStable );
+        Throw.DebugAssert( content.Count > 0 && content[^1].Item1 == hotZone.LastStable );
         _hotZone = hotZone;
         _tip = tip;
         _content = content;
@@ -56,9 +56,9 @@ public sealed partial class TagCommitTree
     public Commit Tip => _tip;
 
     /// <summary>
-    /// Gets the <see cref="VersionTagInfo.HotZoneInfo.LastPublishedStable"/>.
+    /// Gets the <see cref="VersionTagInfo.HotZoneInfo.LastStable"/>.
     /// </summary>
-    public TagCommit LastStable => _hotZone.LastPublishedStable;
+    public TagCommit LastStable => _hotZone.LastStable;
 
     /// <summary>
     /// Gets the versioned tag commits with their 0-based increasing level from the first one.
@@ -208,14 +208,14 @@ public sealed partial class TagCommitTree
 
         SVersion v = LastStable.Version;
         Throw.DebugAssert( "Starting from the stable: no prerelease suffix to cleanup.", v.Prerelease.Length == 0 );
-        if( !v.HasFakeMetadata )
+        // Ultimately use Patch (this is required by the caller: because we build then a minimal version change is expected).
+        if( vChange == SVersionChange.None ) vChange = SVersionChange.Patch;
+        if( !LastStable.IsOrHasFakeVersion )
         {
             if( vChange < SVersionChange.Major )
             {
                 var c = GetVersionChange();
                 if( c > vChange ) vChange = c;
-                // Ultimately use Patch.
-                if( vChange == SVersionChange.None ) vChange = SVersionChange.Patch;
             }
             v = v.SetNextVersionNumbers( vChange );
         }

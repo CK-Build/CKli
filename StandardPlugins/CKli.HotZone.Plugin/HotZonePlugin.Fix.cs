@@ -88,10 +88,10 @@ public sealed partial class HotZonePlugin
                             : $"Unable to find any version to fix for 'v{major}'." );
             return false;
         }
-        if( toFix.Version >= versionInfo.HotZone.LastPublishedStable.Version )
+        if( toFix.Version >= versionInfo.HotZone.LastStable.Version )
         {
             monitor.Error( $"""
-                The version to fix 'v{toFix.Version}' is in the "hot zone" (the last published stable version is 'v{versionInfo.HotZone.LastPublishedStable.Version}').
+                The version to fix 'v{toFix.Version}' is in the "hot zone" (the last published stable version is 'v{versionInfo.HotZone.LastStable.Version}').
                 Use the regular workflow with 'ckli build/publish' commands to produce a fix.
                 """ );
             return false;
@@ -132,7 +132,7 @@ public sealed partial class HotZonePlugin
             else
             {
                 monitor.Error( $"A fix workflow already exists for world '{World.Name}'. It must be canceled first." );
-                context.Screen.Display( exists.ToRenderable );
+                context.Screen.Display( s => exists.ToRenderable( s, withFixingHeader: false ) );
                 return false;
             }
         }
@@ -178,7 +178,7 @@ public sealed partial class HotZonePlugin
         }
 
         // Display (avoid a subsequent 'ckli fix info').
-        context.Screen.Display( workflow.ToRenderable );
+        context.Screen.Display( s => workflow.ToRenderable( s, withFixingHeader: true ) );
         return true;
 
         static bool ParseMajorMinor( ReadOnlySpan<char> s, out int major, out int minor )
@@ -205,7 +205,7 @@ public sealed partial class HotZonePlugin
                                    RepoReleaseInfo origin,
                                    out ImmutableArray<FixWorkflow.TargetRepo> targets )
         {
-            #region Comments
+            #region Comments & thoughts
             // The direct impacts are filtered. This limits the number of release to process at the source: only
             // repo/version that need to be built will appear in the direct impacts.
             //
@@ -432,6 +432,8 @@ public sealed partial class HotZonePlugin
             {
                 // When bFix.Tip.Tree.Sha == toFix.ContentSha, we are in the initial nominal case:
                 // the commit referenced by the /fix branch contains the code to fix.
+
+                // TODO: replace this with HistoryDivergence.
                 if( bFix.Tip.Tree.Sha != toFix.Commit.Tree.Sha )
                 {
                     // The /fix branch must contain the commit to fix.
@@ -454,21 +456,32 @@ public sealed partial class HotZonePlugin
             // Provide an empty commit to the developer so that the branch is not on the existing versioned commit.
             if( bFix == null || bFix.Tip.Sha == toFix.Commit.Sha )
             {
-                var r = repo.GitRepository.Repository;
-                if( withEmptyCommit )
+                bFix = repo.GitRepository.EnsureIntegratedBranch( monitor, branchName, toFix.Commit );
+                if( bFix == null )
                 {
-                    var c = r.ObjectDatabase.CreateCommit( toFix.Commit.Author,
-                                                           context.Committer,
-                                                           $"Starting '{branchName}' (this commit can be amended).",
-                                                           toFix.Commit.Tree,
-                                                           [toFix.Commit],
-                                                           prettifyMessage: false );
-                    // Create or update the /fix branch.
-                    bFix = r.Branches.Add( branchName, c, allowOverwrite: true );
+                    return null;
                 }
-                else
+                if( withEmptyCommit && bFix.Tip.Sha == toFix.Commit.Sha )
                 {
-                    bFix = r.Branches.Add( branchName, toFix.Commit, allowOverwrite: true );
+                    var message = $"Starting '{branchName}' (this commit can be amended).";
+                    if( bFix.IsCurrentRepositoryHead )
+                    {
+                        if( repo.GitRepository.Commit( monitor, message, CommitBehavior.CreateEmptyCommit ) != CommitResult.Committed )
+                        {
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        var r = repo.GitRepository.Repository;
+                        var c = r.ObjectDatabase.CreateCommit( toFix.Commit.Author,
+                                                               context.Committer,
+                                                               message,
+                                                               toFix.Commit.Tree,
+                                                               [toFix.Commit],
+                                                               prettifyMessage: false );
+                        bFix = r.Branches.Add( branchName, c, allowOverwrite: true );
+                    }
                 }
             }
 
@@ -501,7 +514,7 @@ public sealed partial class HotZonePlugin
         }
         else
         {
-            context.Screen.Display( workflow.ToRenderable );
+            context.Screen.Display( s => workflow.ToRenderable( s, withFixingHeader: true ) );
         }
         return true;
     }

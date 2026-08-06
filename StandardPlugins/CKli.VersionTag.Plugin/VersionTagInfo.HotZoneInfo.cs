@@ -20,34 +20,56 @@ public sealed partial class VersionTagInfo
     {
         readonly VersionTagInfo _info;
         readonly TagCommit _topHot;
-        readonly TagCommit _lastPublishedStable;
+        readonly TagCommit _lastStable;
         readonly World.Issue? _hotZoneIssue;
         Dictionary<string, TagCommitTree?>? _commitTrees;
 
-        HotZoneInfo( VersionTagInfo info, TagCommit lastPublishedStable, TagCommit topHot, World.Issue? hotZoneIssue )
+        HotZoneInfo( VersionTagInfo info, TagCommit lastStable, TagCommit topHot, World.Issue? hotZoneIssue )
         {
             _info = info;
-            _lastPublishedStable = lastPublishedStable;
+            _lastStable = lastStable;
             _topHot = topHot;
             _hotZoneIssue = hotZoneIssue;
         }
 
-        internal static HotZoneInfo Create( IActivityMonitor monitor, VersionTagInfo info, TagCommit lastPublishedStable, TagCommit topHot )
+        internal static HotZoneInfo Create( IActivityMonitor monitor, VersionTagInfo info, TagCommit lastStable, TagCommit topHot )
         {
-            World.Issue? hotZoneIssue = null;
-            var hotSupremum = SVersion.Create( lastPublishedStable.Version.Major + 1, 0, 0 );
-            if( topHot.Version >= hotSupremum )
+            Throw.DebugAssert( lastStable.Version.IsStable );
+            string? message = null;
+            if( topHot.Version != lastStable.Version )
             {
-                var message = $"""
-                              The greatest version tag '{topHot.Version.ParsedText}' cannot be greater or equal to 'v{lastPublishedStable.Version.Major + 1
-                              }.0.0' because the last published stable version is '{lastPublishedStable.Version.ParsedText}'.
+                if( lastStable.IsOrHasFakeVersion )
+                {
+                    Throw.DebugAssert( (lastStable.IsFakeVersion && !lastStable.IsLocal) || (lastStable.FakeVersion != null && lastStable.IsLocal) );
+                    if( topHot.Version > lastStable.Version )
+                    {
+                        var fake = lastStable.FakeVersion?.Version ?? lastStable.Version; 
+                        message = $"""
+                              The greatest version tag '{topHot.Version.ParsedText}' cannot be greater or equal to 'v{fake.Major}.{fake.Minor}.{fake.Patch}' because the current stable version is '{fake.ParsedText}'.
                               This should be fixed manually.
                               """;
+                    }
 
+                }
+                else
+                {
+                    var hotSupremum = SVersion.Create( lastStable.Version.Major + 1, 0, 0 );
+                    if( topHot.Version >= hotSupremum )
+                    {
+                        message = $"""
+                              The greatest version tag '{topHot.Version.ParsedText}' cannot be greater or equal to 'v{hotSupremum.Major}.0.0' because the last published stable version is '{lastStable.Version.ParsedText}'.
+                              This should be fixed manually.
+                              """;
+                    }
+                }
+            }
+            World.Issue? hotZoneIssue = null;
+            if( message != null )
+            {
                 monitor.Warn( $"Hot zone issue in '{info.Repo.DisplayPath}': {message}" );
                 hotZoneIssue = World.Issue.CreateManual( "Hot zone issue detected.", info.Repo.World.ScreenType.Text( message ), info.Repo );
             }
-            return new HotZoneInfo( info, lastPublishedStable, topHot, hotZoneIssue );
+            return new HotZoneInfo( info, lastStable, topHot, hotZoneIssue );
         }
 
         /// <summary>
@@ -66,24 +88,26 @@ public sealed partial class VersionTagInfo
         /// This is not an issue: the repository has no pending local versions nor CI build.
         /// </para>
         /// </summary>
-        public bool IsEmpty => _lastPublishedStable == _topHot;
+        public bool IsEmpty => _lastStable == _topHot;
 
         /// <summary>
-        /// Gets the top tag commit. This is greater or equal to <see cref="LastPublishedStable"/>.
+        /// Gets the top tag commit. This is greater or equal to <see cref="LastStable"/>.
         /// </summary>
         public TagCommit TopHot => _topHot;
 
         /// <summary>
-        /// Gets the last published stable version: this is the common ancestor of the "hot zone" where branch model applies.
-        /// <para>
-        /// This can be a "+fake" or a "+deprecated" version (<see cref="TagCommit.IsRegularVersion"/> can be false) and
-        /// <see cref="TagCommit.BuildContentInfo"/> may be null.  
-        /// </para>
+        /// Gets the last stable version: this is the common ancestor of the "hot zone" where branch model applies.
+        /// <list type="bullet">
+        ///     <item>It is most often a published (non "local/") regular version.</item>
+        ///     <item>It can be a "+fake" (fake versions are always stable and published).</item>
+        ///     <item>It can be a "+deprecated" stable version (deprecated versions are always published).</item>
+        ///     <item>It can be a "local/" stable with an associated <see cref="TagCommit.FakeVersion"/>.</item>
+        /// </list>
         /// </summary>
-        public TagCommit LastPublishedStable => _lastPublishedStable;
+        public TagCommit LastStable => _lastStable;
 
         /// <summary>
-        /// Gets all the reachable <see cref="TagCommit"/> from the <paramref name="start"/> up to <see cref="LastPublishedStable"/>
+        /// Gets all the reachable <see cref="TagCommit"/> from the <paramref name="start"/> up to <see cref="LastStable"/>
         /// with their 0-based increasing level from the first tagged commit found.
         /// <para>
         /// This is a breadth-first traversal. Some consecutive levels may be the same: in that case, the ambiguity must
@@ -106,13 +130,13 @@ public sealed partial class VersionTagInfo
             // based on the Content SHA (TREESAME): when playing with "empty commits", we take the risk to miss parents.
             //
             // So we use the Parents and 3 mechanisms help us shorten the walk:
-            //  1) when LastPublishedStable is met, this stops the walk.
-            //  2) the TagCommit version (if it exists) must be greater to the LastPublishedStable otherwise we stop the walk.
+            //  1) when LastStable is met, this stops the walk.
+            //  2) the TagCommit version (if it exists) must be greater to the LastStable otherwise we stop the walk.
             //
-            // The fact is that the following code can produce TagCommits that don't have LastPublishedStable in their ancestors. This 
-            // means that the LastPublishedStable is not a "full synchronization point" in the graph, that some branches have not been
-            // resynchronized on it before being merged in our "tip" commit history (this is where 2) above kicks in: versions older than
-            // LastPublishedStable are rejected).
+            // The fact is that the following code can produce TagCommits that don't have LastStable in their ancestors. This 
+            // means that the LastStable is not a "full synchronization point" in the graph, that some branches have not been
+            // resynchronized on it before being merged in our "tip" commit history (this is where 2 above kicks in: versions older than
+            // LastStable are rejected).
             //
             var collector = new List<(TagCommit, int)>();
             var commitSeen = new HashSet<string>();
@@ -123,7 +147,7 @@ public sealed partial class VersionTagInfo
             do
             {
                 var (c,l) = stack.Pop();
-                int nextL = Collect( _info, commitSeen, _lastPublishedStable, c, l, collector );
+                int nextL = Collect( _info, commitSeen, _lastStable, c, l, collector );
                 if( maxCount > 0 && collector.Count >= maxCount )
                 {
                     break;
@@ -141,14 +165,14 @@ public sealed partial class VersionTagInfo
 
             static int Collect( VersionTagInfo info,
                                  HashSet<string> commitSeen,
-                                 TagCommit lastPublishedStable,
+                                 TagCommit lastStable,
                                  Commit c,
                                  int level,
                                  List<(TagCommit, int)> collector )
             {
-                if( c.Sha == lastPublishedStable.Sha )
+                if( c.Sha == lastStable.Sha )
                 {
-                    collector.Add( (lastPublishedStable, level) );
+                    collector.Add( (lastStable, level) );
                     return -1;
                 }
                 if( !commitSeen.Add( c.Sha ) )
@@ -157,8 +181,11 @@ public sealed partial class VersionTagInfo
                 }
                 if( info.TagCommitsBySha.TryGetValue( c.Sha, out var tc ) )
                 {
-                    if( lastPublishedStable.Version < tc.Version
-                        || (lastPublishedStable.IsFakeVersion && !lastPublishedStable.Version.IsStableRoughBaseOf( tc.Version )) )
+                    // Allow here the version to be "roughly based" on the lastStable when
+                    // the lastStable is a +fake (this is not the case if the lastStable is
+                    // a "local/" associated to a FakeVersion i.e. when IsOrHasFakeVersion is true).
+                    if( lastStable.Version < tc.Version
+                        || (lastStable.IsFakeVersion && !lastStable.Version.IsStableRoughBaseOf( tc.Version )) )
                     {
                         return -1;
                     }
@@ -175,14 +202,14 @@ public sealed partial class VersionTagInfo
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="branch">The branch to consider.</param>
-        /// <returns>The tree or null if <see cref="LastPublishedStable"/> is not reachable from <paramref name="branch"/>.</returns>
+        /// <returns>The tree or null if <see cref="LastStable"/> is not reachable from <paramref name="branch"/>.</returns>
         public TagCommitTree? GetRequiredTagCommitTree( IActivityMonitor monitor, Branch branch )
         {
             var t = GetTagCommitTree( branch.Tip );
             if( t == null )
             {
                 monitor.Error( ActivityMonitor.Tags.ToBeInvestigated,
-                               $"Unable to get tag commit tree from branch '{branch.CanonicalName}' to {_lastPublishedStable} in '{_info.Repo.DisplayPath}'." );
+                               $"Unable to get tag commit tree from branch '{branch.CanonicalName}' to {_lastStable} in '{_info.Repo.DisplayPath}'." );
             }
             return t;
         }
@@ -190,8 +217,8 @@ public sealed partial class VersionTagInfo
         /// <summary>
         /// Gets the <see cref="TagCommitTree"/> for the given commit.
         /// </summary>
-        /// <param name="tip">The starting commit that should have <see cref="LastPublishedStable"/> in its parents.</param>
-        /// <returns>The tree or null if <see cref="LastPublishedStable"/> is not reachable from <paramref name="tip"/>.</returns>
+        /// <param name="tip">The starting commit that should have <see cref="LastStable"/> in its parents.</param>
+        /// <returns>The tree or null if <see cref="LastStable"/> is not reachable from <paramref name="tip"/>.</returns>
         public TagCommitTree? GetTagCommitTree( Commit tip )
         {
             if( _commitTrees != null )
@@ -247,7 +274,7 @@ public sealed partial class VersionTagInfo
             do
             {
                 var (c, l) = stack.Pop();
-                int nextL = Collect( _info, commitSeen, _lastPublishedStable, c, l, collector, headCommits );
+                int nextL = Collect( _info, commitSeen, _lastStable, c, l, collector, headCommits );
                 if( nextL >= 0 )
                 {
                     foreach( var p in c.Parents )
@@ -301,7 +328,7 @@ public sealed partial class VersionTagInfo
         internal bool OnTagCommitRemoved( TagCommit tc )
         {
             _commitTrees?.Clear();
-            return tc != _lastPublishedStable;
+            return tc != _lastStable;
         }
     }
 

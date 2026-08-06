@@ -124,7 +124,7 @@ public sealed class Repo
     /// </summary>
     /// <param name="screenType">The screen type.</param>
     /// <param name="branchName">Non null to add a box with the branch name.</param>
-    /// <param name="withRemoteDiffCount">True to add a box with the commit remotes ↑0↓0 differences indicator.</param>
+    /// <param name="withRemoteDiffCount">True to add a box with the commit remotes ↑0↓0 divergence indicator.</param>
     /// <param name="withOriginUrl">True to add a box with the <see cref="OriginUrl"/>.</param>
     /// <returns>The renderable.</returns>
     public IRenderable ToRenderable( ScreenType screenType, string? branchName = null, bool withRemoteDiffCount = false, bool withOriginUrl = false )

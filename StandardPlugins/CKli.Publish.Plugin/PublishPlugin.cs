@@ -43,25 +43,30 @@ public sealed class PublishPlugin : PrimaryPluginBase
             }
         }
 
-        static Task<bool> PublishAsync( IActivityMonitor monitor,
-                                        World world,
-                                        ArtifactHandlerPlugin artifactHandler,
-                                        VersionTagPlugin versionTag,
-                                        DateTime buildDate,
-                                        FixWorkflow fixWorkflow,
-                                        ImmutableArray<BuildResult> results,
-                                        CancellationToken cancel )
+        static async Task<bool> PublishAsync( IActivityMonitor monitor,
+                                              World world,
+                                              ArtifactHandlerPlugin artifactHandler,
+                                              VersionTagPlugin versionTag,
+                                              DateTime buildDate,
+                                              FixWorkflow fixWorkflow,
+                                              ImmutableArray<BuildResult> results,
+                                              CancellationToken cancel )
         {
             // A fix is on the stable branch.
             var packageSender = PackageSender.Create( monitor, prereleaseName: "", ciBuild: false, artifactHandler, world.StackRepository.SecretsStore );
-            if( packageSender == null ) return Task.FromResult( false );
+            if( packageSender == null ) return false;
 
             var state = new PublishState( world );
             var newOne = WorldReleaseInfo.Create( buildDate, fixWorkflow, results );
             state.Add( monitor, newOne );
 
             var publisher = new SimplePublisher( state, packageSender, artifactHandler, versionTag );
-            return publisher.RunAsync( monitor, cancel );
+            if( await publisher.RunAsync( monitor, cancel ) )
+            {
+                FixWorkflow.DeleteCurrent( monitor, world );
+                return true;
+            }
+            return false;
         }
     }
 

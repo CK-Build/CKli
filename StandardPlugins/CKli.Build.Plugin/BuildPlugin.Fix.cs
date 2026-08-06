@@ -124,12 +124,15 @@ public sealed partial class BuildPlugin
         static IRenderable RenderBuildResults( ScreenType s, FixWorkflow workflow, ImmutableArray<BuildResult> results )
         {
             var d = s.Unit.AddBelow( workflow.Targets.Select( t => t.Repo.ToRenderable( s, t.BranchName )
-                                                                    .AddRight( s.Text( results[t.Index].Version.ToString() )
-                                                                            .Box( marginLeft: 1,
-                                                                                  foreColor: results[t.Index].SkippedBuild
-                                                                                                ? ConsoleColor.DarkYellow
-                                                                                                : ConsoleColor.Green ) ) ) );
+                                                                    .AddRight( BuildInfo( s, results[t.Index] ) ) ) );
             return d.TableLayout();
+
+            static IRenderable BuildInfo( ScreenType s, BuildResult r )
+            {
+                return s.Text( r.SkippedBuild ? 'v' + r.Version.ToString() : "→ v" + r.Version.ToString() )
+                        .Box( marginLeft: r.SkippedBuild ? 3 : 1,
+                              foreColor: r.SkippedBuild ? ConsoleColor.DarkYellow : ConsoleColor.Green );
+            }
         }
     }
 
@@ -150,17 +153,22 @@ public sealed partial class BuildPlugin
         // But when a "fix build --ci" has been done right before, a "--ci" version tag may
         // exist on the same commit we are building. Because this is not allowed, we must
         // handle this case.
-        // There's 2 approaches:
         //  - Aggressive: Cleaning any CI builds (or deprecate the published ones).
         //                Because one cannot rebuild a deprecated (and this is a good feature),
         //                the deprecation must be a "hard delete" (no +deprecated tag)...
         //                That is NOT the spirit so far: published artefacts must be deprecated.
+        //                But deprecating a version from here would be weird (surprising remote impact).
+        //                
         //  - Gentle: Adding an empty commit when needed (when a CI tag exists).
         //
-        //  Synthesis: If a "local/" CI build exists, we destroy the release (suppressing the tag
-        //             and any artefacts).
-        //             If a published CI build exists, create an empty commit to carry the release.
-
+        //  - Gentle Synthesis: If a "local/" CI build exists, we destroy the release (suppressing the tag
+        //                      and any artefacts).
+        //                      If a published CI build exists, create an empty commit to carry the release
+        //                      and let the user deprecate the version manually whenever he wants.
+        //
+        //  If the existing version is or has a +fake, this is an error (fake versions have nothing to do in
+        //  a fix context).
+        //
         var updates = new PackageMapper();
         if( !CheckoutFixTargetBranch( monitor, target, versionInfo, out var toFix, out int commitDepth )
             || !_solutionPlugin.UpdatePackages( monitor, target.Repo, packageMapping, updates )
@@ -178,13 +186,52 @@ public sealed partial class BuildPlugin
         }
         else
         {
-            // No new commit: we must handle the potential CI build.
-            if( versionInfo.TagCommitsBySha.TryGetValue( commitToBuild.Sha, out var exists )
-                && (exists.CI0VersionTag != null || exists.Version.IsCI) )
+            // No new commit: we must handle the potential tag clash.
+            if( versionInfo.TagCommitsBySha.TryGetValue( commitToBuild.Sha, out var exists ) )
             {
+                if( exists.IsOrHasFakeVersion )
+                {
+                    monitor.Error( $"""
+                        Unexpected fake version: {exists.FakeVersion ?? exists} in '{target.Repo.DisplayPath}'.
+                        This must be fixed manually.
+                        """ );
+                    return false;
+                }
+
                 if( exists.IsLocal )
                 {
-                    _versionTags.DestroyLocalRelease( monitor, target.Repo, exists.Version, removeFromNuGetGlobalCache: false );
+                    // The "local/" version exists.
+                    // If it's a non-CI build, we must let the build be skipped.
+                    // If it's a CI build and we are ci build again, we must let the build be skipped.
+                    // => We must only handle a non-CI build on a previous CI build by destroying the
+                    //    "local/" build. 
+                    if( exists.Version.IsCI && !isCIBuild )
+                    {
+                        if( !versionInfo.DestroyLocalRelease( monitor, exists.Version, removeFromNuGetGlobalCache: false ) )
+                        {
+                            return false;
+                        }
+                    }
+
+                }
+                else
+                {
+                    // The commit has been published.
+                    // Only CI builds can be published in a fix workflow via 'ckli fix publish --ci'.
+                    // 'ckli fix publish' ends the workflow but if the publication fails, we must let
+                    // the build be skipped.
+                    // => We only handle a non-CI build on a previously published CI by creating an empty commit.
+                    if( exists.Version.IsCI )
+                    {
+                        var git = target.Repo.GitRepository;
+                        if( git.Commit( monitor, $"Skipped published '{exists.Version.ParsedText}'.", CommitBehavior.CreateEmptyCommit ) != CommitResult.Committed )
+                        {
+                            monitor.Error( $"Unable to create empty commit on branch '{git.CurrentBranchName}' in '{target.Repo.DisplayPath}'." );
+                            return false;
+                        }
+                        commitToBuild = git.Repository.Head.Tip;
+                        commitDepth++;
+                    }
                 }
             }
         }
@@ -193,10 +240,6 @@ public sealed partial class BuildPlugin
         {
             // The target version already has the incremented Patch number.
             targetVersion = targetVersion.SetCINumber( commitDepth, impactStablePatchNumber: false );
-        }
-        else
-        {
-
         }
         var result = await CoreBuildAsync( monitor,
                                            context,

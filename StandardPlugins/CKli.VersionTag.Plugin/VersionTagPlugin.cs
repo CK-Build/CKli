@@ -318,11 +318,10 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         // Second pass: filters out the invalid tags and produces the v2C index
         //              along with potential tag conflicts.
         //              During this pass, we also compute the topHot (that is the greatest version tag)
-        //              and the lastPublishedStable (that can be seen as the "baseHot").
+        //              and the lastStable (that can be seen as the "baseHot").
         var v2c = new Dictionary<SVersion, TagCommit>();
         TagCommit? topHot = null;
         TagCommit? lastStable = null;
-        TagCommit? lastPublishedStable = null;
         foreach( var newOne in validTags )
         {
             // This filters out any version tags (regular, +fake or +deprecated): +invalid always wins.
@@ -352,22 +351,26 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         tagConflicts.Add( ((exists.Version, exists.Tag), (newOne.Version, newOne.Tag), TagConflict.DuplicatedVersionTag) );
                         continue;
                     }
-                    // Easy (we ignore the fake newOne or remove it if the regular or deprecated tag is published): 
+                    // Easy (we ignore - but remember - the fake newOne or remove it if the regular or deprecated tag is published): 
                     if( exists.IsLocal )
                     {
-                        // The fake version has been built, but not published. The +fake may be the only LastPublishedStable,
-                        // and we need a LastPublishedStable! (As it defines the Hot Zone).
-
-                        // But we CANNOT do this:
+                        // The fake version has been built, but not published.
+                        // We must keep the +fake until the version is published but we CANNOT do this:
                         //
                         // v2c.Add( newOne.Version, newOne );
                         //
-                        // The version is the v2c key (this will throw), so:
-                        // - Like the CI0VersionTag, we add a "TagCommit? FakeVersion { get; }" on TagCommit.
+                        // The version is the v2c key (this will throw: one version => one TagCommit), so:
+                        // - Like the CI0Version, we have a "TagCommit? FakeVersion { get; }" on TagCommit.
                         // - The "local/" one holds the FakeVersion.
-                        // - The LastPublishedStable is the +fake (if no better one exist of course)... It is NOT directly in the v2c index...
-                        TrackTagCommit( ref topHot, ref lastStable, ref lastPublishedStable, newOne );
+                        Throw.DebugAssert( exists.IsOrHasFakeVersion is false );
                         exists.SetFake( newOne );
+                        Throw.DebugAssert( exists.IsOrHasFakeVersion is true );
+                        // exists can now be the lastStable because IsOrHasFakeVersion is now true!
+                        Throw.DebugAssert( "A +fake is always published and stable.", newOne.Version.IsStable && !newOne.IsLocal );
+                        if( lastStable == null || lastStable.Version < exists.Version )
+                        {
+                            lastStable = exists;
+                        }
                     }
                     else
                     {
@@ -378,6 +381,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                             removableTags.Add( newOne.Tag );
                         }
                     }
+                    // The lastStable and the topHot stays where they are (they must be on the exists rather than the +fake),
                     continue;
                 }
                 if( exists.IsFakeVersion )
@@ -397,18 +401,15 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     {
                         newOne.SetFake( exists );
                     }
-                    else
+                    else if( _removeUselessFakeTag )
                     {
-                        if( lastPublishedStable == exists ) lastPublishedStable = newOne;
-                        if( _removeUselessFakeTag )
-                        {
-                            removableTags ??= new List<Tag>();
-                            removableTags.Add( exists.Tag );
-                        }
+                        removableTags ??= new List<Tag>();
+                        removableTags.Add( exists.Tag );
                     }
-                    // topHot and lastStable may become regular or deprecated (instead of fake).
-                    if( topHot == exists ) topHot = newOne;
+                    // The lastStable becomes the "local/" with the associated FakeVersion.
                     if( lastStable == exists ) lastStable = newOne;
+                    // The topHot prefers the actual "local/" to the "+fake".
+                    if( topHot == exists ) topHot = newOne;
                     continue;
                 }
                 // Now that "+fake" vs. ("regular" or "deprecated") have been handled, if the same version appears on different commits,
@@ -438,7 +439,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         // If topHot was the "local/" exists, it is now the published newOne.
                         if( topHot == exists ) topHot = newOne;
                         if( lastStable == exists ) lastStable = newOne;
-                        if( lastPublishedStable == exists ) lastPublishedStable = newOne;
                    }
                     continue;
                 }
@@ -456,7 +456,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         removableTags ??= new List<Tag>();
                         removableTags.Add( newOne.Tag );
                     }
-                    Throw.DebugAssert( "The topHot and lastPublishedStable cannot be the newOne (but they may be the 'exists' one).", topHot != newOne && lastPublishedStable != newOne );
+                    Throw.DebugAssert( "The topHot and lastStable cannot be the newOne (but they may be the 'exists' one).", topHot != newOne && lastStable != newOne );
                     continue;
                 }
                 if( newOne.IsDeprecatedVersion && exists.IsRegularVersion )
@@ -473,7 +473,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     // If no better topHot pops, this is annoying (see below).
                     if( topHot == exists ) topHot = newOne;
                     if( lastStable == exists ) lastStable = newOne;
-                    if( lastPublishedStable == exists ) lastPublishedStable = newOne;
                     continue;
                 }
                 // 2 regular tags: we must be able to chose a best one or this is
@@ -492,7 +491,6 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     {
                         if( topHot == exists && best == newOne ) topHot = newOne;
                         if( lastStable == exists && best == newOne ) lastStable = newOne;
-                        if( lastPublishedStable == exists && best == newOne ) lastPublishedStable = newOne;
                         continue;
                     }
                 }
@@ -502,7 +500,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             }
             else
             {
-                TrackTagCommit( ref topHot, ref lastStable, ref lastPublishedStable, newOne );
+                TrackTagCommit( ref topHot, ref lastStable, newOne );
                 v2c.Add( newOne.Version, newOne );
             }
         }
@@ -521,7 +519,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         // Two HotZone issues: no version tags (Build plugin can auto fix that) and a top hot that is "too much higher" than the last
         // stable (this is a strong signal of a bad tag that should be deleted).
         VersionTagInfo.HotZoneInfo? hotZone = null;
-        if( lastPublishedStable == null )
+        if( lastStable == null )
         {
             if( !isExecutingIssue )
             {
@@ -533,8 +531,10 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         else
         {
             Throw.DebugAssert( topHot != null );
-            // The HotZoneInfo will create the required manual fix if topHot.Version >= (lastStable.Major + 1, 0, 0).
-            hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, info, lastPublishedStable, topHot );
+            // The HotZoneInfo will create the required manual fix if topHot.Version >= (lastStable.Major + 1, 0, 0)
+            // or (when lastStable is a +fake or is a "local/" with an associated FakeVersion) if topHot is greater
+            // to the fake version (a fake version is always stable).
+            hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, info, lastStable, topHot );
         }
 
         // Time to work on the "ci.0" version tags.
@@ -859,22 +859,17 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             return false;
         }
 
-        static void TrackTagCommit( ref TagCommit? topHot, ref TagCommit? lastStable, ref TagCommit? lastPublishedStable, TagCommit newOne )
+        static void TrackTagCommit( ref TagCommit? topHot, ref TagCommit? lastStable, TagCommit newOne )
         {
             if( topHot == null || topHot.Version < newOne.Version )
             {
                 topHot = newOne;
             }
-            if( newOne.Version.IsStable )
+            if( newOne.Version.IsStable 
+                && (lastStable == null || lastStable.Version < newOne.Version)
+                && (newOne.IsOrHasFakeVersion || !newOne.IsLocal) )
             {
-                if( !newOne.Version.IsLocal() && (lastPublishedStable == null || lastPublishedStable.Version < newOne.Version) )
-                {
-                    lastPublishedStable = newOne;
-                }
-                if( lastStable == null || lastStable.Version < newOne.Version )
-                {
-                    lastStable = newOne;
-                }
+                lastStable = newOne;
             }
         }
     }

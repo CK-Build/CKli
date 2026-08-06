@@ -20,10 +20,10 @@ public enum CommitResult
     /// <summary>
     /// A commit has been created.
     /// </summary>
-    Commited,
+    Committed,
 
     /// <summary>
-    /// THe current head has been amended.
+    /// The current head has been amended.
     /// </summary>
     Amended,
 }

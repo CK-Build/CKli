@@ -118,67 +118,65 @@ public sealed partial class VersionTagPlugin
             }
         }
         return success;
+    }
 
-
-        static DeprecatedTagInfo? EnsureRootDeprecatedTag( IActivityMonitor monitor,
-                                                           TagCommit existing,
-                                                           string? reason,
-                                                           int daysDelay,
-                                                           bool allowUpdate )
+    internal static DeprecatedTagInfo? EnsureRootDeprecatedTag( IActivityMonitor monitor,
+                                                                TagCommit existing,
+                                                                string? reason,
+                                                                int daysDelay,
+                                                                bool allowUpdate )
+    {
+        var tagInfo = existing.DeprecatedInfo;
+        if( tagInfo == null )
         {
-            var tagInfo = existing.DeprecatedInfo;
-            if( tagInfo == null )
+            if( daysDelay == -1 )
             {
-                if( daysDelay == -1 )
-                {
-                    monitor.Error( "To create a new deprecation tag, flag --immediate or option --days must be specified." );
-                    return null;
-                }
-                return CreateDeprecationTag( monitor, existing, reason, daysDelay );
+                monitor.Error( "To create a new deprecation tag, flag --immediate or option --days must be specified." );
+                return null;
             }
-            if( tagInfo.HasExpired )
-            {
-                monitor.Warn( $"""
-                Version 'v{existing.Version}' has already expired:
+            return CreateDeprecationTag( monitor, existing, reason, daysDelay );
+        }
+        if( tagInfo.HasExpired )
+        {
+            monitor.Warn( $"""
+            Version 'v{existing.Version}' has already expired:
+            {existing.TagMessage}
+
+            """ );
+            // We return the expired tagInfo.
+            return tagInfo;
+        }
+        // Updated +deprecated tag.
+        if( !allowUpdate )
+        {
+            monitor.Error( $"""
+                This version is already 'v{existing.Version}':
                 {existing.TagMessage}
 
+                Use --allow-update to update it.
                 """ );
-                // We return the expired tagInfo.
-                return tagInfo;
-            }
-            // Updated +deprecated tag.
-            if( !allowUpdate )
-            {
-                monitor.Error( $"""
-                    This version is already 'v{existing.Version}':
-                    {existing.TagMessage}
-
-                    Use --allow-update to update it.
-                    """ );
-                return null;
-            }
-            // Normalize empty reason to null.
-            reason = string.IsNullOrWhiteSpace( reason ) ? null : reason;
-            if( daysDelay == -1 && reason == null )
-            {
-                monitor.Error( $"""
-                    To update 'v{existing.Version}', at least --immediate, --days and/or --reason must be specified.
-                    """ );
-                return null;
-            }
-            var newExpiration = daysDelay != -1
-                                    ? DateOnly.FromDateTime( DateTime.UtcNow.AddDays( daysDelay ) )
-                                    : tagInfo.Expiration;
-
-            return newExpiration == tagInfo.Expiration && (reason == null || reason == tagInfo.Reason)
-                    ? tagInfo
-                    : UpdateExistingDeprecationTag( monitor, existing, tagInfo, reason, daysDelay, newExpiration );
+            return null;
         }
+        // Normalize empty reason to null.
+        reason = string.IsNullOrWhiteSpace( reason ) ? null : reason;
+        if( daysDelay == -1 && reason == null )
+        {
+            monitor.Error( $"""
+                To update 'v{existing.Version}', at least --immediate, --days and/or --reason must be specified.
+                """ );
+            return null;
+        }
+        var newExpiration = daysDelay != -1
+                                ? DateOnly.FromDateTime( DateTime.UtcNow.AddDays( daysDelay ) )
+                                : tagInfo.Expiration;
 
+        return newExpiration == tagInfo.Expiration && (reason == null || reason == tagInfo.Reason)
+                ? tagInfo
+                : UpdateExistingDeprecationTag( monitor, existing, tagInfo, reason, daysDelay, newExpiration );
     }
 
     // This is used by UpdateExistingDeprecationTag and CreateDeprecationTag: this pushes the
-    // tag creation to the origin remote.
+    // tag creation/update to the origin remote.
     static void AddTag( Repo repo, TagCommit existing, DeprecatedTagInfo tagInfo, string name )
     {
         repo.GitRepository.Repository.Tags.Add( name,
@@ -199,7 +197,7 @@ public sealed partial class VersionTagPlugin
         existingTagInfo = new DeprecatedTagInfo( existingTagInfo.ContentInfo,
                                                  expiration,
                                                  daysDelay != -1 ? daysDelay : existingTagInfo.DaysDelay,
-                                                 reason != null ? reason : existingTagInfo.Reason );
+                                                 reason ?? existingTagInfo.Reason );
 
         var name = existingCommit.Tag.FriendlyName;
         var repo = existingCommit.Repo;

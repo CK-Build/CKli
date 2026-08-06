@@ -135,7 +135,7 @@ public sealed partial class VersionTagInfo : RepoInfo
         {
             if( _lastMajorMinorStables.IsDefault )
             {
-                var c = _hotZone?.LastPublishedStable;
+                var c = _hotZone?.LastStable;
                 if( c == null )
                 {
                     _lastMajorMinorStables = [];
@@ -164,7 +164,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <summary>
     /// Gets the hot zone information. Never null if <see cref="HasIssue"/> is false.
     /// <para>
-    /// This is not null as soon as a <see cref="HotZoneInfo.LastPublishedStable"/> exists.
+    /// This is not null as soon as a <see cref="HotZoneInfo.LastStable"/> exists.
     /// When null, a first stable version (greater than <see cref="InfVersion"/>) should be produced.
     /// This fix is handled by the Build plugin (if the root "stable" branch exists) that sets the <see cref="InfVersion"/>+fake tag on
     /// the "stable" branch's tip.
@@ -564,7 +564,8 @@ public sealed partial class VersionTagInfo : RepoInfo
             //   applies to "rank 0" repositories that have no dependencies to any other repositories in the stack (no
             //   upstream repositories).
             //   => This must be handled by the caller. Here we reject this case.
-            //      A dedicated empty commit point must be created (with no change from its parent) to carry the "more stable" version.
+            //      A dedicated empty commit point must be created (with no change from its parent) to carry the "more stable" version
+            //      or, if it is a "local/" version, it could be "DestroyLocalRelease" before the build.
             // 
             // - The "--ci.0" version that is a CI version produced from the non-CI commit is a mirror of the previous case:
             //   here also it implies that no dependency updates must be made in the code: this scenario
@@ -574,9 +575,9 @@ public sealed partial class VersionTagInfo : RepoInfo
             //
 
             bool validCI0 = version.CINumber == 0
-                            && ((version.SetCINumber( -1, impactStablePatchNumber: false ) == already.Version && already.IsFakeVersion is true)
+                            && ((version.SetCINumber( -1, impactStablePatchNumber: false ) == already.Version && already.IsOrHasFakeVersion is true)
                                ||
-                               (version.SetCINumber( -1, impactStablePatchNumber: true ) == already.Version && already.IsFakeVersion is false));
+                               (version.SetCINumber( -1, impactStablePatchNumber: true ) == already.Version && already.IsOrHasFakeVersion is false));
             if( !validCI0 )
             {
                 monitor.Error( $"""
@@ -615,7 +616,7 @@ public sealed partial class VersionTagInfo : RepoInfo
             {
                 // New version is "Major.0.0".
                 baseCommit = LastStables.FirstOrDefault( tc => tc.Version.Major < version.Major
-                                                               || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
+                                                               || (tc.IsOrHasFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
                 if( baseCommit == null )
                 {
                     monitor.Error( $"""
@@ -625,7 +626,7 @@ public sealed partial class VersionTagInfo : RepoInfo
                         """ );
                     return null;
                 }
-                if( !baseCommit.IsFakeVersion && baseCommit.Version.Major != version.Major - 1 )
+                if( !baseCommit.IsOrHasFakeVersion && baseCommit.Version.Major != version.Major - 1 )
                 {
                     monitor.Error( $"""
                         Invalid version 'v{version}': the closest major is 'v{baseCommit.Version}' in '{Repo.DisplayPath}'.
@@ -639,7 +640,7 @@ public sealed partial class VersionTagInfo : RepoInfo
             {
                 // New version is "Major.Minor.0".
                 baseCommit = LastStables.FirstOrDefault( tc => tc.Version.Major == version.Major && tc.Version.Minor < version.Minor
-                                                               || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
+                                                               || (tc.IsOrHasFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
                 if( baseCommit == null )
                 {
                     monitor.Error( $"""
@@ -649,7 +650,7 @@ public sealed partial class VersionTagInfo : RepoInfo
                         """ );
                     return null;
                 }
-                if( !baseCommit.IsFakeVersion && baseCommit.Version.Minor != version.Minor - 1 )
+                if( !baseCommit.IsOrHasFakeVersion && baseCommit.Version.Minor != version.Minor - 1 )
                 {
                     monitor.Error( $"""
                         Invalid version 'v{version}': the closest minor is 'v{baseCommit.Version}' in '{Repo.DisplayPath}'.
@@ -666,7 +667,7 @@ public sealed partial class VersionTagInfo : RepoInfo
             baseCommit = LastStables.FirstOrDefault( tc => tc.Version.Major == version.Major
                                                            && tc.Version.Minor == version.Minor
                                                            && tc.Version.Patch < version.Patch
-                                                           || (tc.IsFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
+                                                           || (tc.IsOrHasFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
             if( baseCommit == null )
             {
                 monitor.Error( $"""
@@ -676,7 +677,7 @@ public sealed partial class VersionTagInfo : RepoInfo
                         """ );
                 return null;
             }
-            if( !baseCommit.IsFakeVersion && baseCommit.Version.Patch != version.Patch - 1 )
+            if( !baseCommit.IsOrHasFakeVersion && baseCommit.Version.Patch != version.Patch - 1 )
             {
                 monitor.Error( $"""
                         Invalid version 'v{version}': the closest patch is 'v{baseCommit.Version}' in '{Repo.DisplayPath}'.
@@ -731,7 +732,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// Removes the tag commit (not the Git tag from the repository).
     /// Handles the <see cref="AllTagCommits"/> and <see cref="TagCommitsBySha"/>.
     /// <para>
-    /// If the removed version is the <see cref="HotZoneInfo.LastPublishedStable"/>, the <see cref="HotZone"/> is set to null.
+    /// If the removed version is the <see cref="HotZoneInfo.LastStable"/>, the <see cref="HotZone"/> is set to null.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>

@@ -1113,10 +1113,10 @@ public sealed partial class GitRepository : IDisposable
                 Throw.DebugAssert( commitBehavior == CommitBehavior.CreateEmptyCommit );
                 _git.Commit( commitMessage, Author, _committer, new CommitOptions { AllowEmptyCommit = true } );
                 monitor.CloseGroup( "Empty commit created." );
-                return CommitResult.Commited;
+                return CommitResult.Committed;
             }
             _git.Commit( commitMessage, Author, _committer );
-            return CommitResult.Commited;
+            return CommitResult.Committed;
         }
     }
 

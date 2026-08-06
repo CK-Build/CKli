@@ -56,14 +56,17 @@ public sealed partial class FixWorkflow
     /// Returns a renderable of this workflow.
     /// </summary>
     /// <param name="s">The screen type.</param>
+    /// <param name="withFixingHeader">True to display the header.</param>
     /// <returns>The renderable.</returns>
-    public IRenderable ToRenderable( ScreenType s )
+    public IRenderable ToRenderable( ScreenType s, bool withFixingHeader )
     {
         var o = OriginRepo;
-        var header = s.Text( $"Fixing 'v{o.TargetVersion.Major}.{o.TargetVersion.Minor}.{o.TargetVersion.Patch - 1}' on" ).Box( marginRight: 1 )
+        var header = withFixingHeader
+                     ? s.Text( $"Fixing 'v{o.TargetVersion.Major}.{o.TargetVersion.Minor}.{o.TargetVersion.Patch - 1}' on" ).Box( marginRight: 1 )
                       .AddRight( s.Text( o.Repo.DisplayPath ).HyperLink( new Uri( o.Repo.WorkingFolder ) ) )
                       .AddRight( s.Text( ":" ) )
-                      .Box();
+                      .Box()
+                     : s.Unit;
 
         var rows = ImmutableArray.CreateBuilder<IRenderable>( _targets.Length );
         var indexAndRank = new BuildIndexAndRankDisplayState( s,
@@ -152,7 +155,7 @@ public sealed partial class FixWorkflow
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="world">The world.</param>
-    internal static void DeleteCurrent( IActivityMonitor monitor, World world )
+    public static void DeleteCurrent( IActivityMonitor monitor, World world )
     {
         DeleteCurrent( monitor, world, GetFilePath( world ) );
     }

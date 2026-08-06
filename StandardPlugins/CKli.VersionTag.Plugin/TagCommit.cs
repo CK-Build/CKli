@@ -78,6 +78,11 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     public bool IsFakeVersion => _version.HasFakeMetadata;
 
     /// <summary>
+    /// Gets whether <see cref="IsFakeVersion"/> is true or an associated <see cref="FakeVersion"/> exists.
+    /// </summary>
+    public bool IsOrHasFakeVersion => _version.HasFakeMetadata || _fakeVersion != null;
+
+    /// <summary>
     /// Gets whether this version is a "local/" one.
     /// </summary>
     public bool IsLocal => _version.IsLocal();
@@ -164,9 +169,16 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
 
     internal void SetCI0VersionTag( Tag tag, SVersion v )
     {
-        Throw.DebugAssert( v.ParsedText == tag.FriendlyName );
+#if DEBUG
+        var vParsed = SVersion.Parse( tag.FriendlyName, allowPrefix: true, mustBeCSVersion: true );
+        Throw.DebugAssert( v == vParsed );
+        Throw.DebugAssert( v.IsLocal() == vParsed.IsLocal() );
+#endif
         Throw.DebugAssert( tag != null && tag.IsAnnotated && BuildContentInfo.TryParse( tag.Annotation.Message, out _ ) );
-        Throw.DebugAssert( v.CINumber == 0 && v.SetCINumber( -1, impactStablePatchNumber: false ) == _version );
+        Throw.DebugAssert( v.CINumber == 0
+                            && ((v.SetCINumber( -1, impactStablePatchNumber: false ) == _version && IsOrHasFakeVersion)
+                                ||
+                                (v.SetCINumber( -1, impactStablePatchNumber: true ) == _version && !IsOrHasFakeVersion)) );
         _ci0Tag = tag;
         _ci0Version = v;
         // If we have no content info (because we are a +fake), then we acquire the content info from the

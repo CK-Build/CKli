@@ -126,7 +126,7 @@ sealed class WorldReleaseInfo
         {
             var b = results[i];
             var r = new RepoPublishInfo( i, fixWorkflow.Targets[i].BranchName, b );
-            repoInfos[i++] = r;
+            repoInfos[i] = r;
             publishedLength += r.PublishedLength;
         }
         return new WorldReleaseInfo( fixWorkflow.ToString(), buildDate, ImmutableCollectionsMarshal.AsImmutableArray( repoInfos ), publishedLength, isCIBuild: false );
