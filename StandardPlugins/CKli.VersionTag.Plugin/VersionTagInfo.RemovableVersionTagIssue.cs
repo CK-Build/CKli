@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core;
 using LibGit2Sharp;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.VersionTag.Plugin;
@@ -21,7 +22,7 @@ public sealed partial class VersionTagInfo
             _tagsToDelete = tagsToDelete;
         }
 
-        protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world )
+        protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, CancellationToken cancellation )
         {
             Throw.DebugAssert( Repo != null );
             using var gLog = monitor.OpenInfo( $"Deleting {_tagsToDelete.Count} version tags." );

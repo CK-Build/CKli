@@ -5,6 +5,7 @@ using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Build.Plugin;
@@ -111,7 +112,7 @@ public sealed partial class BuildPlugin
             _tagsToRebuild = tagsToRebuild;
         }
 
-        protected override async  ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world )
+        protected override async  ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, CancellationToken cancellation )
         {
             Throw.DebugAssert( Repo != null );
             using var gLog = monitor.OpenInfo( $"Fixing {_tagsToRebuild.Length} tags content info in '{Repo.DisplayPath}'." );
@@ -163,7 +164,7 @@ public sealed partial class BuildPlugin
             _vInit = vInit;
         }
 
-        protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world )
+        protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, CancellationToken cancellation )
         {
             Throw.DebugAssert( Repo != null && _root.GitBranch != null );
             using( monitor.OpenInfo( $"Fixing missing initial version in '{Repo.DisplayPath}' by creating '{_vInit}' on '{_root}'." ) )

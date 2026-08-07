@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -24,17 +25,19 @@ public sealed class CKliPluginInfo : Command
     /// <inheritdoc />
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         bool skipPullStack = cmdLine.EatFlag( "--skip-pull-stack" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && PluginInfo( monitor, this, context, skipPullStack ) );
+                                     && PluginInfo( monitor, this, context, skipPullStack, scopeAlive ) );
     }
 
     static bool PluginInfo( IActivityMonitor monitor,
                             Command command,
                             CKliEnv context,
-                            bool skipPullStack )
+                            bool skipPullStack,
+                            CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack ) )
         {
@@ -42,7 +45,7 @@ public sealed class CKliPluginInfo : Command
         }
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             bool success = world.RaisePluginInfo( monitor, out var headerText, out var infos );
             context.Screen.DisplayPluginInfo( headerText, infos );
             bool pluginLoadFailed = world.PluginsLoadFailed;

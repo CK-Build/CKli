@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -24,19 +25,21 @@ sealed class CKliBranchPush : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         string branchName = cmdLine.EatArgument();
         bool all = cmdLine.EatFlag( "--all" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && PushBranch( monitor, this, context, branchName, all ) );
+                                     && PushBranch( monitor, this, context, branchName, all, scopeAlive ) );
     }
 
     internal static bool PushBranch( IActivityMonitor monitor,
                                      Command command,
                                      CKliEnv context,
                                      string branchName,
-                                     bool all )
+                                     bool all,
+                                     CancellationToken scopeAlive )
     {
 
         if( !StackRepository.OpenWorldFromPath( monitor,
@@ -50,7 +53,7 @@ sealed class CKliBranchPush : Command
         var s = context.Screen.ScreenType;
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             var repos = all
                         ? world.GetAllDefinedRepo( monitor )
                         : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );

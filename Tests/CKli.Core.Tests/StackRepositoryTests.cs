@@ -14,7 +14,7 @@ namespace CKli.Core.Tests;
 public class StackRepositoryTests
 {
     [Test]
-    public void simple_Clone()
+    public async Task simple_Clone_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
         File.Exists( context.CurrentDirectory.Combine( "CKt/CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeFalse();
@@ -38,7 +38,7 @@ public class StackRepositoryTests
     }
 
     [Test]
-    public void Clone_and_OpenFrom()
+    public async Task Clone_and_OpenFrom_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.OpenRemotes( "CKt" );
@@ -83,7 +83,7 @@ public class StackRepositoryTests
     }
 
     [Test]
-    public void Clone_and_TryOpenWorldFrom()
+    public async Task Clone_and_TryOpenWorldFrom_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.OpenRemotes( "CKt" );
@@ -146,7 +146,7 @@ public class StackRepositoryTests
     }
 
     [Test]
-    public void Clone_and_OpenWorldFrom()
+    public async Task Clone_and_OpenWorldFrom_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.OpenRemotes( "CKt" );

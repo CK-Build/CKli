@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 namespace CKli.Core;
 
@@ -79,7 +80,9 @@ public sealed partial class World
     readonly WorldEvents _events;
     readonly PluginMachinery? _pluginMachinery;
     PluginCollection? _plugins;
+
     Command? _executingCommand;
+    CancellationToken _scopeAlive;
 
     // The WorldDefinitionFile maintains its layout list.
     // AddRepository, RemoveRepository and XifLayout are the only ones that can

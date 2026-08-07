@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -26,13 +27,14 @@ sealed class CKliPush : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         bool stackOnly = cmdLine.EatFlag( "--stack-only" );
         bool all = cmdLine.EatFlag( "--all" );
         bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Push( monitor, this, context, stackOnly, all, continueOnError ) );
+                                     && Push( monitor, this, context, stackOnly, all, continueOnError, scopeAlive ) );
     }
 
     static bool Push( IActivityMonitor monitor,
@@ -40,7 +42,8 @@ sealed class CKliPush : Command
                       CKliEnv context,
                       bool stackOnly,
                       bool all,
-                      bool continueOnError )
+                      bool continueOnError,
+                      CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -52,7 +55,7 @@ sealed class CKliPush : Command
         }
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             // The Stack has been opened with pull. If this succeeded, we push
             // it immediately.
             bool success = stack.PushChanges( monitor );
@@ -72,10 +75,14 @@ sealed class CKliPush : Command
                     // Instead of working branch per branch, we pull (fetch-merge) all branches
                     // first and then push them (CKliPull.DoPull fetches all remote branches and then
                     // merges them).
-                    if( CKliPull.DoPull( monitor, continueOnError, repos, withTags: false ) )
+                    if( CKliPull.DoPull( monitor, continueOnError, repos, withTags: false, scopeAlive ) )
                     {
                         foreach( var repo in repos )
                         {
+                            if( scopeAlive.IsCancellationRequested )
+                            {
+                                return false;
+                            }
                             var r = repo.GitRepository.Repository;
                             foreach( var b in r.Branches )
                             {

@@ -297,7 +297,7 @@ sealed partial class ReflectionPluginCollector
             b.Append( " ", offset ).Append( '"' ).Append( c.MethodName ).Append( "\", MethodAsyncReturn." ).Append( c.ReturnType ).Append(" ) {}").AppendLine();
 
             offset = 4;
-            b.Append( ' ', offset ).Append( "protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )" )
+            b.Append( ' ', offset ).Append( "protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine, System.Threading.CancellationToken scopeAlive )" )
                                    .AppendLine();
             b.Append( ' ', offset ).Append( '{' ).AppendLine();
             offset += 4;

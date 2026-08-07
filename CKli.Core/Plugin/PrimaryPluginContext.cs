@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -56,6 +57,11 @@ public sealed class PrimaryPluginContext
     /// </para>
     /// </summary>
     public Command? Command => _world.ExecutingCommand;
+
+    /// <summary>
+    /// Gets a token that signals an interruption request by the user (Ctrl+C).
+    /// </summary>
+    public CancellationToken Cancellation => _world.ScopeAlive;
 
     /// <summary>
     /// Gets the plugin info.

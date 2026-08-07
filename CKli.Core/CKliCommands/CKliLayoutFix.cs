@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -24,17 +25,19 @@ public sealed class CKliLayoutFix : Command
     /// <inheritdoc />
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         bool deleteAliens = cmdLine.EatFlag( "--delete-aliens" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && LayoutFix( monitor, this, context, deleteAliens ) );
+                                     && LayoutFix( monitor, this, context, deleteAliens, scopeAlive ) );
     }
 
     static bool LayoutFix( IActivityMonitor monitor,
                            Command command,
                            CKliEnv context,
-                           bool deleteAliens = false )
+                           bool deleteAliens,
+                           CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -42,7 +45,7 @@ public sealed class CKliLayoutFix : Command
         }
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
             return world.FixLayout( monitor, deleteAliens, out _ ) && stack.Close( monitor );
         }

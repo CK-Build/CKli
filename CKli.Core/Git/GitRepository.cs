@@ -412,7 +412,7 @@ public sealed partial class GitRepository : IDisposable
     ///     <item>
     ///     If the branch doesn't exist yet, a local branch bound to its 'origin' remote is created.
     ///     If the remote branch doesn't exist, the output <paramref name="branch"/> is null and this is not an error:
-    ///     if you want the local branch to exist, call <see cref="EnsureBranch(IActivityMonitor, string, LogLevel)"/>
+    ///     if you want the local branch to exist, call <see cref="EnsureBranch(IActivityMonitor, string, LogLevel, LibGit2Sharp.Commit?)"/>
     ///     before.
     ///     </item>
     ///     <item>

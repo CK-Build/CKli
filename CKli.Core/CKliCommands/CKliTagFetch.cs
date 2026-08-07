@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -22,17 +23,19 @@ sealed class CKliTagFetch : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         bool all = cmdLine.EatFlag( "--all" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && FetchTags( monitor, this, context, all ) );
+                                     && FetchTags( monitor, this, context, all, scopeAlive ) );
     }
 
     static bool FetchTags( IActivityMonitor monitor,
                            Command command,
                            CKliEnv context,
-                           bool all )
+                           bool all,
+                           CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -45,7 +48,7 @@ sealed class CKliTagFetch : Command
         var s = context.Screen.ScreenType;
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             var repos = all
                         ? world.GetAllDefinedRepo( monitor )
                         : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );

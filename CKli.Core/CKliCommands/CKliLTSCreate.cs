@@ -1,4 +1,5 @@
 using CK.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -24,8 +25,9 @@ sealed class CKliLTSCreate : Command
     public override InteractiveMode InteractiveMode => InteractiveMode.Rejects;
 
     internal protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                          CKliEnv context,
-                                                                          CommandLineArguments cmdLine )
+                                                                    CKliEnv context,
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         string ltsName = cmdLine.EatArgument();
         if( !WorldName.IsValidLTSName( ltsName ) )
@@ -36,20 +38,10 @@ sealed class CKliLTSCreate : Command
                 """ );
             return ValueTask.FromResult( false );
         }
-        return CreateLTSAsync( monitor, this, context, ltsName );
+        return new ValueTask<bool>( CreateLTSFromCurrentWorldAsync( monitor, this, context, ltsName, scopeAlive ) );
     }
 
-    static async ValueTask<bool> CreateLTSAsync( IActivityMonitor monitor, Command command, CKliEnv context, string ltsName )
-    {
-        if( !await CreateLTSFromCurrentWorldAsync( monitor, command, context, ltsName ).ConfigureAwait( false ) )
-        {
-            return false; 
-        }
-        
-        return true;
-    }
-
-    static async Task<bool> CreateLTSFromCurrentWorldAsync( IActivityMonitor monitor, Command command, CKliEnv context, string ltsName )
+    static async Task<bool> CreateLTSFromCurrentWorldAsync( IActivityMonitor monitor, Command command, CKliEnv context, string ltsName, CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: false ) )
         {
@@ -57,7 +49,7 @@ sealed class CKliLTSCreate : Command
         }
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             if( !world.Name.IsDefaultWorld )
             {
                 monitor.Error( $"A Long-Term-Support world can only be created from a default World. Current world is '{world.Name}'." );

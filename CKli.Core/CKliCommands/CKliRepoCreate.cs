@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -20,9 +21,10 @@ sealed class CKliRepoCreate : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
-        return CKliRepoAdd.RepositoryAddOrCreateAsync( monitor, this, context, cmdLine, create: true );
+        return CKliRepoAdd.RepositoryAddOrCreateAsync( monitor, this, context, cmdLine, create: true, scopeAlive );
     }
 
 }

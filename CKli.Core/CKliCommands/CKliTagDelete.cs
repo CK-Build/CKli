@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -30,7 +31,8 @@ sealed class CKliTagDelete : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         bool withRemote = cmdLine.EatFlag( "--with-remote" );
         bool remoteOnly = cmdLine.EatFlag( "--remote-only" );
@@ -42,7 +44,7 @@ sealed class CKliTagDelete : Command
             return ValueTask.FromResult( false );
         }
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && DeleteTags( monitor, this, context, tagNames, multiRepo, remoteOnly, withRemote ) );
+                                     && DeleteTags( monitor, this, context, tagNames, multiRepo, remoteOnly, withRemote, scopeAlive ) );
     }
 
     static bool DeleteTags( IActivityMonitor monitor,
@@ -51,7 +53,8 @@ sealed class CKliTagDelete : Command
                             List<string> tagNames,
                             bool multiRepo,
                             bool remoteOnly,
-                            bool withRemote )
+                            bool withRemote,
+                            CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -64,7 +67,7 @@ sealed class CKliTagDelete : Command
         var s = context.Screen.ScreenType;
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             var repos = GetRepos( monitor, context, multiRepo, world );
             if( repos == null )
             {

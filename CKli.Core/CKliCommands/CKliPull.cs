@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -28,16 +29,17 @@ sealed class CKliPull : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         bool all = cmdLine.EatFlag( "--all" );
         bool withTags = cmdLine.EatFlag( "--with-tags" );
         bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Pull( monitor, this, context, all, withTags, continueOnError ) );
+                                     && Pull( monitor, this, context, all, withTags, continueOnError, scopeAlive ) );
 
 
-        static bool Pull( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool withTags, bool continueOnError )
+        static bool Pull( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool withTags, bool continueOnError, CancellationToken scopeAlive )
         {
             if( !StackRepository.OpenWorldFromPath( monitor,
                                                     context,
@@ -49,13 +51,13 @@ sealed class CKliPull : Command
             }
             try
             {
-                world.SetExecutingCommand( command );
+                world.SetExecutingCommand( command, scopeAlive );
                 var repos = all
                             ? world.GetAllDefinedRepo( monitor )
                             : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
                 if( repos == null ) return false;
 
-                bool success = DoPull( monitor, continueOnError, repos, withTags );
+                bool success = DoPull( monitor, continueOnError, repos, withTags, scopeAlive );
                 // Save a dirty World's DefinitionFile ony if no unhandled exception is thrown.
                 return stack.Close( monitor ) && success;
             }
@@ -70,7 +72,8 @@ sealed class CKliPull : Command
     internal static bool DoPull( IActivityMonitor monitor,
                                  bool continueOnError,
                                  IReadOnlyList<Repo> repos,
-                                 bool withTags )
+                                 bool withTags,
+                                 CancellationToken scopeAlive )
     {
         bool success = true;
         // To limit roundtrips to the remotes, we fetch all the remote branches at once
@@ -80,6 +83,10 @@ sealed class CKliPull : Command
         {
             foreach( var repo in repos )
             {
+                if( scopeAlive.IsCancellationRequested )
+                {
+                    return false;
+                }
                 // withTags = true may set TagFetchMode.Auto (tags that are referenced by the fetched objects will be retrieved)
                 // but we want all tags to be updated. So use the "pull tag *".
                 success &= repo.GitRepository.FetchRemoteBranches( monitor, withTags: false );

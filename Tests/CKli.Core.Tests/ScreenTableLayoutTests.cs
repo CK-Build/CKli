@@ -2,6 +2,7 @@ using CK.Core;
 using NUnit.Framework;
 using Shouldly;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Core.Tests;
@@ -327,7 +328,10 @@ public class ScreenTableLayoutTests
         {
         }
 
-        protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
+        protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
+                                                               CKliEnv context,
+                                                               CommandLineArguments cmdLine,
+                                                               CancellationToken cancellation )
         {
             return ValueTask.FromResult( true );
         }

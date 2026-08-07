@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core;
 using LibGit2Sharp;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.BranchModel.Plugin;
@@ -18,7 +19,7 @@ sealed partial class BranchIssueBuilder
             _desynchronized = desynchronized;
         }
 
-        protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world )
+        protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, CancellationToken cancellation )
         {
             Throw.DebugAssert( Repo != null );
             bool success = true;

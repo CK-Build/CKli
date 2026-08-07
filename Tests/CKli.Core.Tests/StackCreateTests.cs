@@ -30,7 +30,7 @@ public class StackCreateTests
         repoPath.ShouldBe( repositoryPath );
         await gitHubHosting.DeleteRepositoryAsync( TestHelper.Monitor, repoPath ).ConfigureAwait( false );
 
-        using var stack = await StackRepository.CreateAsync( TestHelper.Monitor, context, url, isPublic, ignoreParentStack: true );
+        using var stack = await StackRepository.CreateAsync( TestHelper.Monitor, context, url, isPublic, ignoreParentStack: true, default );
         stack.ShouldNotBeNull();
         stack.StackName.ShouldBe( "Demo" );
         stack.IsPublic.ShouldBe( isPublic );

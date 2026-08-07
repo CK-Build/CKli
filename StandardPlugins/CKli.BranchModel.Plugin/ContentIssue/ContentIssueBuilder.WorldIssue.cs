@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.BranchModel.Plugin;
@@ -19,7 +20,7 @@ public sealed partial class ContentIssueBuilder
             _branchIssues = branchIssues;
         }
 
-        protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world )
+        protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, CancellationToken cancellation )
         {
             Throw.DebugAssert( Repo != null );
             bool success = true;

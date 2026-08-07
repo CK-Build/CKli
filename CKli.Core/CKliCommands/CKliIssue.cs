@@ -3,6 +3,7 @@ using CKli.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -35,7 +36,8 @@ public sealed class CKliIssue : Command
     /// <returns>True on success, false on error.</returns>
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         bool all = cmdLine.EatFlag( "--all" );
         bool fix = cmdLine.EatFlag( "--fix" );
@@ -43,10 +45,10 @@ public sealed class CKliIssue : Command
         {
             return ValueTask.FromResult( false );
         }
-        return IssueAsync( monitor, this, context, all, fix );
+        return IssueAsync( monitor, this, context, all, fix, scopeAlive );
     }
 
-    static async ValueTask<bool> IssueAsync( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool fix )
+    static async ValueTask<bool> IssueAsync( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool fix, CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -54,7 +56,7 @@ public sealed class CKliIssue : Command
         }
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             var issues = new List<World.Issue>();
             if( all )
             {
@@ -109,13 +111,17 @@ public sealed class CKliIssue : Command
                                         {
                                             if( !i.ManualFix )
                                             {
-                                                if( !await i.ExecuteAsync( monitor, context, world ).ConfigureAwait( false ) )
+                                                if( !await i.ExecuteAsync( monitor, context, world, scopeAlive ).ConfigureAwait( false ) )
                                                 {
                                                     monitor.CloseGroup( $"Fixing '{i.Title}' failed." );
                                                     return false;
                                                 }
                                             }
                                             monitor.Info( $"Fixed '{i.Title}'." );
+                                        }
+                                        catch( OperationCanceledException ex ) when (ex.CancellationToken == scopeAlive)
+                                        {
+                                            return false;
                                         }
                                         catch( Exception ex )
                                         {

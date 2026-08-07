@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -24,7 +25,8 @@ sealed class CKliLog : Command
 
     internal protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         var folder = cmdLine.EatFlag( Flags[0].Names );
         if( !cmdLine.Close( monitor ) )

@@ -44,6 +44,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
     {
     }
 
+    /// <inheritdoc />
     protected override void DefaultConfigure( HttpClient client )
     {
         base.DefaultConfigure( client );
@@ -64,6 +65,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         }
     }
 
+    /// <inheritdoc />
     protected internal override NormalizedPath GetRepositoryPathFromUrl( IActivityMonitor monitor, GitRepositoryKey key )
     {
         var sUrl = key.OriginUrl.ToString();
@@ -72,6 +74,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         return sUrl.Substring( BaseUrl.Length + 1 );
     }
 
+    /// <inheritdoc />
     protected override NormalizedPath ValidateRepoPath( IActivityMonitor monitor, NormalizedPath repoPath )
     {
         if( repoPath.Parts.Count < 2 )
@@ -82,11 +85,13 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         return repoPath;
     }
 
+    /// <inheritdoc />
     protected override bool IsSuccessfulResponse( HttpResponseMessage response )
     {
         return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
     }
 
+    /// <inheritdoc />
     protected override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                                  HttpClient client,
                                                                                  NormalizedPath repoPath,
@@ -109,6 +114,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
     }
 
+    /// <inheritdoc />
     protected override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                                 HttpClient client,
                                                                                 NormalizedPath repoPath,
@@ -165,8 +171,12 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         return null;
     }
 
+    /// <summary>
+    /// Always true.
+    /// </summary>
     public override bool CanArchiveRepository => true;
 
+    /// <inheritdoc />
     protected override async Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
                                                                 HttpClient client,
                                                                 NormalizedPath repoPath,
@@ -178,6 +188,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         return response.IsSuccessStatusCode;
     }
 
+    /// <inheritdoc />
     protected override async Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
                                                                HttpClient client,
                                                                NormalizedPath repoPath,
@@ -188,6 +199,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
     }
 
+    /// <inheritdoc />
     protected override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
                                                                     HttpClient client,
                                                                     NormalizedPath repoPath,
@@ -216,6 +228,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         return releaseInfo.TagName;
     }
 
+    /// <inheritdoc />
     protected override async Task<List<PublishedReleaseInfo>?> GetReleaseListAsync( IActivityMonitor monitor,
                                                                                     HttpClient client,
                                                                                     NormalizedPath repoPath,
@@ -273,6 +286,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         return result;
     }
 
+    /// <inheritdoc />
     protected override async Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,
                                                               HttpClient client,
                                                               NormalizedPath repoPath,
@@ -308,6 +322,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         return true;
     }
 
+    /// <inheritdoc />
     protected override Task<bool> FinalizeReleaseAsync( IActivityMonitor monitor,
                                                         HttpClient client,
                                                         NormalizedPath repoPath,
@@ -318,6 +333,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         return Task.FromResult( true );
     }
 
+    /// <inheritdoc />
     protected override async Task<(bool Success, PublishedReleaseInfo? Info)> GetReleaseAsync( IActivityMonitor monitor,
                                                                                                HttpClient client,
                                                                                                NormalizedPath repoPath,
@@ -361,6 +377,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         }
     }
 
+    /// <inheritdoc />
     protected override async Task<bool> DeleteReleaseAsync( IActivityMonitor monitor,
                                                             HttpClient client,
                                                             NormalizedPath repoPath,

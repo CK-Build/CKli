@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -29,12 +30,13 @@ public sealed class CKliPluginRemove : Command
     /// <inheritdoc />
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         string pluginName = cmdLine.EatArgument();
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && CKliPluginCreate.CreateOrRemovePlugin( monitor, this, context, pluginName, allowLTS, create: false ) );
+                                     && CKliPluginCreate.CreateOrRemovePlugin( monitor, this, context, pluginName, allowLTS, create: false, scopeAlive ) );
     }
 
 }

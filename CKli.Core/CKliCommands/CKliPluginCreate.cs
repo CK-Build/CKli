@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -29,12 +30,13 @@ public sealed class CKliPluginCreate : Command
     /// <inheritdoc />
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         string pluginName = cmdLine.EatArgument();
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && CreateOrRemovePlugin( monitor, this, context, pluginName, allowLTS, create: true ) );
+                                     && CreateOrRemovePlugin( monitor, this, context, pluginName, allowLTS, create: true, scopeAlive ) );
     }
 
     internal static bool CreateOrRemovePlugin( IActivityMonitor monitor,
@@ -42,7 +44,8 @@ public sealed class CKliPluginCreate : Command
                                                CKliEnv context,
                                                string pluginName,
                                                bool allowLTS,
-                                               bool create )
+                                               bool create,
+                                               CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -55,7 +58,7 @@ public sealed class CKliPluginCreate : Command
                 return CKliRepoAdd.RequiresAllowLTS( monitor, world.Name );
             }
             // Both CreatePlugin and RemovePlugin handle the WorldDefinition file save and commit.
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             return create
                     ? world.CreatePlugin( monitor, pluginName )
                     : world.RemovePlugin( monitor, pluginName );

@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -34,7 +35,8 @@ sealed class CKliUpdate : Command
 
     internal protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         bool prerelease = cmdLine.EatFlag( "--prerelease" );
         bool stable = cmdLine.EatFlag( "--stable" );

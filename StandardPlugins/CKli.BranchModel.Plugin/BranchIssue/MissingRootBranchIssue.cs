@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using LibGit2Sharp;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.BranchModel.Plugin;
@@ -36,7 +37,7 @@ sealed class MissingRootBranchIssue : World.Issue
                                            prevRoot );
     }
 
-    protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world )
+    protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, CancellationToken cancellation )
     {
         Throw.DebugAssert( Repo != null );
         BranchLink.CreateAheadBranch( Repo.GitRepository, _prevRoot.Tip, _root.BranchName.Name, withEmptyInitializationCommit: true );

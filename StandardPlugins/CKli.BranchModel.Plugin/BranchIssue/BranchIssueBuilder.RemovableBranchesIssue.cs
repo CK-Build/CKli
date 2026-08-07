@@ -4,6 +4,7 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.BranchModel.Plugin;
@@ -36,7 +37,7 @@ sealed partial class BranchIssueBuilder
             return new RemovableBranchesIssue( body, removables, repo );
         }
 
-        protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world )
+        protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, CancellationToken cancellation )
         {
             Throw.DebugAssert( Repo != null );
             var git = Repo.GitRepository;

@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -21,16 +22,18 @@ sealed class CKliRepoAdd : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
-        return RepositoryAddOrCreateAsync( monitor, this, context, cmdLine, create: false );
+        return RepositoryAddOrCreateAsync( monitor, this, context, cmdLine, create: false, scopeAlive );
     }
 
     internal static async ValueTask<bool> RepositoryAddOrCreateAsync( IActivityMonitor monitor,
                                                                       Command command,
                                                                       CKliEnv context,
                                                                       CommandLineArguments cmdLine,
-                                                                      bool create )
+                                                                      bool create,
+                                                                      CancellationToken scopeAlive )
     {
         string sUrl = cmdLine.EatArgument();
         if( !Uri.TryCreate( sUrl, UriKind.Absolute, out var repositoryUrl ) )
@@ -46,7 +49,7 @@ sealed class CKliRepoAdd : Command
         }
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             if( !allowLTS && !world.Name.IsDefaultWorld )
             {
                 return RequiresAllowLTS( monitor, world.Name );
@@ -69,7 +72,11 @@ sealed class CKliRepoAdd : Command
                 {
                     return false;
                 }
-                var remoteInfo = await hostingProvider.CreateRepositoryAsync( monitor, remoteRepoPath, !stack.IsPublic ).ConfigureAwait( false );
+                var remoteInfo = await hostingProvider.CreateRepositoryAsync( monitor,
+                                                                              remoteRepoPath,
+                                                                              !stack.IsPublic,
+                                                                              "main",
+                                                                              scopeAlive ).ConfigureAwait( false );
                 if( remoteInfo == null )
                 {
                     return false;
@@ -80,7 +87,7 @@ sealed class CKliRepoAdd : Command
             // On error, compensate by deleting the new repository (when create was true, the hostingProvider is not null).
             if( !success && hostingProvider != null )
             {
-                await hostingProvider.DeleteRepositoryAsync( monitor, remoteRepoPath ).ConfigureAwait( false );
+                await hostingProvider.DeleteRepositoryAsync( monitor, remoteRepoPath, cancellation: default ).ConfigureAwait( false );
             }
             return success;
         }

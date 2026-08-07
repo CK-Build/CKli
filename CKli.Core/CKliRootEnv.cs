@@ -4,6 +4,7 @@ using System;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,7 +20,7 @@ namespace CKli.Core;
 /// </para>
 /// <para>
 /// This captures the initial <see cref="Environment.CurrentDirectory"/> and initializes the <see cref="GrandOutput.Default"/> if it is
-/// not already initialized.
+/// not already initialized (tests that have already configured the GrandOutput.Default continue to use the test context).
 /// </para>
 /// </summary>
 public static partial class CKliRootEnv
@@ -62,6 +63,7 @@ public static partial class CKliRootEnv
         }
         _screen = screen ?? CreateScreen( arguments );
 
+        InterruptibleScope.Initialize();
         InitializeMonitoring( _screen, _currentDirectory, _currentStackPath );
         NormalizedPath configFilePath = GetConfigPath();
         try

@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -26,14 +27,15 @@ sealed class CKliTagList : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         bool all = cmdLine.EatFlag( "--all" );
         bool remote = cmdLine.EatFlag( "--remote" );
         bool local = cmdLine.EatFlag( "--local" );
         bool diffOnly = cmdLine.EatFlag( "--diff-only" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && ListTags( monitor, this, context, all, local, remote, diffOnly ) );
+                                     && ListTags( monitor, this, context, all, local, remote, diffOnly, scopeAlive ) );
     }
 
     static bool ListTags( IActivityMonitor monitor,
@@ -42,7 +44,8 @@ sealed class CKliTagList : Command
                           bool all,
                           bool local,
                           bool remote,
-                          bool diffOnly )
+                          bool diffOnly,
+                          CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
@@ -55,7 +58,7 @@ sealed class CKliTagList : Command
         var s = context.Screen.ScreenType;
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             var repos = all
                         ? world.GetAllDefinedRepo( monitor )
                         : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );

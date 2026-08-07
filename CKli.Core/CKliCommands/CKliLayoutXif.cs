@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -19,13 +20,14 @@ sealed class CKliLayoutXif : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && LayoutXif( monitor, this, context ) );
+                                     && LayoutXif( monitor, this, context, scopeAlive ) );
     }
 
-    static bool LayoutXif( IActivityMonitor monitor, Command command, CKliEnv context )
+    static bool LayoutXif( IActivityMonitor monitor, Command command, CKliEnv context, CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -33,7 +35,7 @@ sealed class CKliLayoutXif : Command
         }
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             // XifLayout handles the WorldDefinition file save and commit.
             return world.XifLayout( monitor );
         }

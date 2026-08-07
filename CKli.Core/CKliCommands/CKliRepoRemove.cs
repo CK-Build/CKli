@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -20,19 +21,21 @@ sealed class CKliRepoRemove : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         string nameOrUrl = cmdLine.EatArgument();
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && RepoRemove( monitor, this, context, nameOrUrl, allowLTS ) );
+                                     && RepoRemove( monitor, this, context, nameOrUrl, allowLTS, scopeAlive ) );
     }
 
     static bool RepoRemove( IActivityMonitor monitor,
                             Command command,
                             CKliEnv context,
                             string nameOrUrl,
-                            bool allowLTS = false )
+                            bool allowLTS,
+                            CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -40,7 +43,7 @@ sealed class CKliRepoRemove : Command
         }
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             if( !allowLTS && !world.Name.IsDefaultWorld )
             {
                 return CKliRepoAdd.RequiresAllowLTS( monitor, world.Name );

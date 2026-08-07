@@ -1,4 +1,5 @@
 using CK.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -64,7 +65,7 @@ public sealed partial class World
         /// <param name="context">The CKli environment.</param>
         /// <param name="world">The World.</param>
         /// <returns>True on success, false on error.</returns>
-        internal protected abstract ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world );
+        internal protected abstract ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, System.Threading.CancellationToken scopeAlive );
 
         sealed class Manual : Issue
         {
@@ -73,7 +74,7 @@ public sealed partial class World
             {
             }
 
-            protected internal override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world )
+            protected internal override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, CancellationToken cancellation )
             {
                 return ValueTask.FromResult( false );
             }

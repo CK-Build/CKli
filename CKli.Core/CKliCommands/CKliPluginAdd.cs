@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -29,7 +30,8 @@ public sealed class CKliPluginAdd : Command
     /// <inheritdoc />
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         string sPackage = cmdLine.EatArgument();
         if( !PackageInstance.TryParse( sPackage, out var package ) )
@@ -39,14 +41,15 @@ public sealed class CKliPluginAdd : Command
         }
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && PluginAdd( monitor, this, context, package, allowLTS ) );
+                                     && PluginAdd( monitor, this, context, package, allowLTS, scopeAlive ) );
     }
 
     static bool PluginAdd( IActivityMonitor monitor,
                            Command command,
                            CKliEnv context,
                            PackageInstance package,
-                           bool allowLTS )
+                           bool allowLTS,
+                           CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -58,7 +61,7 @@ public sealed class CKliPluginAdd : Command
             {
                 return CKliRepoAdd.RequiresAllowLTS( monitor, world.Name );
             }
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             // AddOrSetPluginPackage handles the WorldDefinition file save and commit.
             return world.AddOrSetPluginPackage( monitor, package.PackageId, package.Version );
         }

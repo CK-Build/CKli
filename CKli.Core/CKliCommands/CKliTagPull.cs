@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -28,16 +29,18 @@ sealed class CKliTagPull : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
-        return ValueTask.FromResult( PullOrPushTags( monitor, this, context, cmdLine, pull: true ) );
+        return ValueTask.FromResult( PullOrPushTags( monitor, this, context, cmdLine, pull: true, scopeAlive ) );
     }
 
     internal static bool PullOrPushTags( IActivityMonitor monitor,
                                          Command command,
                                          CKliEnv context,
                                          CommandLineArguments cmdLine,
-                                         bool pull )
+                                         bool pull,
+                                         CancellationToken scopeAlive )
     {
         bool multiRepo = cmdLine.EatFlag( "--allow-multi-repo" );
         IEnumerable<string> tagNames = cmdLine.EatRemainingArgument();
@@ -71,7 +74,7 @@ sealed class CKliTagPull : Command
         var s = context.Screen.ScreenType;
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             var repos = CKliTagDelete.GetRepos( monitor, context, multiRepo, world );
             if( repos == null ) return false;
 

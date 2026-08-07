@@ -3,6 +3,7 @@ using CKli.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -108,11 +109,15 @@ public static class CKliCommands
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">The minimal context.</param>
     /// <param name="cmdLine">The command line to handle.</param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
     public static ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                       CKliEnv context,
                                                       CommandLineArguments cmdLine )
     {
+        using var interruptibleScope = InterruptibleScope.Create();
+        if( interruptibleScope == null ) return ValueTask.FromResult( false );
+
         monitor.Info( $"Executing '{cmdLine.InitialAsStringArguments}'." );
         context.OnStartCommandHandling();
 
@@ -150,11 +155,11 @@ public static class CKliCommands
         // If it's a CKli command, we can now execute it.
         if( cmdLine.FoundCommand != null )
         {
-            return ExecuteAsync( monitor, context, cmdLine, null );
+            return ExecuteCommandAsync( monitor, context, cmdLine, null, interruptibleScope.Alive );
         }
         // Not a CKli command. Opens the current World and tries to find a plugin command.
         var (stack, world) = StackRepository.TryOpenWorldFromPath( monitor, context, out bool error, skipPullStack: true );
-        if( error )
+        if( error || interruptibleScope.Alive.IsCancellationRequested )
         {
             // Don't enter interactive mode on error here.
             Throw.DebugAssert( stack == null && world == null );
@@ -175,14 +180,15 @@ public static class CKliCommands
         }
 
         // We are in a World, we have an opened Stack: handles World.Commands.
-        return ExecuteWorldCommandAsync( monitor, context, cmdLine, helpPath, stack!, world );
+        return ExecuteWorldCommandAsync( monitor, context, cmdLine, helpPath, stack!, world, interruptibleScope.Alive );
 
         static async ValueTask<bool> ExecuteWorldCommandAsync( IActivityMonitor monitor,
                                                                CKliEnv context,
                                                                CommandLineArguments cmdLine,
                                                                string? helpPath,
                                                                StackRepository stack,
-                                                               World world )
+                                                               World world,
+                                                               CancellationToken scopeAlive )
         {
             try
             {
@@ -216,8 +222,8 @@ public static class CKliCommands
                 }
                 // We are executing a World's plugin command. We use the World as an internal vehicle for
                 // the executing command exposed by the PrimaryPluginContext.
-                world.SetExecutingCommand( cmdLine.FoundCommand );
-                return await ExecuteAsync( monitor, context, cmdLine, stack ).ConfigureAwait( false );
+                world.SetExecutingCommand( cmdLine.FoundCommand, scopeAlive );
+                return await ExecuteCommandAsync( monitor, context, cmdLine, stack, scopeAlive ).ConfigureAwait( false );
             }
             finally
             {
@@ -226,62 +232,71 @@ public static class CKliCommands
         }
     }
 
-    static async ValueTask<bool> ExecuteAsync( IActivityMonitor monitor,
-                                               CKliEnv context,
-                                               CommandLineArguments cmdLine,
-                                               StackRepository? initialStack )
+    static async ValueTask<bool> ExecuteCommandAsync( IActivityMonitor monitor,
+                                                          CKliEnv context,
+                                                          CommandLineArguments cmdLine,
+                                                          StackRepository? initialStack,
+                                                          CancellationToken scopeAlive )
     {
         Throw.DebugAssert( cmdLine.FoundCommand != null );
-        var result = await DoExecuteAsync( monitor, context, cmdLine ).ConfigureAwait( false );
+        var result = await DoExecuteAsync( monitor, context, cmdLine, scopeAlive ).ConfigureAwait( false );
         return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, initialStack, result ).ConfigureAwait( false );
 
-        static async Task<bool> DoExecuteAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
+        static async Task<bool> DoExecuteAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine, CancellationToken scopeAlive )
         {
             Throw.DebugAssert( cmdLine.FoundCommand != null );
             bool success;
             try
             {
-                success = await cmdLine.FoundCommand.HandleCommandAsync( monitor, context, cmdLine ).ConfigureAwait( false );
+                success = await cmdLine.FoundCommand.HandleCommandAsync( monitor, context, cmdLine, scopeAlive ).ConfigureAwait( false );
                 // The following result handling doesn't throw. We execute it here because on exception it is useless
-                // to analyze the command line. 
-                if( !cmdLine.IsClosed )
+                // to analyze the command line.
+                if( !scopeAlive.IsCancellationRequested )
                 {
-                    if( success )
+                    if( !cmdLine.IsClosed )
                     {
-                        // The command line has not been closed but the command handler returned true, it is buggy.
-                        // We return false (even if the handler claimed to be successful).
-                        monitor.Error( $"""
+                        if( success )
+                        {
+                            // The command line has not been closed but the command handler returned true, it is buggy.
+                            // We return false (even if the handler claimed to be successful).
+                            monitor.Error( $"""
                             The command '{cmdLine.FoundCommand.CommandPath}' implementation in '{cmdLine.FoundCommand.PluginTypeInfo?.TypeName ?? "CKli"}' is buggy.
                             The command line MUST be closed before executing the command.
                             """ );
-                        success = false;
+                            success = false;
+                        }
+                        else
+                        {
+                            // The command failed and the command line has not been closed: this indicates a bad argument/option value
+                            // so we display the command help.
+                            // Before we must clear any remaining arguments otherwise we may display
+                            // a misleading remaining arguments message.
+                            cmdLine.CloseAndForgetRemainingArguments();
+                            context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
+                        }
                     }
-                    else
+                    else if( cmdLine.RemainingCount > 0 )
                     {
-                        // The command failed and the command line has not been closed: this indicates a bad argument/option value
-                        // so we display the command help.
-                        // Before we must clear any remaining arguments otherwise we may display
-                        // a misleading remaining arguments message.
-                        cmdLine.CloseAndForgetRemainingArguments();
-                        context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
-                    }
-                }
-                else if( cmdLine.RemainingCount > 0 )
-                {
-                    // The command line has been closed and there are remaining arguments.
-                    // If the command handler returned true, it is buggy.
-                    if( success )
-                    {
-                        monitor.Error( $"""
+                        // The command line has been closed and there are remaining arguments.
+                        // If the command handler returned true, it is buggy.
+                        if( success )
+                        {
+                            monitor.Error( $"""
                             The command '{cmdLine.FoundCommand.CommandPath}' implementation in '{cmdLine.FoundCommand.PluginTypeInfo?.TypeName ?? "CKli"}' is buggy.
                             Arguments remains in the command line but the command handler returned true.
                             """ );
-                        // We consider that this is an error.
-                        success = false;
+                            // We consider that this is an error.
+                            success = false;
+                        }
+                        // This displays the lovely header with remaining arguments.
+                        context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
                     }
-                    // This displays the lovely header with remaining arguments.
-                    context.Screen.DisplayHelp( [new CommandHelp( context.Screen.ScreenType, cmdLine.FoundCommand )], cmdLine, default, default );
                 }
+            }
+            catch( OperationCanceledException ex ) when ( ex.CancellationToken == scopeAlive )
+            {
+                // A SIGINT or SIGTERM. No need to log.
+                success = false;
             }
             catch( Exception ex )
             {

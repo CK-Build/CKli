@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -32,7 +33,8 @@ public sealed class CKliPluginCompile : Command
     /// <inheritdoc />
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         string? sMode = cmdLine.EatSingleOption( "--mode" );
         bool skipPullStack = cmdLine.EatFlag( "--skip-pull-stack" );
@@ -47,14 +49,15 @@ public sealed class CKliPluginCompile : Command
             compileMode = mode;
         }
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Compile( monitor, this, context, skipPullStack, compileMode ) );
+                                     && Compile( monitor, this, context, skipPullStack, compileMode, scopeAlive ) );
     }
 
     static bool Compile( IActivityMonitor monitor,
                          Command command,
                          CKliEnv context,
                          bool skipPullStack,
-                         PluginCompileMode? mode )
+                         PluginCompileMode? mode,
+                         CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack ) )
         {
@@ -62,7 +65,7 @@ public sealed class CKliPluginCompile : Command
         }
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             if( mode.HasValue && mode.Value != world.DefinitionFile.CompileMode )
             {
                 if( !world.SetPluginCompileMode( monitor, mode.Value ) )

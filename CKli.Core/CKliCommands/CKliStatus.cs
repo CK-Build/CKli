@@ -3,6 +3,7 @@ using CKli.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -27,16 +28,23 @@ sealed class CKliStatus : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         bool byBranch = cmdLine.EatFlag( "--by-branch", "-b" );
         bool all = cmdLine.EatFlag( "--all" );
         bool skipPullStack = cmdLine.EatFlag( "--skip-pull-stack" );
         return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && DisplayRepos( monitor, this, context, skipPullStack, byBranch, all ) );
+                                     && DisplayRepos( monitor, this, context, skipPullStack, byBranch, all, scopeAlive ) );
     }
 
-    static bool DisplayRepos( IActivityMonitor monitor, Command command, CKliEnv context, bool skipPullStack, bool byBranch, bool all )
+    static bool DisplayRepos( IActivityMonitor monitor,
+                              Command command,
+                              CKliEnv context,
+                              bool skipPullStack,
+                              bool byBranch,
+                              bool all,
+                              CancellationToken scopeAlive )
     {
         var (stack, world) = StackRepository.TryOpenWorldFromPath( monitor, context, out var error, skipPullStack );
         if( error )
@@ -54,7 +62,7 @@ sealed class CKliStatus : Command
             else
             {
                 Throw.DebugAssert( world != null );
-                world.SetExecutingCommand( command );
+                world.SetExecutingCommand( command, scopeAlive );
                 var repos = all
                         ? world.GetAllDefinedRepo( monitor )
                         : world.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );

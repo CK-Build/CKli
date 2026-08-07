@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
@@ -543,7 +544,8 @@ public sealed partial class StackRepository : IDisposable
                                           bool isPublic,
                                           bool allowDuplicateStack = false,
                                           bool ignoreParentStack = false,
-                                          string stackBranchName = "main" )
+                                          string stackBranchName = "main",
+                                          CancellationToken cancellation = default )
     {
         bool isCKliTestRunning = CKliRootEnv.InstanceName == "CKli-Test";
         Throw.CheckNotNullArgument( monitor );
@@ -681,7 +683,8 @@ public sealed partial class StackRepository : IDisposable
                                                             CKliEnv context,
                                                             Uri url,
                                                             bool isPublic,
-                                                            bool ignoreParentStack )
+                                                            bool ignoreParentStack,
+                                                            CancellationToken cancellation )
     {
         Throw.CheckNotNullArgument( monitor );
         Throw.CheckNotNullArgument( context );
@@ -735,7 +738,7 @@ public sealed partial class StackRepository : IDisposable
             }
         }
         // Everything seems okay. It's time to create the remote before cloning it.
-        var remoteInfo = await hostingProvider.CreateRepositoryAsync( monitor, remoteRepoPath, !isPublic ).ConfigureAwait( false );
+        var remoteInfo = await hostingProvider.CreateRepositoryAsync( monitor, remoteRepoPath, !isPublic, "main", cancellation ).ConfigureAwait( false );
         if( remoteInfo == null )
         {
             return null;
@@ -772,7 +775,8 @@ public sealed partial class StackRepository : IDisposable
             FileHelper.DeleteFolder( monitor, stackRoot );
             try
             {
-                await hostingProvider.DeleteRepositoryAsync( monitor, remoteRepoPath ).ConfigureAwait( false );
+                // If we have been canceled, we want the compensation to run: no CancelationToken.
+                await hostingProvider.DeleteRepositoryAsync( monitor, remoteRepoPath, cancellation: default ).ConfigureAwait( false );
             }
             catch( Exception ex )
             {

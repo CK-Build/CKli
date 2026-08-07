@@ -2,6 +2,7 @@ using CK.Core;
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -141,10 +142,12 @@ public abstract partial class Command
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">The basic command context.</param>
     /// <param name="cmdLine">The matching command line.</param>
+    /// <param name="scopeAlive">The <see cref="InterruptibleScope.Alive"/> token for the command.</param>
     /// <returns>True on success, false on error. Errors must be logged.</returns>
     internal protected abstract ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine );
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive );
 
 
     /// <summary>

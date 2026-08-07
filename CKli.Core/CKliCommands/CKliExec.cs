@@ -1,5 +1,6 @@
 using CK.Core;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -25,7 +26,8 @@ sealed class CKliExec : Command
 
     internal protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         string processName = cmdLine.EatArgument();
         if( string.IsNullOrWhiteSpace( processName ) )
@@ -36,10 +38,17 @@ sealed class CKliExec : Command
         bool continueOnError = cmdLine.EatFlag( "--ckli-continue-on-error" );
         bool all = cmdLine.EatFlag( "--ckli-all" );
         cmdLine.CloseWithRemainingAsProcessStartArgs( out var arguments );
-        return ValueTask.FromResult( DoRun( monitor, this, context, all, continueOnError, processName, arguments ) );
+        return ValueTask.FromResult( DoRun( monitor, this, context, all, continueOnError, processName, arguments, scopeAlive ) );
     }
 
-    static bool DoRun( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool continueOnError, string processName, string arguments )
+    static bool DoRun( IActivityMonitor monitor,
+                       Command command,
+                       CKliEnv context,
+                       bool all,
+                       bool continueOnError,
+                       string processName,
+                       string arguments,
+                       CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, context, out var stack, out var world, skipPullStack: true ) )
         {
@@ -47,7 +56,7 @@ sealed class CKliExec : Command
         }
         try
         {
-            world.SetExecutingCommand( command );
+            world.SetExecutingCommand( command, scopeAlive );
             IReadOnlyList<Repo>? repos = all
                                           ? world.GetAllDefinedRepo( monitor )
                                           : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
@@ -58,6 +67,11 @@ sealed class CKliExec : Command
             bool success = true;
             foreach( var repo in repos )
             {
+                if( scopeAlive.IsCancellationRequested )
+                {
+                    success = false;
+                    break;
+                }
                 using( monitor.OpenTrace( $"Executing '{processName} {arguments}' in '{repo.DisplayPath}'." ) )
                 {
                     var exitCode = ProcessRunner.RunProcess( monitor.ParallelLogger, processName, arguments, repo.WorkingFolder, null );

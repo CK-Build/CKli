@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Threading;
 
 namespace CKli.Core;
 
@@ -22,10 +23,12 @@ public sealed partial class World
     }
 
     internal Command? ExecutingCommand => _executingCommand;
+    internal CancellationToken ScopeAlive => _scopeAlive;
 
-    internal void SetExecutingCommand( Command command )
+    internal void SetExecutingCommand( Command command, CancellationToken scopeAlive )
     {
         _executingCommand = command;
+        _scopeAlive = scopeAlive;
     }
 
     internal bool SetPluginCompileMode( IActivityMonitor monitor, PluginCompileMode mode )

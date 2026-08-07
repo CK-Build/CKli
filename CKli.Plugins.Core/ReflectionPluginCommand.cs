@@ -1,6 +1,7 @@
 using CK.Core;
 using System.Collections.Immutable;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -36,7 +37,7 @@ sealed class ReflectionPluginCommand : PluginCommand
         _parameterCount = parameterCount;
     }
 
-    protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
+    protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine, CancellationToken scopeAlive )
     {
         var args = new object?[_parameterCount];
         args[0] = monitor;
@@ -65,8 +66,8 @@ sealed class ReflectionPluginCommand : PluginCommand
             {
                 var o = Options[i];
                 args[iParam++] = o.Multiple
-                                                ? cmdLine.EatMultipleOption( o.Names )
-                                                : cmdLine.EatSingleOption( o.Names );
+                                    ? cmdLine.EatMultipleOption( o.Names )
+                                    : cmdLine.EatSingleOption( o.Names );
             }
             for( int i = 0; i < Flags.Length; i++ )
             {

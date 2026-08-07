@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -25,8 +26,9 @@ sealed class CKliCreate : Command
     public override InteractiveMode InteractiveMode => InteractiveMode.Rejects;
 
     internal protected override async ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                        CKliEnv context,
-                                                                        CommandLineArguments cmdLine )
+                                                                          CKliEnv context,
+                                                                          CommandLineArguments cmdLine,
+                                                                          CancellationToken scopeAlive )
     {
         string sUrl = cmdLine.EatArgument();
         if( !Uri.TryCreate( sUrl, UriKind.Absolute, out var uri ) )
@@ -40,7 +42,7 @@ sealed class CKliCreate : Command
         {
             return false;
         }
-        using( var stack = await StackRepository.CreateAsync( monitor, context, uri, !isPrivate, ignoreParentStack ) )
+        using( var stack = await StackRepository.CreateAsync( monitor, context, uri, !isPrivate, ignoreParentStack, scopeAlive ) )
         {
             return stack != null;
         }

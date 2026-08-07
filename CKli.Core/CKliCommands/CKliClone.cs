@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Core;
@@ -27,7 +28,8 @@ sealed class CKliClone : Command
 
     internal protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
         string sUrl = cmdLine.EatArgument();
         if( !Uri.TryCreate( sUrl, UriKind.Absolute, out var uri ) )
@@ -42,7 +44,7 @@ sealed class CKliClone : Command
         {
             return ValueTask.FromResult( false );
         }
-        using( var stack = StackRepository.Clone( monitor, context, uri, !isPrivate, allowDuplicate, ignoreParentStack ) )
+        using( var stack = StackRepository.Clone( monitor, context, uri, !isPrivate, allowDuplicate, ignoreParentStack, "main", scopeAlive ) )
         {
             return ValueTask.FromResult( stack != null );
         }

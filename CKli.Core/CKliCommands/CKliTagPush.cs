@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -26,8 +27,9 @@ sealed class CKliTagPush : Command
 
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
-                                                                    CommandLineArguments cmdLine )
+                                                                    CommandLineArguments cmdLine,
+                                                                    CancellationToken scopeAlive )
     {
-        return ValueTask.FromResult( CKliTagPull.PullOrPushTags( monitor, this, context, cmdLine, pull: false ) );
+        return ValueTask.FromResult( CKliTagPull.PullOrPushTags( monitor, this, context, cmdLine, pull: false, scopeAlive ) );
     }
 }
