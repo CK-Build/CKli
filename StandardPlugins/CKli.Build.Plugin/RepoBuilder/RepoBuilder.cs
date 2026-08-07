@@ -25,6 +25,13 @@ public class RepoBuilder : RepoInfo
     readonly ArtifactHandlerPlugin _artifactHandler;
     readonly RepoArtifactInfo _repoArtifact;
 
+    /// <summary>
+    /// Initializes a new <see cref="RepoBuilder"/>.
+    /// </summary>
+    /// <param name="repo">The repository.</param>
+    /// <param name="repositoryBuilder">The factory.</param>
+    /// <param name="artifactHandler">The artifact handler plugin.</param>
+    /// <param name="repoArtifact">The repository artifact info.</param>
     public RepoBuilder( Repo repo, RepositoryBuilderPlugin repositoryBuilder, ArtifactHandlerPlugin artifactHandler, RepoArtifactInfo repoArtifact )
         : base( repo )
     {

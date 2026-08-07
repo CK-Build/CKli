@@ -1,4 +1,5 @@
 using CK.Core;
+using static CKli.Build.Plugin.Roadmap;
 
 namespace CKli.Build.Plugin;
 
@@ -18,8 +19,7 @@ public sealed class RoadmapBuildEventArgs : BuildBaseEventArgs
 
     /// <summary>
     /// Gets the roadmap that has been successfully build.
-    /// The <see cref="BuildInfo.BuildResult">BuildSolution.BuildInfo?.BuildResult</see> is not null for
-    /// solutions with a true <see cref="BuildSolution.MustBuild"/>.
+    /// The <see cref="BuildInfo.BuildResult"/> is not null for solutions with a true <see cref="BuildSolution.MustBuild"/>.
     /// </summary>
     public Roadmap Roadmap => _roadmap;
 }

@@ -16,7 +16,16 @@ namespace CKli.Build.Plugin;
 
 public sealed partial class BuildPlugin
 {
-
+    /// <summary>
+    /// Builds the current workflow if its exists.
+    /// </summary>
+    /// <param name="monitor"></param>
+    /// <param name="context"></param>
+    /// <param name="ci"></param>
+    /// <param name="skipTests"></param>
+    /// <param name="forceTests"></param>
+    /// <param name="rebuild"></param>
+    /// <returns></returns>
     [Description( "Builds the current Fix Workflow." )]
     [CommandPath( "fix build" )]
     public Task<bool> FixBuildAsync( IActivityMonitor monitor,
@@ -38,7 +47,18 @@ public sealed partial class BuildPlugin
         return DoBuildFixAsync( monitor, context, runTest, workflow, rebuild, ci, publish: false );
     }
 
-    [Description( "Builds and publishes the current Fix Workflow." )]
+
+    /// <summary>
+    /// Builds and publishes the current workflow if it exists.
+    /// The publication is handled by the Publish plugin. By default, fix branches are deleted on success but
+    /// may be optionally kept.
+    /// </summary>
+    /// <param name="monitor"></param>
+    /// <param name="context"></param>
+    /// <param name="ci"></param>
+    /// <param name="rebuild"></param>
+    /// <returns></returns>
+    [Description( "Builds and publishes the current Fix Workflow. On success, the current workflow is finished." )]
     [CommandPath( "fix publish" )]
     public Task<bool> FixPublishAsync( IActivityMonitor monitor,
                                        CKliEnv context,

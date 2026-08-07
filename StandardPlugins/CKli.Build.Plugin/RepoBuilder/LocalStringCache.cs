@@ -16,18 +16,34 @@ public sealed class LocalStringCache
     string? _filePath;
     HashSet<string>? _cache;
 
+    /// <summary>
+    /// Initializes a new string cache.
+    /// </summary>
+    /// <param name="world">The world name.</param>
+    /// <param name="name">The name of the cache.</param>
     public LocalStringCache( LocalWorldName world, string name )
     {
         _world = world;
         _name = name;
     }
 
-    public bool Contains( IActivityMonitor monitor, string s ) => GetCache( monitor ).Contains( s );
+    /// <summary>
+    /// Gets whether this cache contains a key.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="key">The key to lookup.</param>
+    /// <returns>True if this cache contains the key.</returns>
+    public bool Contains( IActivityMonitor monitor, string key ) => GetCache( monitor ).Contains( key );
 
-    public void Add( IActivityMonitor monitor, string s )
+    /// <summary>
+    /// Adds a key.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="key">The key to add.</param>
+    public void Add( IActivityMonitor monitor, string key )
     {
         var c = GetCache( monitor );
-        c.Add( s );
+        c.Add( key );
         try
         {
             Throw.DebugAssert( _filePath != null );

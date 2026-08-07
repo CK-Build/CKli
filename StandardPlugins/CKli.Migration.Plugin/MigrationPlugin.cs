@@ -16,6 +16,9 @@ using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Migration.Plugin;
 
+/// <summary>
+/// Very optional plugin. Contains temporary utlities.
+/// </summary>
 public sealed class MigrationPlugin : PrimaryPluginBase
 {
     readonly ArtifactHandlerPlugin _artifactHandler;
@@ -24,6 +27,15 @@ public sealed class MigrationPlugin : PrimaryPluginBase
     readonly HotZonePlugin _hotZone;
     readonly BuildPlugin _build;
 
+    /// <summary>
+    /// Initializes a new migration plugin.
+    /// </summary>
+    /// <param name="primaryContext"></param>
+    /// <param name="artifactHandler"></param>
+    /// <param name="versionTag"></param>
+    /// <param name="branchModel"></param>
+    /// <param name="hotZone"></param>
+    /// <param name="build"></param>
     public MigrationPlugin( PrimaryPluginContext primaryContext,
                             ArtifactHandlerPlugin artifactHandler,  
                             VersionTagPlugin versionTag,
@@ -68,6 +80,13 @@ public sealed class MigrationPlugin : PrimaryPluginBase
         }
     }
 
+    /// <summary>
+    /// Implement migration from Net8 to Net10.
+    /// </summary>
+    /// <param name="monitor"></param>
+    /// <param name="hardResetAll"></param>
+    /// <param name="restoreRemotes"></param>
+    /// <returns></returns>
     [Description( "Migrate Net8 stack." )]
     [CommandPath( "maintenance migrate net8" )]
     public bool MigrateNet8( IActivityMonitor monitor,

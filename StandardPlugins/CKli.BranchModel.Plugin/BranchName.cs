@@ -50,6 +50,7 @@ public sealed class BranchName : IEquatable<BranchName>
     /// </summary>
     public int Index => _index;
 
+    /// <summary>
     /// Gets the parent branch name or null if this is the <see cref="BranchNamespace.Root"/>.
     /// </summary>
     public BranchName? Parent => _parent;

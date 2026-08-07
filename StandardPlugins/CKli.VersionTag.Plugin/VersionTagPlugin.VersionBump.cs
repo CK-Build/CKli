@@ -8,6 +8,13 @@ namespace CKli.VersionTag.Plugin;
 
 public sealed partial class VersionTagPlugin
 {
+    /// <summary>
+    /// Bumps the current repository version number by setting a "+fake" version tag on the "&lt;root&gt;" or "dev/&lt;root&gt;" branch.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The CKli plugin context.</param>
+    /// <param name="version">The bumped version.</param>
+    /// <returns>True on success, false on error.</returns>
     [Description( """Bumps the current repository version number by setting a "+fake" version tag on the "<root>" or "dev/<root>" branch.""" )]
     [CommandPath( "version bump" )]
     public bool VersionBump( IActivityMonitor monitor,

@@ -6,6 +6,14 @@ namespace CKli.BranchModel.Plugin;
 
 public sealed partial class BranchModelPlugin
 {
+    /// <summary>
+    /// Closes a Conformant SVersion branch.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="context">The minimal context.</param>
+    /// <param name="branchName">The branch name to close.</param>
+    /// <param name="discard">True to keep the branch where it is and not integrate it in its closest parent.</param>
+    /// <returns>True on success, false on error.</returns>
     [Description( "Closes a Conformant SVersion branch if it exists." )]
     [CommandPath( "branch close" )]
     public bool BranchClose( IActivityMonitor monitor,
@@ -17,7 +25,7 @@ public sealed partial class BranchModelPlugin
     {
         // Not sure here...
         // Should the close only be "global"?
-        // We can handle a mechanism here where the suppress the branch name only if it doesn't appear anywhere anymore in the World...
+        // We can handle a mechanism here where we suppress the branch name only if it doesn't appear anywhere anymore in the World...
         // But any build of an upstream will recreate the hot branch in downstream repositories...
         // So this seems to be a rather useless complexity.
         // => Choosing the "global only" approach for the moment.

@@ -16,25 +16,6 @@ public static class SVersionExtensions
     /// <returns>True if this is a "local/" prefixed version.</returns>
     public static bool IsLocal( this SVersion version ) => version.ParsedPrefix.AsSpan().Equals( "local/", StringComparison.Ordinal );
 
-
-    public static SVersion ToNextVersion( this SVersion thisVersion, SVersionChange vChange, string? suffix = null )
-    {
-        // The VersionChange that has been computed may be None.
-        // On "+fake" version, we honor this "None": the target version is the "+fake" version (unchanged except the build metadata).
-        // This allows a "v1.0.0+fake" to produce prereleases (like "v1.0.0-a") and/or ci builds (like "v1.0.0--ci.18")
-        // until a non-ci build is done that will produce the "v1.0.0" version.
-        // For regular base version, there's no "None": "Patch" is assumed.
-        return vChange switch
-        {
-            SVersionChange.Major => thisVersion.Major == 0
-                                    ? SVersion.Create( 0, thisVersion.Minor + 1, 0, suffix )
-                                    : SVersion.Create( thisVersion.Major + 1, 0, 0, suffix ),
-            SVersionChange.Minor => SVersion.Create( thisVersion.Major, thisVersion.Minor + 1, 0, suffix ),
-            _ when thisVersion.HasFakeMetadata => SVersion.Create( thisVersion.Major, thisVersion.Minor, thisVersion.Patch, suffix ),
-            _ => SVersion.Create( thisVersion.Major, thisVersion.Minor, thisVersion.Patch + 1, suffix )
-        };
-    }
-
     /// <summary>
     /// Adds an error log on failure of <see cref="SVersion.IsPreviousVersionNumbersOf(SVersion, out SVersionChange)"/>.
     /// </summary>

@@ -20,6 +20,13 @@ public sealed class PublishPlugin : PrimaryPluginBase
     readonly ArtifactHandlerPlugin _artifactHandler;
     readonly VersionTagPlugin _versionTag;
 
+    /// <summary>
+    /// Initializes a new publish plugin.
+    /// </summary>
+    /// <param name="primaryContext">The CKli plugin context.</param>
+    /// <param name="build">The build plugin.</param>
+    /// <param name="artifactHandler">The artifact handler plugin.</param>
+    /// <param name="versionTag">The version tag plugin.</param>
     public PublishPlugin( PrimaryPluginContext primaryContext,
                           BuildPlugin build,
                           ArtifactHandlerPlugin artifactHandler,

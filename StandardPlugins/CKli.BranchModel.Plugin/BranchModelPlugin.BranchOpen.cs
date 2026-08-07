@@ -6,6 +6,14 @@ namespace CKli.BranchModel.Plugin;
 
 public sealed partial class BranchModelPlugin
 {
+    /// <summary>
+    /// Opens a Conformant SVersion branch.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="context">The minimal context.</param>
+    /// <param name="branchName">The branch name to open.</param>
+    /// <param name="parent">Parent branch to consider instead of the currently checked out branch (applies only to 'explo/' branch).</param>
+    /// <returns>True on success, false on error.</returns>
     [Description( """
         Opens a Conformant SVersion branch if it doesn't already exist.
         - For prerelease branches ('alpha', 'bravo', 'charlie', ...'zulu'), the parent branch is based on the lexicographic order.

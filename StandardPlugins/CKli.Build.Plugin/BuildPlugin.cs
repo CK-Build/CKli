@@ -38,7 +38,16 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     readonly PerfectEventSender<RoadmapBuildEventArgs> _onRoadmapBuild;
     readonly PerfectEventSender<FixBuildEventArgs> _onFixBuild;
 
-
+    /// <summary>
+    /// Initializes a new BuildPlugin.
+    /// </summary>
+    /// <param name="primaryContext">The CKli plugin context.</param>
+    /// <param name="versionTags">The version tag plugin.</param>
+    /// <param name="branchModel">The branch model plugin.</param>
+    /// <param name="hotZone">The hot zone plugin.</param>
+    /// <param name="repoBuilder">The repo builder plugin.</param>
+    /// <param name="artifactHandler">The artifact handler plugin.</param>
+    /// <param name="solutionPlugin">The shallow solution plugin.</param>
     public BuildPlugin( PrimaryPluginContext primaryContext,
                         VersionTagPlugin versionTags,
                         BranchModelPlugin branchModel,
@@ -71,7 +80,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     public PerfectEvent<FixBuildEventArgs> OnFixBuild => _onFixBuild.PerfectEvent;
 
     /// <summary>
-    /// Build command.
+    /// Core build command. Upstream repositories are not involved: dependencies are not upgraded.
     /// </summary>
     /// <param name="monitor"></param>
     /// <param name="context"></param>
@@ -114,6 +123,20 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             : DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: false );
     }
 
+    /// <summary>
+    /// Extends build by publishing the build artefacts on success.
+    /// </summary>
+    /// <param name="monitor"></param>
+    /// <param name="context"></param>
+    /// <param name="branch"></param>
+    /// <param name="maxDop"></param>
+    /// <param name="ci"></param>
+    /// <param name="ciForce"></param>
+    /// <param name="skipTests"></param>
+    /// <param name="forceTests"></param>
+    /// <param name="dryRun"></param>
+    /// <param name="all"></param>
+    /// <returns></returns>
     [Description( "Build-Test-Package and propagates packages from the current repositories to their consumers and publishes all the artifacts." )]
     [CommandPath( "publish" )]
     public Task<bool> PublishAsync( IActivityMonitor monitor,
@@ -144,6 +167,20 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
           : DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: true );
     }
 
+    /// <summary>
+    /// "Upstream Build". Upstream repositories are considered. 
+    /// </summary>
+    /// <param name="monitor"></param>
+    /// <param name="context"></param>
+    /// <param name="branch"></param>
+    /// <param name="maxDop"></param>
+    /// <param name="ci"></param>
+    /// <param name="ciForce"></param>
+    /// <param name="skipTests"></param>
+    /// <param name="forceTests"></param>
+    /// <param name="dryRun"></param>
+    /// <param name="all"></param>
+    /// <returns></returns>
     [Description( """Upstream closure build": considers the producers of the current repositories, propagates packages to their consumers, keeping them local.""" )]
     [CommandPath( "*build" )]
     public Task<bool> StarBuildAsync( IActivityMonitor monitor,
@@ -174,6 +211,20 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
          : DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: false );
     }
 
+    /// <summary>
+    /// "Upstream Build" and publish artefacts on success.
+    /// </summary>
+    /// <param name="monitor"></param>
+    /// <param name="context"></param>
+    /// <param name="branch"></param>
+    /// <param name="maxDop"></param>
+    /// <param name="ci"></param>
+    /// <param name="ciForce"></param>
+    /// <param name="skipTests"></param>
+    /// <param name="forceTests"></param>
+    /// <param name="dryRun"></param>
+    /// <param name="all"></param>
+    /// <returns></returns>
     [Description( """Upstream closure publish": considers the producers of the current repositories, propagates packages to their consumers and publishes all the artifacts.""" )]
     [CommandPath( "*publish" )]
     public Task<bool> StarPublishAsync( IActivityMonitor monitor,
@@ -391,16 +442,6 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         return true;
     }
 
-    public enum ForceRebuildMode
-    {
-        /// <summary>
-        /// No force rebuild is made.
-        /// </summary>
-        None,
-        Local,
-        Published
-    }
-
     async Task<BuildResult?> CoreBuildAsync( IActivityMonitor monitor,
                                              CKliEnv context,
                                              VersionTagInfo versionInfo,
@@ -453,49 +494,60 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return null;
         }
-        using var gLog = monitor.OpenTrace( $"Core build for '{buildInfo}'." );
-        //
-        // We ensure that the working folder is checked out on the buildCommit content tree.
-        // We restore the current branch once we are done.
-        // Note that the Branch Head may be a DetachedHead (internal LibGit2Sharp specialization of a Branch) but
-        // we don't care: we restore the current state.
-        //
-        var git = versionInfo.Repo.GitRepository;
-        Branch currentHead = git.Repository.Head;
-        bool mustCheckOut = currentHead.Tip.Tree.Sha != buildCommit.Tree.Sha;
-        if( mustCheckOut )
+        return await RealBuildAsync( monitor, context, versionInfo, buildCommit, runTest.Value, repoBuilder, buildInfo ).ConfigureAwait( false );
+
+        static async Task<BuildResult?> RealBuildAsync( IActivityMonitor monitor,
+                                                        CKliEnv context,
+                                                        VersionTagInfo versionInfo,
+                                                        Commit buildCommit,
+                                                        bool runTest,
+                                                        RepoBuilder repoBuilder,
+                                                        CommitBuildInfo buildInfo )
         {
-            monitor.Trace( $"Current working folder content is not the same as the commit '{buildCommit.Sha}' to build. Checking out a detached head." );
-            if( !git.Checkout( monitor, buildCommit ) )
+            using var gLog = monitor.OpenTrace( $"Core build for '{buildInfo}'." );
+            //
+            // We ensure that the working folder is checked out on the buildCommit content tree.
+            // We restore the current branch once we are done.
+            // Note that the Branch Head may be a DetachedHead (internal LibGit2Sharp specialization of a Branch) but
+            // we don't care: we restore the current state.
+            //
+            var git = versionInfo.Repo.GitRepository;
+            Branch currentHead = git.Repository.Head;
+            bool mustCheckOut = currentHead.Tip.Tree.Sha != buildCommit.Tree.Sha;
+            if( mustCheckOut )
             {
-                return null;
+                monitor.Trace( $"Current working folder content is not the same as the commit '{buildCommit.Sha}' to build. Checking out a detached head." );
+                if( !git.Checkout( monitor, buildCommit ) )
+                {
+                    return null;
+                }
             }
-        }
-        else
-        {
-            if( !git.CheckCleanCommit( monitor ) )
+            else
             {
-                return null;
+                if( !git.CheckCleanCommit( monitor ) )
+                {
+                    return null;
+                }
             }
+            BuildResult? result = null;
+            try
+            {
+                result = await repoBuilder.BuildAsync( monitor,
+                                                       context,
+                                                       buildInfo,
+                                                       runTest ).ConfigureAwait( false );
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"Build failed for '{versionInfo.Repo.DisplayPath}' on commit '{buildCommit.Sha}'.", ex );
+            }
+            if( mustCheckOut )
+            {
+                monitor.Trace( "Restoring working folder to its previous head." );
+                git.Checkout( monitor, currentHead, deleteIgnored: true );
+            }
+            return result;
         }
-        BuildResult? result = null;
-        try
-        {
-            result = await repoBuilder.BuildAsync( monitor,
-                                                   context,
-                                                   buildInfo,
-                                                   runTest.Value ).ConfigureAwait( false );
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( $"Build failed for '{versionInfo.Repo.DisplayPath}' on commit '{buildCommit.Sha}'.", ex );
-        }
-        if( mustCheckOut )
-        {
-            monitor.Trace( "Restoring working folder to its previous head." );
-            git.Checkout( monitor, currentHead, deleteIgnored: true );
-        }
-        return result;
 
     }
 }

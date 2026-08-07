@@ -4,7 +4,7 @@ using CKli.VersionTag.Plugin;
 namespace CKli.Build.Plugin;
 
 /// <summary>
-/// This event is raised by <see cref="RepoBuilder.BuildAsync(IActivityMonitor, CommitBuildInfo, bool)"/>.
+/// This event is raised by <see cref="RepoBuilder.BuildAsync(IActivityMonitor, Core.CKliEnv, CommitBuildInfo, bool)"/>.
 /// It wraps the CommitBuildInfo that describes the build that is about to be ran in
 /// the checked out <see cref="CommitBuildInfo.Repo"/>.
 /// </summary>

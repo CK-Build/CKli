@@ -22,6 +22,11 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     // There is currently no housekeeping.
     internal LocalStringCache? _shaTestRunCache;
 
+    /// <summary>
+    /// Initializes a new builder plugin.
+    /// </summary>
+    /// <param name="primaryContext">The CKli context.</param>
+    /// <param name="artifactHandler">The artifact handler plugin.</param>
     public RepositoryBuilderPlugin( PrimaryPluginContext primaryContext, ArtifactHandlerPlugin artifactHandler )
         : base( primaryContext )
     {
@@ -38,6 +43,7 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     /// </summary>
     public PerfectEvent<CoreBuildEventArgs> OnCoreBuild => _onCoreBuild.PerfectEvent;
 
+    /// <inheritdoc />
     protected override RepoBuilder Create( IActivityMonitor monitor, Repo repo )
     {
         _shaTestRunCache ??= new LocalStringCache( repo.World.Name, "TestRun.Sha" );

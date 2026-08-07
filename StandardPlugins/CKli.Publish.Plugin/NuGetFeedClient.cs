@@ -209,7 +209,7 @@ public sealed partial class NuGetFeedClient : IDisposable
 
     /// <summary>
     /// Sends a delete request for each of the specified package versions.
-    /// See <see cref="DeleteAsync(IActivityMonitor, string, SVersion, CancellationToken)"/> for
+    /// See <see cref="DeleteAsync(IActivityLineEmitter, string, SVersion, CancellationToken)"/> for
     /// the distinction between delete and unlist.
     /// </summary>
     /// <param name="logger">The logger to use.</param>

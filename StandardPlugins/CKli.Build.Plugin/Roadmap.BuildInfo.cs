@@ -69,6 +69,9 @@ public sealed partial class Roadmap
                                 (uUpdates != null || cUpdates != null || dUpdates != null) == ((_buildReason & MustBuildReason.DependencyUpdate) != 0) );
         }
 
+        /// <summary>
+        /// Gets the solution.
+        /// </summary>
         public BuildSolution Solution => _solution;
 
         /// <summary>
@@ -88,7 +91,7 @@ public sealed partial class Roadmap
 
         /// <summary>
         /// Gets the version that must be produced.
-        /// When <see cref="MustBuild"/> is false, this is the last built version (see <see cref="CKli.BranchModel.Plugin.HotGraph.SolutionVersionInfo.LastBuildInCI"/>).
+        /// When <see cref="MustBuild"/> is false, this is the last built version.
         /// </summary>
         public SVersion TargetVersion => _targetVersion;
 

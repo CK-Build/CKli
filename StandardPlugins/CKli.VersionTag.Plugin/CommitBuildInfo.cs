@@ -77,14 +77,17 @@ public sealed class CommitBuildInfo
 
     /// <summary>
     /// Gets whether the build must use "Release" configuration: the version to build is a
-    /// <see cref="CSVersionKind.Stable"/> or a conformant prerelease from <see cref="CSVersionKind.Romeo"/>
-    /// to <see cref="CSVersionKind.Zulu"/>.
+    /// <see cref="CSVersionKind.Stable"/>, conformant prerelease from <see cref="CSVersionKind.Romeo"/>
+    /// to <see cref="CSVersionKind.Zulu"/> or a <see cref="CSVersionKind.Exploratory"/>.
     /// </summary>
-    public bool ReleaseConfiguration => _version.VersionKind >= CSVersionKind.Romeo;
+    public bool ReleaseConfiguration => _version.VersionKind is CSVersionKind.Exploratory or >= CSVersionKind.Romeo;
 
     /// <summary>
-    /// Adds or update the <see cref="TagCommit"/> on the <see cref="BuildCommit"/> for <see cref="Version"/>
-    /// with the provided <paramref name="contentInfo"/>.
+    /// Sets this <see cref="Version"/> as a tag on <see cref="BuildCommit"/>.
+    /// <para>
+    /// This ends a build session and nothing is done to synchronize the <see cref="VersionTagInfo.AllTagCommits"/> collection:
+    /// the state of the system doesn't reflect the repository anymore.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">The context.</param>
@@ -113,61 +116,6 @@ public sealed class CommitBuildInfo
                                   context.Committer,
                                   contentInfo.ToString(),
                                   allowOverwrite: true );
-
-            ////    TODO: investigate whether TagCommits' updates are actually needed...
-            //if( _tagInfo.TryGetTagCommit( _version, out var exists ) )
-            //{
-            //    // A TagCommit exists with the version.
-            //    // - ci.0 case: update the TagCommit with the new ci.0 tag.
-            //    // - other cases:
-            //    // If the existing tag is not exactly the same (but is not a +fake), we remove the tag (this removes a "published"
-            //    // tag if it exists) and then we update the TagCommit:
-            //    //   - If on the same commit, the TagCommit's tag is set to the new one.
-            //    //   - If on a different commit, we remove the TagCommit and recreate a new one on the buildCommit.
-            //    //
-            //    // => This is NOT perfect in terms of TagCommits but we don't really care: once built, the VersionTagInfo
-            //    //    is not used anymore. The really important aspect here is to update the "real" git tags,
-            //    //    not to maintain the TagCommits' state.
-
-
-            //    Throw.DebugAssert( "We must not be able to rebuild a +deprecated commit.", !exists.IsDeprecatedVersion );
-            //    Throw.DebugAssert( """
-            //                       When rebuilding an existing version, the build commit must be the same, except if:
-            //                       - the existing tag is a +fake.
-            //                       - or the tag is a "local/" (the tag moves to the "current" commit).
-            //                       """,
-            //                       exists.IsFakeVersion || exists.Version.IsLocal() || _buildCommit.Sha == exists.Sha );
-            //    if( _version.CINumber == 0 )
-            //    {
-            //        // "--ci.0" case: we must be on the same original non-CI build commit.
-            //        Throw.DebugAssert( "We are on the base version commit.", exists.Commit.Sha == _buildCommit.Sha );
-            //        exists.SetCI0VersionTag( t, _version );
-            //    }
-            //    else
-            //    {
-            //        // We don't want to remove a +fake git tag (this one coexists with its regular counterparts).
-            //        if( !exists.IsFakeVersion && exists.Tag.CanonicalName != t.CanonicalName )
-            //        {
-            //            // Removes the other ("local/" vs. published), tag (may be on the same commit or not).
-            //            git.Tags.Remove( exists.Tag.CanonicalName );
-            //        }
-            //        // 
-            //        if( exists.Commit.Sha == _buildCommit.Sha )
-            //        {
-            //            exists.UpdateVersionTag( t );
-            //        }
-            //        else
-            //        {
-            //            _tagInfo.RemoveTagCommit( monitor, _version );
-            //            _tagInfo.AddReleaseBuildTag( _version, _buildCommit, t, contentInfo );
-            //        }
-            //    }
-            //}
-            //else
-            //{
-            //    Throw.DebugAssert( "We are not on a 'ci.0' version (the commit would have been found).", _version.CINumber != 0 );
-            //    _tagInfo.AddReleaseBuildTag( _version, _buildCommit, t, contentInfo );
-            //}
 
             // Destroys any other (previous!) local releases with the same branch name.
             // Note:

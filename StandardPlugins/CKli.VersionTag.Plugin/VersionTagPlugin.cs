@@ -27,6 +27,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     /// </summary>
     /// <param name="primaryContext">The CKli plugin context.</param>
     /// <param name="artifactHandler">The artifact handler plugin.</param>
+    /// <param name="branchModel">The branch model plugin.</param>
     public VersionTagPlugin( PrimaryPluginContext primaryContext,
                              ArtifactHandlerPlugin artifactHandler,
                              BranchModelPlugin branchModel )

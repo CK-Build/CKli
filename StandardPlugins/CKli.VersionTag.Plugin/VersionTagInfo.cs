@@ -431,7 +431,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="buildCommit">The build commit selected by the build.</param>
     /// <param name="version">The target version. This is necessarily a "local/" prefixed version.</param>
-    /// <param name="allowRebuild">True if the user allows a rebuild of an already built commit.</param>
+    /// <param name="rebuild">Configures the checks.</param>
     /// <returns>The commit build info on success, null on error.</returns>
     public CommitBuildInfo? TryGetCommitBuildInfo( IActivityMonitor monitor, Commit buildCommit, SVersion version, RebuildMode rebuild )
     {

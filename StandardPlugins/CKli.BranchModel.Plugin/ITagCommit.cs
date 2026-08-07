@@ -39,7 +39,7 @@ public interface ITagCommit
         return new TagCommit( repo, version, commit );
     }
 
-    sealed class TagCommit : ITagCommit
+    internal sealed class TagCommit : ITagCommit
     {
         public TagCommit( Repo repo, SVersion version, Commit commit )
         {

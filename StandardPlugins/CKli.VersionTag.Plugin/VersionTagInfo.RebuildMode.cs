@@ -6,6 +6,9 @@ public sealed partial class VersionTagInfo
 {
     /// <summary>
     /// Rebuild options for <see cref="TryGetCommitBuildInfo"/>.
+    /// <para>
+    /// This is a bit over-designed and should be simplified.
+    /// </para>
     /// </summary>
     [Flags]
     public enum RebuildMode

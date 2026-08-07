@@ -9,6 +9,15 @@ namespace CKli.Build.Plugin;
 
 public sealed partial class BuildPlugin
 {
+    /// <summary>
+    /// Tries to rebuild the oldest releases until a success.
+    /// </summary>
+    /// <param name="monitor"></param>
+    /// <param name="context"></param>
+    /// <param name="warnOnly"></param>
+    /// <param name="runTest"></param>
+    /// <param name="all"></param>
+    /// <returns></returns>
     [Description( """
         Tries to rebuild the oldest releases until a success.
         Failing commits are tagged with a '+invalid' tag.
@@ -62,6 +71,15 @@ public sealed partial class BuildPlugin
         return true;
     }
 
+    /// <summary>
+    /// Rebuild the specified version in the current repository.
+    /// </summary>
+    /// <param name="monitor"></param>
+    /// <param name="context"></param>
+    /// <param name="version"></param>
+    /// <param name="skipTests"></param>
+    /// <param name="forceTests"></param>
+    /// <returns></returns>
     [Description( """Rebuild the specified version in the current repository.""" )]
     [CommandPath( "maintenance rebuild version" )]
     public async Task<bool> RebuildVersionAsync( IActivityMonitor monitor,
