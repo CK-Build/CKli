@@ -3,6 +3,7 @@ using CK.PerfectEvent;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Build.Plugin;
@@ -50,7 +51,7 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
         return new RepoBuilder( repo, this, _artifactHandler, _artifactHandler.Get( monitor, repo ) );
     }
 
-    internal async Task<bool> RaiseOnCoreBuildAsync( IActivityMonitor monitor, CommitBuildInfo buildInfo )
+    internal async Task<bool> RaiseOnCoreBuildAsync( IActivityMonitor monitor, CommitBuildInfo buildInfo, CancellationToken cancellation )
     {
         if( _onCoreBuild.HasHandlers )
         {
@@ -59,8 +60,8 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
                 bool eventError = false;
                 using( monitor.OnError( () => eventError = true ) )
                 {
-                    var e = new CoreBuildEventArgs( monitor, buildInfo );
-                    if( !await _onCoreBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false )
+                    var e = new CoreBuildEventArgs( monitor, buildInfo, cancellation );
+                    if( !await _onCoreBuild.SafeRaiseAsync( monitor, e, cancellation ).ConfigureAwait( false )
                         || eventError )
                     {
                         monitor.CloseGroup( $"OnCoreBuild event handling failed." );

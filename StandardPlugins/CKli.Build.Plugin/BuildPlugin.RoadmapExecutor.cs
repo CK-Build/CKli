@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
@@ -46,15 +47,17 @@ public sealed partial class BuildPlugin
         /// or parallel build with <see cref="RunLoopAsync"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
+        /// <param name="cancellation">Cancellation token.</param>
         /// <returns>The array of build result on success or null on error.</returns>
-        internal async Task<BuildResult[]?> BuildAsync( IActivityMonitor monitor )
+        internal async Task<BuildResult[]?> BuildAsync( IActivityMonitor monitor, CancellationToken cancellation )
         {
             Throw.DebugAssert( _roadmap.SolutionBuildCount > 0 );
+            if( cancellation.IsCancellationRequested ) return null;
             if( _singleBuild )
             {
                 var s = _roadmap.OrderedSolutions.Single( s => s.MustBuild );
                 Throw.DebugAssert( s.BuildInfo != null && !s.BuildInfo.DirectRequirements.Any( s => s.MustBuild ) );
-                var r = await DoBuildAsync( monitor, s.BuildInfo );
+                var r = await DoBuildAsync( monitor, s.BuildInfo, cancellation );
                 return r != null
                         ? s.BuildInfo.SetSingleBuildResult( r )
                         : null;
@@ -221,8 +224,10 @@ public sealed partial class BuildPlugin
         // This doesn't catch exception. When called with a true _singleBuild, this is a unhandled
         // command exception handled at the root level.
         // When called in parallel, it is the BuildAsync wrapper above that handles it.
-        async Task<BuildResult?> DoBuildAsync( IActivityMonitor monitor, Roadmap.BuildInfo build )
+        async Task<BuildResult?> DoBuildAsync( IActivityMonitor monitor, Roadmap.BuildInfo build, CancellationToken cancellation )
         {
+            if( cancellation.IsCancellationRequested ) return null;
+
             // EnsureAndCheckoutBranch and UpdateDependenciesAndCommit only interact with their own Repo:
             // parallel builds don't need synchronization for these.
 
@@ -232,12 +237,16 @@ public sealed partial class BuildPlugin
                 return null;
             }
 
+            if( cancellation.IsCancellationRequested ) return null;
+
             // This works on the working folder. (On success, UpdateDependenciesAndCommit refreshes our HotBranch). 
             var commit = UpdateDependenciesAndCommit( monitor, build, _roadmap.PackageMapping, canAmend );
             if( commit == null )
             {
                 return null;
             }
+
+            if( cancellation.IsCancellationRequested ) return null;
 
             // CoreBuildAsync interacts with the ArtifactHandlerPlugin that is mainly a proxy of the file system (the $Local NuGet and Assets folders).
             var result = await _buildPlugin.CoreBuildAsync( monitor,
@@ -246,7 +255,8 @@ public sealed partial class BuildPlugin
                                                             commit,
                                                             build.TargetVersion,
                                                             _runTest,
-                                                            forceRebuild: !build.TargetVersion.IsCI ).ConfigureAwait( false );
+                                                            forceRebuild: !build.TargetVersion.IsCI,
+                                                            cancellation ).ConfigureAwait( false );
             Throw.DebugAssert( result == null || result.Content.Produced.All( p => _roadmap.PackageMapping.GetMappedVersion( p, build.Solution.CurrentVersion ) == result.Version ) );
             // On error, we ensure that we let the repository on the "dev/" branch (this applies to non CI
             // build - in CI build we already are on the "dev/" branch).

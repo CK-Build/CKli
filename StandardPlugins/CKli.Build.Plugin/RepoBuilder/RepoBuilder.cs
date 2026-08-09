@@ -7,6 +7,7 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Immutable;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -65,11 +66,13 @@ public class RepoBuilder : RepoInfo
     /// <param name="context">Minimal CKli context.</param>
     /// <param name="buildInfo">The build info.</param>
     /// <param name="runTest">Whether tests should be run or not.</param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>True on success, false otherwise.</returns>
     public async Task<BuildResult?> BuildAsync( IActivityMonitor monitor,
                                                 CKliEnv context,
                                                 CommitBuildInfo buildInfo,
-                                                bool runTest )
+                                                bool runTest,
+                                                CancellationToken cancellation )
     {
         Throw.CheckState( "Repository must not be dirty when calling build.", !Repo.GitRepository.GetSimpleStatusInfo().IsDirty );
         Throw.CheckArgument( buildInfo.Repo == Repo );
@@ -107,6 +110,9 @@ public class RepoBuilder : RepoInfo
                 {actions.Concatenate( Environment.NewLine )}
                 """ );
         }
+
+        if( cancellation.IsCancellationRequested ) return null;
+
         XmlHelper.SafeSave( configRoot, nugetConfigPath, SaveOptions.DisableFormatting );
 
         // We ResetHard the repository after the build.
@@ -118,8 +124,9 @@ public class RepoBuilder : RepoInfo
         try
         {
 
-            if( await _repositoryBuilder.RaiseOnCoreBuildAsync( monitor, buildInfo ).ConfigureAwait( false )
-                && DotNetBuildTestPack( monitor, buildInfo, runTest, outputPath )
+            if( await _repositoryBuilder.RaiseOnCoreBuildAsync( monitor, buildInfo, cancellation ).ConfigureAwait( false )
+                && DotNetBuildTestPack( monitor, buildInfo, runTest, outputPath, cancellation )
+                && !cancellation.IsCancellationRequested
                 && BuildResult.GetConsumedPackages( monitor, Repo, buildInfo.ToString(), out var consumedPackages ) )
             {
                 // Everything went fine, it's time to cleanup the working folder and we are rather aggressive here:
@@ -229,17 +236,22 @@ public class RepoBuilder : RepoInfo
     /// <param name="buildInfo">The build information.</param>
     /// <param name="runTest">Whether tests should be run or not.</param>
     /// <param name="packOutputPath">Destination folder where the artifact files must be created.</param>
+    /// <param name="cancellation">The cancellation token to consider.</param>
+    /// </summary>
     /// <returns>True on success, false otherwise.</returns>
     protected virtual bool DotNetBuildTestPack( IActivityMonitor monitor,
                                                 CommitBuildInfo buildInfo,
                                                 bool runTest,
-                                                string packOutputPath )
+                                                string packOutputPath,
+                                                CancellationToken cancellation )
     {
-        return DotNetBuild( monitor,
-                            buildInfo.Version,
-                            buildInfo.InformationalVersion,
-                            buildInfo.FileVersion,
-                            buildInfo.ReleaseConfiguration )
+        return !cancellation.IsCancellationRequested
+               && DotNetBuild( monitor,
+                               buildInfo.Version,
+                               buildInfo.InformationalVersion,
+                               buildInfo.FileVersion,
+                               buildInfo.ReleaseConfiguration,
+                               cancellation )
                && (!runTest || DotNetTest( monitor, buildInfo.ReleaseConfiguration ))
                && DotNetPack( monitor, buildInfo.Version, buildInfo.ReleaseConfiguration, packOutputPath );
     }
@@ -252,12 +264,14 @@ public class RepoBuilder : RepoInfo
     /// <param name="informationalVersion">The informational version to set (see <see cref="InformationalVersion"/>).</param>
     /// <param name="fileVersion">The windows file version. See <see cref="CommitBuildInfo.FileVersion"/>.</param>
     /// <param name="release">False to use Debug build configuration.</param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>True on success, false otherwise.</returns>
     protected bool DotNetBuild( IActivityMonitor monitor,
                                 SVersion version,
                                 string informationalVersion,
                                 string fileVersion,
-                                bool release )
+                                bool release,
+                                CancellationToken cancellation )
     {
         // Currently, we always set ContinuousIntegrationBuild.
         // This may impact the SourceRoot for SourceLink: this can allow a local UX that debugs straight to the right source file.
@@ -268,7 +282,8 @@ public class RepoBuilder : RepoInfo
             }" /p:InformationalVersion="{informationalVersion
             }" /p:FileVersion="{fileVersion
             }" /p:ContinuousIntegrationBuild=true
-            """ );
+            """,
+            cancellation: cancellation );
     }
 
     /// <summary>
@@ -276,10 +291,11 @@ public class RepoBuilder : RepoInfo
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="release">Whether the build is in debug or in release.</param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>True on tests success, false otherwise.</returns>
-    protected bool DotNetTest( IActivityMonitor monitor, bool release )
+    protected bool DotNetTest( IActivityMonitor monitor, bool release, CancellationToken cancellation )
     {
-        if( !Repo.RunDotnet( monitor, $"test -tl:off -c {(release ? "Release" : "Debug")} --nologo --no-build" ) )
+        if( !Repo.RunDotnet( monitor, $"test -tl:off -c {(release ? "Release" : "Debug")} --nologo --no-build", cancellation: cancellation ) )
         {
             return false;
         }
@@ -297,12 +313,13 @@ public class RepoBuilder : RepoInfo
     /// <param name="version">The version to pack.</param>
     /// <param name="release">Whether the build is in debug or in release.</param>
     /// <param name="outputPath">Destination folder where the artifact files must be created.</param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>True on success, false otherwise.</returns>
-    protected bool DotNetPack( IActivityMonitor monitor, SVersion version, bool release, string outputPath )
+    protected bool DotNetPack( IActivityMonitor monitor, SVersion version, bool release, string outputPath, CancellationToken cancellation )
     {
         return Repo.RunDotnet( monitor, $"""
             pack -tl:off /p:Version={version} /p:ContinuousIntegrationBuild=true -c {(release ? "Release" : "Debug")} --nologo --no-build -o "{outputPath}" 
-            """ );
+            """, cancellation: cancellation );
     }
 
 

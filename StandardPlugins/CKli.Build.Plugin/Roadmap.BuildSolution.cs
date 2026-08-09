@@ -396,7 +396,7 @@ public sealed partial class Roadmap
 
         /// <summary>
         /// Gets the version and content that must be published. This MUST be called only if <see cref="MustPublish"/> is
-        /// true and after a successful <see cref="Roadmap.BuildAsync(IActivityMonitor, CKliEnv, BuildPlugin, bool?, int)"/>.
+        /// true and after a successful <see cref="Roadmap.BuildAsync"/>.
         /// </summary>
         /// <returns>The version and content to publish.</returns>
         public (SVersion Version, Tag Tag, BuildContentInfo Content) GetFinalPublishInfo()

@@ -48,7 +48,8 @@ public static class ProcessRunner
     /// <param name="stdOut">Optional standard output collector.</param>
     /// <param name="stdErr">Optional standard error collector.</param>
     /// <param name="noLog">True to log the standard output and error.</param>
-    /// <returns>The exit status code or null if timeout occurred.</returns>
+    /// <param name="cancellation">Optional cancellation cancel that <see cref="Process.Kill()"/> the process when signaled.</param>
+    /// <returns>The exit status code or null if timeout or cancellation occurred.</returns>
     public static int? RunProcess( IActivityLineEmitter logger,
                                    string fileName,
                                    string arguments,
@@ -57,7 +58,8 @@ public static class ProcessRunner
                                    int timeout = Timeout.Infinite,
                                    StringBuilder? stdOut = null,
                                    StringBuilder? stdErr = null,
-                                   bool noLog = false )
+                                   bool noLog = false,
+                                   CancellationToken cancellation = default )
     {
         var blind = stdOut == null && stdErr == null && noLog;
         var info = new ProcessStartInfo( fileName, arguments )
@@ -80,6 +82,8 @@ public static class ProcessRunner
         {
             foreach( var kv in environmentVariables ) info.EnvironmentVariables[ kv.Key ] = kv.Value;
         }
+        if( cancellation.IsCancellationRequested ) return null;
+
         using var process = new Process { StartInfo = info };
         if( stdOut == null )
         {
@@ -129,6 +133,7 @@ public static class ProcessRunner
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
         }
+        using var stop = cancellation.CanBeCanceled ? cancellation.UnsafeRegister( p => ((Process)p!).Kill(), process ) : default;
         if( timeout > 0 )
         {
             bool exited = process.WaitForExit( timeout );

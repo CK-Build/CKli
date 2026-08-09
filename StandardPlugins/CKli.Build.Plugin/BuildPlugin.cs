@@ -8,6 +8,7 @@ using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Build.Plugin;
@@ -314,7 +315,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
 
     async Task<bool> DoRunAsync( IActivityMonitor monitor, CKliEnv context, int vMaxDoP, bool? runTest, Roadmap roadmap )
     {
-        var results = await roadmap.BuildAsync( monitor, context, this, runTest, vMaxDoP ).ConfigureAwait( false );
+        var results = await roadmap.BuildAsync( monitor, context, this, runTest, vMaxDoP, PrimaryPluginContext.Cancellation ).ConfigureAwait( false );
         if( results == null )
         {
             return false;
@@ -448,7 +449,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                              Commit buildCommit,
                                              SVersion targetVersion,
                                              bool? runTest,
-                                             bool forceRebuild = false )
+                                             bool forceRebuild,
+                                             CancellationToken cancellation )
     {
         // Obtain the RepoBuilder for the Repo.
         var repoBuilder = _repoBuilder.Get( monitor, versionInfo.Repo );
@@ -456,6 +458,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         runTest ??= !repoBuilder.HasTestRun( monitor, buildCommit );
 
         VersionTagInfo.RebuildMode rebuild = VersionTagInfo.RebuildMode.None;
+
+        if( cancellation.IsCancellationRequested ) return null;
 
         // If we can avoid the build (because forceRebuild is false), we skip the build only if the tag has not been deleted:
         // this supports a "natural" force rebuild for the user by deleting the version tag.
@@ -489,12 +493,15 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             // the parsed prefix: the version is unchanged.
             rebuild = VersionTagInfo.RebuildMode.AllowRebuildCommit | VersionTagInfo.RebuildMode.AllowRebuildVersion | VersionTagInfo.RebuildMode.CheckPreviousVersion;
         }
+
+        if( cancellation.IsCancellationRequested ) return null;
+
         var buildInfo = versionInfo.TryGetCommitBuildInfo( monitor, buildCommit, targetVersion, rebuild );
         if( buildInfo == null )
         {
             return null;
         }
-        return await RealBuildAsync( monitor, context, versionInfo, buildCommit, runTest.Value, repoBuilder, buildInfo ).ConfigureAwait( false );
+        return await RealBuildAsync( monitor, context, versionInfo, buildCommit, runTest.Value, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
 
         static async Task<BuildResult?> RealBuildAsync( IActivityMonitor monitor,
                                                         CKliEnv context,
@@ -502,9 +509,13 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                                         Commit buildCommit,
                                                         bool runTest,
                                                         RepoBuilder repoBuilder,
-                                                        CommitBuildInfo buildInfo )
+                                                        CommitBuildInfo buildInfo,
+                                                        CancellationToken cancellation )
         {
             using var gLog = monitor.OpenTrace( $"Core build for '{buildInfo}'." );
+
+            if( cancellation.IsCancellationRequested ) return null;
+
             //
             // We ensure that the working folder is checked out on the buildCommit content tree.
             // We restore the current branch once we are done.
@@ -535,7 +546,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                 result = await repoBuilder.BuildAsync( monitor,
                                                        context,
                                                        buildInfo,
-                                                       runTest ).ConfigureAwait( false );
+                                                       runTest,
+                                                       cancellation ).ConfigureAwait( false );
             }
             catch( Exception ex )
             {

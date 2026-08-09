@@ -8,6 +8,7 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Build.Plugin;
@@ -196,7 +197,12 @@ public sealed partial class Roadmap
         return success;
     }
 
-    internal Task<BuildResult[]?> BuildAsync( IActivityMonitor monitor, CKliEnv context, BuildPlugin buildPlugin, bool? runTest, int maxDop )
+    internal Task<BuildResult[]?> BuildAsync( IActivityMonitor monitor,
+                                              CKliEnv context,
+                                              BuildPlugin buildPlugin,
+                                              bool? runTest,
+                                              int maxDop,
+                                              CancellationToken cancellation )
     {
         if( _buildSolutionCount == 0 )
         {
@@ -221,7 +227,7 @@ public sealed partial class Roadmap
             }
         }
         var builder = new BuildPlugin.RoadmapExecutor( buildPlugin, context, this, runTest, maxDop );
-        return builder.BuildAsync( monitor );
+        return builder.BuildAsync( monitor, cancellation );
     }
 
     internal struct RStats( int repositoryCount,

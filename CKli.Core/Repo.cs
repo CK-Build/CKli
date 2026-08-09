@@ -1,6 +1,7 @@
 using CK.Core;
 using System;
 using System.Text;
+using System.Threading;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -181,8 +182,13 @@ public sealed class Repo
     /// <param name="args">The arguments.</param>
     /// <param name="stdOut">Optional capture of the standard output.</param>
     /// <param name="stdErr">Optional capture of the standard error.</param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>True if the exist code is 0, false otherwise.</returns>
-    public bool RunDotnet( IActivityMonitor monitor, string args, StringBuilder? stdOut = null, StringBuilder? stdErr = null )
+    public bool RunDotnet( IActivityMonitor monitor,
+                           string args,
+                           StringBuilder? stdOut = null,
+                           StringBuilder? stdErr = null,
+                           CancellationToken cancellation = default )
     {
         using( monitor.OpenInfo( $"Executing 'dotnet {args}' in '{_git.DisplayPath}'." ) )
         {
@@ -191,7 +197,8 @@ public sealed class Repo
                                               args,
                                               _git.WorkingFolder,
                                               stdOut: stdOut,
-                                              stdErr: stdErr );
+                                              stdErr: stdErr,
+                                              cancellation: cancellation );
             if( e != 0 )
             {
                 monitor.CloseGroup( $"Failed with code '{e}'." );
