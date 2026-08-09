@@ -210,6 +210,12 @@ public class RepoBuilder : RepoInfo
                     return false;
                 }
             }
+            var gitignoreAssets = deploymentFolder.AppendPart( ".gitignore" );
+            if( !File.Exists( gitignoreAssets ) )
+            {
+                monitor.Trace( $"Missing 'Deployment/.gitignore' file. Initializing it." );
+                File.WriteAllText( gitignoreAssets, "Assets/" );
+            }
             Directory.CreateDirectory( repoAssetsFolder );
             var e = ProcessRunner.RunProcess( monitor.ParallelLogger,
                                               "dotnet",
