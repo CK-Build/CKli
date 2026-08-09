@@ -39,7 +39,13 @@ sealed class CKliPull : Command
                                      && Pull( monitor, this, context, all, withTags, continueOnError, scopeAlive ) );
 
 
-        static bool Pull( IActivityMonitor monitor, Command command, CKliEnv context, bool all, bool withTags, bool continueOnError, CancellationToken scopeAlive )
+        static bool Pull( IActivityMonitor monitor,
+                          Command command,
+                          CKliEnv context,
+                          bool all,
+                          bool withTags,
+                          bool continueOnError,
+                          CancellationToken scopeAlive )
         {
             if( !StackRepository.OpenWorldFromPath( monitor,
                                                     context,
@@ -73,7 +79,7 @@ sealed class CKliPull : Command
                                  bool continueOnError,
                                  IReadOnlyList<Repo> repos,
                                  bool withTags,
-                                 CancellationToken scopeAlive )
+                                 CancellationToken cancellation )
     {
         bool success = true;
         // To limit roundtrips to the remotes, we fetch all the remote branches at once
@@ -83,7 +89,7 @@ sealed class CKliPull : Command
         {
             foreach( var repo in repos )
             {
-                if( scopeAlive.IsCancellationRequested )
+                if( cancellation.IsCancellationRequested )
                 {
                     return false;
                 }
@@ -110,6 +116,10 @@ sealed class CKliPull : Command
             {
                 foreach( var repo in repos )
                 {
+                    if( cancellation.IsCancellationRequested )
+                    {
+                        return false;
+                    }
                     success &= repo.GitRepository.MergeRemoteBranches( monitor, continueOnError, fromAllRemotes: false );
                     if( !success && !continueOnError ) break;
                 }

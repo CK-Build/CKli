@@ -553,7 +553,14 @@ public sealed partial class StackRepository : IDisposable
         Throw.CheckNotNullArgument( context );
         // The nominal case is that we cannot clone a stack inside another stack. But when ignoreParentStack
         // is specified or we are running the CKli.Core.Tests, we allow this.
-        Throw.CheckArgument( (ignoreParentStack || isCKliTestRunning) || context.CurrentStackPath.IsEmptyPath );
+        if( !ignoreParentStack && !isCKliTestRunning && !context.CurrentStackPath.IsEmptyPath)
+        {
+            monitor.Error( $"""
+                A stack exists above at '{context.CurrentStackPath}'.
+                The option flag --ignore-parent-stack must be specified if this is intended.
+                """ );
+            return null;
+        }
         Throw.CheckNotNullArgument( stackBranchName );
         var parentPath = context.CurrentDirectory;
         if( !parentPath.IsRooted
@@ -580,6 +587,7 @@ public sealed partial class StackRepository : IDisposable
                         $"""
                         The stack '{stackNameFromUrl}' at '{url}' is already available here:
                         {already.Select( p => p.Path ).Concatenate( Environment.NewLine )}
+                        The option flag --allow-duplicate must be specified if this is intended.
                         """ );
             if( !allowDuplicateStack ) return null;
             stackFolderName = DuplicatePrefix + stackNameFromUrl;
@@ -658,7 +666,7 @@ public sealed partial class StackRepository : IDisposable
                 Registry.RegisterNewStack( monitor, gitPath, url );
                 var result = new StackRepository( git, stackRoot, context, stackNameFromUrl );
                 // Now we can clone the world's repositories.
-                if( CloneWorld( monitor, result, result.DefaultWorldName ) )
+                if( await CloneWorldAsync( monitor, result, result.DefaultWorldName, cancellation ) )
                 {
                     return result;
                 }
@@ -668,6 +676,36 @@ public sealed partial class StackRepository : IDisposable
             return null;
         }
         return null;
+
+        static async Task<bool> CloneWorldAsync( IActivityMonitor monitor,
+                                                 StackRepository stack,
+                                                 LocalWorldName world,
+                                                 CancellationToken cancellation )
+        {
+            var definitionFile = world.LoadDefinitionFile( monitor );
+            if( definitionFile == null ) return false;
+            var layout = definitionFile.ReadLayout( monitor );
+            if( layout == null ) return false;
+            bool success = true;
+            using( monitor.OpenInfo( $"Cloning {layout.Count} repositories in {stack.StackRoot}." ) )
+            {
+                foreach( var (url, _, subPath) in layout )
+                {
+                    if( cancellation.IsCancellationRequested )
+                    {
+                        success = false;
+                        break;
+                    }
+                    using( var r = GitRepository.CloneWorkingFolder( monitor,
+                                                                     new GitRepositoryKey( stack.SecretsStore, url, stack.IsPublic ),
+                                                                     world.WorldRoot.Combine( subPath ) ) )
+                    {
+                        success &= r != null;
+                    }
+                }
+            }
+            return success;
+        }
     }
 
     /// <summary>
@@ -891,28 +929,6 @@ public sealed partial class StackRepository : IDisposable
             monitor.Error( $"Error while reading default World definition file '{stackNameFromUrl}.xml'.", ex );
             return false;
         }
-    }
-
-    static bool CloneWorld( IActivityMonitor monitor, StackRepository stack, LocalWorldName world )
-    {
-        var definitionFile = world.LoadDefinitionFile( monitor );
-        if( definitionFile == null ) return false;
-        var layout = definitionFile.ReadLayout( monitor );
-        if( layout == null ) return false;
-        bool success = true;
-        using( monitor.OpenInfo( $"Cloning {layout.Count} repositories in {stack.StackRoot}." ) )
-        {
-            foreach( var (url, _, subPath) in layout )
-            {
-                using( var r = GitRepository.CloneWorkingFolder( monitor,
-                                                                 new GitRepositoryKey( stack.SecretsStore, url, stack.IsPublic ),
-                                                                 world.WorldRoot.Combine( subPath ) ) )
-                {
-                    success &= r != null;
-                }
-            }
-        }
-        return success;
     }
 
     /// <summary>
