@@ -44,7 +44,14 @@ sealed class CKliClone : Command
         {
             return false;
         }
-        using( var stack = await StackRepository.CloneAsync( monitor, context, uri, !isPrivate, allowDuplicate, ignoreParentStack, "main", scopeAlive ) )
+        using( var stack = await StackRepository.CloneAsync( monitor,
+                                                             context,
+                                                             uri,
+                                                             !isPrivate,
+                                                             allowDuplicate,
+                                                             ignoreParentStack,
+                                                             "main",
+                                                             scopeAlive ) )
         {
             return stack != null;
         }

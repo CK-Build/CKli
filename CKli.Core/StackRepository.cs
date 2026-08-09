@@ -583,13 +583,19 @@ public sealed partial class StackRepository : IDisposable
         var already = Registry.CheckExistingStack( monitor, url );
         if( already.Count > 0 )
         {
-            monitor.Log( allowDuplicateStack ? LogLevel.Warn : LogLevel.Error,
-                        $"""
-                        The stack '{stackNameFromUrl}' at '{url}' is already available here:
-                        {already.Select( p => p.Path ).Concatenate( Environment.NewLine )}
-                        The option flag --allow-duplicate must be specified if this is intended.
-                        """ );
-            if( !allowDuplicateStack ) return null;
+            var common = $"""
+                         The stack '{stackNameFromUrl}' at '{url}' is already available here:
+                         {already.Select( p => p.Path ).Concatenate( Environment.NewLine )}
+                         """;
+            if( !allowDuplicateStack )
+            {
+                monitor.Error( common + """
+
+                    The option flag --allow-duplicate must be specified if this is intended.
+                    """ );
+                return null;
+            }
+            monitor.Warn( common );
             stackFolderName = DuplicatePrefix + stackNameFromUrl;
         }
         var stackRoot = parentPath.AppendPart( stackFolderName );
