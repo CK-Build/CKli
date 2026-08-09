@@ -22,7 +22,7 @@ namespace CKli.Core;
 ///         from any local path.
 ///     </item>
 ///     <item>
-///         Calling <see cref="Clone(IActivityMonitor, CKli.Core.CKliEnv, Uri, bool, bool, bool, string, CancellationToken)"/>
+///         Calling <see cref="CloneAsync(IActivityMonitor, CKli.Core.CKliEnv, Uri, bool, bool, bool, string, CancellationToken)"/>
 ///         from the remote Uri of the stack.
 ///     </item>
 /// </list>
@@ -539,14 +539,14 @@ public sealed partial class StackRepository : IDisposable
     /// </param>
     /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The repository or null on error.</returns>
-    public static StackRepository? Clone( IActivityMonitor monitor,
-                                          CKliEnv context,
-                                          Uri url,
-                                          bool isPublic,
-                                          bool allowDuplicateStack = false,
-                                          bool ignoreParentStack = false,
-                                          string stackBranchName = "main",
-                                          CancellationToken cancellation = default )
+    public static async Task<StackRepository?> CloneAsync( IActivityMonitor monitor,
+                                                           CKliEnv context,
+                                                           Uri url,
+                                                           bool isPublic,
+                                                           bool allowDuplicateStack = false,
+                                                           bool ignoreParentStack = false,
+                                                           string stackBranchName = "main",
+                                                           CancellationToken cancellation = default )
     {
         bool isCKliTestRunning = CKliRootEnv.InstanceName == "CKli-Test";
         Throw.CheckNotNullArgument( monitor );
@@ -562,6 +562,7 @@ public sealed partial class StackRepository : IDisposable
             || parentPath.LastPart.Equals( PrivateStackName, StringComparison.OrdinalIgnoreCase ) )
         {
             monitor.Error( $"Invalid path '{parentPath}': it must be rooted and not end with {PublicStackName} or {PrivateStackName}." );
+            return null;
         }
 
         var stackGitKey = GitRepositoryKey.Create( monitor, context.SecretsStore, url, isPublic );
@@ -591,7 +592,7 @@ public sealed partial class StackRepository : IDisposable
             // We cheat here: we allow cloning into the CKli-Stack itself if we are in the "CKli-Test" instance.
             var parentStack = FindGitStackPath( parentPath );
             if( !parentStack.IsEmptyPath
-                && !(isCKliTestRunning && parentStack.Path.EndsWith("/CKli/.PublicStack", StringComparison.OrdinalIgnoreCase )) )
+                && !(isCKliTestRunning && parentStack.Path.EndsWith( "/CKli/.PublicStack", StringComparison.OrdinalIgnoreCase )) )
             {
                 var stackAbove = parentStack.RemoveLastPart();
                 var safeRoot = stackAbove.RemoveLastPart().AppendPart( stackFolderName );

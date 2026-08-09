@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 
@@ -95,11 +96,11 @@ public static partial class CKliTestHelperExtensions
         /// Stack access: clone the stack as a private stack (in a ".PrivateStack" folder) or a public stack (in a ".PublicStack" folder).
         /// </param>
         /// <returns>The default world cloned context.</returns>
-        public CKliEnv Clone( ClonedFolder clonedFolder, Action<IActivityMonitor, NormalizedPath, XElement>? pluginConfigurationEditor = null, bool privateStack = false )
-            => Clone( clonedFolder.Path, false, pluginConfigurationEditor, privateStack );
+        public Task<CKliEnv> CloneAsync( ClonedFolder clonedFolder, Action<IActivityMonitor, NormalizedPath, XElement>? pluginConfigurationEditor = null, bool privateStack = false )
+                        => CloneAsync( clonedFolder.Path, false, pluginConfigurationEditor, privateStack );
 
         /// <summary>
-        /// Implementation of <see cref="Clone(ClonedFolder, Action{IActivityMonitor, NormalizedPath, XElement}?, bool)"/> that can be used in
+        /// Implementation of <see cref="CloneAsync(ClonedFolder, Action{IActivityMonitor, NormalizedPath, XElement}?, bool)"/> that can be used in
         /// sub folders of the <see cref="ClonedFolder"/> to work with multiple clones of the same remote.
         /// </summary>
         /// <param name="allowDuplicateStack">
@@ -118,15 +119,15 @@ public static partial class CKliTestHelperExtensions
         /// Whether to clone the stack as a private stack (in a ".PrivateStack" folder) or a public stack (in a ".PublicStack" folder).
         /// </param>
         /// <returns>The default world cloned context.</returns>
-        public CKliEnv Clone( NormalizedPath folder,
-                              bool allowDuplicateStack,
-                              Action<IActivityMonitor, NormalizedPath, XElement>? pluginConfigurationEditor = null,
-                              bool privateStack = false )
+        public async Task<CKliEnv> CloneAsync( NormalizedPath folder,
+                                               bool allowDuplicateStack,
+                                               Action<IActivityMonitor, NormalizedPath, XElement>? pluginConfigurationEditor = null,
+                                               bool privateStack = false )
         {
             Throw.CheckArgument( folder.StartsWith( _clonedPath ) );
 
             var context = new CKliEnv( folder, screen: new StringScreen(), findCurrentStackPath: false );
-            CloneOrThrow( ref context, _stackUri, _stackName, allowDuplicateStack, privateStack );
+            context = await CloneOrThrowAsync( context, _stackUri, _stackName, allowDuplicateStack, privateStack );
             if( !StackRepository.OpenWorldFromPath( TestHelper.Monitor,
                                                     context,
                                                     out var stack,
@@ -164,14 +165,14 @@ public static partial class CKliTestHelperExtensions
             }
             return context;
 
-            static void CloneOrThrow( ref CKliEnv context, Uri stackUri, string stackName, bool allowDuplicateStack, bool privateStack )
+            static async Task<CKliEnv> CloneOrThrowAsync( CKliEnv context, Uri stackUri, string stackName, bool allowDuplicateStack, bool privateStack )
             {
-                using( var stack = StackRepository.Clone( TestHelper.Monitor,
-                                                          context,
-                                                          stackUri,
-                                                          !privateStack,
-                                                          allowDuplicateStack,
-                                                          ignoreParentStack: true ) )
+                using( var stack = await StackRepository.CloneAsync( TestHelper.Monitor,
+                                                                     context,
+                                                                     stackUri,
+                                                                     !privateStack,
+                                                                     allowDuplicateStack,
+                                                                     ignoreParentStack: true ) )
                 {
                     if( stack == null )
                     {
@@ -179,6 +180,7 @@ public static partial class CKliTestHelperExtensions
                     }
                     context = context.ChangeDirectory( stack.StackRoot );
                 }
+                return context;
             }
         }
 

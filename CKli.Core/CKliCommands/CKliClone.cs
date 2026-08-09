@@ -26,27 +26,27 @@ sealed class CKliClone : Command
 
     public override InteractiveMode InteractiveMode => InteractiveMode.Rejects;
 
-    internal protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                                    CKliEnv context,
-                                                                    CommandLineArguments cmdLine,
-                                                                    CancellationToken scopeAlive )
+    internal protected override async ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
+                                                                          CKliEnv context,
+                                                                          CommandLineArguments cmdLine,
+                                                                          CancellationToken scopeAlive )
     {
         string sUrl = cmdLine.EatArgument();
         if( !Uri.TryCreate( sUrl, UriKind.Absolute, out var uri ) )
         {
             monitor.Error( $"Invalid <stackUrl> argument '{sUrl}'. It must be an absolute url." );
-            return ValueTask.FromResult( false );
+            return false;
         }
         bool isPrivate = cmdLine.EatFlag( "--private" );
         bool allowDuplicate = cmdLine.EatFlag( "--allow-duplicate" );
         bool ignoreParentStack = cmdLine.EatFlag( "--ignore-parent-stack" );
         if( !cmdLine.Close( monitor ) )
         {
-            return ValueTask.FromResult( false );
+            return false;
         }
-        using( var stack = StackRepository.Clone( monitor, context, uri, !isPrivate, allowDuplicate, ignoreParentStack, "main", scopeAlive ) )
+        using( var stack = await StackRepository.CloneAsync( monitor, context, uri, !isPrivate, allowDuplicate, ignoreParentStack, "main", scopeAlive ) )
         {
-            return ValueTask.FromResult( stack != null );
+            return stack != null;
         }
     }
 }

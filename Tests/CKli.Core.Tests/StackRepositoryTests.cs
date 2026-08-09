@@ -20,11 +20,11 @@ public class StackRepositoryTests
         File.Exists( context.CurrentDirectory.Combine( "CKt/CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeFalse();
 
         var remotes = TestEnv.OpenRemotes( "CKt" );
-        using var stack = StackRepository.Clone( TestHelper.Monitor,
-                                                 context,
-                                                 remotes.StackUri,
-                                                 isPublic: true,
-                                                 allowDuplicateStack: false );
+        using var stack = await StackRepository.CloneAsync( TestHelper.Monitor,
+                                                            context,
+                                                            remotes.StackUri,
+                                                            isPublic: true,
+                                                            allowDuplicateStack: false ).ConfigureAwait( false );
         stack.ShouldNotBeNull();
         stack.StackWorkingFolder.LastPart.ShouldBe( ".PublicStack" );
         var localWorldName = stack.DefaultWorldName;
@@ -42,11 +42,11 @@ public class StackRepositoryTests
     {
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.OpenRemotes( "CKt" );
-        using( var stack = StackRepository.Clone( TestHelper.Monitor,
-                                                  context,
-                                                  remotes.StackUri,
-                                                  isPublic: true,
-                                                  allowDuplicateStack: false ) )
+        using( var stack = await StackRepository.CloneAsync( TestHelper.Monitor,
+                                                             context,
+                                                             remotes.StackUri,
+                                                             isPublic: true,
+                                                             allowDuplicateStack: false ).ConfigureAwait( false ) )
         {
             stack.ShouldNotBeNull();
         }
@@ -88,11 +88,11 @@ public class StackRepositoryTests
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.OpenRemotes( "CKt" );
 
-        using( var clone = StackRepository.Clone( TestHelper.Monitor,
-                                                  context,
-                                                  remotes.StackUri,
-                                                  isPublic: true,
-                                                  allowDuplicateStack: false ) )
+        using( var clone = await StackRepository.CloneAsync( TestHelper.Monitor,
+                                                             context,
+                                                             remotes.StackUri,
+                                                             isPublic: true,
+                                                             allowDuplicateStack: false ).ConfigureAwait( false ) )
         {
             clone.ShouldNotBeNull();
         }
@@ -151,11 +151,11 @@ public class StackRepositoryTests
         var context = TestEnv.EnsureCleanFolder();
         var remotes = TestEnv.OpenRemotes( "CKt" );
 
-        using( var clone = StackRepository.Clone( TestHelper.Monitor,
-                                                  context,
-                                                  remotes.StackUri,
-                                                  isPublic: true,
-                                                  allowDuplicateStack: false ) )
+        using( var clone = await StackRepository.CloneAsync( TestHelper.Monitor,
+                                                             context,
+                                                             remotes.StackUri,
+                                                             isPublic: true,
+                                                             allowDuplicateStack: false ).ConfigureAwait( false ) )
         {
             clone.ShouldNotBeNull();
         }
@@ -282,11 +282,11 @@ public class StackRepositoryTests
         }
 
         // ckli clone file:///.../CKt-Stack -p Duplicate1 --allow-duplicate
-        using( var stack = StackRepository.Clone( TestHelper.Monitor,
-                                                  duplicate1,
-                                                  remotes.StackUri,
-                                                  isPublic: true,
-                                                  allowDuplicateStack: true ) )
+        using( var stack = await StackRepository.CloneAsync( TestHelper.Monitor,
+                                                             duplicate1,
+                                                             remotes.StackUri,
+                                                             isPublic: true,
+                                                             allowDuplicateStack: true ).ConfigureAwait( false ) )
         {
             stack.ShouldNotBeNull();
             stack.IsDuplicate.ShouldBeTrue();
