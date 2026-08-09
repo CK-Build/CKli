@@ -211,11 +211,12 @@ sealed partial class SimplePublisher
         // Resets the hosting provider and release state.
         _hostingProvider = null;
         _releaseId = null;
-        // Housekeeping: if the cleanup fails, we still consider this release done.
+        // Housekeeping:
         // Trick here for the tests, we don't cleanup the $Local when testing: we want to keep the versions
         // that a build has produced.
         if( !CKliRootEnv.DefaultCKliEnv.CurrentDirectory.Path.Contains( "CK/.PublicStack/CK-Plugins/Tests/Plugins.Tests" ) )
         {
+            // If the cleanup fails, we still consider this release done.
             _artifactHandler.DestroyLocalRelease( monitor, repo.Repo, repo.PublishVersion, repo.BuildContentInfo, removeFromNuGetGlobalCache: false );
         }
         monitor.Info( ScreenType.CKliScreenTag, $"Published {repo.BuildContentInfo.Produced.Length} packages of '{repo.Repo.DisplayPath}/{repo.PublishVersion}'." );

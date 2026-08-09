@@ -12,14 +12,21 @@ public sealed class FixBuildEventArgs : BuildBaseEventArgs
 {
     readonly FixWorkflow _fix;
     readonly ImmutableArray<BuildResult> _results;
+    readonly bool _keepBranchOnSuccessfulPublish;
     readonly bool _isCIBuild;
 
-    internal FixBuildEventArgs( IActivityMonitor monitor, FixWorkflow fix, bool isCIBuild, ImmutableArray<BuildResult> results, bool shouldPublish )
+    internal FixBuildEventArgs( IActivityMonitor monitor,
+                                FixWorkflow fix,
+                                bool isCIBuild,
+                                ImmutableArray<BuildResult> results,
+                                bool shouldPublish,
+                                bool keepBranchOnSuccessfulPublish )
         : base( monitor, shouldPublish )
     {
         _fix = fix;
         _isCIBuild = isCIBuild;
         _results = results;
+        _keepBranchOnSuccessfulPublish = keepBranchOnSuccessfulPublish;
     }
 
     /// <summary>
@@ -36,4 +43,9 @@ public sealed class FixBuildEventArgs : BuildBaseEventArgs
     /// Gets whether the build is a CI build.
     /// </summary>
     public bool IsCIBuild => _isCIBuild;
+
+    /// <summary>
+    /// Gets whether the "fix/" branches must be kept once the fix is published.
+    /// </summary>
+    public bool KeepBranchOnSuccessfulPublish => _keepBranchOnSuccessfulPublish;
 }

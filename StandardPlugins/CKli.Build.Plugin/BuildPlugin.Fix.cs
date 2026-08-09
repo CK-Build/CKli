@@ -44,7 +44,7 @@ public sealed partial class BuildPlugin
         {
             return Task.FromResult( false );
         }
-        return DoBuildFixAsync( monitor, context, runTest, workflow, rebuild, ci, publish: false );
+        return DoBuildFixAsync( monitor, context, runTest, workflow, rebuild, ci, publish: false, keepBranch: true );
     }
 
 
@@ -56,6 +56,7 @@ public sealed partial class BuildPlugin
     /// <param name="monitor"></param>
     /// <param name="context"></param>
     /// <param name="ci"></param>
+    /// <param name="keepBranch"></param>
     /// <param name="rebuild"></param>
     /// <returns></returns>
     [Description( "Builds and publishes the current Fix Workflow. On success, the current workflow is finished." )]
@@ -64,6 +65,8 @@ public sealed partial class BuildPlugin
                                        CKliEnv context,
                                        [Description( "Publishes CI versions instead of the target stable versions." )]
                                        bool ci = false,
+                                       [Description( "On success, keeps the 'fix/' branches instead of deleting them. Applies only to non-CI builds." )]
+                                       bool keepBranch = false,
                                        [Description( "Force a rebuild." )]
                                        bool rebuild = false )
     {
@@ -77,7 +80,8 @@ public sealed partial class BuildPlugin
                                 workflow,
                                 rebuild,
                                 ci,
-                                publish: true );
+                                publish: true,
+                                keepBranch || ci );
     }
 
     async Task<bool> DoBuildFixAsync( IActivityMonitor monitor,
@@ -86,8 +90,10 @@ public sealed partial class BuildPlugin
                                       FixWorkflow? workflow,
                                       bool rebuild,
                                       bool isCIBuild,
-                                      bool publish )
+                                      bool publish,
+                                      bool keepBranch )
     {
+        Throw.DebugAssert( "!keepBranch => publishing non-CI builds", keepBranch || (publish && !isCIBuild) );
         if( workflow == null )
         {
             monitor.Error( $"No current Fix Workflow exist for world '{World.Name}'." );
@@ -128,7 +134,7 @@ public sealed partial class BuildPlugin
         {
             using( monitor.OpenTrace( $"Raising FixBuild event." ) )
             {
-                var e = new FixBuildEventArgs( monitor, workflow, isCIBuild, results, publish );
+                var e = new FixBuildEventArgs( monitor, workflow, isCIBuild, results, publish, keepBranch );
                 if( !await _onFixBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) )
                 {
                     return false;

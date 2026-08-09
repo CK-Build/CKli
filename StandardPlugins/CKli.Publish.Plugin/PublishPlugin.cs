@@ -40,11 +40,20 @@ public sealed class PublishPlugin : PrimaryPluginBase
         _build.OnFixBuild.Async += OnFixBuildAsync;
     }
 
-    async Task OnFixBuildAsync( IActivityMonitor monitor, FixBuildEventArgs e, CancellationToken cancel )
+    async Task OnFixBuildAsync( IActivityMonitor monitor, FixBuildEventArgs e, CancellationToken cancellation )
     {
         if( e.ShouldPublish )
         {
-            if( !await PublishAsync( monitor, World, _artifactHandler, _versionTag, e.BuildDate, e.FixWorkflow, e.IsCIBuild, e.Results, cancel ) )
+            if( !await PublishAsync( monitor,
+                                     World,
+                                     _artifactHandler,
+                                     _versionTag,
+                                     e.BuildDate,
+                                     e.FixWorkflow,
+                                     e.IsCIBuild,
+                                     e.KeepBranchOnSuccessfulPublish,
+                                     e.Results,
+                                     cancellation ) )
             {
                 e.SetFailed();
             }
@@ -57,11 +66,16 @@ public sealed class PublishPlugin : PrimaryPluginBase
                                               DateTime buildDate,
                                               FixWorkflow fixWorkflow,
                                               bool ciBuild,
+                                              bool keepBranchOnSuccessfulPublish,
                                               ImmutableArray<BuildResult> results,
                                               CancellationToken cancel )
         {
             // A fix is on the stable branch.
-            var packageSender = PackageSender.Create( monitor, prereleaseName: "", ciBuild: ciBuild, artifactHandler, world.StackRepository.SecretsStore );
+            var packageSender = PackageSender.Create( monitor,
+                                                      prereleaseName: "",
+                                                      ciBuild,
+                                                      artifactHandler,
+                                                      world.StackRepository.SecretsStore );
             if( packageSender == null ) return false;
 
             var state = new PublishState( world );
@@ -73,6 +87,23 @@ public sealed class PublishPlugin : PrimaryPluginBase
             {
                 if( !ciBuild )
                 {
+                    // Instead of complicating the SimplePublisher with this capability that makes sense
+                    // only for successful non-CI fix publish, we implement this here as a post-operation:
+                    // intermediate publications (halted on error) always keep the already pushed remote
+                    // branches. Only the very last successful fix publish applies this default behavior.
+                    if( !keepBranchOnSuccessfulPublish )
+                    {
+                        // We ignore any errors here (they are only logged).
+                        foreach( var p in newOne.Repos )
+                        {
+                            var r = p.Repo.GitRepository;
+                            var b = r.Repository.Branches[p.BranchName];
+                            if( b != null )
+                            {
+                                r.DeleteBranch( monitor, b, DeleteGitBranchMode.WithTrackedAndRemoteBranch );
+                            }
+                        }
+                    }
                     FixWorkflow.DeleteCurrent( monitor, world );
                 }
                 return true;
