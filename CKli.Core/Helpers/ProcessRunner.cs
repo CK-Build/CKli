@@ -48,7 +48,11 @@ public static class ProcessRunner
     /// <param name="stdOut">Optional standard output collector.</param>
     /// <param name="stdErr">Optional standard error collector.</param>
     /// <param name="noLog">True to log the standard output and error.</param>
-    /// <param name="cancellation">Optional cancellation cancel that <see cref="Process.Kill()"/> the process when signaled.</param>
+    /// <param name="cancellation">
+    /// Optional cancellation.
+    /// Currently not used as we wait for .Net 11 (see https://devblogs.microsoft.com/dotnet/process-api-improvements-in-dotnet-11/)
+    /// to use SINGINT/SINGTERM instead of brutal kill which is too dangerous.
+    /// </param>
     /// <returns>The exit status code or null if timeout or cancellation occurred.</returns>
     public static int? RunProcess( IActivityLineEmitter logger,
                                    string fileName,
@@ -133,7 +137,12 @@ public static class ProcessRunner
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
         }
-        using var stop = cancellation.CanBeCanceled ? cancellation.UnsafeRegister( p => ((Process)p!).Kill(), process ) : default;
+
+        //// Waiting for .Net 11.
+        //using var stop = cancellation.CanBeCanceled
+        //                    ? cancellation.UnsafeRegister( p => ((Process)p!).Kill(), process )
+        //                    : default;
+
         if( timeout > 0 )
         {
             bool exited = process.WaitForExit( timeout );

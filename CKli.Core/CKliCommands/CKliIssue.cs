@@ -33,6 +33,7 @@ public sealed class CKliIssue : Command
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The minimal context.</param>
     /// <param name="cmdLine">The command line.</param>
+    /// <param name="scopeAlive">Cancellation token from the current <see cref="InterruptibleScope"/>.</param>
     /// <returns>True on success, false on error.</returns>
     protected internal override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,

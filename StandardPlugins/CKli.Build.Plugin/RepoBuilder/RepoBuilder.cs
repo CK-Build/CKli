@@ -237,7 +237,6 @@ public class RepoBuilder : RepoInfo
     /// <param name="runTest">Whether tests should be run or not.</param>
     /// <param name="packOutputPath">Destination folder where the artifact files must be created.</param>
     /// <param name="cancellation">The cancellation token to consider.</param>
-    /// </summary>
     /// <returns>True on success, false otherwise.</returns>
     protected virtual bool DotNetBuildTestPack( IActivityMonitor monitor,
                                                 CommitBuildInfo buildInfo,
@@ -252,8 +251,8 @@ public class RepoBuilder : RepoInfo
                                buildInfo.FileVersion,
                                buildInfo.ReleaseConfiguration,
                                cancellation )
-               && (!runTest || DotNetTest( monitor, buildInfo.ReleaseConfiguration ))
-               && DotNetPack( monitor, buildInfo.Version, buildInfo.ReleaseConfiguration, packOutputPath );
+               && (!runTest || DotNetTest( monitor, buildInfo.ReleaseConfiguration, cancellation ))
+               && DotNetPack( monitor, buildInfo.Version, buildInfo.ReleaseConfiguration, packOutputPath, cancellation );
     }
 
     /// <summary>

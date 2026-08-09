@@ -124,7 +124,8 @@ public sealed partial class BuildPlugin
                                                                      (Commit)t.PeeledTarget,
                                                                      v,
                                                                      runTest: false,
-                                                                     forceRebuild: true );
+                                                                     forceRebuild: true,
+                                                                     cancellation );
                 if( buildResult == null)
                 {
                     return false;

@@ -74,7 +74,7 @@ sealed class CKliExec : Command
                 }
                 using( monitor.OpenTrace( $"Executing '{processName} {arguments}' in '{repo.DisplayPath}'." ) )
                 {
-                    var exitCode = ProcessRunner.RunProcess( monitor.ParallelLogger, processName, arguments, repo.WorkingFolder, null );
+                    var exitCode = ProcessRunner.RunProcess( monitor.ParallelLogger, processName, arguments, repo.WorkingFolder, null, cancellation: scopeAlive );
                     if( exitCode != 0 )
                     {
                         monitor.Error( $"'{processName}' failed in Repo '{repo.DisplayPath}' with exit code {exitCode}. Use 'ckli log' to see the logs." );

@@ -64,8 +64,9 @@ public sealed partial class World
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="context">The CKli environment.</param>
         /// <param name="world">The World.</param>
+        /// <param name="scopeAlive">Cancellation token from the current <see cref="InterruptibleScope"/>.</param>
         /// <returns>True on success, false on error.</returns>
-        internal protected abstract ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, System.Threading.CancellationToken scopeAlive );
+        internal protected abstract ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, CancellationToken scopeAlive );
 
         sealed class Manual : Issue
         {

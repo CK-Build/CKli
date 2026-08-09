@@ -22,7 +22,7 @@ namespace CKli.Core;
 ///         from any local path.
 ///     </item>
 ///     <item>
-///         Calling <see cref="Clone(IActivityMonitor, CKli.Core.CKliEnv, Uri, bool, bool, bool, string)"/>
+///         Calling <see cref="Clone(IActivityMonitor, CKli.Core.CKliEnv, Uri, bool, bool, bool, string, CancellationToken)"/>
 ///         from the remote Uri of the stack.
 ///     </item>
 /// </list>
@@ -537,6 +537,7 @@ public sealed partial class StackRepository : IDisposable
     /// Specifies a branch name.
     /// There should be no reason to use multiple branches in a stack repository.
     /// </param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The repository or null on error.</returns>
     public static StackRepository? Clone( IActivityMonitor monitor,
                                           CKliEnv context,
@@ -655,6 +656,7 @@ public sealed partial class StackRepository : IDisposable
                 SetupNewLocalDirectory( gitPath );
                 Registry.RegisterNewStack( monitor, gitPath, url );
                 var result = new StackRepository( git, stackRoot, context, stackNameFromUrl );
+                // Now we can clone the world's repositories.
                 if( CloneWorld( monitor, result, result.DefaultWorldName ) )
                 {
                     return result;
@@ -678,6 +680,7 @@ public sealed partial class StackRepository : IDisposable
     /// True to allow a stack to be created in an existing one.
     /// This should be avoided (but is required in the tests of Stack plugins).
     /// </param>
+    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The repository or null on error.</returns>
     public static async Task<StackRepository?> CreateAsync( IActivityMonitor monitor,
                                                             CKliEnv context,

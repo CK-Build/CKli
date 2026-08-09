@@ -267,7 +267,8 @@ public sealed partial class BuildPlugin
                                            target.Repo.GitRepository.Repository.Head.Tip,
                                            targetVersion.SetParsedPrefix( "local/" ),
                                            runTest,
-                                           forceRebuild: rebuild ).ConfigureAwait( false );
+                                           forceRebuild: rebuild,
+                                           PrimaryPluginContext.Cancellation ).ConfigureAwait( false );
         if( result == null )
         {
             return false;

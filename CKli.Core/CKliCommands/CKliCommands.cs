@@ -109,7 +109,6 @@ public static class CKliCommands
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">The minimal context.</param>
     /// <param name="cmdLine">The command line to handle.</param>
-    /// <param name="cancellation">Cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
     public static ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                       CKliEnv context,

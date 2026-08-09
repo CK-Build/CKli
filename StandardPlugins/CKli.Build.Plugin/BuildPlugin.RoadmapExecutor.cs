@@ -22,6 +22,7 @@ public sealed partial class BuildPlugin
         readonly Channel<object> _channel;
         readonly CKliEnv _context;
         readonly int _maxDoP;
+        readonly CancellationToken _cancellation;
         readonly bool? _runTest;
         readonly bool _singleBuild;
 
@@ -29,7 +30,8 @@ public sealed partial class BuildPlugin
                                 CKliEnv context,
                                 Roadmap roadmap,
                                 bool? runTest,
-                                int maxDoP )
+                                int maxDoP,
+                                CancellationToken cancellation )
         {
             Throw.DebugAssert( maxDoP >= 1 );
             Throw.DebugAssert( roadmap.SolutionBuildCount >= 1 );
@@ -37,6 +39,7 @@ public sealed partial class BuildPlugin
             _singleBuild = roadmap.SolutionBuildCount == 1;
             _runTest = runTest;
             _maxDoP = maxDoP;
+            _cancellation = cancellation;
             _buildPlugin = buildPlugin;
             _context = context;
             _channel = Channel.CreateUnbounded<object>( new UnboundedChannelOptions() { SingleReader = true } );
@@ -47,17 +50,16 @@ public sealed partial class BuildPlugin
         /// or parallel build with <see cref="RunLoopAsync"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="cancellation">Cancellation token.</param>
         /// <returns>The array of build result on success or null on error.</returns>
-        internal async Task<BuildResult[]?> BuildAsync( IActivityMonitor monitor, CancellationToken cancellation )
+        internal async Task<BuildResult[]?> BuildAsync( IActivityMonitor monitor )
         {
             Throw.DebugAssert( _roadmap.SolutionBuildCount > 0 );
-            if( cancellation.IsCancellationRequested ) return null;
+            if( _cancellation.IsCancellationRequested ) return null;
             if( _singleBuild )
             {
                 var s = _roadmap.OrderedSolutions.Single( s => s.MustBuild );
                 Throw.DebugAssert( s.BuildInfo != null && !s.BuildInfo.DirectRequirements.Any( s => s.MustBuild ) );
-                var r = await DoBuildAsync( monitor, s.BuildInfo, cancellation );
+                var r = await DoBuildAsync( monitor, s.BuildInfo );
                 return r != null
                         ? s.BuildInfo.SetSingleBuildResult( r )
                         : null;
@@ -224,9 +226,9 @@ public sealed partial class BuildPlugin
         // This doesn't catch exception. When called with a true _singleBuild, this is a unhandled
         // command exception handled at the root level.
         // When called in parallel, it is the BuildAsync wrapper above that handles it.
-        async Task<BuildResult?> DoBuildAsync( IActivityMonitor monitor, Roadmap.BuildInfo build, CancellationToken cancellation )
+        async Task<BuildResult?> DoBuildAsync( IActivityMonitor monitor, Roadmap.BuildInfo build )
         {
-            if( cancellation.IsCancellationRequested ) return null;
+            if( _cancellation.IsCancellationRequested ) return null;
 
             // EnsureAndCheckoutBranch and UpdateDependenciesAndCommit only interact with their own Repo:
             // parallel builds don't need synchronization for these.
@@ -237,7 +239,7 @@ public sealed partial class BuildPlugin
                 return null;
             }
 
-            if( cancellation.IsCancellationRequested ) return null;
+            if( _cancellation.IsCancellationRequested ) return null;
 
             // This works on the working folder. (On success, UpdateDependenciesAndCommit refreshes our HotBranch). 
             var commit = UpdateDependenciesAndCommit( monitor, build, _roadmap.PackageMapping, canAmend );
@@ -246,7 +248,7 @@ public sealed partial class BuildPlugin
                 return null;
             }
 
-            if( cancellation.IsCancellationRequested ) return null;
+            if( _cancellation.IsCancellationRequested ) return null;
 
             // CoreBuildAsync interacts with the ArtifactHandlerPlugin that is mainly a proxy of the file system (the $Local NuGet and Assets folders).
             var result = await _buildPlugin.CoreBuildAsync( monitor,
@@ -256,7 +258,7 @@ public sealed partial class BuildPlugin
                                                             build.TargetVersion,
                                                             _runTest,
                                                             forceRebuild: !build.TargetVersion.IsCI,
-                                                            cancellation ).ConfigureAwait( false );
+                                                            _cancellation ).ConfigureAwait( false );
             Throw.DebugAssert( result == null || result.Content.Produced.All( p => _roadmap.PackageMapping.GetMappedVersion( p, build.Solution.CurrentVersion ) == result.Version ) );
             // On error, we ensure that we let the repository on the "dev/" branch (this applies to non CI
             // build - in CI build we already are on the "dev/" branch).

@@ -226,8 +226,8 @@ public sealed partial class Roadmap
                 return Task.FromResult( (BuildResult[]?)null );
             }
         }
-        var builder = new BuildPlugin.RoadmapExecutor( buildPlugin, context, this, runTest, maxDop );
-        return builder.BuildAsync( monitor, cancellation );
+        var builder = new BuildPlugin.RoadmapExecutor( buildPlugin, context, this, runTest, maxDop, cancellation );
+        return builder.BuildAsync( monitor );
     }
 
     internal struct RStats( int repositoryCount,
