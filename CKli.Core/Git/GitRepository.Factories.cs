@@ -4,6 +4,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core;
@@ -32,7 +33,7 @@ public sealed partial class GitRepository
                                         NormalizedPath workingFolder,
                                         NormalizedPath displayPath )
     {
-        var r = CloneWorkingFolder( monitor, git, workingFolder );
+        var r = CloneWorkingFolder( monitor, git, workingFolder, default );
         return r == null ? null : new GitRepository( git, committer, r, workingFolder, displayPath );
     }
 
@@ -204,10 +205,12 @@ public sealed partial class GitRepository
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="git">The Git key.</param>
     /// <param name="workingFolder">The local working folder.</param>
+    /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>The LibGit2Sharp Repository object or null on error.</returns>
     public static Repository? CloneWorkingFolder( IActivityMonitor monitor,
                                                   GitRepositoryKey git,
-                                                  NormalizedPath workingFolder )
+                                                  NormalizedPath workingFolder,
+                                                  CancellationToken cancellation )
     {
         using( monitor.OpenInfo( $"Cloning '{workingFolder}' from '{git.OriginUrl}'." ) )
         {
@@ -217,7 +220,13 @@ public sealed partial class GitRepository
             {
                 Repository.Clone( git.OriginUrl.AbsoluteUri, workingFolder, new CloneOptions()
                 {
-                    FetchOptions = { CredentialsProvider = ( url, user, cred ) => creds },
+                    FetchOptions =
+                    {
+                        CredentialsProvider = ( url, user, cred ) => creds,
+                        OnProgress = _ => !cancellation.IsCancellationRequested,
+                        OnTransferProgress = _ => !cancellation.IsCancellationRequested,
+                        OnUpdateTips = (_,_,_) => !cancellation.IsCancellationRequested,
+                    },
                     Checkout = true
                 } );
                 r = new Repository( workingFolder );

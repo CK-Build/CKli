@@ -692,25 +692,36 @@ public sealed partial class StackRepository : IDisposable
             if( definitionFile == null ) return false;
             var layout = definitionFile.ReadLayout( monitor );
             if( layout == null ) return false;
-            bool success = true;
             using( monitor.OpenInfo( $"Cloning {layout.Count} repositories in {stack.StackRoot}." ) )
             {
-                foreach( var (url, _, subPath) in layout )
+                // Full parallelism...
+                var results = await Task.WhenAll( layout.Select( r => Task.Run( () => DoClone( r.Url, r.Path, stack, world, cancellation ) ) ).ToArray() );
+                return results.All( Util.FuncIdentity );
+            }
+
+            static bool DoClone( Uri url, NormalizedPath subPath, StackRepository stack, LocalWorldName world, CancellationToken cancellation )
+            {
+                // TODO: use a pool of ActivityMonitor?
+                var monitor = new ActivityMonitor();
+                if( cancellation.IsCancellationRequested )
                 {
-                    if( cancellation.IsCancellationRequested )
+                    return false;
+                }
+                // This never throws.
+                using( var r = GitRepository.CloneWorkingFolder( monitor,
+                                                                 new GitRepositoryKey( stack.SecretsStore, url, stack.IsPublic ),
+                                                                 world.WorldRoot.Combine( subPath ),
+                                                                 default ) )
+                {
+                    if( r != null )
                     {
-                        success = false;
-                        break;
+                        monitor.MonitorEnd( $"Done '{subPath}'." );
+                        return true;
                     }
-                    using( var r = GitRepository.CloneWorkingFolder( monitor,
-                                                                     new GitRepositoryKey( stack.SecretsStore, url, stack.IsPublic ),
-                                                                     world.WorldRoot.Combine( subPath ) ) )
-                    {
-                        success &= r != null;
-                    }
+                    monitor.MonitorEnd( $"Failed to clone '{subPath}' from '{url}'." );
+                    return false;
                 }
             }
-            return success;
         }
     }
 
