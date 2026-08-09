@@ -205,7 +205,10 @@ public sealed partial class GitRepository
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="git">The Git key.</param>
     /// <param name="workingFolder">The local working folder.</param>
-    /// <param name="cancellation">Optional cancellation token.</param>
+    /// <param name="cancellation">
+    /// Optional cancellation token.
+    /// This is currently ignored as this doesn't seem to work as intended.
+    /// </param>
     /// <returns>The LibGit2Sharp Repository object or null on error.</returns>
     public static Repository? CloneWorkingFolder( IActivityMonitor monitor,
                                                   GitRepositoryKey git,
@@ -223,9 +226,9 @@ public sealed partial class GitRepository
                     FetchOptions =
                     {
                         CredentialsProvider = ( url, user, cred ) => creds,
-                        OnProgress = _ => !cancellation.IsCancellationRequested,
-                        OnTransferProgress = _ => !cancellation.IsCancellationRequested,
-                        OnUpdateTips = (_,_,_) => !cancellation.IsCancellationRequested,
+                        //OnProgress = _ => !cancellation.IsCancellationRequested,
+                        //OnTransferProgress = _ => !cancellation.IsCancellationRequested,
+                        //OnUpdateTips = (_,_,_) => !cancellation.IsCancellationRequested,
                     },
                     Checkout = true
                 } );

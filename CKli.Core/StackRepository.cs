@@ -711,7 +711,7 @@ public sealed partial class StackRepository : IDisposable
                 using( var r = GitRepository.CloneWorkingFolder( monitor,
                                                                  new GitRepositoryKey( stack.SecretsStore, url, stack.IsPublic ),
                                                                  world.WorldRoot.Combine( subPath ),
-                                                                 default ) )
+                                                                 cancellation ) )
                 {
                     if( r != null )
                     {

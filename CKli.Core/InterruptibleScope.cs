@@ -12,7 +12,6 @@ namespace CKli.Core;
 /// <para>
 /// Once a SIGTERM is received, no more InterruptibleScope can be created.
 /// </para>
-/// If a SIGINT is received when no InterruptibleScope exists, it is considered a SIGTERM.
 /// </summary>
 public sealed class InterruptibleScope : IDisposable
 {
@@ -52,7 +51,7 @@ public sealed class InterruptibleScope : IDisposable
     {
         context.Cancel = true;
         ActivityMonitor.StaticLogger.Info( "Received SIGINT signal." );
-        CancellationTokenSource toSignal;
+        CancellationTokenSource? toSignal = null;
         lock( _lock )
         {
             if( _top != null )
@@ -60,9 +59,8 @@ public sealed class InterruptibleScope : IDisposable
                 toSignal = _top._cancel;
                 _top = _top._prev;
             }
-            else toSignal = _termination;
         }
-        toSignal.Cancel();
+        toSignal?.Cancel();
     }
 
     /// <summary>

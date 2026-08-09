@@ -158,10 +158,15 @@ public static class CKliCommands
         }
         // Not a CKli command. Opens the current World and tries to find a plugin command.
         var (stack, world) = StackRepository.TryOpenWorldFromPath( monitor, context, out bool error, skipPullStack: true );
-        if( error || interruptibleScope.Alive.IsCancellationRequested )
+        if( error )
         {
             // Don't enter interactive mode on error here.
-            Throw.DebugAssert( stack == null && world == null );
+            Throw.DebugAssert( (stack == null && world == null) );
+            return ValueTask.FromResult( false );
+        }
+        if( interruptibleScope.Alive.IsCancellationRequested )
+        {
+            stack?.Dispose();
             return ValueTask.FromResult( false );
         }
         // No current World (not in a Stack directory): we can only display help on the CKli commands.
