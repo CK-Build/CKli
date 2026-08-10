@@ -123,9 +123,12 @@ public class RepoBuilder : RepoInfo
 
         try
         {
-
-            if( await _repositoryBuilder.RaiseOnCoreBuildAsync( monitor, buildInfo, cancellation ).ConfigureAwait( false )
-                && DotNetBuildTestPack( monitor, buildInfo, runTest, outputPath, cancellation )
+            var (success, result) = await _repositoryBuilder.RaiseOnCoreBuildAsync( monitor, buildInfo, outputPath, runTest, cancellation ).ConfigureAwait( false );
+            if( !success || result != null )
+            {
+                return result;
+            }
+            if( DotNetBuildTestPack( monitor, buildInfo, runTest, outputPath, cancellation )
                 && !cancellation.IsCancellationRequested
                 && BuildResult.GetConsumedPackages( monitor, Repo, buildInfo.ToString(), out var consumedPackages ) )
             {
@@ -167,7 +170,8 @@ public class RepoBuilder : RepoInfo
         finally
         {
             if( outputPath != null ) FileHelper.DeleteFolder( monitor, outputPath );
-            // If reset has not been done (build failed), do it.
+            // If reset has not been done (build failed or hooked BuildResult on which we ave no control),
+            // do it.
             if( !resetHardDone )
             {
                 Repo.GitRepository.ResetHard( monitor, out var _ );

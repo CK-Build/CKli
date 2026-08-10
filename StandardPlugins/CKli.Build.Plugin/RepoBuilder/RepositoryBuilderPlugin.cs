@@ -51,8 +51,13 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
         return new RepoBuilder( repo, this, _artifactHandler, _artifactHandler.Get( monitor, repo ) );
     }
 
-    internal async Task<bool> RaiseOnCoreBuildAsync( IActivityMonitor monitor, CommitBuildInfo buildInfo, CancellationToken cancellation )
+    internal async Task<(bool,BuildResult?)> RaiseOnCoreBuildAsync( IActivityMonitor monitor,
+                                                                    CommitBuildInfo buildInfo,
+                                                                    string outputPath,
+                                                                    bool runTest,
+                                                                    CancellationToken cancellation )
     {
+        CoreBuildEventArgs? e = null;
         if( _onCoreBuild.HasHandlers )
         {
             using( monitor.OpenInfo( "Raising CoreBuild event." ) )
@@ -60,12 +65,12 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
                 bool eventError = false;
                 using( monitor.OnError( () => eventError = true ) )
                 {
-                    var e = new CoreBuildEventArgs( monitor, buildInfo, cancellation );
+                    e = new CoreBuildEventArgs( monitor, buildInfo, outputPath, runTest, cancellation );
                     if( !await _onCoreBuild.SafeRaiseAsync( monitor, e, cancellation ).ConfigureAwait( false )
                         || eventError )
                     {
                         monitor.CloseGroup( $"OnCoreBuild event handling failed." );
-                        return false;
+                        return (false, null);
                     }
                 }
             }
@@ -74,6 +79,6 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
         {
             monitor.Info( $"No listener to the CoreBuild event." );
         }
-        return true;
+        return (true, e?.ResultHook);
     }
 }
