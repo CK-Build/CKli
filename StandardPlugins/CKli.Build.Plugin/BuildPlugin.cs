@@ -39,6 +39,28 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     readonly PerfectEventSender<RoadmapBuildEventArgs> _onRoadmapBuild;
     readonly PerfectEventSender<FixBuildEventArgs> _onFixBuild;
 
+    static BuilderFunction _builderFunction = RealBuildAsync;
+
+    /// <summary>
+    /// Sets the builder function that will be used by this plugin.
+    /// <para>
+    /// This is mainly for tests, to inject a fake builder (when possible).
+    /// </para>
+    /// <para>
+    /// Note that the "real", default builder function simply checks out the build commit before
+    /// calling <see cref="RepoBuilder.BuildAsync(IActivityMonitor, CKliEnv, CommitBuildInfo, bool, CancellationToken)"/>
+    /// and restores the repository's working folder to where it was before the build.
+    /// </para>
+    /// </summary>
+    /// <param name="builder">The function or null to use the default implementation.</param>
+    /// <returns>The previous builder. Can be used to chain the calls up to the "real", default builder function.</returns>
+    public static BuilderFunction SetBuilderFunction( BuilderFunction? builder )
+    {
+        var previous = _builderFunction;
+        _builderFunction = builder ?? RealBuildAsync;
+        return previous;
+    }
+
     /// <summary>
     /// Initializes a new BuildPlugin.
     /// </summary>
@@ -501,65 +523,65 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return null;
         }
-        return await RealBuildAsync( monitor, context, versionInfo, buildCommit, runTest.Value, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
-
-        static async Task<BuildResult?> RealBuildAsync( IActivityMonitor monitor,
-                                                        CKliEnv context,
-                                                        VersionTagInfo versionInfo,
-                                                        Commit buildCommit,
-                                                        bool runTest,
-                                                        RepoBuilder repoBuilder,
-                                                        CommitBuildInfo buildInfo,
-                                                        CancellationToken cancellation )
-        {
-            using var gLog = monitor.OpenTrace( $"Core build for '{buildInfo}'." );
-
-            if( cancellation.IsCancellationRequested ) return null;
-
-            //
-            // We ensure that the working folder is checked out on the buildCommit content tree.
-            // We restore the current branch once we are done.
-            // Note that the Branch Head may be a DetachedHead (internal LibGit2Sharp specialization of a Branch) but
-            // we don't care: we restore the current state.
-            //
-            var git = versionInfo.Repo.GitRepository;
-            Branch currentHead = git.Repository.Head;
-            bool mustCheckOut = currentHead.Tip.Tree.Sha != buildCommit.Tree.Sha;
-            if( mustCheckOut )
-            {
-                monitor.Trace( $"Current working folder content is not the same as the commit '{buildCommit.Sha}' to build. Checking out a detached head." );
-                if( !git.Checkout( monitor, buildCommit ) )
-                {
-                    return null;
-                }
-            }
-            else
-            {
-                if( !git.CheckCleanCommit( monitor ) )
-                {
-                    return null;
-                }
-            }
-            BuildResult? result = null;
-            try
-            {
-                result = await repoBuilder.BuildAsync( monitor,
-                                                       context,
-                                                       buildInfo,
-                                                       runTest,
-                                                       cancellation ).ConfigureAwait( false );
-            }
-            catch( Exception ex )
-            {
-                monitor.Error( $"Build failed for '{versionInfo.Repo.DisplayPath}' on commit '{buildCommit.Sha}'.", ex );
-            }
-            if( mustCheckOut )
-            {
-                monitor.Trace( "Restoring working folder to its previous head." );
-                git.Checkout( monitor, currentHead, deleteIgnored: true );
-            }
-            return result;
-        }
-
+        return await _builderFunction( monitor, context, versionInfo, buildCommit, runTest.Value, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
     }
+
+    static async Task<BuildResult?> RealBuildAsync( IActivityMonitor monitor,
+                                                    CKliEnv context,
+                                                    VersionTagInfo versionInfo,
+                                                    Commit buildCommit,
+                                                    bool runTest,
+                                                    RepoBuilder repoBuilder,
+                                                    CommitBuildInfo buildInfo,
+                                                    CancellationToken cancellation )
+    {
+        using var gLog = monitor.OpenTrace( $"Core build for '{buildInfo}'." );
+
+        if( cancellation.IsCancellationRequested ) return null;
+
+        //
+        // We ensure that the working folder is checked out on the buildCommit content tree.
+        // We restore the current branch once we are done.
+        // Note that the Branch Head may be a DetachedHead (internal LibGit2Sharp specialization of a Branch) but
+        // we don't care: we restore the current state.
+        //
+        var git = versionInfo.Repo.GitRepository;
+        Branch currentHead = git.Repository.Head;
+        bool mustCheckOut = currentHead.Tip.Tree.Sha != buildCommit.Tree.Sha;
+        if( mustCheckOut )
+        {
+            monitor.Trace( $"Current working folder content is not the same as the commit '{buildCommit.Sha}' to build. Checking out a detached head." );
+            if( !git.Checkout( monitor, buildCommit ) )
+            {
+                return null;
+            }
+        }
+        else
+        {
+            if( !git.CheckCleanCommit( monitor ) )
+            {
+                return null;
+            }
+        }
+        BuildResult? result = null;
+        try
+        {
+            result = await repoBuilder.BuildAsync( monitor,
+                                                    context,
+                                                    buildInfo,
+                                                    runTest,
+                                                    cancellation ).ConfigureAwait( false );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"Build failed for '{versionInfo.Repo.DisplayPath}' on commit '{buildCommit.Sha}'.", ex );
+        }
+        if( mustCheckOut )
+        {
+            monitor.Trace( "Restoring working folder to its previous head." );
+            git.Checkout( monitor, currentHead, deleteIgnored: true );
+        }
+        return result;
+    }
+
 }
