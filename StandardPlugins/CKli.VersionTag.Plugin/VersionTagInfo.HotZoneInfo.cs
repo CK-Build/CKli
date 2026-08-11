@@ -41,15 +41,14 @@ public sealed partial class VersionTagInfo
                 if( lastStable.IsOrHasFakeVersion )
                 {
                     Throw.DebugAssert( (lastStable.IsFakeVersion && !lastStable.IsLocal) || (lastStable.FakeVersion != null && lastStable.IsLocal) );
-                    if( topHot.Version > lastStable.Version )
+                    var fake = lastStable.FakeVersion?.Version ?? lastStable.Version; 
+                    if( !fake.IsStableRoughBaseOf( topHot.Version ) )
                     {
-                        var fake = lastStable.FakeVersion?.Version ?? lastStable.Version; 
                         message = $"""
-                              The greatest version tag '{topHot.Version.ParsedText}' cannot be greater or equal to 'v{fake.Major}.{fake.Minor}.{fake.Patch}' because the current stable version is '{fake.ParsedText}'.
+                              The greatest version tag '{topHot.Version.ParsedText}' is invalid because the current stable version is '{fake.ParsedText}'.
                               This should be fixed manually.
                               """;
                     }
-
                 }
                 else
                 {
