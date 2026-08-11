@@ -51,7 +51,7 @@ public sealed partial class ContentIssueEvent : EventMonitoredArgs
     /// <summary>
     /// Gets the content of the <see cref="Branch"/> from <see cref="GitContentBranch"/>.
     /// </summary>
-    public INormalizedFileProvider Content => _content ??= _shallowSolution.GetFiles( GitContentBranch.Tip );
+    public INormalizedFileProvider Content => _content ??= _shallowSolution.GetFiles( GitContentBranch.Tip, useWorkingFolder: false );
 
     /// <summary>
     /// Gets the <see cref="GitSolution"/> from the <see cref="GitContentBranch"/> if the ".slnx" exists
@@ -69,7 +69,7 @@ public sealed partial class ContentIssueEvent : EventMonitoredArgs
         if( _gitSolutionResolved is null )
         {
             // If an error occurs while 
-            if( _shallowSolution.TryGetShallowSolution( monitor, Repo, GitContentBranch, out _gitSolution ) )
+            if( _shallowSolution.TryGetShallowSolution( monitor, Repo, GitContentBranch, useWorkingFolder: false, out _gitSolution ) )
             {
                 _gitSolutionResolved = true;
                 if( _gitSolution == null )

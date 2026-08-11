@@ -27,7 +27,7 @@ sealed class CheckedOutFileProvider : INormalizedFileProvider
         // must be the store one (not the requested one).
         var fullPath = _p.Root + sub.Path;
         if( !File.Exists( fullPath ) ) return null;
-        // The file exists but to get its exact case, we need to
+        // The file exists but to get its exact case, we need to...
         var dir = Path.GetDirectoryName( fullPath );
         var exact = Directory.GetFileSystemEntries( dir!, sub.LastPart )[0];
         // Reuse the PhysicalFileInfo class here... even with its rather useless

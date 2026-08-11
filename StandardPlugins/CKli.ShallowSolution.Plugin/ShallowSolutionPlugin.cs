@@ -15,6 +15,7 @@ namespace CKli.ShallowSolution.Plugin;
 /// </summary>
 public sealed class ShallowSolutionPlugin : PrimaryPluginBase
 {
+    // Indexed by Tree.Sha.
     readonly Dictionary<string, TreeFolder> _gitContents;
 
     /// <summary>
@@ -31,16 +32,17 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
     /// Gets the content of the commit as a <see cref="INormalizedFileProvider"/> that can be
     /// the physical file system if the commit is the head of the repository.
     /// <para>
-    /// There is no cache and no tracking: when <paramref name="useWorkingFolder"/> is true (the default),
+    /// There is no cache and no tracking when <paramref name="useWorkingFolder"/> is true:
     /// if another commit is checked out, the content must not be used anymore or kittens will die.
     /// </para>
     /// </summary>
     /// <param name="commit">The commit for which content must be returned.</param>
     /// <param name="useWorkingFolder">
+    /// True to use the file system if the commit is checked out.
     /// False to always use the committed content and ignores the current file system.
     /// </param>
     /// <returns>The commit content.</returns>
-    public INormalizedFileProvider GetFiles( Commit commit, bool useWorkingFolder = true )
+    public INormalizedFileProvider GetFiles( Commit commit, bool useWorkingFolder )
     {
         var repo = ((IBelongToARepository)commit).Repository;
         return useWorkingFolder && commit.Sha == repo.Head.Tip.Sha
@@ -64,16 +66,51 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
     }
 
     /// <summary>
-    /// Same as <see cref="GetShallowSolution(IActivityMonitor, Repo, Branch)"/> except that the ".slnx" file may not exist.
+    /// Creates a <see cref="GitSolutionContent"/> from a root ".slnx" file that must be conventionally named
+    /// with the current repository name.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="repo">The repository.</param>
+    /// <param name="commit">The commit from which the solution must be read.</param>
+    /// <param name="useWorkingFolder">
+    /// True to use the file system if the branch is checked out.
+    /// False to always use the committed content and ignores the current file system.
+    /// </param>
+    /// <returns>The solution content or null on error.</returns>
+    public GitSolutionContent? GetRequiredContent( IActivityMonitor monitor, Repo repo, Commit commit, bool useWorkingFolder )
+    {
+        try
+        {
+            var (files, fileName, doc) = GetSolutionXDocument( repo, commit, useWorkingFolder );
+            if( doc == null )
+            {
+                monitor.Error( $"Solution '{fileName}' must exist in '{repo.DisplayPath}', commit '{commit.Sha.AsSpan(0,7)} {commit.MessageShort}'." );
+                return null;
+            }
+            return GitSolutionContent.Create( monitor, files, doc );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While loading '{repo.DisplayPath}' solution from commit '{commit.Sha.AsSpan( 0, 7 )} {commit.MessageShort}'.", ex );
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Same as <see cref="GetShallowSolution(IActivityMonitor, Repo, Branch, bool)"/> except that the ".slnx" file may not exist.
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="repo">The repository.</param>
     /// <param name="branch">The branch from which the solution must be read.</param>
+    /// <param name="useWorkingFolder">
+    /// True to use the file system if the branch is checked out.
+    /// False to always use the committed content and ignores the current file system.
+    /// </param>
     /// <param name="solution">Outputs the loaded solution if the ".slnx" file exists and no error occurred.</param>
     /// <returns>True on success (the <paramref name="solution"/> may be null), false on error.</returns>
-    public bool TryGetShallowSolution( IActivityMonitor monitor, Repo repo, Branch branch, out GitSolution? solution )
+    public bool TryGetShallowSolution( IActivityMonitor monitor, Repo repo, Branch branch, bool useWorkingFolder, out GitSolution? solution )
     {
-        var (files, doc) = GetSolutionXDocument( monitor, repo, branch, required: false );
+        var (files, doc) = GetSolutionXDocument( monitor, repo, branch, required: false, useWorkingFolder );
         if( doc == null )
         {
             solution = null;
@@ -82,7 +119,7 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
         using( monitor.OpenInfo( $"Loading shallow solution from '{repo.DisplayPath}' branch '{branch.FriendlyName}'." ) )
         {
             Throw.DebugAssert( files != null );
-            solution = DoLoadSolution( monitor, repo, branch, files, doc );
+            solution = GitSolution.Create( monitor, repo, branch, files, doc );
             return solution != null;
         }
     }
@@ -95,64 +132,67 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
     /// <param name="monitor">The monitor.</param>
     /// <param name="repo">The repository.</param>
     /// <param name="branch">The branch from which the solution must be read.</param>
+    /// <param name="useWorkingFolder">
+    /// True to use the file system if the branch is checked out.
+    /// False to always use the committed content and ignores the current file system.
+    /// </param>
     /// <returns>The solution or null on error.</returns>
-    public GitSolution? GetShallowSolution( IActivityMonitor monitor, Repo repo, Branch branch )
+    public GitSolution? GetShallowSolution( IActivityMonitor monitor, Repo repo, Branch branch, bool useWorkingFolder )
     {
         Throw.CheckArgument( !branch.IsRemote );
         using( monitor.OpenInfo( $"Loading shallow solution from '{repo.DisplayPath}' branch '{branch.FriendlyName}'." ) )
         {
-            var (files, doc) = GetSolutionXDocument( monitor, repo, branch, required: true );
+            var (files, doc) = GetSolutionXDocument( monitor, repo, branch, required: true, useWorkingFolder );
             if( doc == null )
             {
                 return null;
             }
             Throw.DebugAssert( files != null );
-            return DoLoadSolution( monitor, repo, branch, files, doc );
+            return GitSolution.Create( monitor, repo, branch, files, doc );
         }
     }
 
-    static GitSolution? DoLoadSolution( IActivityMonitor monitor, Repo repo, Branch branch, INormalizedFileProvider files, XDocument doc )
+    (INormalizedFileProvider? Files, XDocument? Doc) GetSolutionXDocument( IActivityMonitor monitor,
+                                                                           Repo repo,
+                                                                           Branch branch,
+                                                                           bool required,
+                                                                           bool useWorkingFolder )
     {
-        var s = new GitSolution( repo, branch );
-        if( !CommonSolution.LoadAllProjectFiles( monitor,
-                                                 files,
-                                                 doc.Root!,
-                                                 LoadOptions.PreserveWhitespace,
-                                                 s.AddProjectFile ) )
-        {
-            return null;
-        }
-        return s;
-    }
-
-    (INormalizedFileProvider?, XDocument?) GetSolutionXDocument( IActivityMonitor monitor, Repo repo, Branch branch, bool required )
-    {
-        var gitFromBranch = ((IBelongToARepository)branch).Repository;
-        Throw.CheckArgument( repo.GitRepository.Repository == gitFromBranch );
-        var root = GetFiles( branch.Tip );
-        var expectedName = repo.DisplayPath.LastPart + ".slnx";
-
-        var solutionInfo = root.GetFileInfo( expectedName );
-        if( solutionInfo == null )
-        {
-            if( required )
-            {
-                monitor.Error( $"Expecting file '{expectedName}' in '{repo.DisplayPath}', branch '{branch.FriendlyName}'." );
-            }
-            return (root, null);
-        }
         try
         {
-            using var stream = solutionInfo.CreateReadStream();
-            var doc = XDocument.Load( stream, LoadOptions.PreserveWhitespace );
-            Throw.CheckData( "A .slnx file must contain a <Solution> root element.", doc.Root?.Name.LocalName == "Solution" );
-            return (root, doc);
+            var (files, fileName, doc) = GetSolutionXDocument( repo, branch.Tip, useWorkingFolder );
+            if( doc == null && required )
+            {
+                monitor.Error( $"Expecting file '{fileName}' in '{repo.DisplayPath}', branch '{branch.FriendlyName}'." );
+            }
+            return (files, doc);
         }
         catch( Exception ex )
         {
-            monitor.Error( $"While loading '{repo.DisplayPath}/{expectedName}' solution in branch '{branch.FriendlyName}'.", ex );
+            monitor.Error( $"While loading '{repo.DisplayPath}' solution from branch '{branch.FriendlyName}'.", ex );
             return (null, null);
         }
+    }
+
+
+    (INormalizedFileProvider Files, string FileName, XDocument? Doc) GetSolutionXDocument( Repo repo,
+                                                                                           Commit commit,
+                                                                                           bool useWorkingFolder )
+    {
+        var gitFromCommit = ((IBelongToARepository)commit).Repository;
+        Throw.CheckArgument( repo.GitRepository.Repository == gitFromCommit );
+        var root = GetFiles( commit, useWorkingFolder );
+        var fileName = repo.DisplayPath.LastPart + ".slnx";
+
+        var solutionInfo = root.GetFileInfo( fileName );
+        if( solutionInfo == null )
+        {
+            return (root, fileName, null);
+        }
+        using var stream = solutionInfo.CreateReadStream();
+        var doc = XDocument.Load( stream, LoadOptions.PreserveWhitespace );
+        Throw.CheckData( "A .slnx file must contain a <Solution> root element.", doc.Root?.Name.LocalName == "Solution" );
+        return (root, fileName, doc);
     }
 
     /// <summary>

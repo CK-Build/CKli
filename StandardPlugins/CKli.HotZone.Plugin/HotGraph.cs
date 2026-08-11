@@ -185,7 +185,7 @@ public sealed partial class HotGraph
                 var devBranch = s.Branch.GitDevBranch;
                 if( devBranch != null )
                 {
-                    var newSolution = _shallowSolution.GetShallowSolution( monitor, s.Repo, devBranch );
+                    var newSolution = _shallowSolution.GetShallowSolution( monitor, s.Repo, devBranch, useWorkingFolder: false );
                     if( newSolution == null )
                     {
                         success = false;
@@ -221,15 +221,18 @@ public sealed partial class HotGraph
         Throw.DebugAssert( closestBranch.GitBranch != null );
         Throw.DebugAssert( "isDevSolution => We are on the theoretical graph branch.", !isDevSolution || closestBranch.BranchName == _branchName );
 
-        // Read the .slnx from the "dev/" or the regular branch. 
-        var shallow = _shallowSolution.GetShallowSolution( monitor, repo, (isDevSolution ? closestBranch.GitDevBranch : null) ?? closestBranch.GitBranch );
+        // Read the .slnx from the "dev/" or the regular branch.
+        var shallow = _shallowSolution.GetShallowSolution( monitor,
+                                                           repo,
+                                                           (isDevSolution ? closestBranch.GitDevBranch : null) ?? closestBranch.GitBranch,
+                                                           useWorkingFolder: false );
         if( shallow == null )
         {
             // Unable to read the solution from the initial branch. But we can save the situation if
             // the branch was the regular one: the "dev/" may contain a valid solution.
             if( !isDevSolution && closestBranch.GitDevBranch != null )
             {
-                shallow = _shallowSolution.GetShallowSolution( monitor, repo, closestBranch.GitDevBranch );
+                shallow = _shallowSolution.GetShallowSolution( monitor, repo, closestBranch.GitDevBranch, useWorkingFolder: false );
             }
             if( shallow == null )
             {
