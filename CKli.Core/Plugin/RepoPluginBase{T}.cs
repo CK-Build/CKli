@@ -1,4 +1,5 @@
 using CK.Core;
+using System;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 
@@ -14,7 +15,7 @@ namespace CKli.Core;
 /// </para>
 /// </summary>
 /// <typeparam name="T">The information type.</typeparam>
-public abstract class RepoPluginBase<T> : PluginBase
+public abstract class RepoPluginBase<T> : RepoInfoPluginBase
     where T : RepoInfo
 {
     readonly T?[] _infos;
@@ -25,7 +26,7 @@ public abstract class RepoPluginBase<T> : PluginBase
     /// </summary>
     /// <param name="world">The world.</param>
     protected RepoPluginBase( World world )
-        : base( world )
+        : base( world, typeof(T) )
     {
         _infos = new T[world.Layout.Count];
     }

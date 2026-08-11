@@ -96,6 +96,29 @@ public sealed class Repo
     public RandomId CKliRepoId => _repoId;
 
     /// <summary>
+    /// Mirror of <see cref="RepoPluginBase{T}.Get(IActivityMonitor, Repo)"/>.
+    /// </summary>
+    /// <typeparam name="T">The <see cref="RepoInfo"/> precise type.</typeparam>
+    /// <param name="monitor">The monitor.</param>
+    /// <returns>The information.</returns>
+    public T GetInfo<T>( IActivityMonitor monitor ) where T : RepoInfo
+    {
+        return ((RepoPluginBase<T>)_world.FindRepoInfoPlugin( typeof( T ) )).Get( monitor, this );
+    }
+
+    /// <summary>
+    /// Mirror of <see cref="RepoPluginBase{T}.GetWithoutIssue(IActivityMonitor, Repo, string?)"/>.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="repo">The repository.</param>
+    /// <param name="before">Expected following operation description. When null, no error is emitted (it must be emitted by the caller).</param>
+    /// <returns>The non null info or null if there are issues.</returns>
+    public T? GetInfoWithoutIssue<T>( IActivityMonitor monitor, Repo repo, string? before = "continuing" ) where T : RepoInfo
+    {
+        return ((RepoPluginBase<T>)_world.FindRepoInfoPlugin( typeof( T ) )).GetWithoutIssue( monitor, this );
+    }
+
+    /// <summary>
     /// Returns the <see cref="DisplayPath"/> (with its link to <see cref="WorkingFolder"/>) as a <see cref="ContentBox"/>
     /// or a <see cref="HorizontalContent"/> with it and:
     /// <list type="number">

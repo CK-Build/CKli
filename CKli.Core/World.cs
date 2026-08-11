@@ -7,7 +7,8 @@ using System.Threading;
 namespace CKli.Core;
 
 /// <summary>
-/// The World handles the <see cref="Repo"/> that are defined in its <see cref="Layout"/>.
+/// The World handles the <see cref="Repo"/> that are defined in its <see cref="Layout"/> with the help
+/// of its plugins.
 /// <para>
 /// The only way to obtain a World is to use the StackRepository. A World has a "short" life time (just like
 /// its <see cref="StackRepository"/>): it is bound to a command execution (even in interactive mode).
@@ -81,8 +82,10 @@ public sealed partial class World
     readonly PluginMachinery? _pluginMachinery;
     PluginCollection? _plugins;
 
+    // Used to carry the Executing command and cancellation token to the PrimaryPluginContext.
     Command? _executingCommand;
     CancellationToken _scopeAlive;
+    RepoInfoPluginBase? _firstRepoInfoPlugin;
 
     // The WorldDefinitionFile maintains its layout list.
     // AddRepository, RemoveRepository and XifLayout are the only ones that can
@@ -266,6 +269,28 @@ public sealed partial class World
             return null;
         }
         return _ckliRepoIndex.GetValueOrDefault( id );
+    }
+
+    /// <summary>
+    /// Finds an available plugin or returns null if the plugin is not available.
+    /// </summary>
+    /// <typeparam name="T">The exact type of the plugin.</typeparam>
+    /// <returns>The loaded plugin or null if not found.</returns>
+    public T? GetPlugin<T>() where T : PluginBase => _plugins?.FindPlugin<T>();
+
+    /// <summary>
+    /// Finds an available plugin or returns null and emits an error if the plugin is not available.
+    /// </summary>
+    /// <typeparam name="T">The exact type of the plugin.</typeparam>
+    /// <returns>The loaded plugin or null if not found.</returns>
+    public T? GetRequiredPlugin<T>( IActivityMonitor monitor ) where T : PluginBase
+    {
+        var p = _plugins?.FindPlugin<T>();
+        if( p == null )
+        {
+            monitor.Error( $"Unable to find plugin of type '{typeof(T).Name}'." );
+        }
+        return p;
     }
 
     /// <summary>

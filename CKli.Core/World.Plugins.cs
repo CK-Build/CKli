@@ -22,14 +22,28 @@ public sealed partial class World
         }
     }
 
+    internal RepoInfoPluginBase? RegisterNextRepoInfoPlugin( RepoInfoPluginBase p )
+    {
+        var previous = _firstRepoInfoPlugin;
+        _firstRepoInfoPlugin = p;
+        return previous;
+    }
+
+    internal RepoInfoPluginBase FindRepoInfoPlugin( Type repoInfoType )
+    {
+        Throw.DebugAssert( typeof( RepoInfo ).IsAssignableFrom( repoInfoType ) );
+        return RepoInfoPluginBase.FindRepoInfoPlugin( _firstRepoInfoPlugin, repoInfoType );
+    }
+
+    #region Used to carry the Executing command and cancellation token to the PrimaryPluginContext.
     internal Command? ExecutingCommand => _executingCommand;
     internal CancellationToken ScopeAlive => _scopeAlive;
-
     internal void SetExecutingCommand( Command command, CancellationToken scopeAlive )
     {
         _executingCommand = command;
         _scopeAlive = scopeAlive;
     }
+    #endregion
 
     internal bool SetPluginCompileMode( IActivityMonitor monitor, PluginCompileMode mode )
     {

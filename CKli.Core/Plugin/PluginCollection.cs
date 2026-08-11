@@ -47,6 +47,16 @@ public abstract class PluginCollection
     /// </summary>
     public virtual bool HasLoadError => false;
 
+    internal T? FindPlugin<T>() where T : PluginBase
+    {
+        Throw.DebugAssert( "DisposeDisposablePlugins has not been called.", _instantiated != null );
+        foreach( var o in _instantiated )
+        {
+            if( o is T plugin ) return plugin;
+        }
+        return null;
+    }
+
     internal bool CallPluginsInitialization( IActivityMonitor monitor )
     {
         Throw.DebugAssert( "DisposeDisposablePlugins has not been called.", _instantiated != null );
@@ -78,5 +88,6 @@ public abstract class PluginCollection
             _instantiated = null;
         }
     }
+
 }
 
