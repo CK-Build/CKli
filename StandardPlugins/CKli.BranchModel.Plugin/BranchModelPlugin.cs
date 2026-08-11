@@ -2,6 +2,8 @@ using CK.Core;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Xml.Linq;
 
@@ -175,6 +177,28 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
                && s.TryMatchInteger( out minor )
                && minor >= 0
                && s.Length == 0;
+    }
+
+    bool GetReposAndBranch( IActivityMonitor monitor,
+                            CKliEnv context,
+                            bool all,
+                            string branchName,
+                            [NotNullWhen( true )] out IReadOnlyList<Repo>? repos,
+                            [NotNullWhen( true )] out BranchName? branch,
+                            out bool isDevName )
+    {
+        isDevName = branchName.StartsWith( "dev/" );
+        repos = all
+                ? World.GetAllDefinedRepo( monitor )
+                : World.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
+        if( repos == null )
+        {
+            branch = null;
+            return false;
+        }
+        if( isDevName ) branchName = branchName.Substring( 4 );
+        branch = _namespace.FindRequired( monitor, branchName );
+        return branch != null;
     }
 }
 

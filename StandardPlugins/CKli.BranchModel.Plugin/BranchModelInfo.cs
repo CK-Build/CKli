@@ -44,7 +44,7 @@ public sealed partial class BranchModelInfo : RepoInfo
 
     /// <summary>
     /// Gets all the <see cref="HotBranch"/> indexed by their <see cref="BranchName.Index"/>.
-    /// Their git <see cref="HotBranch.GitBranch"/> may be null.
+    /// Their git <see cref="HotBranch.GitBranch"/> may be null (<see cref="HotBranch.Exists"/> can be false).
     /// </summary>
     public ImmutableArray<HotBranch> Branches => _branches;
 

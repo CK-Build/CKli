@@ -1,5 +1,8 @@
 using CK.Core;
 using CKli.Core;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.BranchModel.Plugin;
 
@@ -13,7 +16,7 @@ public sealed partial class BranchModelPlugin
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">The minimal CKli context.</param>
-    /// <param name="branchName">The branch name to switch to.</param>
+    /// <param name="branch">The branch name to switch to.</param>
     /// <param name="create">True to open an unexisting branch.</param>
     /// <param name="all">Consider all the Repos of the current World.</param>
     /// <returns>True on success, false otherwise.</returns>
@@ -22,31 +25,25 @@ public sealed partial class BranchModelPlugin
     public bool BranchSwitch( IActivityMonitor monitor,
                               CKliEnv context,
                               [Description( "Branch name to checkout." )]
-                              string branchName,
+                              string branch,
                               [Description( "Create and synchronize the branch if it doesn't exist, instead of switching to the closest existing one." )]
                               [OptionName("--create,-c")]
                               bool create = false,
                               [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
                               bool all = false )
     {
-        var repos = all
-                    ? World.GetAllDefinedRepo( monitor )
-                    : World.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
-        if( repos == null ) return false;
-
-        bool isDevName = branchName.StartsWith( "dev/" );
-        if( isDevName ) branchName = branchName.Substring( 4 );
-        var name = _namespace.FindRequired( monitor, branchName );
-        if( name == null ) return false;
-
+        if( !GetReposAndBranch( monitor, context, all, branch, out var repos, out var branchName, out var isDevName ) )
+        {
+            return false;
+        }
         bool success = true;
         foreach( var repo in repos )
         {
             var info = Get( monitor, repo );
-            var b = info.Branches[name.Index];
+            var b = info.Branches[branchName.Index];
             if( !create || b.EnsureExists( monitor ) )
             {
-                var target = b.Exists ? b : info.GetRequiredClosestExistingBranch( monitor, name );
+                var target = b.Exists ? b : info.GetRequiredClosestExistingBranch( monitor, branchName );
                 if( target != null )
                 {
                     Throw.DebugAssert( target.Exists );
