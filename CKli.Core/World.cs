@@ -81,11 +81,11 @@ public sealed partial class World
     readonly WorldEvents _events;
     readonly PluginMachinery? _pluginMachinery;
     PluginCollection? _plugins;
+    RepoInfoPluginBase? _firstRepoInfoPlugin;
 
     // Used to carry the Executing command and cancellation token to the PrimaryPluginContext.
     Command? _executingCommand;
     CancellationToken _scopeAlive;
-    RepoInfoPluginBase? _firstRepoInfoPlugin;
 
     // The WorldDefinitionFile maintains its layout list.
     // AddRepository, RemoveRepository and XifLayout are the only ones that can
@@ -202,6 +202,7 @@ public sealed partial class World
         _events.ReleaseEvents();
         if( _plugins != null )
         {
+            _firstRepoInfoPlugin = null;
             _plugins.Commands.Clear();
             _plugins.DisposeDisposablePlugins();
             _plugins = null;
