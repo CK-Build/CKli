@@ -692,34 +692,26 @@ public sealed partial class StackRepository : IDisposable
             if( definitionFile == null ) return false;
             var layout = definitionFile.ReadLayout( monitor );
             if( layout == null ) return false;
+
+            var pool = new ActivityMonitorAsyncPool( 5 );
             using( monitor.OpenInfo( $"Cloning {layout.Count} repositories in {stack.StackRoot}." ) )
             {
                 // Full parallelism...
-                var results = await Task.WhenAll( layout.Select( r => Task.Run( () => DoClone( r.Url, r.Path, stack, world, cancellation ) ) ).ToArray() );
+                var results = await Task.WhenAll( layout.Select( r => Task.Run( () => DoCloneAsync( pool, r.Url, r.Path, stack, world, cancellation ) ) ).ToArray() );
                 return results.All( Util.FuncIdentity );
             }
 
-            static bool DoClone( Uri url, NormalizedPath subPath, StackRepository stack, LocalWorldName world, CancellationToken cancellation )
+            static async Task<bool> DoCloneAsync( ActivityMonitorAsyncPool pool, Uri url, NormalizedPath subPath, StackRepository stack, LocalWorldName world, CancellationToken cancellation )
             {
-                // TODO: use a pool of ActivityMonitor?
-                var monitor = new ActivityMonitor();
-                if( cancellation.IsCancellationRequested )
-                {
-                    return false;
-                }
+                using var monitor = await pool.GetAsync( cancellation ).ConfigureAwait( false );
+                if( monitor == null ) return false;
                 // This never throws.
                 using( var r = GitRepository.CloneWorkingFolder( monitor,
                                                                  new GitRepositoryKey( stack.SecretsStore, url, stack.IsPublic ),
                                                                  world.WorldRoot.Combine( subPath ),
                                                                  cancellation ) )
                 {
-                    if( r != null )
-                    {
-                        monitor.MonitorEnd( $"Done '{subPath}'." );
-                        return true;
-                    }
-                    monitor.MonitorEnd( $"Failed to clone '{subPath}' from '{url}'." );
-                    return false;
+                    return r != null;
                 }
             }
         }
