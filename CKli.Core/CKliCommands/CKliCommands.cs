@@ -110,12 +110,12 @@ public static class CKliCommands
     /// <param name="context">The minimal context.</param>
     /// <param name="cmdLine">The command line to handle.</param>
     /// <returns>True on success, false on error.</returns>
-    public static ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
-                                                      CKliEnv context,
-                                                      CommandLineArguments cmdLine )
+    public static async ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
+                                                            CKliEnv context,
+                                                            CommandLineArguments cmdLine )
     {
         using var interruptibleScope = InterruptibleScope.Create();
-        if( interruptibleScope == null ) return ValueTask.FromResult( false );
+        if( interruptibleScope == null ) return false;
 
         monitor.Info( $"Executing '{cmdLine.InitialAsStringArguments}'." );
         context.OnStartCommandHandling();
@@ -149,12 +149,12 @@ public static class CKliCommands
                                         cmdLine,
                                         (interactiveScreen != null ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
                                         (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
-            return FinalizeCommandExecutionAsync( monitor, context, cmdLine, null, true );
+            return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, null, true ).ConfigureAwait( false );
         }
         // If it's a CKli command, we can now execute it.
         if( cmdLine.FoundCommand != null )
         {
-            return ExecuteCommandAsync( monitor, context, cmdLine, null, interruptibleScope.Alive );
+            return await ExecuteCommandAsync( monitor, context, cmdLine, null, interruptibleScope.Alive ).ConfigureAwait( false );
         }
         // Not a CKli command. Opens the current World and tries to find a plugin command.
         var (stack, world) = StackRepository.TryOpenWorldFromPath( monitor, context, out bool error, skipPullStack: true );
@@ -162,12 +162,12 @@ public static class CKliCommands
         {
             // Don't enter interactive mode on error here.
             Throw.DebugAssert( (stack == null && world == null) );
-            return ValueTask.FromResult( false );
+            return false;
         }
         if( interruptibleScope.Alive.IsCancellationRequested )
         {
             stack?.Dispose();
-            return ValueTask.FromResult( false );
+            return false;
         }
         // No current World (not in a Stack directory): we can only display help on the CKli commands.
         if( world == null )
@@ -180,11 +180,11 @@ public static class CKliCommands
                                         cmdLine,
                                         (interactiveScreen != null ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
                                         (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
-            return FinalizeCommandExecutionAsync( monitor, context, cmdLine, null, false );
+            return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, null, false ).ConfigureAwait( false );
         }
 
         // We are in a World, we have an opened Stack: handles World.Commands.
-        return ExecuteWorldCommandAsync( monitor, context, cmdLine, helpPath, stack!, world, interruptibleScope.Alive );
+        return await ExecuteWorldCommandAsync( monitor, context, cmdLine, helpPath, stack!, world, interruptibleScope.Alive ).ConfigureAwait( false );
 
         static async ValueTask<bool> ExecuteWorldCommandAsync( IActivityMonitor monitor,
                                                                CKliEnv context,
@@ -237,10 +237,10 @@ public static class CKliCommands
     }
 
     static async ValueTask<bool> ExecuteCommandAsync( IActivityMonitor monitor,
-                                                          CKliEnv context,
-                                                          CommandLineArguments cmdLine,
-                                                          StackRepository? initialStack,
-                                                          CancellationToken scopeAlive )
+                                                      CKliEnv context,
+                                                      CommandLineArguments cmdLine,
+                                                      StackRepository? initialStack,
+                                                      CancellationToken scopeAlive )
     {
         Throw.DebugAssert( cmdLine.FoundCommand != null );
         var result = await DoExecuteAsync( monitor, context, cmdLine, scopeAlive ).ConfigureAwait( false );

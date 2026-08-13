@@ -537,6 +537,9 @@ public sealed partial class StackRepository : IDisposable
     /// Specifies a branch name.
     /// There should be no reason to use multiple branches in a stack repository.
     /// </param>
+    /// <param name="maxDop">
+    /// Maximal parallel repository clone.
+    /// </param>
     /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The repository or null on error.</returns>
     public static async Task<StackRepository?> CloneAsync( IActivityMonitor monitor,
@@ -546,6 +549,7 @@ public sealed partial class StackRepository : IDisposable
                                                            bool allowDuplicateStack = false,
                                                            bool ignoreParentStack = false,
                                                            string stackBranchName = "main",
+                                                           int maxDop = 0,
                                                            CancellationToken cancellation = default )
     {
         bool isCKliTestRunning = CKliRootEnv.InstanceName == "CKli-Test";
@@ -634,7 +638,8 @@ public sealed partial class StackRepository : IDisposable
                                        stackGitKey,
                                        context.Committer,
                                        gitPath,
-                                       gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ) );
+                                       gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ),
+                                       cancellation );
         if( git != null )
         {
             // Before doing anything else, we read the definition file and extract the actual
@@ -672,7 +677,7 @@ public sealed partial class StackRepository : IDisposable
                 Registry.RegisterNewStack( monitor, gitPath, url );
                 var result = new StackRepository( git, stackRoot, context, stackNameFromUrl );
                 // Now we can clone the world's repositories.
-                if( await CloneWorldAsync( monitor, result, result.DefaultWorldName, cancellation ) )
+                if( await CloneWorldAsync( monitor, result, result.DefaultWorldName, maxDop, cancellation ) )
                 {
                     return result;
                 }
@@ -686,6 +691,7 @@ public sealed partial class StackRepository : IDisposable
         static async Task<bool> CloneWorldAsync( IActivityMonitor monitor,
                                                  StackRepository stack,
                                                  LocalWorldName world,
+                                                 int maxDop,
                                                  CancellationToken cancellation )
         {
             var definitionFile = world.LoadDefinitionFile( monitor );
@@ -693,26 +699,17 @@ public sealed partial class StackRepository : IDisposable
             var layout = definitionFile.ReadLayout( monitor );
             if( layout == null ) return false;
 
-            var pool = new ActivityMonitorAsyncPool( 5 );
-            using( monitor.OpenInfo( $"Cloning {layout.Count} repositories in {stack.StackRoot}." ) )
+            using( monitor.OpenInfo( $"Cloning {layout.Count} repositories in {stack.StackRoot} ({(maxDop <= 0 ? "parallel" : $"--max-dop {maxDop}")})." ) )
             {
-                // Full parallelism...
-                var results = await Task.WhenAll( layout.Select( r => Task.Run( () => DoCloneAsync( pool, r.Url, r.Path, stack, world, cancellation ) ) ).ToArray() );
-                return results.All( Util.FuncIdentity );
-            }
-
-            static async Task<bool> DoCloneAsync( ActivityMonitorAsyncPool pool, Uri url, NormalizedPath subPath, StackRepository stack, LocalWorldName world, CancellationToken cancellation )
-            {
-                using var monitor = await pool.GetAsync( cancellation ).ConfigureAwait( false );
-                if( monitor == null ) return false;
-                // This never throws.
-                using( var r = GitRepository.CloneWorkingFolder( monitor,
-                                                                 new GitRepositoryKey( stack.SecretsStore, url, stack.IsPublic ),
-                                                                 world.WorldRoot.Combine( subPath ),
-                                                                 cancellation ) )
-                {
-                    return r != null;
-                }
+                var pool = new ActivityMonitorAsyncPool( maxDop <= 0 ? int.MaxValue : maxDop );
+                return await pool.ParallelAsync( layout,
+                                                 ( monitor, l, cancellation ) => GitRepository.TryCloneWorkingFolder( monitor,
+                                                                                                                      new GitRepositoryKey( stack.SecretsStore, l.Url, stack.IsPublic ),
+                                                                                                                      world.WorldRoot.Combine( l.Path ),
+                                                                                                                      cancellation ),
+                                                 ParallelErrorBehavior.SoftStop,
+                                                 cancellation )
+                                 .ConfigureAwait( false );
             }
         }
     }
@@ -807,7 +804,8 @@ public sealed partial class StackRepository : IDisposable
                                    gitKey,
                                    isPublic,
                                    stackName,
-                                   out gitRepository );
+                                   out gitRepository,
+                                   cancellation );
         }
         catch( Exception ex )
         {
@@ -842,14 +840,16 @@ public sealed partial class StackRepository : IDisposable
                                             GitRepositoryKey gitKey,
                                             bool isPublic,
                                             string stackName,
-                                            out GitRepository? gitRepository )
+                                            out GitRepository? gitRepository,
+                                            CancellationToken cancellation )
         {
             NormalizedPath gitPath = stackRoot.AppendPart( isPublic ? PublicStackName : PrivateStackName );
             gitRepository = GitRepository.Clone( monitor,
                                                  gitKey,
                                                  context.Committer,
                                                  gitPath,
-                                                 gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ) );
+                                                 gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ),
+                                                 cancellation );
             if( gitRepository == null
                 || !gitRepository.FullCheckout( monitor, "main", skipFetchMerge: true ) )
             {

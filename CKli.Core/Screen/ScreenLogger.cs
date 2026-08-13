@@ -83,7 +83,7 @@ public sealed class ScreenLogger : IActivityMonitorClient
 
         public ValueTask HandleAsync( IActivityMonitor monitor, InputLogEntry logEvent )
         {
-            Throw.DebugAssert( (logEvent.MonitorId == _monitorId) == ReferenceEquals( logEvent.MonitorId, _monitorId ) );
+            Throw.DebugAssert( (logEvent.MonitorId == _monitorId) == logEvent.MonitorId.Equals( _monitorId, StringComparison.Ordinal ) );
             if( !ReferenceEquals( logEvent.MonitorId, _monitorId ) || !(logEvent.Tags & _processRunnerTag).IsEmpty )
             {
                 var t = logEvent.Text;

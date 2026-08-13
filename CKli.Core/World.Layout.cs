@@ -217,16 +217,20 @@ sealed partial class World
 
         var potentiallyEmptyFolders = new HashSet<NormalizedPath>();
 
-        if( !ExecuteMoves( monitor, this, actions, potentiallyEmptyFolders ) )
+        if( !ExecuteMoves( monitor, this, actions, potentiallyEmptyFolders, _scopeAlive ) )
         {
             monitor.Error( "Error while fixing layout. This must be manually fixed." );
             return false;
         }
-        if( !ExecuteClones( monitor, this, _stackRepository.Context.Committer, actions, out newClones ) )
+        if( !ExecuteClones( monitor, this, _stackRepository.Context.Committer, actions, out newClones, _scopeAlive ) )
         {
             return false;
         }
-        ExecuteSuppress( monitor, this, deleteAliens, actions, potentiallyEmptyFolders );
+        ExecuteSuppress( monitor, this, deleteAliens, actions, potentiallyEmptyFolders, _scopeAlive );
+        if( _scopeAlive.IsCancellationRequested )
+        {
+            return false;
+        }
 
         potentiallyEmptyFolders.Remove( _name.WorldRoot );
         if( potentiallyEmptyFolders.Count > 0 )
@@ -235,11 +239,16 @@ sealed partial class World
         }
         return _events.SafeRaiseEvent( monitor, new FixedAllLayoutEvent( monitor, this, newClones ) );
 
-        static bool ExecuteMoves( IActivityMonitor monitor, World world, List<LayoutAction> actions, HashSet<NormalizedPath> potentiallyEmptyFolders )
+        static bool ExecuteMoves( IActivityMonitor monitor,
+                                  World world,
+                                  List<LayoutAction> actions,
+                                  HashSet<NormalizedPath> potentiallyEmptyFolders,
+                                  CancellationToken cancellation )
         {
             bool success = true;
             foreach( var m in actions.OfType<Move>() )
             {
+                if( cancellation.IsCancellationRequested ) break;
                 success &= FileHelper.MoveFolder( monitor, m.Path, m.NewPath, potentiallyEmptyFolders );
             }
             return success;
@@ -249,16 +258,28 @@ sealed partial class World
                                    World world,
                                    Signature committer,
                                    List<LayoutAction> actions,
-                                   [NotNullWhen( true )] out List<Repo>? newClones )
+                                   [NotNullWhen( true )] out List<Repo>? newClones,
+                                   CancellationToken cancellation )
         {
             bool success = true;
             newClones = null;
+            // No parallelism here because we interact with world._cachedRepositories.
+            // Not a big issue because in practice there's a few repositories to fix.
             foreach( var c in actions.OfType<Clone>() )
             {
                 Throw.DebugAssert( "Since we must Clone, the cached repository is missing.", world._cachedRepositories[c.Uri.ToString()] == null );
                 Throw.DebugAssert( "Since we must Clone, the cached repository is missing.", world._cachedRepositories[c.Path] == null );
+                if( cancellation.IsCancellationRequested )
+                {
+                    return false;
+                }
                 var gitKey = new GitRepositoryKey( world._stackRepository.SecretsStore, c.Uri, world._stackRepository.IsPublic );
-                var cloned = GitRepository.Clone( monitor, gitKey, committer, c.Path, c.Path.RemoveFirstPart( world.Name.WorldRoot.Parts.Count ) );
+                var cloned = GitRepository.Clone( monitor,
+                                                  gitKey,
+                                                  committer,
+                                                  c.Path,
+                                                  c.Path.RemoveFirstPart( world.Name.WorldRoot.Parts.Count ),
+                                                  cancellation );
                 if( cloned == null )
                 {
                     success = false;
@@ -277,7 +298,8 @@ sealed partial class World
                                      World world,
                                      bool deleteAliens,
                                      List<LayoutAction> actions,
-                                     HashSet<NormalizedPath> potentiallyEmptyFolders )
+                                     HashSet<NormalizedPath> potentiallyEmptyFolders,
+                                     CancellationToken cancellation )
         {
             var toSuppr = actions.OfType<Suppress>().ToList();
             if( toSuppr.Count > 0 )
@@ -288,6 +310,7 @@ sealed partial class World
                     {
                         foreach( var suppr in actions.OfType<Suppress>() )
                         {
+                            if( cancellation.IsCancellationRequested ) break;
                             if( FileHelper.DeleteFolder( monitor, suppr.Path ) )
                             {
                                 potentiallyEmptyFolders.Add( suppr.Path.RemoveLastPart() );

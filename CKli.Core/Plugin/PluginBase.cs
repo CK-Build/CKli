@@ -71,4 +71,52 @@ public abstract class PluginBase
     /// <param name="monitor">The monitor to use.</param>
     /// <returns>True on success, false on error.</returns>
     internal protected virtual bool Initialize( IActivityMonitor monitor ) => true;
+
+    /// <summary>
+    /// Static centralized helper that handles integer parameter parsing.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="optionName">The option name ("--max-dop").</param>
+    /// <param name="oValue">The option value.</param>
+    /// <param name="result">The resulting value to use.</param>
+    /// <param name="defaultValue">The default value (when <paramref name="oValue"/> is null).</param>
+    /// <param name="minValue">The minimal allowed value.</param>
+    /// <param name="maxValue">The maximal allowed value.</param>
+    /// <returns>True on success, false on error.</returns>
+    internal protected static bool ParseInteger( IActivityMonitor monitor, string optionName, string? oValue, out int result, int defaultValue, int? minValue = 0, int? maxValue = null )
+    {
+        Throw.CheckArgument( minValue == null || maxValue == null || minValue <= maxValue ); 
+        if( oValue == null ) result = defaultValue;
+        else if( !int.TryParse( oValue, out result )
+                 || (minValue is not null && result < minValue.Value)
+                 || (maxValue is not null && result > maxValue.Value) )
+        {
+            if( minValue is not null )
+            {
+                if( maxValue is not null )
+                {
+                    monitor.Error( $"Invalid {optionName} value. Must be an integer between {minValue} and {maxValue} included." );
+                }
+                else
+                {
+                    monitor.Error( $"Invalid {optionName} value. Must be an integer greater or equal to {minValue}." );
+                }
+            }
+            else
+            {
+                if( maxValue is not null )
+                {
+                    monitor.Error( $"Invalid {optionName} value. Must be an integer lower or equal to {maxValue}." );
+                }
+                else
+                {
+                    monitor.Error( $"Invalid {optionName} value. Must be an integer." );
+                }
+            }
+            return false;
+        }
+        return true;
+    }
+
+
 }

@@ -23,6 +23,7 @@ sealed class CKliPull : Command
                     (["--all"], "Consider all the Repos' of the current World (even if current path is in a Repo)."),
                     (["--with-tags"], "Pull tags: remote tags replace local ones with the same name."),
                     (["--continue-on-error"], "Continues even on error. By default the first error stops the operation."),
+                    (["--max-dop"], "Limits the parallelism when pulling the repositories."),
              ] )
     {
     }
@@ -35,17 +36,27 @@ sealed class CKliPull : Command
         bool all = cmdLine.EatFlag( "--all" );
         bool withTags = cmdLine.EatFlag( "--with-tags" );
         bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
-        return ValueTask.FromResult( cmdLine.Close( monitor )
-                                     && Pull( monitor, this, context, all, withTags, continueOnError, scopeAlive ) );
+        if( !PluginBase.ParseInteger( monitor,
+                              "--max-dop",
+                              cmdLine.EatSingleOption( "--max-dop" ),
+                              out int maxDop,
+                              defaultValue: 0,
+                              minValue: 1 )
+            || !cmdLine.Close( monitor ) )
+        {
+            return ValueTask.FromResult( false );
+        }
+        return new ValueTask<bool>( PullAsync( monitor, this, context, all, maxDop, withTags, continueOnError, scopeAlive ) );
 
 
-        static bool Pull( IActivityMonitor monitor,
-                          Command command,
-                          CKliEnv context,
-                          bool all,
-                          bool withTags,
-                          bool continueOnError,
-                          CancellationToken scopeAlive )
+        static async Task<bool> PullAsync( IActivityMonitor monitor,
+                                           Command command,
+                                           CKliEnv context,
+                                           bool all,
+                                           int maxDop,
+                                           bool withTags,
+                                           bool continueOnError,
+                                           CancellationToken scopeAlive )
         {
             if( !StackRepository.OpenWorldFromPath( monitor,
                                                     context,
@@ -63,9 +74,17 @@ sealed class CKliPull : Command
                             : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
                 if( repos == null ) return false;
 
-                bool success = DoPull( monitor, continueOnError, repos, withTags, scopeAlive );
-                // Save a dirty World's DefinitionFile ony if no unhandled exception is thrown.
-                return stack.Close( monitor ) && success;
+                using( monitor.OpenInfo( $"Pulling {repos.Count} repositories, {(withTags ? "updating" : "preserving")} local tags ({(maxDop <= 0 ? "parallel" : $"--max-dop {maxDop}")})." ) )
+                {
+                    var pool = new ActivityMonitorAsyncPool( maxDop <= 0 ? int.MaxValue : maxDop );
+                    bool success = await pool.ParallelAsync( repos,
+                                                             ( monitor, repo, cancellation ) => PullOne( monitor, repo, withTags, continueOnError, cancellation ),
+                                                             continueOnError ? ParallelErrorBehavior.Ignore : ParallelErrorBehavior.SoftStop,
+                                                             scopeAlive )
+                                             .ConfigureAwait( false );
+                    // Save a dirty World's DefinitionFile ony if no unhandled exception is thrown.
+                    return stack.Close( monitor ) && success;
+                }
             }
             finally
             {
@@ -82,47 +101,40 @@ sealed class CKliPull : Command
                                  CancellationToken cancellation )
     {
         bool success = true;
-        // To limit roundtrips to the remotes, we fetch all the remote branches at once
-        // and then use MergeTrackedBranches to merge them (MergeTrackedBranches correctly handles the branch
-        // that may be checked out).
         using( monitor.OpenInfo( $"Fetching remote branches {(withTags ? "and tags " : "")}for {repos.Count} repositories." ) )
         {
             foreach( var repo in repos )
             {
-                if( cancellation.IsCancellationRequested )
-                {
-                    return false;
-                }
-                // withTags = true may set TagFetchMode.Auto (tags that are referenced by the fetched objects will be retrieved)
-                // but we want all tags to be updated. So use the "pull tag *".
-                success &= repo.GitRepository.FetchRemoteBranches( monitor, withTags: false );
-                if( !success && !continueOnError ) break;
-                if( !withTags )
-                {
-                    // "ckli pull" => "ckli tag fetch" => By default the tags are "safely fetched".
-                    success &= repo.GitRepository.FetchTags( monitor );
-                }
-                else
-                {
-                    // "ckli pull --with-tags" => "ckli tag pull *" => git pull --tags --force
-                    success &= repo.GitRepository.PullTags( monitor, ["*"] );
-                }
-                if( !success && !continueOnError ) break;
+                return PullOne( monitor, repo, withTags, continueOnError, cancellation );
             }
         }
+        return success;
+    }
+
+    // Should this be the GitRepository.Pull method?
+    static bool PullOne( IActivityMonitor monitor, Repo repo, bool withTags, bool continueOnError, CancellationToken cancellation )
+    {
+        // First, we Pull (Fetch + Merge on success).
+        // We first fetch all the remote branches at once and then use MergeTrackedBranches to merge them (MergeTrackedBranches
+        // correctly handles the branch that may be checked out).
+        // 
+        // Then we handle tags: by default only purely remote tags are fetched (safe fetch).
+        // withTags = true may set TagFetchMode.Auto (tags that are referenced by the fetched objects will be retrieved)
+        // but we want all tags to be updated. So we use the "tag pull *" below.
+        //
+        bool success = repo.GitRepository.FetchRemoteBranches( monitor, withTags: false, cancellation: cancellation )
+                        && repo.GitRepository.MergeRemoteBranches( monitor, continueOnError, fromAllRemotes: false );
         if( success || continueOnError )
         {
-            using( monitor.OpenInfo( $"Merging remote branches into existing local ones for {repos.Count} repositories." ) )
+            if( !withTags )
             {
-                foreach( var repo in repos )
-                {
-                    if( cancellation.IsCancellationRequested )
-                    {
-                        return false;
-                    }
-                    success &= repo.GitRepository.MergeRemoteBranches( monitor, continueOnError, fromAllRemotes: false );
-                    if( !success && !continueOnError ) break;
-                }
+                // "ckli pull" => "ckli tag fetch" => By default the tags are "safely fetched".
+                success &= repo.GitRepository.FetchTags( monitor, cancellation: cancellation );
+            }
+            else
+            {
+                // "ckli pull --with-tags" => "ckli tag pull *" => git pull --tags --force
+                success &= repo.GitRepository.PullTags( monitor, ["*"], cancellation: cancellation );
             }
         }
         return success;

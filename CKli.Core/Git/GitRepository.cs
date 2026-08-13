@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core;
@@ -347,8 +348,13 @@ public sealed partial class GitRepository : IDisposable
     /// relies on this behavior.
     /// </para>
     /// </param>
+    /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool FetchRemoteBranches( IActivityMonitor monitor, bool withTags, string? branchSpec = null, bool prune = true )
+    public bool FetchRemoteBranches( IActivityMonitor monitor,
+                                     bool withTags,
+                                     string? branchSpec = null,
+                                     bool prune = true,
+                                     CancellationToken cancellation = default )
     {
         if( string.IsNullOrEmpty( branchSpec ) )
         {
@@ -361,12 +367,15 @@ public sealed partial class GitRepository : IDisposable
         {
             try
             {
-                if( !_repositoryKey.AccessKey.GetReadCredentials( monitor, out var creds ) ) return false;
-
                 var remote = _git.Network.Remotes["origin"];
                 if( remote == null )
                 {
                     monitor.Error( $"No remote 'origin' for repository '{_displayPath}'." );
+                    return false;
+                }
+                if( cancellation.IsCancellationRequested
+                    || !_repositoryKey.AccessKey.GetReadCredentials( monitor, out var creds ) )
+                {
                     return false;
                 }
                 IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
@@ -378,7 +387,10 @@ public sealed partial class GitRepository : IDisposable
                 {
                     CredentialsProvider = ( url, user, types ) => creds,
                     Prune = prune,
-                    TagFetchMode = withTags ? TagFetchMode.Auto : TagFetchMode.None
+                    TagFetchMode = withTags ? TagFetchMode.Auto : TagFetchMode.None,
+                    OnProgress = _ => !cancellation.IsCancellationRequested,
+                    OnTransferProgress = _ => !cancellation.IsCancellationRequested,
+                    OnUpdateTips = ( _, _, _ ) => !cancellation.IsCancellationRequested,
                 }, null );
                 if( prune )
                 {
@@ -400,7 +412,12 @@ public sealed partial class GitRepository : IDisposable
             }
             catch( Exception ex )
             {
-                monitor.Error( "Error while fetching. This requires a manual fix.", ex );
+                // Avoid error dump if cancelled. We may miss "real exception" but we don't care.
+                // This skips LibGit2Sharp's UserCancelledException.
+                if( !cancellation.IsCancellationRequested )
+                {
+                    monitor.Error( "Error while fetching. This requires a manual fix.", ex );
+                }
                 return false;
             }
         }
@@ -432,8 +449,9 @@ public sealed partial class GitRepository : IDisposable
     /// <param name="branchName">The human friendly branch name.</param>
     /// <param name="withTags">True to fetch the tags that point to any fetched object. False to not retrieve any remote tag.</param>
     /// <param name="branch">On success, contains an up-to-date branch instance.</param>
+    /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool FetchRemoteBranch( IActivityMonitor monitor, string branchName, bool withTags, out Branch? branch )
+    public bool FetchRemoteBranch( IActivityMonitor monitor, string branchName, bool withTags, out Branch? branch, CancellationToken cancellation = default )
     {
         branch = GetBranch( monitor, branchName, LogLevel.None );
         if( branch == null )
@@ -441,7 +459,7 @@ public sealed partial class GitRepository : IDisposable
             // The branch doesn't exist locally (as a local branch or as a known "origin/" branch).
             // We try to fetch the remote branch from 'origin' and then use GetBranch to create it
             // if it has been found on the 'origin' remote.
-            if( !FetchFromOrigin( monitor, branchName, withTags ) )
+            if( !FetchFromOrigin( monitor, branchName, withTags, cancellation ) )
             {
                 branch = null;
                 return false;
@@ -456,7 +474,7 @@ public sealed partial class GitRepository : IDisposable
             {
                 // The branch exists locally but is not bound to a tracked branch.
                 // Same as above, we try to fetch the 'origin' one.
-                if( !FetchFromOrigin( monitor, branchName, withTags ) )
+                if( !FetchFromOrigin( monitor, branchName, withTags, cancellation ) )
                 {
                     // On error, we let the local branch instance be returned.
                     return false;
@@ -472,7 +490,7 @@ public sealed partial class GitRepository : IDisposable
             else if( tracked.Reference.IsRemoteTrackingBranch )
             {
                 // The branch is a "refs/remotes/" branch.
-                if( !DoFetch( monitor, this, tracked.RemoteName, branch.CanonicalName, tracked.CanonicalName, withTags ) )
+                if( !DoFetch( monitor, this, tracked.RemoteName, branch.CanonicalName, tracked.CanonicalName, withTags, cancellation ) )
                 {
                     return false;
                 }
@@ -489,14 +507,15 @@ public sealed partial class GitRepository : IDisposable
             }
         }
 
-        bool FetchFromOrigin( IActivityMonitor monitor, string branchName, bool withTags )
+        bool FetchFromOrigin( IActivityMonitor monitor, string branchName, bool withTags, CancellationToken cancellation )
         {
             return DoFetch( monitor,
                             this,
                             "origin",
                             src: $"refs/heads/{branchName}",
                             dst: $"refs/remotes/origin/{branchName}",
-                            withTags );
+                            withTags,
+                            cancellation );
         }
 
         static bool DoFetch( IActivityMonitor monitor,
@@ -504,21 +523,34 @@ public sealed partial class GitRepository : IDisposable
                              string remoteName,
                              string src,
                              string dst,
-                             bool withTags )
+                             bool withTags,
+                             CancellationToken cancellation )
         {
             var refSpec = $"+{src}:{dst}";
             try
             {
-                if( !r._repositoryKey.AccessKey.GetReadCredentials( monitor, out var creds ) ) return false;
+                if( cancellation.IsCancellationRequested
+                    || !r._repositoryKey.AccessKey.GetReadCredentials( monitor, out var creds ) )
+                {
+                    return false;
+                }
                 Commands.Fetch( r._git, remoteName, [refSpec], new FetchOptions()
                 {
                     CredentialsProvider = ( url, user, types ) => creds,
-                    TagFetchMode = withTags ? TagFetchMode.Auto : TagFetchMode.None
+                    TagFetchMode = withTags ? TagFetchMode.Auto : TagFetchMode.None,
+                    OnProgress = _ => !cancellation.IsCancellationRequested,
+                    OnTransferProgress = _ => !cancellation.IsCancellationRequested,
+                    OnUpdateTips = ( _, _, _ ) => !cancellation.IsCancellationRequested,
                 }, null );
             }
             catch( Exception ex )
             {
-                monitor.Error( $"Error while fetching '{refSpec}'.", ex );
+                // Avoid error dump if cancelled. We may miss "real exception" but we don't care.
+                // This skips LibGit2Sharp's UserCancelledException.
+                if( !cancellation.IsCancellationRequested )
+                {
+                    monitor.Error( $"Error while fetching '{refSpec}'.", ex );
+                }
                 return false;
             }
             return true;

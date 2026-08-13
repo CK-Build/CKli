@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Threading;
 
 namespace CKli.Core;
 
@@ -102,8 +103,12 @@ public sealed partial class GitRepository
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="tags">The remote <see cref="GitTagInfo"/> on success.</param>
     /// <param name="remoteName">The remote name.</param>
+    /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool GetRemoteTags( IActivityMonitor monitor, [NotNullWhen( true )] out GitTagInfo? tags, string remoteName = "origin" )
+    public bool GetRemoteTags( IActivityMonitor monitor,
+                               [NotNullWhen( true )] out GitTagInfo? tags,
+                               string remoteName = "origin",
+                               CancellationToken cancellation = default )
     {
         try
         {
@@ -115,10 +120,16 @@ public sealed partial class GitRepository
             var result = ImmutableArray.CreateBuilder<TagInfo>();
             ImmutableArray<string>.Builder? invalidTags = null;
             List<(string CanonicalName, string TargetIdentifier)>? missing = null;
+            // Currently there's no way to cancel the ListReferences. We use cancellation in the loop.
             LibGit2Sharp.Handlers.CredentialsHandler credHandler = ( url, user, types ) => creds;
             var remoteRefs = _git.Network.ListReferences( remote, credHandler );
             foreach( var r in remoteRefs )
             {
+                if( cancellation.IsCancellationRequested )
+                {
+                    tags = null;
+                    return false;
+                }
                 var sName = r.CanonicalName.AsSpan();
                 if( sName.StartsWith( "refs/tags/", StringComparison.Ordinal ) )
                 {
@@ -166,7 +177,17 @@ public sealed partial class GitRepository
             }
             if( missing != null )
             {
-                Commands.Fetch( _git, "origin", missing.Select( m => m.TargetIdentifier ), new FetchOptions { CredentialsProvider = credHandler }, null );
+                Commands.Fetch( _git,
+                                "origin",
+                                missing.Select( m => m.TargetIdentifier ),
+                                new FetchOptions
+                                {
+                                    CredentialsProvider = credHandler,
+                                    OnProgress = _ => !cancellation.IsCancellationRequested,
+                                    OnTransferProgress = _ => !cancellation.IsCancellationRequested,
+                                    OnUpdateTips = ( _, _, _ ) => !cancellation.IsCancellationRequested,
+                                },
+                                null );
                 foreach( var m in missing )
                 {
                     var target = _git.Lookup( new ObjectId( m.TargetIdentifier ) );
@@ -197,7 +218,12 @@ public sealed partial class GitRepository
         }
         catch( Exception ex )
         {
-            monitor.Error( "Error while getting remote tags. This requires a manual fix.", ex );
+            // Avoid error dump if cancelled. We may miss "real exception" but we don't care.
+            // This skips LibGit2Sharp's UserCancelledException.
+            if( !cancellation.IsCancellationRequested )
+            {
+                monitor.Error( "Error while getting remote tags. This requires a manual fix.", ex );
+            }
             tags = null;
             return false;
         }
@@ -246,14 +272,18 @@ public sealed partial class GitRepository
 
     /// <summary>
     /// Pulls any number of tags (empty <paramref name="tagNames"/> is a no-op).
-    /// Local modifications of pulled tags are lost: use <see cref="FetchTags(IActivityMonitor, string)"/> to safely 
+    /// Local modifications of pulled tags are lost: use <see cref="FetchTags(IActivityMonitor, string, CancellationToken)"/> to safely 
     /// fetch remote-only tags.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="tagNames">The tag names. They can be canonic (start with "refs/tags/") or regular.</param>
     /// <param name="remoteName">The remote name to consider.</param>
+    /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool PullTags( IActivityMonitor monitor, IEnumerable<string> tagNames, string remoteName = "origin" )
+    public bool PullTags( IActivityMonitor monitor,
+                          IEnumerable<string> tagNames,
+                          string remoteName = "origin",
+                          CancellationToken cancellation = default )
     {
         var names = tagNames.Concatenate();
         if( names.Length == 0 ) return true;
@@ -273,13 +303,26 @@ public sealed partial class GitRepository
                             new FetchOptions()
                             {
                                 CredentialsProvider = ( url, user, types ) => creds,
-                                TagFetchMode = TagFetchMode.None
+                                TagFetchMode = TagFetchMode.None,
+                                OnProgress = _ => !cancellation.IsCancellationRequested,
+                                OnTransferProgress = _ => !cancellation.IsCancellationRequested,
+                                OnUpdateTips = ( _, _, _ ) => !cancellation.IsCancellationRequested,
                             }, logMsg );
             return true;
         }
+        catch( UserCancelledException )
+        {
+            // Avoid too many error dumps on cancellation.
+            return false;
+        }
         catch( Exception ex )
         {
-            monitor.Error( "Error while pulling remote tags. This requires a manual fix.", ex );
+            // Avoid error dump if cancelled. We may miss "real exception" but we don't care.
+            // This skips LibGit2Sharp's UserCancelledException.
+            if( !cancellation.IsCancellationRequested )
+            {
+                monitor.Error( "Error while pulling remote tags. This requires a manual fix.", ex );
+            }
             return false;
         }
     }
@@ -315,11 +358,15 @@ public sealed partial class GitRepository
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="diff">The diff between local and remote tags on success.</param>
     /// <param name="remoteName">The remote name.</param>
+    /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool GetDiffTags( IActivityMonitor monitor, [NotNullWhen( true )] out GitTagInfo.Diff? diff, string remoteName = "origin" )
+    public bool GetDiffTags( IActivityMonitor monitor,
+                             [NotNullWhen( true )] out GitTagInfo.Diff? diff,
+                             string remoteName = "origin",
+                             CancellationToken cancellation = default )
     {
         if( !GetLocalTags( monitor, out var localTags )
-            || !GetRemoteTags( monitor, out var remoteTags, remoteName ) )
+            || !GetRemoteTags( monitor, out var remoteTags, remoteName, cancellation ) )
         {
             diff = null;
             return false;
@@ -335,10 +382,11 @@ public sealed partial class GitRepository
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="remoteName">The remote name to consider.</param>
+    /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool FetchTags( IActivityMonitor monitor, string remoteName = "origin" )
+    public bool FetchTags( IActivityMonitor monitor, string remoteName = "origin", CancellationToken cancellation = default )
     {
-        if( !GetDiffTags( monitor, out var diff, remoteName ) )
+        if( !GetDiffTags( monitor, out var diff, remoteName, cancellation ) )
         {
             return false;
         }
@@ -346,7 +394,7 @@ public sealed partial class GitRepository
         if( diff.RemoteOnlyCount > 0 )
         {
             // This traces the pulled tags.
-            return PullTags( monitor, diff.RemoteOnlyTags.Select( t => t.CanonicalName ), remoteName );
+            return PullTags( monitor, diff.RemoteOnlyTags.Select( t => t.CanonicalName ), remoteName, cancellation );
         }
         return true;
     }

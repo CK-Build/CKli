@@ -26,14 +26,16 @@ public sealed partial class GitRepository
     /// The short path to display, relative to a well known root. It must not be empty.
     /// (This is often the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
     /// </param>
+    /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>The GitRepository object or null on error.</returns>
     public static GitRepository? Clone( IActivityMonitor monitor,
                                         GitRepositoryKey git,
                                         Signature committer,
                                         NormalizedPath workingFolder,
-                                        NormalizedPath displayPath )
+                                        NormalizedPath displayPath,
+                                        CancellationToken cancellation = default )
     {
-        var r = CloneWorkingFolder( monitor, git, workingFolder, default );
+        var r = CloneWorkingFolder( monitor, git, workingFolder, cancellation );
         return r == null ? null : new GitRepository( git, committer, r, workingFolder, displayPath );
     }
 
@@ -205,10 +207,7 @@ public sealed partial class GitRepository
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="git">The Git key.</param>
     /// <param name="workingFolder">The local working folder.</param>
-    /// <param name="cancellation">
-    /// Optional cancellation token.
-    /// This is currently ignored as this doesn't seem to work as intended.
-    /// </param>
+    /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>The LibGit2Sharp Repository object or null on error.</returns>
     public static Repository? CloneWorkingFolder( IActivityMonitor monitor,
                                                   GitRepositoryKey git,
@@ -226,22 +225,51 @@ public sealed partial class GitRepository
                     FetchOptions =
                     {
                         CredentialsProvider = ( url, user, cred ) => creds,
-                        //OnProgress = _ => !cancellation.IsCancellationRequested,
-                        //OnTransferProgress = _ => !cancellation.IsCancellationRequested,
-                        //OnUpdateTips = (_,_,_) => !cancellation.IsCancellationRequested,
+                        OnProgress = _ => !cancellation.IsCancellationRequested,
+                        OnTransferProgress = _ => !cancellation.IsCancellationRequested,
+                        OnUpdateTips = (_,_,_) => !cancellation.IsCancellationRequested,
                     },
                     Checkout = true
                 } );
+                if( cancellation.IsCancellationRequested )
+                {
+                    return null;
+                }
                 r = new Repository( workingFolder );
                 EnsureFirstCommit( monitor, r );
                 return r;
             }
             catch( Exception ex )
             {
-                monitor.Error( "Git clone failed. Leaving existing directory as-is.", ex );
+                // Avoid error dump if cancelled. We may miss "real exception" but we don't care.
+                // This skips LibGit2Sharp's UserCancelledException.
+                if( !cancellation.IsCancellationRequested )
+                {
+                    monitor.Error( "Git clone failed. Leaving existing directory as-is.", ex );
+                }
                 r?.Dispose();
                 return null;
             }
+        }
+    }
+
+    /// <summary>
+    /// See <see cref="CloneWorkingFolder(IActivityMonitor, GitRepositoryKey, NormalizedPath, CancellationToken)"/>.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="git">The Git key.</param>
+    /// <param name="workingFolder">The local working folder.</param>
+    /// <param name="cancellation">Optional cancellation token.</param>
+    /// <returns>True on success, false on error.</returns>
+    public static bool TryCloneWorkingFolder( IActivityMonitor monitor,
+                                              GitRepositoryKey git,
+                                              NormalizedPath workingFolder,
+                                              CancellationToken cancellation )
+    {
+        // This never throws.
+        using( var r = CloneWorkingFolder( monitor, git, workingFolder, cancellation ) )
+        {
+            return r != null;
         }
     }
 

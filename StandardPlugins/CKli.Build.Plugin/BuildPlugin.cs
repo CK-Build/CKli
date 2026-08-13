@@ -290,7 +290,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                           bool isPullBuild,
                           bool publish )
     {
-        if( !HandleMaxDoP( monitor, maxDop, out var vMaxDoP )
+        if( !ParseInteger( monitor, "--max-dop", maxDop, out var vMaxDoP, 4 )
             || !HandleForceSkipTests( monitor, skipTests, forceTests, out bool? runTest ) )
         {
             return Task.FromResult( false );
@@ -323,7 +323,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             monitor.Info( ScreenType.CKliScreenTag, "The --skip-tests option is ignored when building a non CI version." );
         }
         var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.None, mustPublish: publish, branch, all );
-        if( roadmap == null || !HandleMaxDoP( monitor, maxDop, out var vMaDxDop ) )
+        if( roadmap == null || !ParseInteger( monitor, "--max-dop", maxDop, out var vMaDxDop, 4 ) )
         {
             return Task.FromResult( false );
         }
@@ -433,17 +433,6 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             }
             return branch;
         }
-    }
-
-    static bool HandleMaxDoP( IActivityMonitor monitor, string? maxDop, out int vMaxDop )
-    {
-        if( maxDop == null ) vMaxDop = 4;
-        else if( !int.TryParse( maxDop, out vMaxDop ) || vMaxDop <= 0 )
-        {
-            monitor.Error( "Invalid --max-dop value. Must be an integer greater than 0." );
-            return false;
-        }
-        return true;
     }
 
     static bool HandleForceSkipTests( IActivityMonitor monitor, bool skipTests, bool forceTests, out bool? runTest )

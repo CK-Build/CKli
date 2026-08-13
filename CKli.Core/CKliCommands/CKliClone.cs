@@ -20,6 +20,7 @@ sealed class CKliClone : Command
                     (["--private"], "Indicates a private repository. A Personal Access Token (or any other secret) is required."),
                     (["--allow-duplicate"], "Allows a Stack that already exists locally to be cloned."),
                     (["--ignore-parent-stack"], "Allows the cloned Stack to be inside an existing one."),
+                    (["--max-dop"], "Limits the parallelism when cloning the repositories."),
                 ] )
     {
     }
@@ -40,6 +41,15 @@ sealed class CKliClone : Command
         bool isPrivate = cmdLine.EatFlag( "--private" );
         bool allowDuplicate = cmdLine.EatFlag( "--allow-duplicate" );
         bool ignoreParentStack = cmdLine.EatFlag( "--ignore-parent-stack" );
+        if( !PluginBase.ParseInteger( monitor,
+                                      "--max-dop",
+                                      cmdLine.EatSingleOption( "--max-dop" ),
+                                      out int maxDop,
+                                      defaultValue: 0,
+                                      minValue: 1 ) )
+        {
+            return false;
+        }
         if( !cmdLine.Close( monitor ) )
         {
             return false;
@@ -51,6 +61,7 @@ sealed class CKliClone : Command
                                                              allowDuplicate,
                                                              ignoreParentStack,
                                                              "main",
+                                                             maxDop,
                                                              scopeAlive ) )
         {
             return stack != null;
