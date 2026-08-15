@@ -47,10 +47,10 @@ public sealed partial class BranchModelPlugin
                 if( target != null )
                 {
                     Throw.DebugAssert( target.Exists );
-                    // If create is true, we will synchronize but the "dev/" branch may not be created
-                    // (if the BranchLinkType is manual or if there's nothing to synchronize) so we
-                    // ensure that the "dev/" branch exists.
-                    if( isDevName && target == b && create )
+                    // Whatever create is, when the user specified a "dev/", we ensure that the "dev/" branch exists.
+                    // Note that if create is true, we will synchronize but the "dev/" branch may not be created
+                    // (if the BranchLinkType is manual or if there's nothing to synchronize).
+                    if( isDevName && target == b )
                     {
                         target.EnsureDevBranch();
                     }

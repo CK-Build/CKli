@@ -94,6 +94,7 @@ public sealed partial class HotZonePlugin : PrimaryPluginBase
                                 : "all repositories";
         using( monitor.OpenTrace( $"Computing Hot Graph from '{branchName}' for {displayPivots}." ) )
         {
+            // Concretize all the BranchModelInfo once for all: there must be no issue.
             if( !_branchModel.TryGetAllWithoutIssue( monitor, out _ ) )
             {
                 return null;
@@ -148,7 +149,7 @@ public sealed partial class HotZonePlugin : PrimaryPluginBase
 
                     // isDevSolution may transition from false to true if the solution failed to be read in the
                     // regular branch but is valid in the "dev/".
-                    if( !graph.AddSolution( monitor, repo, hotBranch, hasPivots && isContainedInPivots, ref isDevSolution ) )
+                    if( !graph.AddSolution( monitor, branchInfo, hotBranch, hasPivots && isContainedInPivots, ref isDevSolution ) )
                     {
                         return null;
                     }

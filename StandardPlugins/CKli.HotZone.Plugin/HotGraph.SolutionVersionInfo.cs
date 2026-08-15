@@ -12,8 +12,8 @@ namespace CKli.HotZone.Plugin;
 public sealed partial class HotGraph
 {
     /// <summary>
-    /// Captures version related information for a <see cref="Solution"/>.
-    /// Exposed by <see cref="Solution.VersionInfo"/> but initialized by a successful call to <see cref="HotGraph.GetPackageUpdater(IActivityMonitor)"/>.
+    /// Captures version related information for a <see cref="HotGraph.Solution"/>.
+    /// Exposed by <see cref="Solution.VersionInfo"/> but initialized by a successful call to <see cref="HotGraph.GetPackageUpdater(IActivityMonitor, VersionTagPlugin)"/>.
     /// Requires that <see cref="VersionTagPlugin"/> has no issue.
     /// <para>
     /// This tracks branches that must be built 

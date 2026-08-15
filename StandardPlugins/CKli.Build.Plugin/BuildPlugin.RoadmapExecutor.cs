@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
+using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using LibGit2Sharp;
@@ -225,7 +226,7 @@ public sealed partial class BuildPlugin
 
         // This doesn't catch exception. When called with a true _singleBuild, this is a unhandled
         // command exception handled at the root level.
-        // When called in parallel, it is the BuildAsync wrapper above that handles it.
+        // When called in parallel, it is the ParallelBuildAsync wrapper above that handles it.
         async Task<BuildResult?> DoBuildAsync( IActivityMonitor monitor, Roadmap.BuildInfo build )
         {
             if( _cancellation.IsCancellationRequested ) return null;
@@ -233,8 +234,21 @@ public sealed partial class BuildPlugin
             // EnsureAndCheckoutBranch and UpdateDependenciesAndCommit only interact with their own Repo:
             // parallel builds don't need synchronization for these.
 
+            // If the solution has been read is the theoretical branch name we have nothing to do.
+            var hotBranch = build.Solution.VersionInfo.Solution.Branch;
+            if( hotBranch.BranchName != _roadmap.Graph.BranchName )
+            {
+                // The real branch from which the build must be done doesn't exist.
+                // We create and synchronize it.
+                hotBranch = build.Solution.VersionInfo.Solution.BranchInfo.Branches[_roadmap.Graph.BranchName.Index];
+                Throw.DebugAssert( !hotBranch.Exists );
+                if( !hotBranch.EnsureExists( monitor ) || !hotBranch.Synchronize( monitor ) )
+                {
+                    return null;
+                }
+            }
             // This checks out the "dev/" (CI build) or integrate it in the regular branch and checks out the regular branch (non CI build).
-            if( !EnsureAndCheckoutBranch( monitor, build, out var canAmend ) )
+            if( !EnsureAndCheckoutBranch( monitor, build, hotBranch, out var canAmend ) )
             {
                 return null;
             }
@@ -269,13 +283,16 @@ public sealed partial class BuildPlugin
             }
             return result;
 
-            static bool EnsureAndCheckoutBranch( IActivityMonitor monitor, Roadmap.BuildInfo build, out bool canAmend )
+            static bool EnsureAndCheckoutBranch( IActivityMonitor monitor,
+                                                 Roadmap.BuildInfo build,
+                                                 HotBranch b,
+                                                 out bool canAmend )
             {
-                var b = build.Solution.Solution.Branch;
-                Throw.DebugAssert( b.GitBranch != null );
+                Throw.DebugAssert( b.Exists && build.Solution.Repo == b.Repo );
                 var gitRepository = build.Solution.Repo.GitRepository;
                 Branch workingBranch;
                 canAmend = false;
+
                 bool hasDev = b.GitDevBranch != null;
                 if( build.Solution.Roadmap.IsCIBuild )
                 {
@@ -299,9 +316,9 @@ public sealed partial class BuildPlugin
                     }
                     // This is too risky to do this here: this is done by the Publish plugin only
                     // when everything went right.
-                    //// Whether the "dev/" branch exists or not, IF a git push occurs, then remove
-                    //// the remote branch.
-                    //gitRepository.DeferredPushRefSpecs.Add( $":refs/heads/{b.BranchName.DevName}" );
+                    //  // Whether the "dev/" branch exists or not, IF a git push occurs, then remove
+                    //  // the remote branch.
+                    //  gitRepository.DeferredPushRefSpecs.Add( $":refs/heads/{b.BranchName.DevName}" );
 
                     workingBranch = b.GitBranch;
                 }

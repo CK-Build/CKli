@@ -17,7 +17,7 @@ public sealed partial class BuildPlugin
         var monitor = e.Monitor;
         foreach( var r in e.Repos )
         {
-            CollectVersionTagIssues( monitor, _versionTags.Get( monitor, r ), e.ScreenType, e.Add ); 
+            CollectVersionTagIssues( monitor, _versionTag.Get( monitor, r ), e.ScreenType, e.Add ); 
         }
     }
 

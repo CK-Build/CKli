@@ -30,7 +30,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     const string _dDryRun = "Only display the build roadmap.";
     const string _oDryRun = "--dry-run,-d";
 
-    readonly VersionTagPlugin _versionTags;
+    readonly VersionTagPlugin _versionTag;
     readonly BranchModelPlugin _branchModel;
     readonly HotZonePlugin _hotZone;
     readonly RepositoryBuilderPlugin _repoBuilder;
@@ -80,7 +80,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                         ShallowSolutionPlugin solutionPlugin )
         : base( primaryContext )
     {
-        _versionTags = versionTags;
+        _versionTag = versionTags;
         _branchModel = branchModel;
         _hotZone = hotZone;
         _repoBuilder = repoBuilder;
@@ -417,7 +417,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         var hotGraph = _hotZone.GetHotGraph( monitor, branchName, ciBuildMode != CIBuildMode.None, pivots );
         if( hotGraph == null ) return null;
 
-        var roadmap = Roadmap.Create( monitor, _versionTags, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish );
+        var roadmap = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish );
         if( roadmap != null  )
         {
             context.Screen.Display( roadmap.ToRenderable );

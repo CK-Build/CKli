@@ -171,7 +171,7 @@ public sealed partial class BuildPlugin
                                              FixPackageMapper packageMapping,
                                              FixWorkflow.TargetRepo target )
     {
-        var versionInfo = _versionTags.Get( monitor, target.Repo );
+        var versionInfo = _versionTag.Get( monitor, target.Repo );
 
         // We are ready to build or rebuild the target.
         // We have nothing to do when rebuilding: the previous "local/" if it exists, will be
@@ -289,7 +289,7 @@ public sealed partial class BuildPlugin
                     The version 'v{target.ToFixVersion}' produced packages: '{toFix.BuildContentInfo.Produced.Concatenate( "', '" )}'.
                     But the new fix 'v{targetVersion}' produced: '{result.Content.Produced.Concatenate( "', '" )}'.
                     """ );
-            _versionTags.DestroyLocalRelease( monitor, result.Repo, targetVersion );
+            _versionTag.DestroyLocalRelease( monitor, result.Repo, targetVersion );
             return false;
         }
         // Adds the new produced packages to the updates map.

@@ -23,7 +23,7 @@ public sealed partial class HotGraph
     public sealed class Solution : IComparable<Solution>
     {
         readonly HotGraph _graph;
-        readonly Repo _repo;
+        readonly BranchModelInfo _branchInfo;
         readonly HotBranch _branch;
         readonly List<Solution> _directRequirements;
         readonly HashSet<Solution> _allRequirements;
@@ -40,14 +40,14 @@ public sealed partial class HotGraph
         bool _isDevSolution;
 
         internal Solution( HotGraph graph,
-                           Repo repo,
+                           BranchModelInfo branchInfo,
                            HotBranch closestBranch,
                            GitSolution solution,
                            bool isPivot,
                            bool isDevSolution )
         {
             _graph = graph;
-            _repo = repo;
+            _branchInfo = branchInfo;
             _branch = closestBranch;
             _solution = solution;
             _isPivot = isPivot;
@@ -81,7 +81,12 @@ public sealed partial class HotGraph
         /// <summary>
         /// Gets the repository.
         /// </summary>
-        public Repo Repo => _repo;
+        public Repo Repo => _branchInfo.Repo;
+
+        /// <summary>
+        /// Gets the <see cref="BranchModelInfo"/> for the repository.
+        /// </summary>
+        public BranchModelInfo BranchInfo => _branchInfo;
 
         /// <summary>
         /// Gets the branch name from which this <see cref="GitSolution"/> has been read: it is the closest

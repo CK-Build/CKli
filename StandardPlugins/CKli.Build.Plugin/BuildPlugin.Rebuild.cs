@@ -43,7 +43,7 @@ public sealed partial class BuildPlugin
         {
             using( monitor.OpenInfo( $"Rebuilding old releases of '{repo.DisplayPath}'." ) )
             {
-                var versionTagInfo = _versionTags.Get( monitor, repo );
+                var versionTagInfo = _versionTag.Get( monitor, repo );
                 foreach( var tag in versionTagInfo.LastStables.Reverse() )
                 {
                     if( !tag.IsRegularVersion ) continue;
@@ -106,7 +106,7 @@ public sealed partial class BuildPlugin
         {
             return false;
         }
-        var versionTagInfo = _versionTags.GetWithoutIssue( monitor, repo );
+        var versionTagInfo = _versionTag.GetWithoutIssue( monitor, repo );
         if( versionTagInfo == null )
         {
             return false;

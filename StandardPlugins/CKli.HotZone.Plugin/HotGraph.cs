@@ -20,7 +20,8 @@ namespace CKli.HotZone.Plugin;
 /// This implies that <see cref="BranchModelInfo.HasIssue"/> is false but doesn't depend on the <see cref="VersionTagPlugin"/>.
 /// </para>
 /// version tags issues don't prevent a HotGraph to be obtained. They prevent <see cref="PackageUpdater"/>
-/// and <see cref="SolutionVersionInfo"/> to be obtained (and eventually CKli.BuildPlugin.Roadmap creation).
+/// creation (<see cref="GetPackageUpdater"/>) and <see cref="SolutionVersionInfo"/> to be
+/// obtained (and eventually CKli.BuildPlugin.Roadmap creation).
 /// </summary>
 public sealed partial class HotGraph
 {
@@ -130,8 +131,9 @@ public sealed partial class HotGraph
     /// This requires that no version related issue exist (all <see cref="VersionTagInfo.HasIssue"/> are false).
     /// </summary>
     /// <param name="monitor">The required monitor.</param>
+    /// <param name="versionTag">The version tag plugin.</param>
     /// <returns>The package updater or null on error.</returns>
-    public PackageUpdater? GetPackageUpdater( IActivityMonitor monitor )
+    public PackageUpdater? GetPackageUpdater( IActivityMonitor monitor, VersionTagPlugin versionTag )
     {
         if( _packageUpdater == null )
         {
@@ -143,7 +145,7 @@ public sealed partial class HotGraph
                 for( int i = 0; i < _solutions.Length; i++ )
                 {
                     Solution? s = _solutions[i];
-                    var sV = s.ComputeVersionInfo( monitor, _versionTags.GetWithoutIssue( monitor, s.Repo ) );
+                    var sV = s.ComputeVersionInfo( monitor, versionTag.GetWithoutIssue( monitor, s.Repo ) );
                     if( sV != null )
                     {
                         versions[i] = sV;
@@ -215,15 +217,15 @@ public sealed partial class HotGraph
         return success;
     }
 
-    internal bool AddSolution( IActivityMonitor monitor, Repo repo, HotBranch closestBranch, bool isPivot, ref bool isDevSolution )
+    internal bool AddSolution( IActivityMonitor monitor, BranchModelInfo branchInfo, HotBranch closestBranch, bool isPivot, ref bool isDevSolution )
     {
-        Throw.DebugAssert( _solutions[repo.Index] == null );
+        Throw.DebugAssert( _solutions[branchInfo.Repo.Index] == null );
         Throw.DebugAssert( closestBranch.GitBranch != null );
         Throw.DebugAssert( "isDevSolution => We are on the theoretical graph branch.", !isDevSolution || closestBranch.BranchName == _branchName );
 
         // Read the .slnx from the "dev/" or the regular branch.
         var shallow = _shallowSolution.GetShallowSolution( monitor,
-                                                           repo,
+                                                           branchInfo.Repo,
                                                            (isDevSolution ? closestBranch.GitDevBranch : null) ?? closestBranch.GitBranch,
                                                            useWorkingFolder: false );
         if( shallow == null )
@@ -232,7 +234,7 @@ public sealed partial class HotGraph
             // the branch was the regular one: the "dev/" may contain a valid solution.
             if( !isDevSolution && closestBranch.GitDevBranch != null )
             {
-                shallow = _shallowSolution.GetShallowSolution( monitor, repo, closestBranch.GitDevBranch, useWorkingFolder: false );
+                shallow = _shallowSolution.GetShallowSolution( monitor, branchInfo.Repo, closestBranch.GitDevBranch, useWorkingFolder: false );
             }
             if( shallow == null )
             {
@@ -243,9 +245,9 @@ public sealed partial class HotGraph
             monitor.Info( ScreenType.CKliScreenTag, $"Considering solution in branch '{closestBranch.GitDevBranch.FriendlyName}' that can be read without errors." );
             isDevSolution = true;
         }
-        var s = new Solution( this, repo, closestBranch, shallow, isPivot, isDevSolution );
-        _solutions[repo.Index] = s;
-        _orderedSolutions[repo.Index] = s;
+        var s = new Solution( this, branchInfo, closestBranch, shallow, isPivot, isDevSolution );
+        _solutions[branchInfo.Repo.Index] = s;
+        _orderedSolutions[branchInfo.Repo.Index] = s;
         return RegisterProjects( monitor, s, shallow );
     }
 

@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
+using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
@@ -27,7 +28,6 @@ namespace CKli.Build.Plugin;
 /// </summary>
 public sealed partial class Roadmap
 {
-    readonly VersionTagPlugin _versionTags;
     readonly HotGraph _graph;
     readonly CIBuildMode _ciBuildMode;
     readonly bool _isPullBuild;
@@ -39,14 +39,12 @@ public sealed partial class Roadmap
     int _buildSolutionCount;
     int _publishSolutionCount;
 
-    Roadmap( VersionTagPlugin versionTags,
-             HotGraph graph,
+    Roadmap( HotGraph graph,
              HotGraph.PackageUpdater packageUpdater,
              bool isPullBuild,
              CIBuildMode ciBuildMode,
              bool mustPublish )
     {
-        _versionTags = versionTags;
         _graph = graph;
         _packageUpdater = packageUpdater;
         _isPullBuild = isPullBuild;
@@ -72,7 +70,7 @@ public sealed partial class Roadmap
     }
 
     internal static Roadmap? Create( IActivityMonitor monitor,
-                                     VersionTagPlugin versionTags,
+                                     VersionTagPlugin versionTag,
                                      ArtifactHandlerPlugin artifactHandler,
                                      HotGraph graph,
                                      bool isPullBuild,
@@ -99,10 +97,10 @@ public sealed partial class Roadmap
             // is de facto concurrent-safe: before April 2026, a ConcurrentDictionary was used as a layer above the
             // PackageUpdater.Mappings that was updated by the RoadmapExecutor.DoBuildAsync after each build.)
             //
-            var packageUpdater = graph.GetPackageUpdater( monitor );
+            var packageUpdater = graph.GetPackageUpdater( monitor, versionTag );
             if( packageUpdater == null ) return null;
 
-            roadmap = new Roadmap( versionTags, graph, packageUpdater, isPullBuild, ciBuildMode, mustPublish );
+            roadmap = new Roadmap( graph, packageUpdater, isPullBuild, ciBuildMode, mustPublish );
             if( !roadmap.Initialize( monitor ) )
             {
                 return null;

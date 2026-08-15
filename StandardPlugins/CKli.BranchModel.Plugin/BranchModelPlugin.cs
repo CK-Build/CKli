@@ -116,6 +116,8 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         _commitProvider = commitProvider;
     }
 
+    internal ITagCommitProvider? TagCommitProvider => _commitProvider;
+
     /// <summary>
     /// <see cref="BranchModelInfo"/> factory.
     /// </summary>

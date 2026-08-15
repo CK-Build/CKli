@@ -245,12 +245,9 @@ public sealed class HotBranch
     /// according to <see cref="BranchName.LinkType"/>.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="commitProvider">
-    /// Required commit information provider to support <see cref="BranchLinkType.Release"/> and <see cref="BranchLinkType.CI"/>.
-    /// </param>
     /// <param name="applyLink">Optional link type to consider. By default, this configured <see cref="BranchName.LinkType"/> is considered.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool Synchronize( IActivityMonitor monitor, ITagCommitProvider? commitProvider, BranchLinkType applyLink = BranchLinkType.None )
+    public bool Synchronize( IActivityMonitor monitor, BranchLinkType applyLink = BranchLinkType.None )
     {
         Throw.CheckState( Exists );
         // Merge the tracked branches of the regular and the dev/ if they exist.
@@ -289,7 +286,7 @@ public sealed class HotBranch
             return false;
         }
         Throw.DebugAssert( parent.Exists );
-        if( !parent.Synchronize( monitor, commitProvider, BranchLinkType.None ) )
+        if( !parent.Synchronize( monitor, BranchLinkType.Manual ) )
         {
             return false;
         }
@@ -317,7 +314,8 @@ public sealed class HotBranch
         // We must find the commit and make sure that it is integrated in this branch.
         Throw.DebugAssert( _name.Parent != null );
 
-        Throw.CheckNotNullArgument( "Required for BranchLinkType Release or CI.", commitProvider );
+        var commitProvider = _info._plugin.TagCommitProvider;
+        Throw.CheckState( "Required for BranchLinkType Release or CI.", commitProvider != null );
 
         var tagCommit = commitProvider.GetCommit( monitor, parent, applyLink is BranchLinkType.CI );
         if( tagCommit == null )

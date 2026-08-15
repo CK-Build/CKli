@@ -300,7 +300,7 @@ public sealed partial class Roadmap
 #endregion /Initialize
 
         internal bool ConcludeInitialization( IActivityMonitor monitor,
-                                              ArtifactHandlerPlugin artifactHandlerPlugin,
+                                              ArtifactHandlerPlugin artifactHandler,
                                               ref int idxBuildNumber )
         {
             Throw.DebugAssert( !_mustPublish );
@@ -330,7 +330,7 @@ public sealed partial class Roadmap
                 {
                     _lastBuildToPublish = _lastBuild.TagCommit.BuildContentInfo;
                     Throw.DebugAssert( "Because CurrentVersion cannot be a +fake (MustBuild would be true).", _lastBuildToPublish != null ); 
-                    if( !artifactHandlerPlugin.HasAllArtifacts( monitor, _solution.Repo, CurrentVersion, _lastBuildToPublish, out _ ) )
+                    if( !artifactHandler.HasAllArtifacts( monitor, _solution.Repo, CurrentVersion, _lastBuildToPublish, out _ ) )
                     {
                         monitor.Error( $"""
                         Repository '{Repo.DisplayPath}' must be published in existing version '{CurrentVersion}' but this version misses local artifacts.
