@@ -82,7 +82,7 @@ sealed class CKliTagPull : Command
             foreach( var repo in repos )
             {
                 success &= pull
-                            ? repo.GitRepository.PullTags( monitor, tagNames )
+                            ? repo.GitRepository.PullTags( monitor, tagNames, cancellation: scopeAlive )
                             : repo.GitRepository.PushTags( monitor, tagNames );
             }
             return success;

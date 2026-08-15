@@ -79,7 +79,7 @@ sealed class CKliTagList : Command
                 }
                 if( remote )
                 {
-                    if( !repo.GitRepository.GetRemoteTags( monitor, out var tags ) )
+                    if( !repo.GitRepository.GetRemoteTags( monitor, out var tags, cancellation: scopeAlive ) )
                     {
                         return false;
                     }
@@ -94,7 +94,7 @@ sealed class CKliTagList : Command
                     {
                         return false;
                     }
-                    if( !repo.GitRepository.GetRemoteTags( monitor, out var remoteTags ) )
+                    if( !repo.GitRepository.GetRemoteTags( monitor, out var remoteTags, cancellation: scopeAlive ) )
                     {
                         return false;
                     }

@@ -55,7 +55,7 @@ sealed class CKliTagFetch : Command
             if( repos == null ) return false;
             foreach( var repo in repos )
             {
-                if( !repo.GitRepository.FetchTags( monitor ) )
+                if( !repo.GitRepository.FetchTags( monitor, cancellation: scopeAlive ) )
                 {
                     return false;
                 }

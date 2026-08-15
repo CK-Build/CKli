@@ -61,7 +61,7 @@ sealed class CKliBranchPush : Command
 
             foreach( var repo in repos )
             {
-                if( !repo.GitRepository.FetchRemoteBranch( monitor, branchName, withTags: false, out var branch ) )
+                if( !repo.GitRepository.FetchRemoteBranch( monitor, branchName, withTags: false, out var branch, scopeAlive ) )
                 {
                     return false;
                 }
