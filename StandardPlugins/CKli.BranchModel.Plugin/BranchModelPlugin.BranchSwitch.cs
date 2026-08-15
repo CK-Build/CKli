@@ -57,7 +57,7 @@ public sealed partial class BranchModelPlugin
                     // When -c is used, we Synchronize the branch with its remote and parent: this unifies
                     // the behavior regardless of the initial branch existence.
                     Throw.DebugAssert( "create => we are on the target branch.", !create || target == b );
-                    if( create && !target.Synchronize( monitor, _commitProvider ) )
+                    if( create && !target.Synchronize( monitor ) )
                     {
                         success = false;
                     }

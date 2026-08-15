@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using System;
 using System.Linq;
 
 namespace CKli.BranchModel.Plugin;
@@ -24,11 +25,18 @@ public sealed partial class BranchModelPlugin
                             CKliEnv context,
                             [Description( "Branch name to open." )]
                             string branchName,
+                            [Description( "Specifies the link (Manual, Release, CI or Full) to the parent branch. Defaults to CI." )]
+                            string? link = null,
                             [Description( "Parent branch to consider instead of the currently checked out branch (applies only to 'explo/' branch)." )]
                             string? parent = null )
     {
         var repos = World.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
         if( repos == null ) return false;
+
+        if( !ParseLink( monitor, link, allowManual: true, out var linkType ) )
+        {
+            return false;
+        }
 
         // The system state is... what it is.
         // We can have a git branch and/or a BranchName: we must not rely here on any kind of synchronization
@@ -36,7 +44,7 @@ public sealed partial class BranchModelPlugin
 
         // First, handle the branch namespace because it is a immutable model. The namespace will be updated
         // only if git branch manipulations/synchronizations below work.
-        if( !BranchName.TryParseBranchName( monitor, branchName, out var csPrerelease ) )
+        if( !BranchName.TryParseBranchName( monitor, branchName, out CSVersionKind csPrerelease ) )
         {
             return false;
         }
@@ -46,7 +54,7 @@ public sealed partial class BranchModelPlugin
 
         if( csPrerelease != CSVersionKind.None )
         {
-            (ns, newBranch) = _namespace.AddOrUpdate( BranchLinkType.CI, csPrerelease );
+            (ns, newBranch) = _namespace.AddOrUpdate( linkType, csPrerelease );
         }
         else
         {
@@ -77,7 +85,7 @@ public sealed partial class BranchModelPlugin
                     """ );
                 return false;
             }
-            (ns, newBranch) = _namespace.AddOrUpdateExplo( branchName, BranchLinkType.CI, parentBranch );
+            (ns, newBranch) = _namespace.AddOrUpdateExplo( branchName, linkType, parentBranch );
         }
         bool namespaceChanged = !ns.Equals( _namespace );
         if( namespaceChanged )
@@ -88,7 +96,8 @@ public sealed partial class BranchModelPlugin
                 {newBranch.ToParentedString()}
                 """ );
         }
-        // To handle git branches, we create a BranchModelInfo (with the HotBranch) that is driven by the new namespace.
+        // To handle git branches, we create a brand new BranchModelInfo (with its HotBranches) that
+        // is driven by the new namespace.
         foreach( var repo in repos )
         {
             var info = Create( monitor, repo, ns, _autoFixUselessBranch );
@@ -99,14 +108,33 @@ public sealed partial class BranchModelPlugin
                 return false;
             }
             var b = info.Branches[newBranch.Index];
-            // Since we explicitly open the branch here, we want the "dev/" to exist (and be checked out).
+            // Since we explicitly open the branch here:
+            // - We want the "dev/" to exist (and be checked out).
+            // - We want the branch to be synchronized (according to its LinkType).
             if( !b.EnsureExists( monitor ) ) return false;
             b.EnsureDevBranch();
-            if( !b.Synchronize( monitor, _commitProvider ) ) return false;
-            if( !repo.GitRepository.Checkout(monitor,b.GitDevBranch) ) return false;
+            if( !b.Synchronize( monitor ) ) return false;
+            if( !repo.GitRepository.Checkout( monitor, b.GitDevBranch ) ) return false;
         }
         // Everything went fine: save the updated namespace if needed.
         return !namespaceChanged || SaveBranchNamespace( monitor, ns );
+    }
+
+    static bool ParseLink( IActivityMonitor monitor, string? link, bool allowManual, out BranchLinkType linkType )
+    {
+        linkType = BranchLinkType.None;
+        var sMode = link.AsSpan();
+        if( sMode.Length > 0 )
+        {
+            if( !BranchLinkTypeExtensions.TryMatchLinkType( ref sMode, out linkType )
+                || sMode.Length > 0
+                || (!allowManual && linkType is BranchLinkType.Manual) )
+            {
+                monitor.Error( "Invalid mode. Must be Release, CI or Full." );
+                return false;
+            }
+        }
+        return true;
     }
 
 }

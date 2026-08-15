@@ -17,7 +17,7 @@ public sealed partial class BranchModelInfo : RepoInfo
     static readonly string[] _autoPrevRootBranchNames = ["stable", "main", "master", "root", "trunk", "mother", "primary", "develop"];
 
     readonly BranchNamespace _namespace;
-    readonly BranchModelPlugin _plugin;
+    internal readonly BranchModelPlugin _plugin;
 
     // Deferred initialization.
     ImmutableArray<HotBranch> _branches;

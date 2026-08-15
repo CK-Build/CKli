@@ -504,7 +504,7 @@ public sealed partial class VersionTagInfo : RepoInfo
                 return true;
             }
             // The existing version tag must not be "+deprecated" one.
-            if( !CheckDeprecatedVersion( monitor, exists ) )
+            if( !exists.CheckDeprecatedVersion( monitor ) )
             {
                 return false;
             }
@@ -531,80 +531,19 @@ public sealed partial class VersionTagInfo : RepoInfo
             isRebuild = true;
             return true;
         }
-        // This is a new version. The build process must have checked that the build commit has not already been released with
-        // a different version (otherwise we would be in the case above where the version exists).
+        // This is a new version. The build process must have checked that the build commit is not already associated to
+        // an incompatible version.
         if( TagCommitsBySha.TryGetValue( buildCommit.Sha, out var already ) )
         {
-            // If the build commit carries a +fake version, then the target version must be "roughly based" on it.
-            if( already.IsFakeVersion )
+            var msg = already.CanBearVersion( version );
+            if( msg != null )
             {
-                if( already.Version.IsStableRoughBaseOf( version ) )
-                {
-                    return true;
-                }
-                monitor.Error( $"""
-                        Invalid version 'v{version}' in '{Repo.DisplayPath}'.
-                        This version is not compatible with the fake 'v{already.Version}'.
-                        """ );
-                return false;
-            }
-
-            // Already released under a different version.
-            if( !CheckDeprecatedVersion( monitor, already ) )
-            {
-                return false;
-            }
-            // Interesting case here: the same commit must produce 2 different versions (allowing this directly
-            // would require the TagCommitsBySha to be a Dictionary<string,List<TagCommit>>).
-            //
-            // There is only 2 cases where it makes sense to produce 2 versions from the same commit:
-            // - When a CI version (resp. prerelease) has been created and, without any change in the code, a
-            //   non-CI (resp. stable or "less prerelease") version must be produced.
-            //   This is quite rare as it implies that no dependency updates must be made in the code: this scenario
-            //   applies to "rank 0" repositories that have no dependencies to any other repositories in the stack (no
-            //   upstream repositories).
-            //   => This must be handled by the caller. Here we reject this case.
-            //      A dedicated empty commit point must be created (with no change from its parent) to carry the "more stable" version
-            //      or, if it is a "local/" version, it could be "DestroyLocalRelease" before the build.
-            // 
-            // - The "--ci.0" version that is a CI version produced from the non-CI commit is a mirror of the previous case:
-            //   here also it implies that no dependency updates must be made in the code: this scenario
-            //   applies to "rank 0" repositories that have no dependencies to any other repositories in the stack (no
-            //   upstream repositories).
-            //   However we handle this without the empty commit in order to have a true 0-based commit depth for CI builds. 
-            //
-
-            bool validCI0 = version.CINumber == 0
-                            && ((version.SetCINumber( -1, impactStablePatchNumber: false ) == already.Version && already.IsOrHasFakeVersion is true)
-                               ||
-                               (version.SetCINumber( -1, impactStablePatchNumber: true ) == already.Version && already.IsOrHasFakeVersion is false));
-            if( !validCI0 )
-            {
-                monitor.Error( $"""
-                        Invalid build commit '{buildCommit.Sha}' for version 'v{version}' in '{Repo.DisplayPath}'.
-                        This commit has already released the version 'v{already.Version}' on {already.Commit.Committer.When}.
-
-                        The same commit cannot produce 2 different versions.
-                        """ );
+                monitor.Error( msg );
                 return false;
             }
         }
         return true;
 
-        bool CheckDeprecatedVersion( IActivityMonitor monitor, TagCommit exists )
-        {
-            Throw.CheckArgument( !exists.IsFakeVersion );
-            if( exists.IsDeprecatedVersion )
-            {
-                monitor.Error( $"""
-                    The version '{exists.Version.ParsedText}' in '{Repo.DisplayPath}' is deprecated (on '{exists.Sha}' commit).
-
-                    Deprecated versions should not be produced again.
-                    """ );
-                return false;
-            }
-            return true;
-        }
     }
 
     TagCommit? FindBaseCommitByVersion( IActivityMonitor monitor, Commit buildCommit, SVersion version )

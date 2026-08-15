@@ -27,7 +27,7 @@ public sealed partial class BranchModelPlugin
                             [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
                             bool all = false )
     {
-        if( !ParseMode( monitor, mode, out var linkType ) )
+        if( !ParseLink( monitor, mode, allowManual: false, out var linkType ) )
         {
             return false;
         }
@@ -51,7 +51,7 @@ public sealed partial class BranchModelPlugin
                 var b = info.Branches[branchName.Index];
                 if( b.Exists )
                 {
-                    success &= b.Synchronize( monitor, _commitProvider, linkType );
+                    success &= b.Synchronize( monitor, linkType );
                 }
             }
         }
@@ -60,23 +60,6 @@ public sealed partial class BranchModelPlugin
             monitor.Warn( $"One or more repositories have issues. They have been skipped." );
         }
         return success;
-
-        static bool ParseMode( IActivityMonitor monitor, string? mode, out BranchLinkType linkType )
-        {
-            linkType = BranchLinkType.None;
-            var sMode = mode.AsSpan();
-            if( sMode.Length > 0 )
-            {
-                if( !BranchLinkTypeExtensions.TryMatchLinkType( ref sMode, out linkType )
-                    || sMode.Length > 0
-                    || linkType is BranchLinkType.Manual )
-                {
-                    monitor.Error( "Invalid mode. Must be Release, CI or Full." );
-                    return false;
-                }
-            }
-            return true;
-        }
     }
 }
 
