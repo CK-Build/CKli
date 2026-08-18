@@ -1,6 +1,5 @@
 using CK.Core;
 using CKli.Core;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
