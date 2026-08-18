@@ -3,9 +3,6 @@ using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 

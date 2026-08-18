@@ -1,7 +1,6 @@
 using CK.Core;
 using CKli.Core;
 using System;
-using System.Data;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
@@ -9,6 +8,11 @@ namespace CKli.BranchModel.Plugin;
 
 /// <summary>
 /// Branch in the <see cref="BranchModelPlugin.BranchNamespace"/>.
+/// <para>
+/// The <see cref="Name"/> starts with the "<see cref="WorldName.LTSName"/>/" when in a LTS world.
+/// Use <see cref="Match(SVersion)"/> to test whether a <see cref="SVersion"/> is bound to a branch
+/// (avoid using <see cref="SVersion.BranchName"/>).
+/// </para>
 /// </summary>
 [DebuggerDisplay( "{ToString(),nq}" )]
 public sealed class BranchName : IEquatable<BranchName>
@@ -33,11 +37,13 @@ public sealed class BranchName : IEquatable<BranchName>
 
     /// <summary>
     /// Gets the branch name.
+    /// This starts with the <see cref="WorldName.LTSName"/> in a LTS world.
     /// </summary>
     public string Name => _name;
 
     /// <summary>
     /// Gets the "dev/<see cref="Name"/>" branch name.
+    /// This starts with the <see cref="WorldName.LTSName"/> in a LTS world.
     /// </summary>
     public string DevName => _devName ??= ToDevBranchName( _ltsPrefixLength, _name );
 
@@ -75,6 +81,18 @@ public sealed class BranchName : IEquatable<BranchName>
     public CSVersionKind VersionKind => _versionKind;
 
     /// <summary>
+    /// Gets whether this branch corresponds to the <paramref name="version"/>.
+    /// </summary>
+    /// <param name="version">The version.</param>
+    /// <returns>True if the version corresponds to this branch name.</returns>
+    public bool Match( SVersion version )
+    {
+        return version.VersionKind is CSVersionKind.Exploratory
+                ? _name.AsSpan( _ltsPrefixLength + 6 ).Equals( version.ExploratoryName, StringComparison.Ordinal )
+                : version.VersionKind == _versionKind;
+    }
+
+    /// <summary>
     /// Gets whether a branch name is below this one.
     /// </summary>
     /// <param name="b">The potential child.</param>
@@ -88,18 +106,6 @@ public sealed class BranchName : IEquatable<BranchName>
             p = p.Parent;
         }
         return false;
-    }
-
-    /// <summary>
-    /// Gets whether this branch corresponds to the <paramref name="version"/>.
-    /// </summary>
-    /// <param name="version">The version.</param>
-    /// <returns>True if the version corresponds to this branch name.</returns>
-    public bool Match( SVersion version )
-    {
-        return version.VersionKind is CSVersionKind.Exploratory
-                ? _name.AsSpan( _ltsPrefixLength + 6 ).Equals( version.ExploratoryName, StringComparison.Ordinal )
-                : version.VersionKind == _versionKind;
     }
 
     /// <summary>

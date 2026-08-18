@@ -1,6 +1,4 @@
 using CK.Core;
-using CKli.Core;
-using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;

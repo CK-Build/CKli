@@ -1,12 +1,8 @@
 using CK.Core;
-using CKli.BranchModel.Plugin;
 using CKli.Core;
 using LibGit2Sharp;
-using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using LogLevel = CK.Core.LogLevel;
 
 
 namespace CKli.VersionTag.Plugin;
@@ -40,7 +36,7 @@ public sealed partial class VersionTagInfo
             {
                 if( lastStable.IsOrHasFakeVersion )
                 {
-                    Throw.DebugAssert( (lastStable.IsFakeVersion && !lastStable.IsLocal) || (lastStable.FakeVersion != null && lastStable.IsLocal) );
+                    Throw.DebugAssert( (lastStable.IsFakeVersion && !lastStable.IsBuildingOrLocal) || (lastStable.FakeVersion != null && lastStable.IsBuildingOrLocal) );
                     var fake = lastStable.FakeVersion?.Version ?? lastStable.Version; 
                     if( !fake.IsStableRoughBaseOf( topHot.Version ) )
                     {

@@ -1,8 +1,5 @@
 using CK.Core;
 using CKli.Core;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.BranchModel.Plugin;
 

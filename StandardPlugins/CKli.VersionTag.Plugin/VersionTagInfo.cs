@@ -2,7 +2,6 @@ using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using LibGit2Sharp;
-using NuGet.Protocol.Core.Types;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -247,7 +246,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     ///     <item>The <see cref="TagCommit.CI0Version"/> if it is not null.</item>
     ///     <item>
     ///     The version and tag of the <see cref="TagCommit.FakeVersion"/> if it is not null.
-    ///     This FakeVersion (only appears on true <see cref="TagCommit.IsLocal"/>) doesn't appear in the <see cref="AllTagCommits"/>.
+    ///     This FakeVersion (only appears on true <see cref="TagCommit.IsBuildingOrLocal"/>) doesn't appear in the <see cref="AllTagCommits"/>.
     ///     </item>
     /// </list>
     /// </summary>
@@ -339,7 +338,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     {
         bool success = true;
         var cleanupLocals = AllVersions.Select( tc => tc.Version )
-                                       .Where( v => v.IsLocal() && v.BuildMetaData.Length == 0 && (filter == null || filter( v )) )
+                                       .Where( v => v.IsBuildingOrLocal() && v.BuildMetaData.Length == 0 && (filter == null || filter( v )) )
                                        .ToList();
         if( cleanupLocals.Count > 0 )
         {
@@ -402,7 +401,7 @@ public sealed partial class VersionTagInfo : RepoInfo
             tag = tagCommit.Tag;
             v = tagCommit.Version;
         }
-        if( !v.IsLocal() )
+        if( !v.IsBuildingOrLocal() )
         {
             monitor.Error( $"Existing versioned tag '{tag.FriendlyName}' is not 'local/'. Skipped DestroyLocalRelease." );
             return true;
@@ -435,7 +434,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <returns>The commit build info on success, null on error.</returns>
     public CommitBuildInfo? TryGetCommitBuildInfo( IActivityMonitor monitor, Commit buildCommit, SVersion version, RebuildMode rebuild )
     {
-        Throw.CheckArgument( "Published version => rebuild commit", !version.IsLocal() || (rebuild & RebuildMode.AllowRebuildCommit)!=0 );
+        Throw.CheckArgument( "Published version => rebuild commit", !version.IsBuildingOrLocal() || (rebuild & RebuildMode.AllowRebuildCommit)!=0 );
         // Preconditions for any commit.
         if( !CanBuildAnyCommit( monitor, buildCommit, version, rebuild, out bool isRebuild ) )
         {

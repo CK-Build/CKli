@@ -1,6 +1,5 @@
 using CK.Core;
 using CKli.ShallowSolution.Plugin;
-using System;
 
 
 namespace CKli.Build.Plugin;

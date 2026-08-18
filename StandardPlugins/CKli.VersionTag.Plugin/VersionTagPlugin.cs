@@ -130,9 +130,9 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
 
 
     /// <summary>
-    /// Destroys a "local/" released version. The version tag is deleted, any artifacts are removed.
+    /// Destroys a "building/" or a "local/" released version. The version tag is deleted, any artifacts are removed.
     /// <para>
-    /// This is idempotent (if the "local/" version tag doesn't exist, nothing is done) and doesn't trigger the initialization
+    /// This is idempotent (if the "building/" or "local/" version tag doesn't exist, nothing is done) and doesn't trigger the initialization
     /// of the <see cref="VersionTagInfo"/> for the Repo, but if it <see cref="RepoPluginBase{T}.HasRepoInfoBeenCreated(Repo)">has been created</see>
     /// the existing <see cref="TagCommit"/> is removed.
     /// </para>
@@ -161,8 +161,13 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         {
             return Get( monitor, repo ).DestroyLocalRelease( monitor, version, removeFromNuGetGlobalCache );
         }
-        var tagName = $"refs/tags/local/v{version}";
+        var tagName = $"refs/tags/building/v{version}";
         tag = repo.GitRepository.Repository.Tags[tagName];
+        if( tag ==null )
+        {
+            tagName = $"refs/tags/local/v{version}";
+            tag = repo.GitRepository.Repository.Tags[tagName];
+        }
         if( tag == null )
         {
             monitor.Trace( $"Tag '{tagName}' already deleted. Skipped DestroyLocalRelease." );
@@ -353,7 +358,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         continue;
                     }
                     // Easy (we ignore - but remember - the fake newOne or remove it if the regular or deprecated tag is published): 
-                    if( exists.IsLocal )
+                    if( exists.IsBuildingOrLocal )
                     {
                         // The fake version has been built, but not published.
                         // We must keep the +fake until the version is published but we CANNOT do this:
@@ -367,7 +372,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         exists.SetFake( newOne );
                         Throw.DebugAssert( exists.IsOrHasFakeVersion is true );
                         // exists can now be the lastStable because IsOrHasFakeVersion is now true!
-                        Throw.DebugAssert( "A +fake is always published and stable.", newOne.Version.IsStable && !newOne.IsLocal );
+                        Throw.DebugAssert( "A +fake is always published and stable.", newOne.Version.IsStable && !newOne.IsBuildingOrLocal );
                         if( lastStable == null || lastStable.Version < exists.Version )
                         {
                             lastStable = exists;
@@ -398,7 +403,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     // Same as above:
                     //  - If newOne is published, we can remove the +fake one.
                     //  - Otherwise we associate the existing +fake to the "local/" newOne.
-                    if( newOne.IsLocal )
+                    if( newOne.IsBuildingOrLocal )
                     {
                         newOne.SetFake( exists );
                     }
@@ -425,9 +430,9 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 // The commit is tagged with 2 identical versions. What differs is the +deprecated, and/or "local/" prefix.
                 // "local/" applies to regular (deprecations are published) but we can ignore this here: if a "local/" duplicates
                 // a non "local/" (with the same build metadata), we consider that the non local wins.
-                if( exists.IsDeprecatedVersion == newOne.IsDeprecatedVersion && exists.IsLocal != newOne.IsLocal )
+                if( exists.IsDeprecatedVersion == newOne.IsDeprecatedVersion && exists.IsBuildingOrLocal != newOne.IsBuildingOrLocal )
                 {
-                    if( newOne.IsLocal )
+                    if( newOne.IsBuildingOrLocal )
                     {
                         removableTags ??= new List<Tag>();
                         removableTags.Add( newOne.Tag );
@@ -584,9 +589,9 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                             Throw.DebugAssert( tBase.CI0Version != null );
                             // The 2 tags can only differ by their "local/" prefix.
                             // We keep the published, and add the "local/" to the removable tags.
-                            Throw.DebugAssert( tBase.CI0Version.IsLocal() != v.IsLocal() );
+                            Throw.DebugAssert( tBase.CI0Version.IsBuildingOrLocal() != v.IsBuildingOrLocal() );
                             removableTags ??= new List<Tag>();
-                            if( tBase.CI0Version.IsLocal() )
+                            if( tBase.CI0Version.IsBuildingOrLocal() )
                             {
                                 removableTags.Add( tBase.CI0VersionTag );
                                 tBase.SetCI0VersionTag( t, v );
@@ -718,15 +723,15 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 // Consider only tag that are Conformant SVersion and a empty or "local/" ParsedPrefix.
                 // a "local/" version cannot be a +fake, +deprecated nor +invalid: a "local/" is a regular version.
                 bool invalidParsedPrefix = false;
-                bool invalidLocalPrefix = false;
+                bool invalidBuildingOrLocalPrefix = false;
                 if( v.VersionKind == CSVersionKind.None
-                    || (invalidParsedPrefix = (!string.IsNullOrEmpty( v.ParsedPrefix ) && v.ParsedPrefix != "local/"))
-                    || (invalidLocalPrefix = (v.HasFakeMetadata || v.HasDeprecatedMetadata || v.HasInvalidMetadata) && v.IsLocal() ) )
+                    || (invalidParsedPrefix = (!string.IsNullOrEmpty( v.ParsedPrefix ) && v.ParsedPrefix != "building/" && v.ParsedPrefix != "local/"))
+                    || (invalidBuildingOrLocalPrefix = (v.HasFakeMetadata || v.HasDeprecatedMetadata || v.HasInvalidMetadata) && v.IsBuildingOrLocal() ) )
                 {
-                    if( invalidLocalPrefix )
+                    if( invalidBuildingOrLocalPrefix )
                     {
                         nonConformantTags ??= [];
-                        nonConformantTags.Add( $"Invalid 'local/' prefix: +fake, +deprecated or +invalid tags must not be local. ({tagName})" );
+                        nonConformantTags.Add( $"Invalid 'building/' or local/' prefix: +fake, +deprecated or +invalid tags must not be local. ({tagName})" );
                     }
                     else if( invalidParsedPrefix )
                     {
@@ -868,7 +873,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             }
             if( newOne.Version.IsStable 
                 && (lastStable == null || lastStable.Version < newOne.Version)
-                && (newOne.IsOrHasFakeVersion || !newOne.IsLocal) )
+                && (newOne.IsOrHasFakeVersion || !newOne.IsBuildingOrLocal) )
             {
                 lastStable = newOne;
             }

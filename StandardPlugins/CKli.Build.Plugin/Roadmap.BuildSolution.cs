@@ -7,8 +7,6 @@ using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
 using System;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace CKli.Build.Plugin;
@@ -24,9 +22,12 @@ public sealed partial class Roadmap
         readonly HotGraph.Solution _solution;
         readonly HotGraph.SolutionVersionInfo _versionInfo;
         BuildInfo? _buildInfo;
-        HotGraph.SolutionVersionInfo.BuiltVersion _lastBuild;
-        BuildContentInfo? _lastBuildToPublish;
+        HotGraph.SolutionVersionInfo.LastBuiltVersion _lastBuild;
         int _buildNumber;
+
+        [Obsolete]
+        BuildContentInfo? _lastBuildToPublish;
+        [Obsolete]
         bool _mustPublish;
 
         internal BuildSolution( Roadmap roadmap, HotGraph.Solution solution, HotGraph.SolutionVersionInfo versionInfo )
@@ -167,7 +168,7 @@ public sealed partial class Roadmap
                     // The version target is the last built one.
                     var vTarget = _lastBuild.TagCommit.Version;
                     Throw.DebugAssert( "Fake version triggered MustBuildReason.FakeVersion.", !vTarget.HasFakeMetadata );
-                    // If we are in --ci.0 mode and considered the non skippable conditions and we are here (MustBuildReason.None),
+                    // If we are in --ci.0 mode and in non skippable conditions and we are here (MustBuildReason.None),
                     // then the version to consider must be the ci.0 version (not the non-CI build version associated to the TagCommit).
                     // This ci.0 version necessarily exists otherwise the UpdateSkippableBuildReason would have returned the "CI0" reason.
                     if( _roadmap._ciBuildMode == CIBuildMode.CIForce && !canSkip && !vTarget.IsCI )
@@ -178,8 +179,6 @@ public sealed partial class Roadmap
                     // We compute the version change not for us (this solution will not be built) but for
                     // the downstream solutions to correctly propagate the change level (here it may be None).
                     // If the LastStable is a +fake, we consider no impact (there's no code change if we are here).
-                    // In practice, commits should appear above the fake LastStable with their conventional commit
-                    // messages that can introduce breaking and feature changes.
                     // IsPreviousVersionNumbersOf doesn't care of +fake version metadata and returns None when the
                     // Major.Minor.Patch are equal: we have nothing special to do.
                     if( !_versionInfo.BaseBuild.Version.IsPreviousVersionNumbersOf( monitor, vTarget, out vChange ) )
@@ -188,6 +187,7 @@ public sealed partial class Roadmap
                     }
                     _buildInfo = new BuildInfo( this,
                                                 MustBuildReason.None,
+                                                null,
                                                 vChange,
                                                 vTarget,
                                                 directRequirements,
@@ -218,7 +218,7 @@ public sealed partial class Roadmap
             {
                 return false;
             }
-            targetVersion = targetVersion.SetParsedPrefix( "local/" );
+            targetVersion = targetVersion.SetParsedPrefix( "building/" );
 
             // If the base version is a +fake, then IF this happens to be published we must ensure
             // that the +fake tag appears on the remote otherwise the target version will not be "understandable".
@@ -229,8 +229,16 @@ public sealed partial class Roadmap
                 Repo.GitRepository.DeferredPushRefSpecs.Add( $"+{_versionInfo.BaseBuild.Tag.CanonicalName}" );
             }
             monitor.Info( $"'{_solution}' build reason: '{buildReason}', computed target version: '{targetVersion}'." );
+
+            // The BuildBranch is the "theoretical branch name".
+            var buildBranch = _versionInfo.Solution.Branch;
+            if( buildBranch.BranchName != _roadmap.Graph.BranchName )
+            {
+                buildBranch = _versionInfo.Solution.BranchInfo.Branches[_roadmap.Graph.BranchName.Index];
+            }
             _buildInfo = new BuildInfo( this,
                                         buildReason,
+                                        buildBranch,
                                         vChange,
                                         targetVersion,
                                         directRequirements,
@@ -241,7 +249,7 @@ public sealed partial class Roadmap
             return true;
 
             static void UpdateSkippableBuildReason( PackagesUpdateDetails packageUpdates,
-                                                    HotGraph.SolutionVersionInfo.BuiltVersion lastBuild,
+                                                    HotGraph.SolutionVersionInfo.LastBuiltVersion lastBuild,
                                                     CIBuildMode ciBuildMode,
                                                     ref MustBuildReason buildReason )
             {
@@ -314,18 +322,20 @@ public sealed partial class Roadmap
             else
             {
                 // The CurrentVersion may already be published (not "local/" anymore).
-                // If the CurrentVersion (that is the last built version) is "local/", we must  publish it (comes from a previous build).
+                // If the CurrentVersion (that is the last built version) is "local/", we must publish it (it comes from a
+                // previous build) but only if this version is from the "theoretical branch name".
                 //
-                // But, in order to publish it, its artifacts must be locally available... If not, we must rebuild this version (and eventually
-                // publish it).
+                // But, in order to publish it, its artifacts must be locally available... If not, we must rebuild this version (and
+                // eventually publish it).
                 // This is an unusual situation as this version should be available somewhere!
                 // First idea was to consider that this must be fixed here (and without the "upstream pivot condition"):
                 // even if this happens in an upstream of a Pivot, we must trigger the build of this solution.
-                // However, this looks more like an issue that can be detected at the VersionTagInfo level, when "ckli issue" is
-                // executed (not preemptively), so we error here and ask the user to use "ckli issue". This avoid the "_mustPublish"
-                // to appear in the Initialize step and scopes it only here in the ConcludeInitialization step.
+                // However, this looks more like an issue that can be detected at the VersionTagInfo level (when "ckli issue" is
+                // executed - not preemptively?) AND it is a weird state (should barely happen), so we error here and ask the
+                // user to use "maintenance rebuild version".
+                // This avoid the "_mustPublish" to appear in the Initialize step and scopes it only here in the ConcludeInitialization step.
                 //
-                _mustPublish = CurrentVersion.IsLocal();
+                _mustPublish = CurrentVersion.IsBuildingOrLocal() && _roadmap.Graph.BranchName.Match( CurrentVersion );
                 if( _mustPublish )
                 {
                     _lastBuildToPublish = _lastBuild.TagCommit.BuildContentInfo;
@@ -333,9 +343,9 @@ public sealed partial class Roadmap
                     if( !artifactHandler.HasAllArtifacts( monitor, _solution.Repo, CurrentVersion, _lastBuildToPublish, out _ ) )
                     {
                         monitor.Error( $"""
-                        Repository '{Repo.DisplayPath}' must be published in existing version '{CurrentVersion}' but this version misses local artifacts.
-                        Use "maintenance rebuild version" to rebuild it.
-                        """ );
+                                Repository '{Repo.DisplayPath}' must be published in existing version '{CurrentVersion}' but this version misses local artifacts.
+                                Use "maintenance rebuild version" to rebuild it.
+                                """ );
                         return false;
                     }
                     ++_roadmap._publishSolutionCount;
@@ -376,6 +386,11 @@ public sealed partial class Roadmap
         public SVersion CurrentVersion => _lastBuild.TagCommit.Version;
 
         /// <summary>
+        /// Gets the <see cref="HotGraph.SolutionVersionInfo.LastBuiltVersion"/>.
+        /// </summary>
+        public HotGraph.SolutionVersionInfo.LastBuiltVersion LastBuild => _lastBuild;
+
+        /// <summary>
         /// Gets the build info. This is null if this solution is not impacted
         /// by any of the <see cref="Roadmap.Pivots"/>.
         /// </summary>
@@ -389,8 +404,8 @@ public sealed partial class Roadmap
 
         /// <summary>
         /// Gets whether this solution should be published:
-        /// <see cref="MustBuild"/> is true (the <see cref="BuildInfo.TargetVersion"/> must be published) or the <see cref="CurrentVersion"/>
-        /// is not in the published database.
+        /// <see cref="MustBuild"/> is true (the <see cref="BuildInfo.TargetVersion"/> must be published) or
+        /// the <see cref="CurrentVersion"/> is a "local/" one that is on the "theoretical branch name" <see cref="HotGraph.BranchName"/>.
         /// </summary>
         public bool MustPublish => _mustPublish;
 
@@ -406,7 +421,7 @@ public sealed partial class Roadmap
 
             Throw.DebugAssert( MustBuild || _lastBuildToPublish != null );
             return MustBuild
-                    ? (BuildInfo.TargetVersion, BuildInfo.BuildResult!.VersionTag, BuildInfo.BuildResult!.Content)
+                    ? (BuildInfo.BuildResult!.Version, BuildInfo.BuildResult!.VersionTag, BuildInfo.BuildResult!.Content)
                     : (CurrentVersion, _lastBuild.TagCommit.Tag, _lastBuildToPublish!);
         }
 
@@ -427,22 +442,32 @@ public sealed partial class Roadmap
 
             var statusAndName = RepoName( head.Screen, Repo, MustBuild, BuildInfo == null );
             r = r.AddRight( statusAndName );
-            bool localCurrentVersion = CurrentVersion.IsLocal();
-            if( MustBuild )
-            {
-                Throw.DebugAssert( "An error has been emitted if a MustBuild target version has already been published.", _mustPublish );
-                Throw.DebugAssert( BuildInfo.BuildReason != MustBuildReason.None );
 
-                r = r.AddRight( head.Screen.Text( localCurrentVersion ? $"v{CurrentVersion}-" : $"v{CurrentVersion}",
-                                                  ConsoleColor.Blue,
-                                                  effect: localCurrentVersion ? TextEffect.Strikethrough : TextEffect.Ignore ),
-                                head.Screen.Text( $"→ 🡡/v{BuildInfo.TargetVersion}", ConsoleColor.Green ).Box( marginLeft: 1, marginRight: 1 ),
-                                BuildInfo.RenderBuildReason( head.Screen, ref stats ) );
+            var currentVersion = _lastBuild.TagCommit.Version;
+            if( _buildInfo != null )
+            {
+                if( _buildInfo.MustBuild )
+                {
+                    Throw.DebugAssert( _buildInfo.BuildReason != MustBuildReason.None );
+
+                    bool replace = currentVersion.IsBuildingOrLocal() && _roadmap.Graph.BranchName.Match( currentVersion );
+
+                    r = r.AddRight( head.Screen.Text( replace ? $"(v{currentVersion})" : $"v{currentVersion}",
+                                                      replace ? ConsoleColor.Blue : ConsoleColor.DarkBlue,
+                                                      effect: replace ? TextEffect.Strikethrough : TextEffect.Ignore ),
+                                    head.Screen.Text( $"→ ⏚/v{_buildInfo.TargetVersion}", ConsoleColor.Green ).Box( marginLeft: 1, marginRight: 1 ),
+                                    _buildInfo.RenderBuildReason( head.Screen, ref stats ) );
+                }
+                else
+                {
+                    var sCurrentVersion = currentVersion.IsBuildingOrLocal() ? $"⏚/v{currentVersion}" : $"v{currentVersion}";
+                    r = r.AddRight( head.Screen.Text( sCurrentVersion, currentVersion.IsBuildingOrLocal() ? ConsoleColor.Blue : ConsoleColor.DarkBlue ) );
+                }
             }
             else
             {
-                var currentVersion = localCurrentVersion ? $"🡡/v{CurrentVersion}" : $"v{CurrentVersion}";
-                r = r.AddRight( head.Screen.Text( currentVersion, _mustPublish ? ConsoleColor.Blue : ConsoleColor.DarkBlue ) );
+                var sCurrentVersion = currentVersion.IsBuildingOrLocal() ? $"⏚/v{currentVersion}" : $"v{currentVersion}";
+                r = r.AddRight( head.Screen.Text( sCurrentVersion, ConsoleColor.DarkBlue ) );
             }
             return r;
 

@@ -6,6 +6,7 @@ using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
 
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -122,10 +123,14 @@ public sealed partial class BuildPlugin
                 }
             }
         }
-        if( bResults.Count != workflow.Targets.Length )
+        // If all of them have been produced: success!
+        // Commit any "building/" prefix to the "local/" one.
+        if( bResults.Count != workflow.Targets.Length
+            || !CommitBuildingTags( monitor, bResults ) )
         {
-            return default;
+            return false;
         }
+
         var results = bResults.MoveToImmutable();
         var s = context.Screen.ScreenType;
         var display = RenderBuildResults( s, workflow, results );
@@ -146,6 +151,30 @@ public sealed partial class BuildPlugin
             monitor.Info( $"No listener to the FixBuild event." );
         }
         return true;
+
+        static bool CommitBuildingTags( IActivityMonitor monitor, IEnumerable<BuildResult> results )
+        {
+            var buildings = results.Where( r => r.Version.IsBuilding() ).ToList();
+            if( buildings.Count > 0 )
+            {
+                using( monitor.OpenInfo( $"Build succeed: committing {buildings.Count} 'building/ versions to 'local/' ones." ) )
+                {
+                    try
+                    {
+                        foreach( var r in buildings )
+                        {
+                            r.CommitBuilding();
+                        }
+                    }
+                    catch( Exception ex )
+                    {
+                        monitor.Error( "While committing 'building/ versions to 'local/' ones.", ex );
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
 
         static IRenderable RenderBuildResults( ScreenType s, FixWorkflow workflow, ImmutableArray<BuildResult> results )
         {
@@ -174,7 +203,7 @@ public sealed partial class BuildPlugin
         var versionInfo = _versionTag.Get( monitor, target.Repo );
 
         // We are ready to build or rebuild the target.
-        // We have nothing to do when rebuilding: the previous "local/" if it exists, will be
+        // We have nothing to do when rebuilding: the previous "building/" or "local/" if it exists, will be
         // moved (the "rolling local build" feature).
         // But when a "fix build --ci" has been done right before, a "--ci" version tag may
         // exist on the same commit we are building. Because this is not allowed, we must
@@ -187,7 +216,7 @@ public sealed partial class BuildPlugin
         //                
         //  - Gentle: Adding an empty commit when needed (when a CI tag exists).
         //
-        //  - Gentle Synthesis: If a "local/" CI build exists, we destroy the release (suppressing the tag
+        //  - Gentle Synthesis: If a "building/" or "local/" CI build exists, we destroy the release (suppressing the tag
         //                      and any artefacts).
         //                      If a published CI build exists, create an empty commit to carry the release
         //                      and let the user deprecate the version manually whenever he wants.
@@ -224,7 +253,7 @@ public sealed partial class BuildPlugin
                     return false;
                 }
 
-                if( exists.IsLocal )
+                if( exists.IsBuildingOrLocal )
                 {
                     // The "local/" version exists.
                     // If it's a non-CI build, we must let the build be skipped.
@@ -267,11 +296,12 @@ public sealed partial class BuildPlugin
             // The target version already has the incremented Patch number.
             targetVersion = targetVersion.SetCINumber( commitDepth, impactStablePatchNumber: false );
         }
+        targetVersion = targetVersion.SetParsedPrefix( "building/" );
         var result = await CoreBuildAsync( monitor,
                                            context,
                                            versionInfo,
                                            target.Repo.GitRepository.Repository.Head.Tip,
-                                           targetVersion.SetParsedPrefix( "local/" ),
+                                           targetVersion,
                                            runTest,
                                            forceRebuild: rebuild,
                                            PrimaryPluginContext.Cancellation ).ConfigureAwait( false );

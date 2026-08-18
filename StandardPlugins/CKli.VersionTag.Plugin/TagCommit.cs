@@ -16,9 +16,9 @@ namespace CKli.VersionTag.Plugin;
 public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, BranchModel.Plugin.ITagCommit
 {
     readonly VersionTagInfo _versionRepoInfo;
-    readonly SVersion _version;
     readonly Commit _commit;
     readonly string _sha;
+    SVersion _version;
     Tag _tag;
     Tag? _ci0Tag;
     SVersion? _ci0Version;
@@ -46,7 +46,7 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
 
     internal void SetFake( TagCommit fake )
     {
-        Throw.DebugAssert( fake.IsFakeVersion && fake.Version == _version && IsLocal && _fakeVersion == null );
+        Throw.DebugAssert( fake.IsFakeVersion && fake.Version == _version && IsBuildingOrLocal && _fakeVersion == null );
         _fakeVersion = fake;
     }
 
@@ -83,9 +83,9 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     public bool IsOrHasFakeVersion => _version.HasFakeMetadata || _fakeVersion != null;
 
     /// <summary>
-    /// Gets whether this version is a "local/" one.
+    /// Gets whether this version is a "building" or "local/" one.
     /// </summary>
-    public bool IsLocal => _version.IsLocal();
+    public bool IsBuildingOrLocal => _version.IsBuildingOrLocal();
 
     /// <summary>
     /// Gets whether this version tag is "+deprecated" one. <see cref="DeprecatedInfo"/> is necessarily not null.
@@ -125,7 +125,7 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
 
     /// <summary>
     /// Gets the +fake commit for this <see cref="Version"/> if it exists.
-    /// This is available only when <see cref="IsLocal"/> is true.
+    /// This is available only when <see cref="IsBuildingOrLocal"/> is true.
     /// </summary>
     public TagCommit? FakeVersion => _fakeVersion;
 
@@ -140,40 +140,12 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     public BuildContentInfo? BuildContentInfo => _buildContentInfo;
 
     /// <summary>
-    /// TagCommits are first ordered by <see cref="Repo.Index"/> and then reverts the <see cref="SVersion.CompareTo(SVersion?)"/> result:
-    /// we want the first <see cref="TagCommit"/> in <see cref="VersionTagInfo.LastStables"/> to be the latest one, not the oldest one.
-    /// </summary>
-    /// <param name="other">The other versioned tag commit.</param>
-    /// <returns>The standard compare result.</returns>
-    public int CompareTo( TagCommit? other )
-    {
-        if( other is null ) return 1;
-        int cmp = Repo.Index.CompareTo( other.Repo.Index );
-        return cmp != 0 ? cmp : -_version.CompareTo( other?._version );
-    }
-
-    /// <inheritdoc />
-    public bool Equals( TagCommit? other ) => _versionRepoInfo == other?._versionRepoInfo && _version.Equals( other?._version );
-
-    /// <inheritdoc />
-    public override bool Equals( object? obj ) => Equals( obj as TagCommit );
-
-    /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine( _versionRepoInfo, _version );
-
-    /// <summary>
-    /// Overridden to return the tag and referenced commit's sha.
-    /// </summary>
-    /// <returns></returns>
-    public override string ToString() => $"Tag '{Repo.DisplayPath}/{_version.ParsedText}' references Commit '{_sha}'";
-
-    /// <summary>
     /// Tests whether a new version can be associated to this commit.
     /// This prevents 2 incompatible versions to be carried by the same commit. 
     /// </summary>
     /// <param name="version">The new version.</param>
     /// <returns>The error message or null.</returns>
-    internal string? CanBearVersion( SVersion version )
+    public string? CanBearVersion( SVersion version )
     {
         // If this is a +fake version, then the new version must be "roughly based" on it.
         if( IsFakeVersion )
@@ -214,20 +186,20 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
 
         // Then, there is the "rolling local build" case: if this version is a local one with the same branch name as the
         // new one, then it's fine: this previous version will be destroyed (ApplyReleaseBuildTag calls DestroyLocalReleases).
-        bool rollingLocal = IsLocal && Version.BranchName == version.BranchName;
+        bool rollingLocal = IsBuildingOrLocal && Version.BranchName == version.BranchName;
 
         Throw.DebugAssert( "The IsFakeVersion case has been handled above.", !IsOrHasFakeVersion || FakeVersion != null );
-        Throw.DebugAssert( "(HasFakeVersion => IsLocal) <=> (!IsLocal => !HasFakeVersion)", FakeVersion == null || IsLocal );
+        Throw.DebugAssert( "(HasFakeVersion => IsLocal) <=> (!IsLocal => !HasFakeVersion)", FakeVersion == null || IsBuildingOrLocal );
         // The --ci.0 case implies that the versions have the same branch name (the rolling local build above generalizes it),
         // but here we save the case where this Version is published.
-        bool validCI0 = !IsLocal
+        bool validCI0 = !IsBuildingOrLocal
                         && ((version.CINumber == 0 && version.SetCINumber( -1, impactStablePatchNumber: true ) == Version)
                             || Version.CINumber == 0 && Version.SetCINumber( -1, impactStablePatchNumber: true ) == version);
 
         if( !rollingLocal && !validCI0 )
         {
             return $"""
-                    Invalid build commit '{Sha.AsSpan(0,7)} {Commit.MessageShort}' for version 'v{version}' in '{Repo.DisplayPath}'.
+                    Invalid build commit '{Sha.AsSpan( 0, 7 )} {Commit.MessageShort}' for version 'v{version}' in '{Repo.DisplayPath}'.
                     This commit has already released the version 'v{Version}' on {Commit.Committer.When}.
 
                     The same commit cannot produce 2 different versions.
@@ -235,6 +207,51 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
         }
         return null;
     }
+
+
+    /// <summary>
+    /// Applies <see cref="BuildResult.CommitBuilding(Repo, Tag, SVersion)"/> on (<see cref="CI0VersionTag"/>,<see cref="CI0Version"/>)
+    /// or (<see cref="Tag"/>,<see cref="Version"/>).
+    /// </summary>
+    /// <param name="ci0Tag">Whether the ci.0 version is concerned.</param>
+    /// <returns>The updated tag in the repository and the version.</returns>
+    public (Tag,SVersion) CommitBuilding( bool ci0Tag )
+    {
+        if( ci0Tag )
+        {
+            Throw.CheckState( _ci0Tag != null && _ci0Version != null );
+            return (_ci0Tag, _ci0Version) = BuildResult.CommitBuilding( _versionRepoInfo.Repo, _ci0Tag, _ci0Version );
+        }
+        return (_tag, _version) = BuildResult.CommitBuilding( _versionRepoInfo.Repo, _tag, _version );
+    }
+
+    /// <summary>
+    /// TagCommits are first ordered by <see cref="Repo.Index"/> and then reverts the <see cref="SVersion.CompareTo(SVersion?)"/> result:
+    /// we want the first <see cref="TagCommit"/> in <see cref="VersionTagInfo.LastStables"/> to be the latest one, not the oldest one.
+    /// </summary>
+    /// <param name="other">The other versioned tag commit.</param>
+    /// <returns>The standard compare result.</returns>
+    public int CompareTo( TagCommit? other )
+    {
+        if( other is null ) return 1;
+        int cmp = Repo.Index.CompareTo( other.Repo.Index );
+        return cmp != 0 ? cmp : -_version.CompareTo( other?._version );
+    }
+
+    /// <inheritdoc />
+    public bool Equals( TagCommit? other ) => _versionRepoInfo == other?._versionRepoInfo && _version.Equals( other?._version );
+
+    /// <inheritdoc />
+    public override bool Equals( object? obj ) => Equals( obj as TagCommit );
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine( _versionRepoInfo, _version );
+
+    /// <summary>
+    /// Overridden to return the tag and referenced commit's sha.
+    /// </summary>
+    /// <returns></returns>
+    public override string ToString() => $"Tag '{Repo.DisplayPath}/{_version.ParsedText}' references Commit '{_sha}'";
 
     internal bool CheckDeprecatedVersion( IActivityMonitor monitor )
     {
@@ -265,7 +282,7 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
 #if DEBUG
         var vParsed = SVersion.Parse( tag.FriendlyName, allowPrefix: true, mustBeCSVersion: true );
         Throw.DebugAssert( v == vParsed );
-        Throw.DebugAssert( v.IsLocal() == vParsed.IsLocal() );
+        Throw.DebugAssert( v.IsBuildingOrLocal() == vParsed.IsBuildingOrLocal() );
 #endif
         Throw.DebugAssert( tag != null && tag.IsAnnotated && BuildContentInfo.TryParse( tag.Annotation.Message, out _ ) );
         Throw.DebugAssert( v.CINumber == 0

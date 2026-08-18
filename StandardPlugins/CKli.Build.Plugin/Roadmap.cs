@@ -1,6 +1,5 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
-using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
@@ -296,7 +295,7 @@ public sealed partial class Roadmap
             }
             else
             {
-                r = r.AddBelow( screen.Text( $"🡡 {publishSolutionCount} repositories {(mustPublish ? "must" : "can")} be published.", new TextStyle( ConsoleColor.Blue, ConsoleColor.Black ) ) );
+                r = r.AddBelow( screen.Text( $"⏚ {publishSolutionCount} repositories {(mustPublish ? "must" : "can")} be published.", new TextStyle( ConsoleColor.Blue, ConsoleColor.Black ) ) );
             }
             return r;
         }

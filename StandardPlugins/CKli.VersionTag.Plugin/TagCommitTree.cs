@@ -1,15 +1,10 @@
 using CK.Core;
 using CKli.BranchModel.Plugin;
-using CKli.Core;
 using LibGit2Sharp;
-using NuGet.Protocol.Core.Types;
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text.RegularExpressions;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace CKli.VersionTag.Plugin;
 
@@ -71,12 +66,12 @@ public sealed partial class TagCommitTree
     /// </summary>
     /// <param name="branch">The branch name.</param>
     /// <param name="allowCI">Whether CI versions are allowed.</param>
-    /// <param name="allowLocal">Whether <see cref="SVersionExtensions.IsLocal(SVersion)"/> versions must be considered.</param>
+    /// <param name="allowLocal">Whether <see cref="SVersionExtensions.IsBuildingOrLocal(SVersion)"/> versions must be considered.</param>
     /// <returns>The versioned tag commit or null if not found.</returns>
     public TagCommit? GetLastBuild( BranchName branch, bool allowCI, bool allowLocal )
     {
         return _content.Select( x => x.Item1 ).FirstOrDefault( tc => (allowCI || !tc.Version.IsCI )
-                                                                     && (allowLocal || !tc.Version.IsLocal())
+                                                                     && (allowLocal || !tc.Version.IsBuildingOrLocal())
                                                                      && branch.Match( tc.Version ) );
     }
 
@@ -193,7 +188,7 @@ public sealed partial class TagCommitTree
     /// Whether a new commit will be created: this increments the <see cref="SVersion.CINumber"/> (applies only
     /// if <paramref name="ciBuild"/> is true).
     /// </param>
-    /// <param name="allowLocal">Whether <see cref="SVersionExtensions.IsLocal(SVersion)"/> versions must be considered.</param>
+    /// <param name="allowLocal">Whether <see cref="SVersionExtensions.IsBuildingOrLocal(SVersion)"/> versions must be considered.</param>
     /// <returns>The version to create or null on error.</returns>
     public SVersion? ComputeTargetVersion( IActivityMonitor monitor,
                                            ref SVersionChange vChange,

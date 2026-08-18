@@ -3,11 +3,9 @@ using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
-using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 
 namespace CKli.HotZone.Plugin;
 
@@ -89,7 +87,7 @@ public sealed partial class HotGraph
         public BranchModelInfo BranchInfo => _branchInfo;
 
         /// <summary>
-        /// Gets the branch name from which this <see cref="GitSolution"/> has been read: it is the closest
+        /// Gets the branch from which this <see cref="GitSolution"/> has been read: it is the closest
         /// opened branch from the <see cref="HotGraph.BranchName"/>: its <see cref="HotBranch.GitBranch"/> is necessarily not null.
         /// </summary>
         public HotBranch Branch => _branch;

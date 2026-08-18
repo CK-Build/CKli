@@ -81,8 +81,7 @@ public sealed partial class BuildPlugin
                     // We have a root branch: let's fix this by building it based on the InfVersion.
                     var vBase = versionTagInfo.InfVersion ?? SVersion.ZeroVersion;
                     var vInit = $"v{vBase.Major}.{vBase.Minor}.{vBase.Patch}+fake";
-                    collector( new NoVersionTagIssue( this,
-                                                      versionTagInfo,
+                    collector( new NoVersionTagIssue( versionTagInfo.Repo,
                                                       "Missing initial version.",
                                                       screenType.Text( $"""
                                                           This can be fixed by creating a '{vInit}' on '{branchModel.Root.BranchName}' branch.
@@ -130,17 +129,17 @@ public sealed partial class BuildPlugin
                 {
                     return false;
                 }
-                // If the tag that triggered the build differs from the final "local/" one, removes it.
+                // If the tag that triggered the build differs from the final target one, removes it.
                 Throw.DebugAssert( "Tags to rebuild are regular ones.", v.BuildMetaData.Length == 0 );
                 if( t.CanonicalName != buildResult.VersionTag.CanonicalName )
                 {
                     Repo.GitRepository.DeleteLocalTags( monitor, [t.CanonicalName] );
                 }
-                if( !v.IsLocal() )
+                if( !v.IsBuildingOrLocal() )
                 {
                     monitor.Warn( $"""
                         Tag '{v.ParsedText}' in '{Repo.DisplayPath}' has been rebuilt.
-                        It must be manually published.
+                        Its artefacts, if any, must be manually published.
                         """ );
                 }
             }
@@ -150,17 +149,13 @@ public sealed partial class BuildPlugin
 
     sealed class NoVersionTagIssue : World.Issue
     {
-        readonly BuildPlugin _buildPlugin;
-        readonly VersionTagInfo _versionTagInfo;
         readonly HotBranch _root;
         readonly string _vInit;
 
-        public NoVersionTagIssue( BuildPlugin buildPlugin, VersionTagInfo versionTagInfo, string title, IRenderable body, HotBranch root, string vInit )
-            : base( title, body, versionTagInfo.Repo )
+        public NoVersionTagIssue( Repo repo, string title, IRenderable body, HotBranch root, string vInit )
+            : base( title, body, repo )
         {
             Throw.DebugAssert( vInit.EndsWith( "+fake" ) );
-            _buildPlugin = buildPlugin;
-            _versionTagInfo = versionTagInfo;
             _root = root;
             _vInit = vInit;
         }

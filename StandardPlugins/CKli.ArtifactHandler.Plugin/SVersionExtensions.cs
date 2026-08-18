@@ -1,5 +1,4 @@
 using CK.Core;
-using NuGet.Protocol.Core.Types;
 using System;
 
 namespace CKli;
@@ -9,6 +8,24 @@ namespace CKli;
 /// </summary>
 public static class SVersionExtensions
 {
+    /// <summary>
+    /// Gets whether <see cref="SVersion.ParsedPrefix"/> is "building/" or "local/".
+    /// </summary>
+    /// <param name="version">This version.</param>
+    /// <returns>True if this is a "building/" or "local/" prefixed version.</returns>
+    public static bool IsBuildingOrLocal( this SVersion version )
+    {
+        ReadOnlySpan<char> s = version.ParsedPrefix.AsSpan();
+        return s.Length > 0 && (s.Equals( "local/", StringComparison.Ordinal ) || s.Equals( "building/", StringComparison.Ordinal ));
+    }
+
+    /// <summary>
+    /// Gets whether <see cref="SVersion.ParsedPrefix"/> is "building/".
+    /// </summary>
+    /// <param name="version">This version.</param>
+    /// <returns>True if this is a "building/" prefixed version.</returns>
+    public static bool IsBuilding( this SVersion version ) => version.ParsedPrefix.AsSpan().Equals( "building/", StringComparison.Ordinal );
+
     /// <summary>
     /// Gets whether <see cref="SVersion.ParsedPrefix"/> is "local/".
     /// </summary>

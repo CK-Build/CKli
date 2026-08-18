@@ -97,7 +97,7 @@ public sealed partial class HotGraph
 
         /// <summary>
         /// Gets the package mapping with the current <see cref="SolutionVersionInfo.GetLastBuild(bool)"/> version of each solution
-        /// excluding true <see cref="SolutionVersionInfo.BuiltVersion.VersionMustBuild"/>: when the version is a "+fake" or a "+deprecated",
+        /// excluding true <see cref="SolutionVersionInfo.LastBuiltVersion.VersionMustBuild"/>: when the version is a "+fake" or a "+deprecated",
         /// mapping is ignored.
         /// </summary>
         public IPackageMapping GetAlreadyBuiltMapping( bool ciBuild )

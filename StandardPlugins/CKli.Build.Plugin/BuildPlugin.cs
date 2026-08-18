@@ -463,6 +463,11 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                              bool forceRebuild,
                                              CancellationToken cancellation )
     {
+        // We reproduce the "building/", "local/" or nothing (published): we don't set
+        // the parsed prefix: the version is unchanged.
+        Throw.DebugAssert( "When calling this, the targetVersion must specify its final prefix.",
+                           targetVersion.ParsedPrefix != null || targetVersion.IsBuildingOrLocal() );
+
         // Obtain the RepoBuilder for the Repo.
         var repoBuilder = _repoBuilder.Get( monitor, versionInfo.Repo );
         // Should we run the tests?
@@ -495,13 +500,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                 }
             }
             rebuild = VersionTagInfo.RebuildMode.AllowRebuildCommitAndCheckPrevious;
-            // On success, we will create a new BuildResult with a "local/" version.
-            targetVersion = targetVersion.SetParsedPrefix( "local/" );
         }
         else
         {
-            // Explicit force rebuild: we reproduce the "local/" or not: we don't set
-            // the parsed prefix: the version is unchanged.
             rebuild = VersionTagInfo.RebuildMode.AllowRebuildCommit | VersionTagInfo.RebuildMode.AllowRebuildVersion | VersionTagInfo.RebuildMode.CheckPreviousVersion;
         }
 
@@ -556,10 +557,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         try
         {
             result = await repoBuilder.BuildAsync( monitor,
-                                                    context,
-                                                    buildInfo,
-                                                    runTest,
-                                                    cancellation ).ConfigureAwait( false );
+                                                   context,
+                                                   buildInfo,
+                                                   runTest,
+                                                   cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {

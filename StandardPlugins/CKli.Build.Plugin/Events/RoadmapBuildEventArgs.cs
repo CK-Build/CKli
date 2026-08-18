@@ -1,5 +1,4 @@
 using CK.Core;
-using static CKli.Build.Plugin.Roadmap;
 
 namespace CKli.Build.Plugin;
 
@@ -10,7 +9,7 @@ namespace CKli.Build.Plugin;
 public sealed class RoadmapBuildEventArgs : BuildBaseEventArgs
 {
     readonly Roadmap _roadmap;
-
+    
     internal RoadmapBuildEventArgs( IActivityMonitor monitor, Roadmap roadmap )
         : base( monitor, roadmap.MustPublish )
     {

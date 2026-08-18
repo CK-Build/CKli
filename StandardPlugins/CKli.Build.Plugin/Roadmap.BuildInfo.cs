@@ -1,10 +1,12 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
+using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -29,11 +31,12 @@ public sealed partial class Roadmap
         readonly BuildSolution _solution;
         readonly MustBuildReason _buildReason;
         readonly SVersionChange _versionChange;
-        readonly SVersion _targetVersion;
+        readonly HotBranch? _buildBranch;
         readonly PackageMapper? _uUpdates;
         readonly PackageMapper? _cUpdates;
         readonly PackageMapper? _dUpdates;
         readonly ImmutableArray<BuildSolution> _directRequirements;
+        SVersion _targetVersion;
 
         readonly Lock _buildTaskLock;
         Task<BuildResult?>? _buildTask;
@@ -41,32 +44,42 @@ public sealed partial class Roadmap
 
         internal BuildInfo( BuildSolution solution,
                             MustBuildReason buildReason,
+                            HotBranch? buildBranch,
                             SVersionChange versionChange,
                             SVersion targetVersion,
-                            BuildSolution[]? directRequirements,
+                            BuildSolution[] directRequirements,
                             PackageMapper? uUpdates,
                             PackageMapper? cUpdates,
                             PackageMapper? dUpdates )
         {
             _solution = solution;
             _buildReason = buildReason;
+            _buildBranch = buildBranch;
             _versionChange = versionChange;
             _targetVersion = targetVersion;
             _uUpdates = uUpdates;
             _cUpdates = cUpdates;
             _dUpdates = dUpdates;
-            _directRequirements = directRequirements != null
-                                    ? ImmutableCollectionsMarshal.AsImmutableArray( directRequirements )
-                                    : [];
+            _directRequirements = ImmutableCollectionsMarshal.AsImmutableArray( directRequirements );
             _buildTaskLock = new Lock();
-
-            Throw.DebugAssert( "When we must build then version changes at least Patch.",
-                               buildReason == MustBuildReason.None || versionChange >= SVersionChange.Patch );
 
             Throw.DebugAssert( "Currently the version can never be a +fake (the +fake is not skippable).", !_targetVersion.HasFakeMetadata );
 
             Throw.DebugAssert( "Any dependency updates appear in the BuildReason.",
                                 (uUpdates != null || cUpdates != null || dUpdates != null) == ((_buildReason & MustBuildReason.DependencyUpdate) != 0) );
+
+            Throw.DebugAssert( "When we must build then version changes at least the Patch.",
+                                buildReason == MustBuildReason.None || versionChange >= SVersionChange.Patch );
+
+            Throw.DebugAssert( "When we must build, there is a build branch.",
+                                buildReason == MustBuildReason.None || buildBranch != null );
+
+            Throw.DebugAssert( "When we must build, the target version is a 'building/' one.",
+                                buildReason == MustBuildReason.None || _targetVersion.ParsedPrefix == "building/" );
+
+            Throw.DebugAssert( "When we must not build, the target version is either the last built version or its ci.0 version.",
+                               buildReason != MustBuildReason.None || (ReferenceEquals( _targetVersion, solution.LastBuild.TagCommit.Version )
+                                                                       || ReferenceEquals( _targetVersion, solution.LastBuild.TagCommit.CI0Version)) );
         }
 
         /// <summary>
@@ -77,6 +90,7 @@ public sealed partial class Roadmap
         /// <summary>
         /// Gets whether this solution must be built.
         /// </summary>
+        [MemberNotNullWhen( true, nameof( BuildBranch ))]
         public bool MustBuild => _buildReason != MustBuildReason.None;
 
         /// <summary>
@@ -116,9 +130,19 @@ public sealed partial class Roadmap
         public PackageMapper? DUpdates => _dUpdates;
 
         /// <summary>
+        /// Gets the <see cref="HotBranch"/> that must be built: it corresponds to the "theoretical branch name"
+        /// that is the <see cref="HotGraph.BranchName"/>. Always null when <see cref="MustBuild"/> is false.
+        /// <para>
+        /// This branch may not <see cref="HotBranch.Exists"/> until <see cref="Roadmap.BuildAsync"/> is called. 
+        /// </para>
+        /// </summary>
+        public HotBranch? BuildBranch => _buildBranch;
+
+        /// <summary>
         /// Gets the build result. Not null when <see cref="MustBuild"/> is true and build succeeded.
         /// </summary>
         public BuildResult? BuildResult => _buildResult;
+
 
         internal BuildResult[]? SetSingleBuildResult( BuildResult r )
         {
@@ -178,6 +202,24 @@ public sealed partial class Roadmap
             return r;
         }
 
+
+        internal void CommitBuilding()
+        {
+            if( _buildResult != null )
+            {
+                _buildResult.CommitBuilding();
+                _targetVersion = _buildResult.Version;
+            }
+            else
+            {
+                Throw.DebugAssert( ReferenceEquals( _targetVersion, _solution.LastBuild.TagCommit.Version ) || ReferenceEquals( _targetVersion, _solution.LastBuild.TagCommit.CI0Version ) );
+                if( _targetVersion.IsBuilding() )
+                {
+                    bool isCI0 = ReferenceEquals( _targetVersion, _solution.LastBuild.TagCommit.CI0Version );
+                    (_, _targetVersion) = _solution.LastBuild.TagCommit.CommitBuilding( isCI0 );
+                }
+            }
+        }
     }
 
 }

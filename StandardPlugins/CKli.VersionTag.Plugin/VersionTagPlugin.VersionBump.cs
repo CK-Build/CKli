@@ -59,7 +59,7 @@ public sealed partial class VersionTagPlugin
         //
         // Ignore +fake (even if they are published by design).
         // What matters are only non fake published version (regular or deprecated). 
-        var maxVersion = versionInfo.AllVersions.Select( tc => tc.Version ).Where( v => !v.HasFakeMetadata && !v.IsLocal() ).Max();
+        var maxVersion = versionInfo.AllVersions.Select( tc => tc.Version ).Where( v => !v.HasFakeMetadata && !v.IsBuildingOrLocal() ).Max();
         if( futureFake <= maxVersion )
         {
             monitor.Error( $"""Provided version must be greater than the current maximal version "{maxVersion.ParsedText}".""" );

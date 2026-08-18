@@ -56,7 +56,7 @@ public sealed partial class VersionTagPlugin
             monitor.Error( $"Unable to find version tag 'v{version}'." );
             return false;
         }
-        if( tagCommit.Version.IsLocal() )
+        if( tagCommit.Version.IsBuildingOrLocal() )
         {
             monitor.Error( $"Version 'v{version}' has not been published yet." );
             return false;

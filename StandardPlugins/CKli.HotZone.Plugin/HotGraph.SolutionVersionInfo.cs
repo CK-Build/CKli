@@ -3,9 +3,6 @@ using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
-using LibGit2Sharp;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace CKli.HotZone.Plugin;
 
@@ -44,13 +41,16 @@ public sealed partial class HotGraph
         /// <summary>
         /// Captures the last <see cref="TagCommit"/> to consider in a build context (branch and whether we are building
         /// regular or CI build).
+        /// <para>
+        /// Created by <see cref="SolutionVersionInfo.GetLastBuild(bool)"/>.
+        /// </para>
         /// </summary>
-        public readonly struct BuiltVersion
+        public readonly struct LastBuiltVersion
         {
             readonly SolutionVersionInfo _info;
             readonly TagCommit _tagCommit;
 
-            internal BuiltVersion( SolutionVersionInfo info, TagCommit tagCommit )
+            internal LastBuiltVersion( SolutionVersionInfo info, TagCommit tagCommit )
             {
                 _info = info;
                 _tagCommit = tagCommit;
@@ -133,9 +133,9 @@ public sealed partial class HotGraph
         /// </summary>
         /// <param name="ciBuild">Whether we are in a CI build context.</param>
         /// <returns>The CI or non CI last build.</returns>
-        public BuiltVersion GetLastBuild( bool ciBuild )
+        public LastBuiltVersion GetLastBuild( bool ciBuild )
         {
-           return new BuiltVersion( this, _tagCommitTree.GetBestBuildFor( _solution.Branch.BranchName, ciBuild ).Commit );
+           return new LastBuiltVersion( this, _tagCommitTree.GetBestBuildFor( _solution.Branch.BranchName, ciBuild ).Commit );
         }
 
 

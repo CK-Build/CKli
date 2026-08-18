@@ -56,19 +56,42 @@ public sealed partial class BuildPlugin
         {
             Throw.DebugAssert( _roadmap.SolutionBuildCount > 0 );
             if( _cancellation.IsCancellationRequested ) return null;
+            BuildResult[]? result;
             if( _singleBuild )
             {
                 var s = _roadmap.OrderedSolutions.Single( s => s.MustBuild );
                 Throw.DebugAssert( s.BuildInfo != null && !s.BuildInfo.DirectRequirements.Any( s => s.MustBuild ) );
                 var r = await DoBuildAsync( monitor, s.BuildInfo );
-                return r != null
-                        ? s.BuildInfo.SetSingleBuildResult( r )
-                        : null;
+                result = r != null
+                            ? s.BuildInfo.SetSingleBuildResult( r )
+                            : null;
             }
-            using( monitor.OpenInfo( $"Building {_roadmap.SolutionBuildCount} solutions (--max-dop {_maxDoP})." ) )
+            else
             {
-                return await RunLoopAsync( monitor );
+                using( monitor.OpenInfo( $"Building {_roadmap.SolutionBuildCount} solutions (--max-dop {_maxDoP})." ) )
+                {
+                    result = await RunLoopAsync( monitor );
+                }
             }
+            if( result != null )
+            {
+                using( monitor.OpenInfo( $"Build succeed: committing 'building/' versions to 'local/' ones." ) )
+                {
+                    try
+                    {
+                        foreach( var s in _roadmap.OrderedSolutions )
+                        {
+                            s.BuildInfo?.CommitBuilding();
+                        }
+                    }
+                    catch( Exception ex )
+                    {
+                        monitor.Error( "While committing 'building/ versions to 'local/' ones.", ex );
+                        return null;
+                    }
+                }
+            }
+            return result;
         }
 
         async Task<BuildResult[]?> RunLoopAsync( IActivityMonitor monitor )
@@ -231,37 +254,62 @@ public sealed partial class BuildPlugin
         {
             if( _cancellation.IsCancellationRequested ) return null;
 
+            Throw.DebugAssert( build.MustBuild );
+            var repo = build.Solution.Repo;
+            var git = repo.GitRepository;
+
             // EnsureAndCheckoutBranch and UpdateDependenciesAndCommit only interact with their own Repo:
             // parallel builds don't need synchronization for these.
 
-            // If the solution has been read is the theoretical branch name we have nothing to do.
-            var hotBranch = build.Solution.VersionInfo.Solution.Branch;
-            if( hotBranch.BranchName != _roadmap.Graph.BranchName )
+            // If the real branch from which the build must be done doesn't exist, we create and synchronize it.
+            var buildBranch = build.BuildBranch;
+            if( !buildBranch.Exists )
             {
-                // The real branch from which the build must be done doesn't exist.
-                // We create and synchronize it.
-                hotBranch = build.Solution.VersionInfo.Solution.BranchInfo.Branches[_roadmap.Graph.BranchName.Index];
-                Throw.DebugAssert( !hotBranch.Exists );
-                if( !hotBranch.EnsureExists( monitor ) || !hotBranch.Synchronize( monitor ) )
+                if( !buildBranch.EnsureExists( monitor ) || !buildBranch.Synchronize( monitor ) )
                 {
                     return null;
                 }
             }
             // This checks out the "dev/" (CI build) or integrate it in the regular branch and checks out the regular branch (non CI build).
-            if( !EnsureAndCheckoutBranch( monitor, build, hotBranch, out var canAmend ) )
+            if( !EnsureAndCheckoutBranch( monitor, build, buildBranch, out var canAmend ) )
             {
                 return null;
             }
 
             if( _cancellation.IsCancellationRequested ) return null;
 
-            // This works on the working folder. (On success, UpdateDependenciesAndCommit refreshes our HotBranch). 
+            // From now on, we work on the working folder. 
+
+            // If no new commit has been created (canAmend is false), then we check whether the new version
+            // requires an independent commit.
+            if( !canAmend
+                && build.Solution.VersionInfo.VersionTagInfo.TagCommitsBySha.TryGetValue( git.Repository.Head.Tip.Sha, out var already ) )
+            {
+                var error = already.CanBearVersion( build.TargetVersion );
+                if( error != null )
+                {
+                    monitor.Info( $"""
+                        Creating an empty commit to avoid error:
+                        {error}
+                        """ );
+                    // We create the commit on the checked out branch (can be the regular or the "dev/") and
+                    // refresh the buildBranch.
+                    if( git.Commit( monitor,
+                                    $"Producing 'v{build.TargetVersion}' from unchanged '{already.Version.ParsedText}'.",
+                                    CommitBehavior.CreateEmptyCommit ) == CommitResult.Error
+                        || !buildBranch.Refresh( monitor ) )
+                    {
+                        return null;
+                    }
+                    canAmend = true;
+                }
+            }
+            // Since we work on the working folder, we must refresh the build branch.
             var commit = UpdateDependenciesAndCommit( monitor, build, _roadmap.PackageMapping, canAmend );
-            if( commit == null )
+            if( commit == null || !buildBranch.Refresh( monitor ) )
             {
                 return null;
             }
-
             if( _cancellation.IsCancellationRequested ) return null;
 
             // CoreBuildAsync interacts with the ArtifactHandlerPlugin that is mainly a proxy of the file system (the $Local NuGet and Assets folders).
@@ -279,48 +327,48 @@ public sealed partial class BuildPlugin
             if( result == null && !_roadmap.IsCIBuild )
             {
                 // The files are exactly the same by design (hard reset has already been done by CoreBuild, no need to handle untracked & ignored files).
-                build.Solution.Repo.GitRepository.Checkout( monitor, build.Solution.Solution.Branch.EnsureDevBranch(), deleteUntracked: false );
+                repo.GitRepository.Checkout( monitor, buildBranch.EnsureDevBranch(), deleteUntracked: false );
             }
             return result;
 
             static bool EnsureAndCheckoutBranch( IActivityMonitor monitor,
                                                  Roadmap.BuildInfo build,
-                                                 HotBranch b,
+                                                 HotBranch buildBranch,
                                                  out bool canAmend )
             {
-                Throw.DebugAssert( b.Exists && build.Solution.Repo == b.Repo );
+                Throw.DebugAssert( buildBranch.Exists && build.Solution.Repo == buildBranch.Repo );
                 var gitRepository = build.Solution.Repo.GitRepository;
                 Branch workingBranch;
                 canAmend = false;
 
-                bool hasDev = b.GitDevBranch != null;
+                bool hasDev = buildBranch.GitDevBranch != null;
                 if( build.Solution.Roadmap.IsCIBuild )
                 {
                     // CI build: easy, always work on the "dev/" branch.
-                    workingBranch = b.EnsureDevBranch();
+                    workingBranch = buildBranch.EnsureDevBranch();
                 }
                 else
                 {
                     // Stable build: if a "dev/" branch exists, integrate it.
-                    if( b.GitDevBranch != null )
+                    if( buildBranch.GitDevBranch != null )
                     {
                         // Allow amend to update dependencies only if a merge commit
                         // has been created.
-                        var before = b.GitDevBranch.Tip.Sha;
-                        if( !b.IntegrateDevBranch( monitor ) )
+                        var before = buildBranch.GitDevBranch.Tip.Sha;
+                        if( !buildBranch.IntegrateDevBranch( monitor ) )
                         {
                             return false;
                         }
                         // canAmend == a new merge commit has been created. 
-                        canAmend = b.GitBranch.Tip.Sha != before;
+                        canAmend = buildBranch.GitBranch.Tip.Sha != before;
                     }
                     // This is too risky to do this here: this is done by the Publish plugin only
                     // when everything went right.
                     //  // Whether the "dev/" branch exists or not, IF a git push occurs, then remove
                     //  // the remote branch.
-                    //  gitRepository.DeferredPushRefSpecs.Add( $":refs/heads/{b.BranchName.DevName}" );
+                    //  gitRepository.DeferredPushRefSpecs.Add( $":refs/heads/{buildBranch.BranchName.DevName}" );
 
-                    workingBranch = b.GitBranch;
+                    workingBranch = buildBranch.GitBranch;
                 }
                 if( !gitRepository.Checkout( monitor, workingBranch ) )
                 {
@@ -348,8 +396,6 @@ public sealed partial class BuildPlugin
                 // Creates the commit... or not: this does nothing if there's nothing to do.
                 // Here we create a commit on the regular branch if it has been integrated (non
                 // CI build case).
-                // This may not be a good idea and may change in the future.
-                // We must refresh the HotBranch (because we don't use its Commit method).
                 var commitMsg = $"""
                 Updated dependencies.
 
@@ -366,31 +412,6 @@ public sealed partial class BuildPlugin
                     return null;
                 }
 
-                // We forbid the same commit to produce 2 different versions. This enables the VersionTagInfo to expose a
-                // simple TagCommitsBySha instead of a ListOfTagCommitsBySha.
-                // This check is done before build (by VersionTagInfo.CanBuildAnyCommit) that triggers an error is such case.
-                // Here we handle the case of a previous prerelease from the same commit IIF we are building a stable
-                // version: we create an empty commit to "carry" the stable version dedicated to the stable version.
-                if( !build.Solution.Roadmap.IsCIBuild
-                    && build.Solution.VersionInfo.VersionTagInfo.TagCommitsBySha.TryGetValue( git.Repository.Head.Tip.Sha, out var already ) )
-                {
-                    // If it's a +fake or a +deprecated, we let the final check trigger an error.
-                    if( already.IsRegularVersion && already.Version.IsPrerelease )
-                    {
-                        if( git.Commit( monitor,
-                                        $"Producing 'v{build.TargetVersion}' from unchanged '{already.Version.ParsedText}'.",
-                                        CommitBehavior.CreateEmptyCommit ) == CommitResult.Error )
-                        {
-                            return null;
-                        }
-                        canAmend = true;
-                    }
-                }
-                // Refreshing the HotBranch.
-                if( !build.Solution.Solution.Branch.Refresh( monitor ) )
-                {
-                    return null;
-                }
                 return git.Repository.Head.Tip;
             }
         }

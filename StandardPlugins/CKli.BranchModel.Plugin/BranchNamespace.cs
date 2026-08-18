@@ -280,6 +280,9 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
 
     /// <summary>
     /// Finds a branch by its name.
+    /// <para>
+    /// This transparently prepends the <see cref="WorldName.LTSName"/> if it's missing.
+    /// </para>
     /// </summary>
     /// <param name="name">The branch name.</param>
     /// <returns>The branch or null.</returns>
@@ -288,6 +291,9 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
     /// <summary>
     /// Finds the <paramref name="branchName"/> in this <see cref="BranchNamespace"/> or emits an error
     /// if this is not an existing branch name.
+    /// <para>
+    /// This transparently prepends the <see cref="WorldName.LTSName"/> if it's missing.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to emit the error.</param>
     /// <param name="branchName">The branch name to lookup.</param>
@@ -307,6 +313,9 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
 
     /// <summary>
     /// Finds the <paramref name="branchName"/> in this <see cref="BranchNamespace"/> or throws an <see cref="InvalidOperationException"/>.
+    /// <para>
+    /// This transparently prepends the <see cref="WorldName.LTSName"/> if it's missing.
+    /// </para>
     /// </summary>
     /// <param name="branchName">The branch name to lookup.</param>
     /// <returns>The name.</returns>

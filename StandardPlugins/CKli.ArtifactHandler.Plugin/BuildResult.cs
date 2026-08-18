@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using LibGit2Sharp;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -12,21 +13,25 @@ namespace CKli.ArtifactHandler.Plugin;
 /// Captures the result of a successful repository build.
 /// This result can have a true <see cref="SkippedBuild"/> (the commit to build was
 /// already built).
+/// <para>
+/// This is not fully immutable: calling <see cref="CommitBuilding"/> updates
+/// the <see cref="Version"/>, the <see cref="VersionTag"/> and the repository.
+/// </para>
 /// </summary>
 public sealed partial class BuildResult
 {
     readonly Repo _repo;
-    readonly Tag _versionTag;
-    readonly SVersion _version;
     readonly BuildContentInfo _buildContentInfo;
     readonly NormalizedPath _assetsFolder;
     readonly bool _skippedBuild;
+    Tag _versionTag;
+    SVersion _version;
 
     /// <summary>
     /// Initializes a result.
     /// </summary>
     /// <param name="repo">The repository.</param>
-    /// <param name="versionTag">The version tag. It must be up to date and not change anymore.</param>
+    /// <param name="versionTag">The version tag.</param>
     /// <param name="version">The built or already built version.</param>
     /// <param name="content">Existing content info.</param>
     /// <param name="assetsFolder">
@@ -42,7 +47,11 @@ public sealed partial class BuildResult
                         bool skippedBuild )
     {
         Throw.CheckArgument( assetsFolder.IsEmptyPath == content.AssetFileNames.IsEmpty );
-        Throw.CheckArgument( version.IsCSVersion );
+
+        Throw.CheckArgument( (version.IsLocal() && versionTag.CanonicalName.StartsWith("refs/tags/local/", StringComparison.Ordinal ))
+                             || (version.IsBuilding() && versionTag.CanonicalName.StartsWith( "refs/tags/building/", StringComparison.Ordinal ))
+                             || (!version.IsBuildingOrLocal() && versionTag.CanonicalName == $"refs/tags/v{version}") );
+
         _repo = repo;
         _versionTag = versionTag;
         _version = version;
@@ -63,7 +72,10 @@ public sealed partial class BuildResult
 
     /// <summary>
     /// Gets the commit's version tag.
-    /// This tag is up to date and may be a non "local/" one.
+    /// <para>
+    /// This tag is synchronized with this <see cref="Version"/> and may be a mere (published) version or have
+    /// a "building/" or "local/" prefix.
+    /// </para>
     /// </summary>
     public Tag VersionTag => _versionTag;
 
@@ -93,6 +105,45 @@ public sealed partial class BuildResult
     /// Gets the <see cref="BuildContentInfo.Produced"/> with this <see cref="Version"/>.
     /// </summary>
     public IEnumerable<PackageInstance> Produced => _buildContentInfo.Produced.Select( p => new PackageInstance( p, _version ) );
+
+    /// <summary>
+    /// Updates <see cref="VersionTag"/> and <see cref="Version"/> by calling <see cref="CommitBuilding(Repo, Tag, SVersion)"/>.
+    /// <para>
+    /// This must be called only once.
+    /// </para>
+    /// </summary>
+    public void CommitBuilding() => (_versionTag, _version) = CommitBuilding( _repo, _versionTag, _version );
+
+    /// <summary>
+    /// The <paramref name="buildingVersionTag"/> with a "refs/tags/building/" prefix is updated to have a "refs/tags/local/" prefix.
+    /// The <paramref name="buildingVersion"/>'s prefix is also updated to "local/".
+    /// <para>
+    /// The building version tag and the version must be synchronized or an <see cref="ArgumentException"/> is thrown.
+    /// <see cref="CKException"/> or a <see cref="LibGit2SharpException"/> may be thrown if anything goes wrong.
+    /// </para>
+    /// </summary>
+    /// <returns>The updated tag in the repository and the version.</returns>
+    public static (Tag, SVersion) CommitBuilding( Repo repo, Tag buildingVersionTag, SVersion buildingVersion )
+    {
+        Throw.CheckArgument( buildingVersion.IsBuilding() );
+        Throw.CheckArgument( buildingVersionTag.CanonicalName.StartsWith( "refs/tags/building/v", StringComparison.Ordinal ) );
+        Throw.CheckArgument( buildingVersionTag.CanonicalName.AsSpan( 19 ).EndsWith( buildingVersion.ToString(), StringComparison.Ordinal ) );
+
+        // Defensive programming (allowOverwrite: true).
+        var vTag = $"local/{buildingVersion}";
+        var newTag = repo.GitRepository.Repository.Tags.Add( vTag,
+                                                             buildingVersionTag.Target,
+                                                             buildingVersionTag.Annotation.Tagger,
+                                                             buildingVersionTag.Annotation.Message,
+                                                             allowOverwrite: true );
+        if( newTag == null )
+        {
+            var commit = (Commit)buildingVersionTag.Target;
+            throw new CKException( $"Unable to apply tag '{vTag}' in '{repo.DisplayPath}' on commit '{commit.Sha.AsSpan( 0, 7 )} {commit.MessageShort}'." );
+        }
+        repo.GitRepository.Repository.Tags.Remove( buildingVersionTag );
+        return (newTag, buildingVersion.SetParsedPrefix( "local/" ));
+    }
 
     /// <summary>
     /// Gets the <see cref="BuildContentInfo"/>.

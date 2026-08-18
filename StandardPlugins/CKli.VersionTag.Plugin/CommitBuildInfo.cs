@@ -97,10 +97,11 @@ public sealed class CommitBuildInfo
                                                        CKliEnv context,
                                                        BuildContentInfo contentInfo )
     {
-        // When rebuilding, the _version is not "local/".
-        var vPublishedTag = $"v{_version}";
-        var vLocalTag = $"local/{vPublishedTag}";
-        var vTag = _version.IsLocal() ? vLocalTag : vPublishedTag;
+        var vTag = _version.IsLocal()
+                    ? $"local/v{_version}"
+                    : _version.IsBuilding()
+                        ? $"building/v{_version}"
+                        : $"v{_version}";
 
         monitor.Info( $"""
                 Setting build tag '{vTag}' on '{Repo.DisplayPath}' (commit: '{_buildCommit}'):
@@ -108,7 +109,7 @@ public sealed class CommitBuildInfo
                 """ );
         try
         {
-            // Creates the tag (with or without "local/" prefix). If this exact tag is on another
+            // Creates the tag (with or without "building/" or "local/" prefix). If this exact tag is on another
             // commit, it is moved (allowOverwrite: true).
             var git = _tagInfo.Repo.GitRepository.Repository;
             var t = git.Tags.Add( vTag,
@@ -116,13 +117,17 @@ public sealed class CommitBuildInfo
                                   context.Committer,
                                   contentInfo.ToString(),
                                   allowOverwrite: true );
-
-            // Destroys any other (previous!) local releases with the same branch name.
+            if( t == null )
+            {
+                monitor.Error( GetErrorMessage( contentInfo, vTag ) );
+                return (null, null);
+            }
+            // Destroys any other (previous!) building or local releases with the same branch name.
             // Note:
-            //   First idea was to add these conditions:
-            //      - always if they are CI (because whatever we just built, it is "better" than an old CI).
-            //      - if they are not CI, then we destroy them only if we just built a new non-CI version.
-            //   This would have preserved non-CI builds in presence of CI builds.
+            //     |  First idea was to add these conditions:
+            //     |     - always if they are CI (because whatever we just built, it is "better" than an old CI).
+            //     |     - if they are not CI, then we destroy them only if we just built a new non-CI version.
+            //     |  This would have preserved non-CI builds in presence of CI builds.
             //   But having 2 sets of local versions introduces major ambiguities (technically but also
             //   for the user). So we decide to ignore the CI/non-CI aspect: a "local/" always replaces the
             //   previously built "local/" version.
@@ -134,11 +139,16 @@ public sealed class CommitBuildInfo
             // This should be a "World.Problem"
             // Problems may be future new beasts that are serializable proto/persistent-issues with a
             // "bool StillApply( ... out World.Issue issue )". 
-            monitor.Error( $"""
-                Unexpecting error while applying '{vTag}' on '{Repo.DisplayPath}' (commit: '{_buildCommit.Sha}') with content:
-                {contentInfo}
-                """, ex );
+            monitor.Error( GetErrorMessage( contentInfo, vTag ), ex );
             return (null,null);
+        }
+
+        string GetErrorMessage( BuildContentInfo contentInfo, string vTag )
+        {
+            return $"""
+                    Unable to apply tag '{vTag}' in '{Repo.DisplayPath}' on commit '{_buildCommit.Sha.AsSpan( 0, 7 )} {_buildCommit.MessageShort}' with content:
+                    {contentInfo}
+                    """;
         }
     }
 

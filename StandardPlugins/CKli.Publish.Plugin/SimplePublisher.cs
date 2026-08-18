@@ -121,7 +121,7 @@ sealed partial class SimplePublisher
         // Enter the atomic phase:
         // - version tag -> (create draft release -> push build branch with removed remote "dev/" or create the remote regular branch).
         var tag = repo.PublishTag;
-        Throw.DebugAssert( repo.PublishVersion.IsLocal() == tag.CanonicalName.StartsWith( "refs/tags/local/", System.StringComparison.Ordinal ) );
+        Throw.DebugAssert( repo.PublishVersion.IsLocal() || !repo.PublishVersion.IsBuilding() );
         if( repo.PublishVersion.IsLocal() )
         {
             r.Repository.Tags.Remove( tag.CanonicalName );
