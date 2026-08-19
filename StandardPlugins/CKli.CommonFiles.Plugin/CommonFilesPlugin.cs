@@ -52,7 +52,11 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         var content = GetFolderContent( ev.Monitor );
         foreach( var item in content )
         {
-            var target = item.RelativeTargetPath.Replace( "$SolutionName$", ev.Repo.DisplayPath.LastPart );
+            if( item.RelativeTargetPath.Contains( "$SolutionName$" ) )
+            {
+                Throw.CKException( $"The '$SolutionName$' placeholder in '{item.RelativeTargetPath}' must be renamed '$RepositoryName$'." );
+            }
+            var target = item.RelativeTargetPath.Replace( "$RepositoryName$", ev.Repo.DisplayPath.LastPart );
             switch( item.Action )
             {
                 case FileType.AlwaysCopy: CopyFile( ev, item.SourcePath, target ); break;

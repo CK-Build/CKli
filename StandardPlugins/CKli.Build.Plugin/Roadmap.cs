@@ -36,6 +36,7 @@ public sealed partial class Roadmap
     readonly HotGraph.PackageUpdater _packageUpdater;
     readonly Mapping _packageMapping;
     int _buildSolutionCount;
+    PublishableStatus _publishable;
 
     [Obsolete]
     int _publishSolutionCount;
@@ -118,7 +119,32 @@ public sealed partial class Roadmap
         {
             return null;
         }
+        if( mustPublish
+            && roadmap.Publishable == PublishableStatus.PublishRequiredBaseBranch
+            && !roadmap.CreateRequiredPublishBaseList( monitor, versionTag ) )
+        {
+            return null;
+        }
+
         return roadmap;
+    }
+
+    bool CreateRequiredPublishBaseList( IActivityMonitor monitor, VersionTagPlugin versionTag )
+    {
+        Throw.DebugAssert( _mustPublish && _publishable == PublishableStatus.PublishRequiredBaseBranch );
+        var releaseDB = versionTag.EnsureDatabase( monitor );
+        if( releaseDB == null )
+        {
+            return false;
+        }
+        foreach( var s in _orderedSolutions )
+        {
+            if( s.Publishable == PublishableStatus.PublishRequiredBaseBranch )
+            {
+                var info = releaseDB.GetReleaseInfo( monitor, s.LastBuild.TagCommit );
+            }
+        }
+        return true;
     }
 
     /// <summary>
@@ -144,6 +170,11 @@ public sealed partial class Roadmap
     /// Gets the count of <see cref="OrderedSolutions"/> that have true <see cref="BuildSolution.MustBuild"/>.
     /// </summary>
     public int SolutionBuildCount => _buildSolutionCount;
+
+    /// <summary>
+    /// Gets the publishable status.
+    /// </summary>
+    internal PublishableStatus Publishable => _publishable;
 
     /// <summary>
     /// Gets the number of solutions that must be published: their <see cref="BuildSolution.MustBuild"/> is true
@@ -188,11 +219,13 @@ public sealed partial class Roadmap
                                  ArtifactHandlerPlugin artifactHandler )
     {
         bool success = true;
+        var publishableStatus = PublishableStatus.None;
         int idxBuildNumber = 1;
         foreach( var s in _orderedSolutions )
         {
-            success &= s.ConcludeInitialization( monitor, artifactHandler, ref idxBuildNumber );
+            success &= s.ConcludeInitialization( monitor, artifactHandler, ref idxBuildNumber, ref publishableStatus );
         }
+        _publishable = publishableStatus;
         return success;
     }
 
