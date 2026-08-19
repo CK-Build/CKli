@@ -175,30 +175,10 @@ public sealed partial class VersionTagInfo : RepoInfo
 
     /// <summary>
     /// Gets a <see cref="TagCommit"/> for a version.
-    /// <para>
-    /// For "ci.0" version (when <see cref="SVersion.CINumber"/> is 0), this returns the commit of the base version
-    /// if it exists.
-    /// The found base may have a <see cref="TagCommit.CI0Version"/>.
-    /// </para>
     /// </summary>
     /// <param name="version">The version to find.</param>
     /// <returns>The tag commit if it exists, null otherwise.</returns>
-    public TagCommit? GetTagCommit( SVersion version )
-    {
-        if( _v2C.TryGetValue( version, out var tc ) )
-        {
-            return tc;
-        }
-        if( version.CINumber == 0 )
-        {
-            var vBase = version.SetCINumber( -1, impactStablePatchNumber: false );
-            if( _v2C.TryGetValue( vBase, out tc ) )
-            {
-                return tc;
-            }
-        }
-        return null;
-    }
+    public TagCommit? GetTagCommit( SVersion version ) => _v2C.GetValueOrDefault( version );
 
     /// <summary>
     /// Gets a <see cref="TagCommit"/> for a version.
@@ -380,21 +360,17 @@ public sealed partial class VersionTagInfo : RepoInfo
         var tagCommit = GetTagCommit( version );
         if( tagCommit == null )
         {
-            monitor.Trace( $"Version tag 'local/v{version}' not found. Skipped DestroyLocalRelease." );
+            monitor.Trace( $"Version tag 'building/v{version}' or 'local/v{version}' not found. Skipped DestroyLocalRelease." );
             return true;
         }
         // Use the right (tag,version).
         Tag tag;
         SVersion v;
-        if( version.CINumber == 0 )
+        if( version == tagCommit.CI0Version )
         {
-            if( tagCommit.CI0VersionTag == null )
-            {
-                monitor.Error( ActivityMonitor.Tags.ToBeInvestigated, $"""Internal version mismatch: "--ci.0" '{version}' found but its TagCommit.CI0VersionTag is null.""" );
-                return false;
-            }
+            Throw.DebugAssert( tagCommit.CI0VersionTag != null );
             tag = tagCommit.CI0VersionTag;
-            v = tagCommit.CI0Version!;
+            v = tagCommit.CI0Version;
         }
         else
         {
@@ -403,7 +379,7 @@ public sealed partial class VersionTagInfo : RepoInfo
         }
         if( !v.IsBuildingOrLocal() )
         {
-            monitor.Error( $"Existing versioned tag '{tag.FriendlyName}' is not 'local/'. Skipped DestroyLocalRelease." );
+            monitor.Error( $"Existing versioned tag '{tag.FriendlyName}' is not 'building/' or 'local/'. Skipped DestroyLocalRelease." );
             return true;
         }
         if( v.HasFakeMetadata || v.HasDeprecatedMetadata )
@@ -680,20 +656,27 @@ public sealed partial class VersionTagInfo : RepoInfo
     {
         if( _v2C.Remove( version, out var tc ) )
         {
-            if( _sha2C != null )
+            if( version == tc.CI0Version )
             {
-                _sha2C.Remove( tc.Sha );
+                tc.ClearCI0VersionTag();
             }
-            if( version.IsStable && !_lastStables.IsDefault )
+            else
             {
-                var idx = _lastStables.BinarySearch( tc );
-                Throw.DebugAssert( idx >= 0 );
-                _lastStables = _lastStables.RemoveAt( idx );
-                _lastMajorMinorStables = default;
-                if( _hotZone != null && !_hotZone.OnTagCommitRemoved( tc ) )
+                if( _sha2C != null )
                 {
-                    monitor.Info( $"Removed {tc} that is the current LastStable in '{Repo.DisplayPath}': the HotZone has been disabled." );
-                    _hotZone = null;
+                    _sha2C.Remove( tc.Sha );
+                }
+                if( version.IsStable && !_lastStables.IsDefault )
+                {
+                    var idx = _lastStables.BinarySearch( tc );
+                    Throw.DebugAssert( idx >= 0 );
+                    _lastStables = _lastStables.RemoveAt( idx );
+                    _lastMajorMinorStables = default;
+                    if( _hotZone != null && !_hotZone.OnTagCommitRemoved( tc ) )
+                    {
+                        monitor.Info( $"Removed {tc} that is the current LastStable in '{Repo.DisplayPath}': the HotZone has been disabled." );
+                        _hotZone = null;
+                    }
                 }
             }
         }

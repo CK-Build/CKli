@@ -276,6 +276,12 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
                 : null;
     }
 
+    internal void ClearCI0VersionTag()
+    {
+        Throw.DebugAssert( _ci0Tag != null && _ci0Version != null );
+        _ci0Version = null;
+        _ci0Tag = null;
+    }
 
     internal void SetCI0VersionTag( Tag tag, SVersion v )
     {

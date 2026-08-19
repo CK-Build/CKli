@@ -595,6 +595,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                             {
                                 removableTags.Add( tBase.CI0VersionTag );
                                 tBase.SetCI0VersionTag( t, v );
+                                v2c[v] = tBase;
                             }
                             else
                             {
@@ -604,6 +605,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         else
                         {
                             tBase.SetCI0VersionTag( t, v );
+                            v2c.Add( v, tBase );
                         }
                     }
                 }

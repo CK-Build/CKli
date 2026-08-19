@@ -15,5 +15,7 @@ readonly record struct RepoKey( Repo Repo, SVersion Version )
 
     public override int GetHashCode() => _hash;
 
-    public override string ToString() => $"{Repo.DisplayPath}/v{Version}";
+    public override string ToString() => ToString( Repo, Version );
+
+    public static string ToString( Repo r, SVersion v ) => $"{r.DisplayPath}/v{v}";
 }

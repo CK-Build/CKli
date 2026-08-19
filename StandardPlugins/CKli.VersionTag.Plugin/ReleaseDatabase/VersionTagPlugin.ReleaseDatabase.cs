@@ -41,16 +41,14 @@ public sealed partial class VersionTagPlugin
         /// <returns>The information or null if the released version doesn't exist.</returns>
         public RepoReleaseInfo? GetReleaseInfo( IActivityMonitor monitor, Repo repo, SVersion version, LogLevel errorLevel )
         {
-            var key = new RepoKey( repo, version );
             if( !_allVersionTagInfos[repo.Index].TryGetTagCommit( version, out var tc ) || tc.BuildContentInfo == null )
             {
-                monitor.Log( errorLevel, $"No release exist for '{key}'." );
+                monitor.Log( errorLevel, $"No release exist for '{RepoKey.ToString( repo, version )}'." );
                 return null;
-
             }
             lock( _dbLock )
             {
-                return GetReleasedInfo( monitor, key, tc.BuildContentInfo );
+                return GetReleasedInfo( monitor, new RepoKey( repo, version ), tc.BuildContentInfo );
             }
         }
 
@@ -128,25 +126,25 @@ public sealed partial class VersionTagPlugin
                         if( tc.BuildContentInfo == null ) continue;
                         if( !tc.IsFakeVersion )
                         {
-                            foreach( var id in tc.BuildContentInfo.Produced )
+                            foreach( var packageId in tc.BuildContentInfo.Produced )
                             {
-                                AddPackage( index, r, tc.Version, id );
+                                AddPackage( index, r, tc.Version, packageId );
                             }
                         }
                         if( tc.CI0Version != null )
                         {
-                            foreach( var id in tc.BuildContentInfo.Produced )
+                            foreach( var packageId in tc.BuildContentInfo.Produced )
                             {
-                                AddPackage( index, r, tc.CI0Version, id );
+                                AddPackage( index, r, tc.CI0Version, packageId );
                             }
                         }
                     }
                 }
                 return index;
 
-                static void AddPackage( Dictionary<PackageInstance, RepoKey> index, Repo r, SVersion v, string id )
+                static void AddPackage( Dictionary<PackageInstance, RepoKey> index, Repo r, SVersion v, string packageId )
                 {
-                    var p = new PackageInstance( id, v );
+                    var p = new PackageInstance( packageId, v );
                     var repoKey = new RepoKey( r, v );
                     if( !index.TryAdd( p, repoKey ) )
                     {
