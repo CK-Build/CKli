@@ -9,9 +9,11 @@ namespace CKli.VersionTag.Plugin;
 /// </summary>
 /// <param name="Repo">The repository.</param>
 /// <param name="Version">The version.</param>
-readonly record struct RepoKey( Repo Repo, SVersion Version )
+readonly record struct RepoKey( TagCommit TagCommit, SVersion Version )
 {
-    readonly int _hash = HashCode.Combine( Repo, Version );
+    readonly int _hash = HashCode.Combine( TagCommit.Repo, Version );
+
+    public Repo Repo => TagCommit.Repo;
 
     public override int GetHashCode() => _hash;
 

@@ -105,7 +105,7 @@ public sealed partial class VersionTagPlugin
         {
             return false;
         }
-        var releaseInfo = releaseDatabase.GetReleaseInfo( monitor, tagCommit );
+        var releaseInfo = releaseDatabase.GetReleaseInfo( monitor, tagCommit, v.CINumber == 0 );
         var visited = new HashSet<RepoReleaseInfo>() { releaseInfo };
         EnsureImpliedDeprecatedTag( monitor, releaseInfo, visited, path: [releaseInfo], tagInfo.DaysDelay, tagInfo.Expiration );
 

@@ -32,55 +32,42 @@ public sealed partial class VersionTagPlugin
         internal ArtifactHandlerPlugin ArtifactHandlerPlugin => _versionTagPlugin._artifactHandlerPlugin;
 
         /// <summary>
-        /// Gets the <see cref="RepoReleaseInfo"/> for a released version of a repository.
-        /// </summary>
-        /// <param name="monitor">The monitor.</param>
-        /// <param name="repo">The released repository.</param>
-        /// <param name="version">The released version.</param>
-        /// <param name="errorLevel">Log level when not found. Use <see cref="LogLevel.None"/> to skip logging.</param>
-        /// <returns>The information or null if the released version doesn't exist.</returns>
-        public RepoReleaseInfo? GetReleaseInfo( IActivityMonitor monitor, Repo repo, SVersion version, LogLevel errorLevel )
-        {
-            if( !_allVersionTagInfos[repo.Index].TryGetTagCommit( version, out var tc ) || tc.BuildContentInfo == null )
-            {
-                monitor.Log( errorLevel, $"No release exist for '{RepoKey.ToString( repo, version )}'." );
-                return null;
-            }
-            lock( _dbLock )
-            {
-                return GetReleasedInfo( monitor, new RepoKey( repo, version ), tc.BuildContentInfo );
-            }
-        }
-
-        /// <summary>
         /// Gets the <see cref="RepoReleaseInfo"/> for a <see cref="TagCommit"/> that must not be <see cref="TagCommit.IsFakeVersion"/>
         /// or a <see cref="System.ArgumentException"/> is thrown.
         /// </summary>
         /// <param name="monitor">The monitor.</param>
         /// <param name="tagCommit">The existing, non fake, tag commit.</param>
+        /// <param name="ci0version">True to consider the <see cref="TagCommit.CI0Version"/> instead of the <see cref="TagCommit.Version"/>.</param>
         /// <returns>The information or null if the released version doesn't exist.</returns>
-        public RepoReleaseInfo GetReleaseInfo( IActivityMonitor monitor, TagCommit tagCommit )
+        public RepoReleaseInfo GetReleaseInfo( IActivityMonitor monitor, TagCommit tagCommit, bool ci0version = false )
         {
             Throw.CheckArgument( !tagCommit.IsFakeVersion );
+            var v = ci0version ? tagCommit.CI0Version : tagCommit.Version;
+            if( v == null )
+            {
+                Throw.ArgumentException( nameof( ci0version ), $"{tagCommit} has no ci.0 version." );
+            }
             lock( _dbLock )
             {
-                return GetReleasedInfo( monitor, new RepoKey( tagCommit.Repo, tagCommit.Version ), tagCommit.BuildContentInfo );
+                return GetReleasedInfo( monitor, new RepoKey( tagCommit, v ) );
             }
         }
 
-        RepoReleaseInfo GetReleasedInfo( IActivityMonitor monitor, RepoKey key, BuildContentInfo content )
+        RepoReleaseInfo GetReleasedInfo( IActivityMonitor monitor, RepoKey key )
         {
             Throw.DebugAssert( _dbLock.IsHeldByCurrentThread );
             if( !_releaseInfo.TryGetValue( key, out var r ) )
             {
+                BuildContentInfo? content = key.TagCommit.BuildContentInfo;
+                Throw.DebugAssert( "TagCommit is not a +fake nor a +deprecated.", content != null );
                 var directProducers = new List<RepoReleaseInfo>();
                 var allProducers = new HashSet<RepoReleaseInfo>();
                 foreach( var consumed in content.Consumed )
                 {
                     // If we can't find a producer for a consumed package, it is an external package.
-                    if( FindProducer( consumed, out RepoKey producerKey, out BuildContentInfo? producerContent ) )
+                    if( FindProducer( consumed, out RepoKey producerKey ) )
                     {
-                        var p = GetReleasedInfo( monitor, producerKey, producerContent );
+                        var p = GetReleasedInfo( monitor, producerKey );
                         directProducers.Add( p );
                         allProducers.UnionWith( p.AllProducers );
                     }
@@ -99,16 +86,7 @@ public sealed partial class VersionTagPlugin
             return r;
         }
 
-        internal bool FindProducer( PackageInstance p, out RepoKey repo, [NotNullWhen( true )] out BuildContentInfo? content )
-        {
-            if( EnsureProducedIndex().TryGetValue( p, out repo ) )
-            {
-                content = _allVersionTagInfos[repo.Repo.Index].GetTagCommit( repo.Version )!.BuildContentInfo!;
-                return true;
-            }
-            content = null;
-            return false;
-        }
+        internal bool FindProducer( PackageInstance p, out RepoKey repo ) => EnsureProducedIndex().TryGetValue( p, out repo );
 
         Dictionary<PackageInstance, RepoKey> EnsureProducedIndex()
         {
@@ -128,24 +106,24 @@ public sealed partial class VersionTagPlugin
                         {
                             foreach( var packageId in tc.BuildContentInfo.Produced )
                             {
-                                AddPackage( index, r, tc.Version, packageId );
+                                AddPackage( index, tc, tc.Version, packageId );
                             }
                         }
                         if( tc.CI0Version != null )
                         {
                             foreach( var packageId in tc.BuildContentInfo.Produced )
                             {
-                                AddPackage( index, r, tc.CI0Version, packageId );
+                                AddPackage( index, tc, tc.CI0Version, packageId );
                             }
                         }
                     }
                 }
                 return index;
 
-                static void AddPackage( Dictionary<PackageInstance, RepoKey> index, Repo r, SVersion v, string packageId )
+                static void AddPackage( Dictionary<PackageInstance, RepoKey> index, TagCommit c, SVersion v, string packageId )
                 {
                     var p = new PackageInstance( packageId, v );
-                    var repoKey = new RepoKey( r, v );
+                    var repoKey = new RepoKey( c, v );
                     if( !index.TryAdd( p, repoKey ) )
                     {
                         var exists = index[p];
@@ -162,9 +140,9 @@ public sealed partial class VersionTagPlugin
         {
             lock( _dbLock )
             {
-                // Collecting in a dictionary: duplicated RepoKey is removed,
+                // Collecting in a HashSet: duplicated RepoKey is removed,
                 // this handles the Package -> Solution projection.
-                var consumers = new Dictionary<RepoKey, BuildContentInfo>();
+                var consumers = new HashSet<RepoKey>();
                 foreach( var id in info.Content.Produced )
                 {
                     CollectConsumers( new PackageInstance( id, info.Version ), consumers );
@@ -187,9 +165,9 @@ public sealed partial class VersionTagPlugin
                 // the direct consumers (the "future").
                 //
                 var consumerInfos = new List<RepoReleaseInfo>();
-                foreach( var (consumerKey, consumerContent) in consumers )
+                foreach( var c in consumers )
                 {
-                    consumerInfos.Add( GetReleasedInfo( monitor, consumerKey, consumerContent ) );
+                    consumerInfos.Add( GetReleasedInfo( monitor, c ) );
                 }
                 for( int i = 0; i < consumerInfos.Count; i++ )
                 {
@@ -209,7 +187,7 @@ public sealed partial class VersionTagPlugin
             }
         }
 
-        void CollectConsumers( in PackageInstance p, Dictionary<RepoKey, BuildContentInfo> collector )
+        void CollectConsumers( in PackageInstance p, HashSet<RepoKey> collector )
         {
             foreach( var vInfo in _allVersionTagInfos )
             {
@@ -220,7 +198,7 @@ public sealed partial class VersionTagPlugin
                     {
                         if( tc.BuildContentInfo.Consumed.Contains( p ) )
                         {
-                            collector.TryAdd( new RepoKey(r, tc.Version), tc.BuildContentInfo );
+                            collector.Add( new RepoKey(tc, tc.Version) );
                         }
                     }
                 }
