@@ -36,6 +36,8 @@ public sealed partial class Roadmap
     readonly HotGraph.PackageUpdater _packageUpdater;
     readonly Mapping _packageMapping;
     int _buildSolutionCount;
+
+    [Obsolete]
     int _publishSolutionCount;
 
     Roadmap( HotGraph graph,
@@ -229,7 +231,6 @@ public sealed partial class Roadmap
 
     internal struct RStats( int repositoryCount,
                             int buildSolutionCount,
-                            int publishSolutionCount,
                             bool hasPivots,
                             int pivotsCount,
                             bool isPullBuild,
@@ -289,14 +290,6 @@ public sealed partial class Roadmap
                     }
                 }
             }
-            if( publishSolutionCount == 0 )
-            {
-                r = r.AddBelow( screen.Text( $"Nothing to publish (the {repositoryCount} repositories are already published)", new TextStyle( ConsoleColor.DarkBlue, ConsoleColor.Black ) ) );
-            }
-            else
-            {
-                r = r.AddBelow( screen.Text( $"⏚ {publishSolutionCount} repositories {(mustPublish ? "must" : "can")} be published.", new TextStyle( ConsoleColor.Blue, ConsoleColor.Black ) ) );
-            }
             return r;
         }
 
@@ -320,7 +313,6 @@ public sealed partial class Roadmap
 
         var stats = new RStats( _orderedSolutions.Length,
                                 _buildSolutionCount,
-                                _publishSolutionCount,
                                 _graph.HasPivots,
                                 _pivots.Length,
                                 _isPullBuild,

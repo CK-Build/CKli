@@ -24,6 +24,7 @@ public sealed partial class Roadmap
         BuildInfo? _buildInfo;
         HotGraph.SolutionVersionInfo.LastBuiltVersion _lastBuild;
         int _buildNumber;
+        PublishableStatus _publishable;
 
         [Obsolete]
         BuildContentInfo? _lastBuildToPublish;
@@ -149,6 +150,7 @@ public sealed partial class Roadmap
             if( buildReason == MustBuildReason.None )
             {
                 // Pivot dependent conditions: this build can be skipped (not in the scope).
+                // This is the only place where the "star build" appears!
                 bool canSkip = !_roadmap._isPullBuild && _roadmap._graph.HasPivots && !_solution.IsPivot;
                 if( !canSkip )
                 {
@@ -309,13 +311,52 @@ public sealed partial class Roadmap
 
         internal bool ConcludeInitialization( IActivityMonitor monitor,
                                               ArtifactHandlerPlugin artifactHandler,
-                                              ref int idxBuildNumber )
+                                              ref int idxBuildNumber,
+                                              ref PublishableStatus publishable )
         {
-            Throw.DebugAssert( !_mustPublish );
+            Throw.DebugAssert( _publishable is PublishableStatus.None );
+            if( _buildInfo != null )
+            {
+                if( _buildInfo.MustBuild )
+                {
+                    Throw.DebugAssert( _buildNumber == 0 && idxBuildNumber >= 1 );
+                    _buildNumber = idxBuildNumber++;
+                    _publishable = PublishableStatus.Build;
+                }
+                else
+                {
+                    if( _buildInfo.TargetVersion.IsLocal() )
+                    {
+                        if( _roadmap._graph.BranchName.Match( _buildInfo.TargetVersion ) )
+                        {
+                            _publishable = PublishableStatus.PublishRequired;
+                        }
+                        else
+                        {
+                            _publishable = PublishableStatus.PublishRequiredBaseBranch;
+                        }
+                    }
+                    else if( _buildInfo.TargetVersion.IsBuilding() )
+                    {
+                        _publishable = PublishableStatus.BuildingPending;
+                    }
+                    else 
+                    {
+                        _publishable = PublishableStatus.AlreadyPublished;
+                    }
+                }
+
+                if( publishable < _publishable )
+                {
+                    _publishable = publishable;
+                }
+            }
+
+            // Obsolete.
             if( MustBuild )
             {
-                Throw.DebugAssert( _buildNumber == 0 && idxBuildNumber >= 1 );
-                _buildNumber = idxBuildNumber++;
+                //Throw.DebugAssert( _buildNumber == 0 && idxBuildNumber >= 1 );
+                //_buildNumber = idxBuildNumber++;
                 _mustPublish = true;
                 ++_roadmap._publishSolutionCount;
             }
@@ -352,6 +393,7 @@ public sealed partial class Roadmap
                 }
                 Throw.DebugAssert( _buildNumber == 0 );
             }
+
             return true;
         }
 
@@ -380,9 +422,7 @@ public sealed partial class Roadmap
         /// </summary>
         public SVersion BaseVersion => _versionInfo.BaseBuild.Version;
 
-        /// <summary>
-        /// Gets the current version (from <see cref="HotGraph.SolutionVersionInfo.GetLastBuild(bool)"/>).
-        /// </summary>
+        [Obsolete( "Use LastBuild" )]
         public SVersion CurrentVersion => _lastBuild.TagCommit.Version;
 
         /// <summary>
@@ -430,6 +470,11 @@ public sealed partial class Roadmap
         /// 0 when <see cref="MustBuild"/> is false.
         /// </summary>
         public int BuildNumber => _buildNumber;
+
+        /// <summary>
+        /// Gets the publishable status.
+        /// </summary>
+        internal PublishableStatus Publishable => _publishable;
 
         internal IRenderable ToRenderable(  ref BuildIndexAndRankDisplayState head, ref RStats stats )
         {

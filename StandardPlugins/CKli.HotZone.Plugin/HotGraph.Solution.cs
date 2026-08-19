@@ -135,7 +135,7 @@ public sealed partial class HotGraph
         /// <summary>
         /// Gets whether this solution belongs to the current <see cref="HotGraph.DevSolutions"/>.
         /// <para>
-        /// To be a "dev solution", this <see cref="HotBranch"/> must be the <see cref="HotGraph.BranchName"/> but this
+        /// To be a "dev solution", this <see cref="Branch"/> must be the <see cref="HotGraph.BranchName"/> but this
         /// doesn't mean that the "dev/" git branch exists. The <see cref="GitSolution"/> is bound to the regular branch
         /// when there is no "dev/" branch but if it exists then the GitSolution is bound to it.
         /// </para>
@@ -147,7 +147,7 @@ public sealed partial class HotGraph
         public bool IsDevSolution => _isDevSolution;
 
         /// <summary>
-        /// Gets whether this solution can be <see cref="IsDevSolution"/>: this <see cref="HotBranch"/> is the <see cref="HotGraph.BranchName"/>.
+        /// Gets whether this solution can be <see cref="IsDevSolution"/>: this <see cref="Branch"/> is the <see cref="HotGraph.BranchName"/>.
         /// </summary>
         public bool CanBeDevSolution => _branch.BranchName == _graph.BranchName;
 
