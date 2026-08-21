@@ -7,7 +7,6 @@ using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
 using System;
 using System.Diagnostics.CodeAnalysis;
-using System.Text.RegularExpressions;
 
 namespace CKli.Build.Plugin;
 
@@ -168,16 +167,19 @@ public sealed partial class Roadmap
                         return false;
                     }
                     // The version target is the last built one.
-                    var vTarget = _lastBuild.TagCommit.Version;
+                    var vTarget = _lastBuild.Version;
                     Throw.DebugAssert( "Fake version triggered MustBuildReason.FakeVersion.", !vTarget.HasFakeMetadata );
                     // If we are in --ci.0 mode and in non skippable conditions and we are here (MustBuildReason.None),
                     // then the version to consider must be the ci.0 version (not the non-CI build version associated to the TagCommit).
                     // This ci.0 version necessarily exists otherwise the UpdateSkippableBuildReason would have returned the "CI0" reason.
-                    if( _roadmap._ciBuildMode == CIBuildMode.CIForce && !canSkip && !vTarget.IsCI )
-                    {
-                        Throw.DebugAssert( _lastBuild.TagCommit.CI0Version != null );
-                        vTarget = _lastBuild.TagCommit.CI0Version;
-                    }
+                    //
+                    // And because in --ci.0 mode, the last build has been obtained with allowCI = true, we have here:
+                    //
+                    //  _roadmap._ciBuildMode == CIBuildMode.CIForce && !canSkip => vTarget is CI and if ci.0 then it is the TagCommit.CI0Version.
+                    //
+                    Throw.DebugAssert( !(_roadmap._ciBuildMode == CIBuildMode.CIForce && !canSkip)
+                                        || (vTarget.CINumber > 0 || (vTarget.CINumber == 0 && vTarget == _lastBuild.TagCommit.CI0Version)) );
+
                     // We compute the version change not for us (this solution will not be built) but for
                     // the downstream solutions to correctly propagate the change level (here it may be None).
                     // If the LastStable is a +fake, we consider no impact (there's no code change if we are here).
@@ -454,6 +456,7 @@ public sealed partial class Roadmap
         /// true and after a successful <see cref="Roadmap.BuildAsync"/>.
         /// </summary>
         /// <returns>The version and content to publish.</returns>
+        [Obsolete("Will be replaced by PublishInfo.")]
         public (SVersion Version, Tag Tag, BuildContentInfo Content) GetFinalPublishInfo()
         {
             Throw.CheckState( MustPublish );
@@ -568,9 +571,6 @@ public sealed partial class Roadmap
                 return r.Box();
             }
         }
-
-        [GeneratedRegex( @"^(?<1>\w+)(?:\((?<2>[^()]+)\))?(?<3>!)?:", RegexOptions.CultureInvariant )]
-        private static partial Regex ConventionalCommitHeader();
 
         /// <summary>
         /// Overridden to return the solution and current/target versions.

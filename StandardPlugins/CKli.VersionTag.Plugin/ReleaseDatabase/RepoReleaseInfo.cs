@@ -18,6 +18,7 @@ public sealed class RepoReleaseInfo
     readonly List<RepoReleaseInfo> _directProducers;
     readonly HashSet<RepoReleaseInfo> _allProducers;
     IReadOnlyList<RepoReleaseInfo>? _directConsumers;
+    internal HashSet<RepoReleaseInfo>? _allConsumers;
 
     internal RepoReleaseInfo( VersionTagPlugin.ReleaseDatabase releaseDatabase,
                               RepoKey repoKey,
@@ -43,7 +44,13 @@ public sealed class RepoReleaseInfo
     public SVersion Version => _repoKey.Version;
 
     /// <summary>
-    /// Gets the Repo's release content.
+    /// Gets the TagCommit.
+    /// </summary>
+    public TagCommit TagCommit => _repoKey.TagCommit;
+
+    /// <summary>
+    /// Gets the Repo's release content (the necessarily not null <see cref="TagCommit.BuildContentInfo"/>
+    /// because TagCommit is not a +fake).
     /// </summary>
     public BuildContentInfo Content => _buildContentInfo;
 
@@ -86,10 +93,23 @@ public sealed class RepoReleaseInfo
     }
 
     /// <summary>
+    /// Gets all consumers of this release.
+    /// <para>
+    /// This set is built on demand and cached.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The required monitor.</param>
+    /// <returns>The set of all consumers.</returns>
+    public IReadOnlySet<RepoReleaseInfo> GetAllConsumers( IActivityMonitor monitor )
+    {
+        return _allConsumers ??= _releaseDatabase.GetAllConsumers( monitor, this );
+    }
+
+    /// <summary>
     /// Overridden to return the Repo display path and the released version.
     /// The format is "Repo/v{Version}" that intentionally differs from the <see cref="PackageInstance.ToString()"/>.
     /// </summary>
     /// <returns>Repo display path/v{Released version}.</returns>
-    public override string ToString() => $"{Repo.DisplayPath}/v{Version}";
+    public override string ToString() => $"{Repo.DisplayPath}/{Version.ParsedPrefix}v{Version}";
 
 }

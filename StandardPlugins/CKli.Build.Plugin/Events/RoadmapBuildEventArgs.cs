@@ -11,7 +11,7 @@ public sealed class RoadmapBuildEventArgs : BuildBaseEventArgs
     readonly Roadmap _roadmap;
     
     internal RoadmapBuildEventArgs( IActivityMonitor monitor, Roadmap roadmap )
-        : base( monitor, roadmap.MustPublish )
+        : base( monitor, roadmap.Publish != null )
     {
         _roadmap = roadmap;
     }

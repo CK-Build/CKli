@@ -11,7 +11,7 @@ public sealed partial class Roadmap
     /// the statuses of multiple solutions is achieved by considering the maximum value.
     /// </para>
     /// </summary>
-    internal enum PublishableStatus
+    public enum PublishableStatus
     {
         /// <summary>
         /// Not relevant: the <see cref="BuildSolution"/> is not in the scope of the <see cref="Roadmap.Pivots"/>.
@@ -40,7 +40,7 @@ public sealed partial class Roadmap
         /// <summary>
         /// The solution is an upstream repository that has been locally built in a base branch (not in
         /// the current <see cref="HotGraph.BranchName"/>).
-        /// This must be published along with all the repositories that consume this version.
+        /// This must be published along with all the repositories that produce or consume this version.
         /// </summary>
         PublishRequiredBaseBranch = 4,
 

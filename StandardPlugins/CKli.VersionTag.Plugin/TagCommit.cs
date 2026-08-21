@@ -251,7 +251,7 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     /// Overridden to return the tag and referenced commit's sha.
     /// </summary>
     /// <returns></returns>
-    public override string ToString() => $"Tag '{Repo.DisplayPath}/{_version.ParsedText}' references Commit '{_sha}'";
+    public override string ToString() => $"Tag '{Repo.DisplayPath}/{_version.ParsedPrefix}{_version}' references Commit '{_sha}'";
 
     internal bool CheckDeprecatedVersion( IActivityMonitor monitor )
     {

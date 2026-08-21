@@ -3,7 +3,6 @@ using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 
 namespace CKli.VersionTag.Plugin;
@@ -32,21 +31,21 @@ public sealed partial class VersionTagPlugin
         internal ArtifactHandlerPlugin ArtifactHandlerPlugin => _versionTagPlugin._artifactHandlerPlugin;
 
         /// <summary>
-        /// Gets the <see cref="RepoReleaseInfo"/> for a <see cref="TagCommit"/> that must not be <see cref="TagCommit.IsFakeVersion"/>
-        /// or a <see cref="System.ArgumentException"/> is thrown.
+        /// Gets the <see cref="RepoReleaseInfo"/> for a <see cref="TagCommit.Version"/> or its <see cref="TagCommit.CI0Version"/>.
+        /// The version must not be a +fake or an <see cref="System.ArgumentException"/> is thrown.
         /// </summary>
         /// <param name="monitor">The monitor.</param>
         /// <param name="tagCommit">The existing, non fake, tag commit.</param>
         /// <param name="ci0version">True to consider the <see cref="TagCommit.CI0Version"/> instead of the <see cref="TagCommit.Version"/>.</param>
-        /// <returns>The information or null if the released version doesn't exist.</returns>
+        /// <returns>The information.</returns>
         public RepoReleaseInfo GetReleaseInfo( IActivityMonitor monitor, TagCommit tagCommit, bool ci0version = false )
         {
-            Throw.CheckArgument( !tagCommit.IsFakeVersion );
             var v = ci0version ? tagCommit.CI0Version : tagCommit.Version;
             if( v == null )
             {
                 Throw.ArgumentException( nameof( ci0version ), $"{tagCommit} has no ci.0 version." );
             }
+            Throw.CheckArgument( !v.HasFakeMetadata );
             lock( _dbLock )
             {
                 return GetReleasedInfo( monitor, new RepoKey( tagCommit, v ) );
@@ -59,13 +58,14 @@ public sealed partial class VersionTagPlugin
             if( !_releaseInfo.TryGetValue( key, out var r ) )
             {
                 BuildContentInfo? content = key.TagCommit.BuildContentInfo;
-                Throw.DebugAssert( "TagCommit is not a +fake nor a +deprecated.", content != null );
+                Throw.DebugAssert( "TagCommit is not a +fake.", content != null );
                 var directProducers = new List<RepoReleaseInfo>();
                 var allProducers = new HashSet<RepoReleaseInfo>();
+                Dictionary<PackageInstance, RepoKey> producedIndex = EnsureProducedIndex();
                 foreach( var consumed in content.Consumed )
                 {
                     // If we can't find a producer for a consumed package, it is an external package.
-                    if( FindProducer( consumed, out RepoKey producerKey ) )
+                    if( producedIndex.TryGetValue( consumed, out RepoKey producerKey ) )
                     {
                         var p = GetReleasedInfo( monitor, producerKey );
                         directProducers.Add( p );
@@ -85,8 +85,6 @@ public sealed partial class VersionTagPlugin
             }
             return r;
         }
-
-        internal bool FindProducer( PackageInstance p, out RepoKey repo ) => EnsureProducedIndex().TryGetValue( p, out repo );
 
         Dictionary<PackageInstance, RepoKey> EnsureProducedIndex()
         {
@@ -136,6 +134,51 @@ public sealed partial class VersionTagPlugin
             }
         }
 
+
+        internal HashSet<RepoReleaseInfo> GetAllConsumers( IActivityMonitor monitor, RepoReleaseInfo info )
+        {
+            lock( _dbLock )
+            {
+                return EnsureAllConsumers( monitor, info );
+            }
+        }
+
+        HashSet<RepoReleaseInfo> EnsureAllConsumers( IActivityMonitor monitor, RepoReleaseInfo info )
+        {
+            Throw.DebugAssert( _dbLock.IsHeldByCurrentThread );
+            if( info._allConsumers == null )
+            {
+                var allConsumers = new HashSet<RepoReleaseInfo>();
+                foreach( var id in info.Content.Produced )
+                {
+                    var p = new PackageInstance( id, info.Version );
+                    foreach( var vInfo in _allVersionTagInfos )
+                    {
+                        foreach( TagCommit tc in vInfo.AllTagCommits )
+                        {
+                            if( tc.BuildContentInfo != null && tc.BuildContentInfo.Consumed.Contains( p ) )
+                            {
+                                if( !tc.IsFakeVersion )
+                                {
+                                    var consumerInfo = GetReleasedInfo( monitor, new RepoKey( tc, tc.Version ) );
+                                    allConsumers.Add( consumerInfo );
+                                    allConsumers.UnionWith( EnsureAllConsumers( monitor, consumerInfo ) );
+                                }
+                                if( tc.CI0Version != null )
+                                {
+                                    var consumerInfo = GetReleasedInfo( monitor, new RepoKey( tc, tc.CI0Version ) );
+                                    allConsumers.Add( consumerInfo );
+                                    allConsumers.UnionWith( EnsureAllConsumers( monitor, consumerInfo ) );
+                                }
+                            }
+                        }
+                    }
+                }
+                info._allConsumers = allConsumers;
+            }
+            return info._allConsumers;
+        }
+
         internal IReadOnlyList<RepoReleaseInfo> GetDirectConsumers( IActivityMonitor monitor, RepoReleaseInfo info )
         {
             lock( _dbLock )
@@ -161,8 +204,8 @@ public sealed partial class VersionTagPlugin
                 // Here, the single direct consumer of CK-Core is CK.ActivityMonitor.
                 // To evict CK-XXX as a direct consumer, we must first discover CK-Monitoring (that is not itself
                 // a direct consumer of CK-Core).
-                // Instead of implementing here the mirror of the RepoReleaseInfo, we use them (the "past") to filter
-                // the direct consumers (the "future").
+                // Instead of implementing here the mirror of the RepoReleaseInfo (using the EnsureAllConsumers sets), we use
+                // the AllProducers sets (the "past") to filter the direct consumers (the "future").
                 //
                 var consumerInfos = new List<RepoReleaseInfo>();
                 foreach( var c in consumers )
@@ -191,15 +234,11 @@ public sealed partial class VersionTagPlugin
         {
             foreach( var vInfo in _allVersionTagInfos )
             {
-                var r = vInfo.Repo;
                 foreach( TagCommit tc in vInfo.AllTagCommits )
                 {
-                    if( tc.IsRegularVersion )
+                    if( tc.BuildContentInfo != null && tc.BuildContentInfo.Consumed.Contains( p ) )
                     {
-                        if( tc.BuildContentInfo.Consumed.Contains( p ) )
-                        {
-                            collector.Add( new RepoKey(tc, tc.Version) );
-                        }
+                        collector.Add( new RepoKey(tc, tc.Version) );
                     }
                 }
             }

@@ -30,13 +30,14 @@ public sealed partial class Roadmap
     readonly HotGraph _graph;
     readonly CIBuildMode _ciBuildMode;
     readonly bool _isPullBuild;
-    readonly bool _mustPublish;
     readonly ImmutableArray<BuildSolution> _orderedSolutions;
     readonly ImmutableArray<BuildSolution> _pivots;
+    readonly BuildSolutionList _buildSolutions;
     readonly HotGraph.PackageUpdater _packageUpdater;
     readonly Mapping _packageMapping;
     int _buildSolutionCount;
     PublishableStatus _publishable;
+    PublishInfo? _publishInfo;
 
     [Obsolete]
     int _publishSolutionCount;
@@ -51,7 +52,6 @@ public sealed partial class Roadmap
         _packageUpdater = packageUpdater;
         _isPullBuild = isPullBuild;
         _ciBuildMode = ciBuildMode;
-        _mustPublish = mustPublish;
         var buildSolutions = new BuildSolution[graph.Solutions.Count];
         var pivots = graph.HasPivots ? new BuildSolution[graph.Pivots.Count] : buildSolutions;
         int iPivot = 0;
@@ -69,6 +69,7 @@ public sealed partial class Roadmap
         _orderedSolutions = ImmutableCollectionsMarshal.AsImmutableArray( buildSolutions );
         _packageMapping = new Mapping( packageUpdater, _orderedSolutions, _ciBuildMode != CIBuildMode.None );
         _pivots = ImmutableCollectionsMarshal.AsImmutableArray( pivots );
+        _buildSolutions = new BuildSolutionList( this );
     }
 
     internal static Roadmap? Create( IActivityMonitor monitor,
@@ -115,37 +116,18 @@ public sealed partial class Roadmap
         }
         while( hasChanged );
 
-        if( !roadmap.ConcludeInitialization( monitor, artifactHandler ) )
+        if( !roadmap.ConcludeInitialization( monitor, artifactHandler, versionTag, mustPublish ) )
         {
             return null;
         }
-        if( mustPublish
-            && roadmap.Publishable == PublishableStatus.PublishRequiredBaseBranch
-            && !roadmap.CreateRequiredPublishBaseList( monitor, versionTag ) )
-        {
-            return null;
-        }
-
         return roadmap;
     }
 
-    bool CreateRequiredPublishBaseList( IActivityMonitor monitor, VersionTagPlugin versionTag )
-    {
-        Throw.DebugAssert( _mustPublish && _publishable == PublishableStatus.PublishRequiredBaseBranch );
-        var releaseDB = versionTag.EnsureDatabase( monitor );
-        if( releaseDB == null )
-        {
-            return false;
-        }
-        foreach( var s in _orderedSolutions )
-        {
-            if( s.Publishable == PublishableStatus.PublishRequiredBaseBranch )
-            {
-                var info = releaseDB.GetReleaseInfo( monitor, s.LastBuild.TagCommit );
-            }
-        }
-        return true;
-    }
+
+    /// <summary>
+    /// Gets the build solutions indexed by <see cref="Repo"/> and ordered by <see cref="Repo.Index"/>.
+    /// </summary>
+    public BuildSolutionList BuildSolutions => _buildSolutions;
 
     /// <summary>
     /// Gets the build solutions (ordered by <see cref="HotGraph.Solution.OrderedIndex"/>).
@@ -154,9 +136,9 @@ public sealed partial class Roadmap
 
     /// <summary>
     /// Gets the pivots solutions if some has been specified.
-    /// This is never empty (no pivot means all solutions are pivot).
+    /// This is never empty (no pivot means all solutions are pivot: in this case Pivots contains all the solutions).
     /// <para>
-    /// This list is ordered by <see cref="Repo.Index"/>.
+    /// This list is ordered by <see cref="Repo.Index"/> but .
     /// </para>
     /// </summary>
     public ImmutableArray<BuildSolution> Pivots => _pivots;
@@ -188,9 +170,9 @@ public sealed partial class Roadmap
     public bool IsCIBuild => _ciBuildMode != CIBuildMode.None;
 
     /// <summary>
-    /// Gets whether this roadmap must eventually be published or if the artifacts must be kept locally.
+    /// Gets a non null publish info if this roadmap must eventually be published.
     /// </summary>
-    public bool MustPublish => _mustPublish;
+    public PublishInfo? Publish => _publishInfo;
 
     /// <summary>
     /// Gets the package mapping.
@@ -216,7 +198,9 @@ public sealed partial class Roadmap
     }
 
     bool ConcludeInitialization( IActivityMonitor monitor,
-                                 ArtifactHandlerPlugin artifactHandler )
+                                 ArtifactHandlerPlugin artifactHandler,
+                                 VersionTagPlugin versionTag,
+                                 bool mustPublish )
     {
         bool success = true;
         var publishableStatus = PublishableStatus.None;
@@ -226,6 +210,14 @@ public sealed partial class Roadmap
             success &= s.ConcludeInitialization( monitor, artifactHandler, ref idxBuildNumber, ref publishableStatus );
         }
         _publishable = publishableStatus;
+        if( mustPublish )
+        {
+            _publishInfo = PublishInfo.Create( monitor, this, versionTag );
+            if( _publishInfo == null )
+            {
+                return false;
+            }
+        }
         return success;
     }
 
@@ -267,7 +259,7 @@ public sealed partial class Roadmap
                             bool hasPivots,
                             int pivotsCount,
                             bool isPullBuild,
-                            bool mustPublish )
+                            bool isPublish )
     {
         IRenderable? _uDepHead;
         IRenderable? _cDepHead;
@@ -280,7 +272,7 @@ public sealed partial class Roadmap
         public int CDepUpdates;
         public int DDepUpdates;
 
-        readonly string Action => mustPublish ? "publish" : "build";
+        readonly string Action => isPublish ? "publish" : "build";
 
         public IRenderable Render( ScreenType screen )
         {
@@ -349,7 +341,7 @@ public sealed partial class Roadmap
                                 _graph.HasPivots,
                                 _pivots.Length,
                                 _isPullBuild,
-                                _mustPublish );
+                                _publishInfo != null );
         var renderables = ImmutableArray.CreateBuilder<IRenderable>( _orderedSolutions.Length );
 
         var indexAndRank = new BuildIndexAndRankDisplayState( screen,

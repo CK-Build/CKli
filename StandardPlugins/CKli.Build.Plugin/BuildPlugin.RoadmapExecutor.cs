@@ -323,7 +323,7 @@ public sealed partial class BuildPlugin
                                                             _cancellation ).ConfigureAwait( false );
             Throw.DebugAssert( "If build succeeded, the produced packages in the last built version must all be mapped to the new target version.",
                                result == null
-                               || result.Content.Produced.All( p => _roadmap.PackageMapping.GetMappedVersion( p, build.Solution.LastBuild.TagCommit.Version ) == result.Version ) );
+                               || result.Content.Produced.All( p => _roadmap.PackageMapping.GetMappedVersion( p, build.Solution.LastBuild.Version ) == result.Version ) );
             // On error, we ensure that we let the repository on the "dev/" branch (this applies to non CI
             // build - in CI build we already are on the "dev/" branch).
             if( result == null && !_roadmap.IsCIBuild )

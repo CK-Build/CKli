@@ -39,8 +39,8 @@ public sealed partial class HotGraph
         internal bool IsDirty => _builtTipSha != _solution.GitSolution.GitBranch.Tip.Sha;
 
         /// <summary>
-        /// Captures the last <see cref="TagCommit"/> to consider in a build context (branch and whether we are building
-        /// regular or CI build).
+        /// Captures the last <see cref="Version"/>, its <see cref="TagCommit"/> and <see cref="BranchName"/>, to consider in a build
+        /// context (considering the <see cref="Solution.Branch"/> and whether we are building regular or CI build).
         /// <para>
         /// Created by <see cref="SolutionVersionInfo.GetLastBuild(bool)"/>.
         /// </para>
@@ -49,17 +49,31 @@ public sealed partial class HotGraph
         {
             readonly SolutionVersionInfo _info;
             readonly TagCommit _tagCommit;
+            readonly SVersion _version;
+            readonly BranchName _branchName;
 
-            internal LastBuiltVersion( SolutionVersionInfo info, TagCommit tagCommit )
+            internal LastBuiltVersion( SolutionVersionInfo info, in (TagCommit Commit, SVersion Version, BranchName Branch) bestBuild )
             {
                 _info = info;
-                _tagCommit = tagCommit;
+                _tagCommit = bestBuild.Commit;
+                _version = bestBuild.Version;
+                _branchName = bestBuild.Branch;
             }
 
             /// <summary>
-            /// Gets the version tag.
+            /// Gets the tagged commit.
             /// </summary>
             public TagCommit TagCommit => _tagCommit;
+
+            /// <summary>
+            /// Gets the built version (either <see cref="TagCommit.Version"/> or <see cref="TagCommit.CI0Version"/>).
+            /// </summary>
+            public SVersion Version => _version;
+
+            /// <summary>
+            /// Gets the closest branch name to <see cref="Solution.Branch"/> from which this <see cref="TagCommit"/> is available.
+            /// </summary>
+            public BranchName BranchName => _branchName;
 
             /// <summary>
             /// Gets whether a build is required because <see cref="TagCommit"/> version is either
@@ -76,7 +90,7 @@ public sealed partial class HotGraph
             /// This MAY be handled one day but this has been considered too fragile: a "+fake" version is currently not skippable.
             /// </para>
             /// </remarks>
-            public bool VersionMustBuild => !_tagCommit.IsRegularVersion;
+            public bool VersionMustBuild => _version.BuildMetaData.Length > 0;
 
             /// <summary>
             /// Gets whether a build is required because <see cref="TagCommit"/>'s content is not the same as
@@ -135,7 +149,7 @@ public sealed partial class HotGraph
         /// <returns>The CI or non CI last build.</returns>
         public LastBuiltVersion GetLastBuild( bool ciBuild )
         {
-           return new LastBuiltVersion( this, _tagCommitTree.GetBestBuildFor( _solution.Branch.BranchName, ciBuild ).Commit );
+           return new LastBuiltVersion( this, _tagCommitTree.GetBestBuildFor( _solution.Branch.BranchName, ciBuild ) );
         }
 
 

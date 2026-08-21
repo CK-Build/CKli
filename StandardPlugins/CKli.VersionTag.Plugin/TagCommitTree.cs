@@ -106,38 +106,40 @@ public sealed partial class TagCommitTree
     /// </summary>
     /// <param name="branch">The starting branch (the "point of view").</param>
     /// <param name="allowCI">Whether CI version are allowed.</param>
-    /// <returns>The versioned tag commit and the final branch.</returns>
-    public (TagCommit Commit, BranchName Branch) GetBestBuildFor( BranchName branch, bool allowCI )
+    /// <returns>The versioned tag commit, its version (may be <see cref="TagCommit.Version"/> or <see cref="TagCommit.CI0Version"/>) and the final branch.</returns>
+    public (TagCommit Commit, SVersion Version, BranchName Branch) GetBestBuildFor( BranchName branch, bool allowCI )
     {
         TagCommit? c = null;
+        SVersion? v = null;
         BranchName? b = null;
         int level = 0;
         int i = 0;
         while( i < _content.Count )
         {
-            (c, b) = BestInLevel( _content, branch, ref i, level, allowCI );
+            (c, v, b) = BestInLevel( _content, branch, ref i, level, allowCI );
             if( c != null ) break;
             ++level;
         }
-        Throw.DebugAssert( "We eventually reached LastStable.", c != null && b != null );
-        return (c, b);
+        Throw.DebugAssert( "We eventually reached LastStable.", c != null && v != null && b != null );
+        return (c, v, b);
 
-
-        static (TagCommit?,BranchName?) BestInLevel( IReadOnlyList<(TagCommit T, int Level)> content,
-                                                     BranchName branchName,
-                                                     ref int i,
-                                                     int level,
-                                                     bool allowCI )
+        static (TagCommit?,SVersion?,BranchName?) BestInLevel( IReadOnlyList<(TagCommit T, int Level)> content,
+                                                               BranchName branchName,
+                                                               ref int i,
+                                                               int level,
+                                                               bool allowCI )
         {
             Throw.DebugAssert( content[i].Level == level );
             BranchName? bestB = null;
-            TagCommit? bestC = null;
+            (TagCommit? T, SVersion? V) bestC = (null,null);
             do
             {
                 var newC = Filter( content, i, allowCI );
-                if( newC == null ) continue;
+                if( newC.T == null ) continue;
 
-                var newB = FindClosestBranch( newC.Version, branchName );
+                Throw.DebugAssert( "Both are null or non null.", newC.V != null );
+
+                var newB = FindClosestBranch( newC.V, branchName );
                 if( newB == null ) continue;
 
                 // Regular case: the branch is the one of the version.
@@ -148,12 +150,16 @@ public sealed partial class TagCommitTree
                 }
             }
             while( ++i < content.Count && content[i].Level == level );
-            return (bestC,bestB);
+            return (bestC.T,bestC.V,bestB);
 
-            static TagCommit? Filter( IReadOnlyList<(TagCommit T, int Level)> candidates, int i, bool allowCI )
+            static (TagCommit? T, SVersion? V) Filter( IReadOnlyList<(TagCommit T, int Level)> candidates, int i, bool allowCI )
             {
-                var r = candidates[i].T;
-                return allowCI || !r.Version.IsCI ? r : null;
+                var tc = candidates[i].T;
+                if( allowCI )
+                {
+                    return (tc, tc.CI0Version ?? tc.Version);
+                }
+                return tc.Version.IsCI ? (null, null) : (tc, tc.Version);
             }
         }
 
