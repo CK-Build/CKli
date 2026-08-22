@@ -1,4 +1,5 @@
 using CK.Core;
+using CKli.Core;
 using System;
 
 namespace CKli.Build.Plugin;
@@ -6,18 +7,17 @@ namespace CKli.Build.Plugin;
 /// <summary>
 /// Common build event that unifies <see cref="RoadmapBuildEventArgs"/> and <see cref="FixBuildEventArgs"/>.
 /// </summary>
-public abstract class BuildBaseEventArgs : EventMonitoredArgs
+public abstract class BuildBaseEventArgs : WorldEventArgs
 {
     readonly bool _shouldPublish;
     readonly DateTime _buildDate;
     bool _success;
 
-    private protected BuildBaseEventArgs( IActivityMonitor monitor, bool shouldPublish )
-        : base( monitor )
+    private protected BuildBaseEventArgs( IActivityMonitor monitor, CKliEnv context, World world, bool shouldPublish )
+        : base( monitor, context, world )
     {
         _shouldPublish = shouldPublish;
         _buildDate = DateTime.UtcNow;
-        _success = true;
     }
 
     /// <summary>

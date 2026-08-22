@@ -161,7 +161,7 @@ public sealed partial class HotZonePlugin
                 bool eventError = false;
                 using( monitor.OnError( () => eventError = true ) )
                 {
-                    var e = new FixWorkflowStartEventArgs( monitor, targets, restartingWorkflow );
+                    var e = new FixWorkflowStartEventArgs( monitor, context, World, targets, restartingWorkflow );
                     if( !await _onFixStart.SafeRaiseAsync( monitor, e ).ConfigureAwait( false )
                         || eventError )
                     {

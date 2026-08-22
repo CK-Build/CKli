@@ -10,7 +10,7 @@ namespace CKli.BranchModel.Plugin;
 /// exist: this is used to check the content of the repositories (more precisely, the content of the
 /// <see cref="HotBranch"/> that are active (the ones with a <see cref="HotBranch.GitBranch"/>).
 /// </summary>
-public sealed partial class ContentIssueEvent : EventMonitoredArgs
+public sealed partial class ContentIssueEventArgs : WorldEventArgs
 {
     readonly ShallowSolutionPlugin _shallowSolution;
     readonly Collector _collector;
@@ -18,10 +18,11 @@ public sealed partial class ContentIssueEvent : EventMonitoredArgs
     GitSolution? _gitSolution;
     bool? _gitSolutionResolved;
 
-    internal ContentIssueEvent( IActivityMonitor monitor,
-                                HotBranch branch,
-                                ShallowSolutionPlugin shallowSolution )
-        : base( monitor )
+    internal ContentIssueEventArgs( IActivityMonitor monitor,
+                                    CKliEnv context,
+                                    HotBranch branch,
+                                    ShallowSolutionPlugin shallowSolution )
+        : base( monitor, context, branch.Repo.World )
     {
         _collector = new Collector( branch );
         _shallowSolution = shallowSolution;

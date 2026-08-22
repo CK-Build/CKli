@@ -117,19 +117,28 @@ public sealed class PublishPlugin : PrimaryPluginBase
     {
         if( e.ShouldPublish )
         {
-            // "ckli publish", when everything has already been published, may trigger a check of the remote feeds here.
-            //
-            // if( e.Roadmap.SolutionPublishCount == 0 )
-            // {
-            //    monitor.Info( $"Checking that remote feeds contain the packages." );
-            // }
-            // else 
-            if( !await PublishAsync( monitor, World, _artifactHandler, _versionTag, e.BuildDate, e.Roadmap, cancel ).ConfigureAwait( false ) )
+            var roadmap = e.Roadmap;
+            Throw.DebugAssert( roadmap.PublishableStatus > PublishableStatus.None );
+            if( roadmap.PublishableStatus > PublishableStatus.AlreadyPublished )
             {
-                e.SetFailed();
+                //var publish = PublishRoadmap.Create( e.Monitor, roadmap, _versionTag );
+                //if( publish != null )
+                //{
+                //    e.Screen.Display( publish.ToRenderable );
+                //    if( !roadmap.DryRun )
+                //    {
+                //        await publish.PublishAsync( e.Monitor );
+                //    }
+                //}
+
+                if( !await PublishAsync( monitor, World, _artifactHandler, _versionTag, e.BuildDate, e.Roadmap, cancel ).ConfigureAwait( false ) )
+                {
+                    e.SetFailed();
+                }
             }
         }
 
+        [Obsolete( "Should use the more complex PublishRoadmap now..." )]
         static Task<bool> PublishAsync( IActivityMonitor monitor,
                                         World world,
                                         ArtifactHandlerPlugin artifactHandler,

@@ -10,11 +10,11 @@ public sealed partial class ContentIssueBuilder
 {
     sealed class WorldIssue : World.Issue
     {
-        readonly List<ContentIssueEvent.Collector> _branchIssues;
+        readonly List<ContentIssueEventArgs.Collector> _branchIssues;
 
         public WorldIssue( string title,
                            IRenderable body,
-                           List<ContentIssueEvent.Collector> branchIssues )
+                           List<ContentIssueEventArgs.Collector> branchIssues )
             : base( title, body, branchIssues[0].Branch.Repo )
         {
             _branchIssues = branchIssues;

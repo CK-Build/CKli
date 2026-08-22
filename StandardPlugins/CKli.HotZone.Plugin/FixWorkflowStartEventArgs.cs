@@ -1,4 +1,5 @@
 using CK.Core;
+using CKli.Core;
 using System.Collections.Immutable;
 
 namespace CKli.HotZone.Plugin;
@@ -6,15 +7,17 @@ namespace CKli.HotZone.Plugin;
 /// <summary>
 /// Event raised by <see cref="HotZonePlugin.FixStartAsync"/>.
 /// </summary>
-public sealed class FixWorkflowStartEventArgs : EventMonitoredArgs
+public sealed class FixWorkflowStartEventArgs : WorldEventArgs
 {
     readonly ImmutableArray<FixWorkflow.TargetRepo> _targets;
     readonly bool _restartingWorkflow;
 
     internal FixWorkflowStartEventArgs( IActivityMonitor monitor,
+                                        CKliEnv context,
+                                        World world,
                                         ImmutableArray<FixWorkflow.TargetRepo> targets,
                                         bool restartingWorkflow )
-        : base( monitor )
+        : base( monitor, context, world )
     {
         _targets = targets;
         _restartingWorkflow = restartingWorkflow;

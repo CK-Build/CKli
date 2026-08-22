@@ -12,7 +12,7 @@ namespace CKli.Build.Plugin;
 
 public sealed partial class BuildPlugin
 {
-    void IssueRequested( IssueEvent e )
+    void IssueRequested( IssueEventArgs e )
     {
         var monitor = e.Monitor;
         foreach( var r in e.Repos )

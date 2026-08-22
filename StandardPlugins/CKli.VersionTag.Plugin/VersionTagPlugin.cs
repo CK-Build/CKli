@@ -41,7 +41,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         _removeUselessFakeTag = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.RemoveUselessFakeTag ) ?? false;
     }
 
-    void IssueRequested( IssueEvent e )
+    void IssueRequested( IssueEventArgs e )
     {
         var monitor = e.Monitor;
         foreach( var r in e.Repos )

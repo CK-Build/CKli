@@ -10,8 +10,11 @@ namespace CKli.BranchModel.Plugin;
 /// Branch in the <see cref="BranchModelPlugin.BranchNamespace"/>.
 /// <para>
 /// The <see cref="Name"/> starts with the "<see cref="WorldName.LTSName"/>/" when in a LTS world.
+/// </para>
+/// <para>
 /// Use <see cref="Match(SVersion)"/> to test whether a <see cref="SVersion"/> is bound to a branch
-/// (avoid using <see cref="SVersion.BranchName"/>).
+/// (avoid using <see cref="SVersion.BranchName"/>) and use <see cref="BranchNamespace.Find(SVersion)"/>
+/// to find a branch from a version.
 /// </para>
 /// </summary>
 [DebuggerDisplay( "{ToString(),nq}" )]

@@ -46,7 +46,7 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
         branchModel.ContentIssue += HandleNuGetConfig;
     }
 
-    void HandleNuGetConfig( ContentIssueEvent ev )
+    void HandleNuGetConfig( ContentIssueEventArgs ev )
     {
         NormalizedPath n = "nuget.config";
         var nInfo = ev.Content.GetFileInfo( n );

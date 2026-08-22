@@ -123,7 +123,7 @@ public class RepoBuilder : RepoInfo
 
         try
         {
-            var (success, result) = await _repositoryBuilder.RaiseOnCoreBuildAsync( monitor, buildInfo, outputPath, runTest, cancellation ).ConfigureAwait( false );
+            var (success, result) = await _repositoryBuilder.RaiseOnCoreBuildAsync( monitor, context, buildInfo, outputPath, runTest, cancellation ).ConfigureAwait( false );
             if( !success || result != null )
             {
                 return result;

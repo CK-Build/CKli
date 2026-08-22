@@ -7,8 +7,8 @@ namespace CKli.VersionTag.Plugin;
 /// <summary>
 /// Internal key for a Repo/Version.
 /// </summary>
-/// <param name="Repo">The repository.</param>
-/// <param name="Version">The version.</param>
+/// <param name="TagCommit">The TagCommit.</param>
+/// <param name="Version">The version. Either <see cref="TagCommit.Version"/> or <see cref="TagCommit.CI0Version"/>.</param>
 readonly record struct RepoKey( TagCommit TagCommit, SVersion Version )
 {
     readonly int _hash = HashCode.Combine( TagCommit.Repo, Version );
@@ -19,5 +19,5 @@ readonly record struct RepoKey( TagCommit TagCommit, SVersion Version )
 
     public override string ToString() => ToString( Repo, Version );
 
-    public static string ToString( Repo r, SVersion v ) => $"{r.DisplayPath}/v{v}";
+    public static string ToString( Repo r, SVersion v ) => $"{r.DisplayPath}/{v.ParsedPrefix}v{v}";
 }

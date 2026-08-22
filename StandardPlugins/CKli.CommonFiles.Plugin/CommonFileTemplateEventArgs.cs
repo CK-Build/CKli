@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.BranchModel.Plugin;
+using CKli.Core;
 
 namespace CKli.CommonFiles.Plugin;
 
@@ -10,15 +11,15 @@ namespace CKli.CommonFiles.Plugin;
 /// <see cref="Handled"/> should be set to true by a handler or an error will be raised.
 /// </para>
 /// </summary>
-public sealed partial class CommonFileTemplateEvent : EventMonitoredArgs
+public sealed partial class CommonFileTemplateEventArgs : WorldEventArgs
 {
-    readonly ContentIssueEvent _ev;
+    readonly ContentIssueEventArgs _ev;
     readonly string _sourcePath;
     readonly string _relativeTargetPath;
     bool _handled;
 
-    internal CommonFileTemplateEvent( ContentIssueEvent ev, string sourcePath, string relativeTargetPath )
-        : base( ev.Monitor )
+    internal CommonFileTemplateEventArgs( ContentIssueEventArgs ev, string sourcePath, string relativeTargetPath )
+        : base( ev.Monitor, ev.Context, ev.World )
     {
         _ev = ev;
         _sourcePath = sourcePath;
@@ -28,7 +29,7 @@ public sealed partial class CommonFileTemplateEvent : EventMonitoredArgs
     /// <summary>
     /// Gets the original <see cref="ContentIssueEvent"/>.
     /// </summary>
-    public ContentIssueEvent ContentIssueEvent => _ev;
+    public ContentIssueEventArgs ContentIssueEvent => _ev;
 
     /// <summary>
     /// Gets the full source file path with a file name that starts with "[Template]".
@@ -36,7 +37,7 @@ public sealed partial class CommonFileTemplateEvent : EventMonitoredArgs
     public string SourcePath => _sourcePath;
 
     /// <summary>
-    /// Gets the target file path in the <see cref="ContentIssueEvent.Content"/>.
+    /// Gets the target file path in the <see cref="ContentIssueEventArgs.Content"/>.
     /// </summary>
     public string RelativeTargetPath => _relativeTargetPath;
 

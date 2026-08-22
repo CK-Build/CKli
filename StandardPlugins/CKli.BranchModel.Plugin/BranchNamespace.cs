@@ -327,6 +327,39 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
     }
 
     /// <summary>
+    /// Finds a <see cref="BranchName"/> that corresponds to a Conformant Semantic Version (see <see cref="CSVersionKind"/>).
+    /// <para>
+    /// See also <see cref="BranchName.Match(SVersion)"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="version">The version for which the associated branch should be found.</param>
+    /// <returns>The branch name or null if not found.</returns>
+    public BranchName? Find( SVersion version ) => _branches.FirstOrDefault( b => b.Match( version ) );
+
+
+    /// <summary>
+    /// Finds a <see cref="BranchName"/> that corresponds to a Conformant Semantic Version (see <see cref="CSVersionKind"/>)
+    /// or returns null and logs an error if not found.
+    /// <para>
+    /// See also <see cref="BranchName.Match(SVersion)"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="version">The version for which the associated branch should be found.</param>
+    /// <returns>The branch name or null if not found.</returns>
+    public BranchName? FindRequired( IActivityMonitor monitor, SVersion version )
+    {
+        var b = Find( version );
+        if( b == null )
+        {
+            monitor.Error( $"""
+                Unable to find a branch for version '{version}'. Defined branches are:
+                {_branches.Select( b => b.Name ).Concatenate()}
+                """ );
+        }
+        return b;
+    }
+
+    /// <summary>
     /// Gets the branches that correspond to the <see cref="Root"/> and <see cref="CSVersionKind"/> prereleases as a string.
     /// </summary>
     /// <returns>The mainline.</returns>

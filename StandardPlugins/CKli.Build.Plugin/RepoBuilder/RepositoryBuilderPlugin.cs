@@ -52,6 +52,7 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     }
 
     internal async Task<(bool,BuildResult?)> RaiseOnCoreBuildAsync( IActivityMonitor monitor,
+                                                                    CKliEnv context,
                                                                     CommitBuildInfo buildInfo,
                                                                     string outputPath,
                                                                     bool runTest,
@@ -65,7 +66,7 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
                 bool eventError = false;
                 using( monitor.OnError( () => eventError = true ) )
                 {
-                    e = new CoreBuildEventArgs( monitor, buildInfo, outputPath, runTest, cancellation );
+                    e = new CoreBuildEventArgs( monitor, context, buildInfo, outputPath, runTest, cancellation );
                     if( !await _onCoreBuild.SafeRaiseAsync( monitor, e, cancellation ).ConfigureAwait( false )
                         || eventError )
                     {

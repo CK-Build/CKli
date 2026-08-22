@@ -12,22 +12,22 @@ namespace CKli.BranchModel.Plugin;
 public sealed partial class ContentIssueBuilder
 {
     readonly BranchModelInfo _info;
-    readonly Func<IActivityMonitor, ContentIssueEvent, bool> _eventSender;
+    readonly Func<IActivityMonitor, ContentIssueEventArgs, bool> _eventSender;
 
-    internal ContentIssueBuilder( BranchModelInfo info, Func<IActivityMonitor, ContentIssueEvent, bool> eventSender )
+    internal ContentIssueBuilder( BranchModelInfo info, Func<IActivityMonitor, ContentIssueEventArgs, bool> eventSender )
     {
         _info = info;
         _eventSender = eventSender;
     }
 
-    internal bool CreateIssue( IActivityMonitor monitor, ScreenType screenType, Action<World.Issue> collector )
+    internal bool CreateIssue( IActivityMonitor monitor, CKliEnv context, Action<World.Issue> collector )
     {
-        List<ContentIssueEvent.Collector>? branchIssues = null;
-        IRenderable manualBody = screenType.Unit;
+        List<ContentIssueEventArgs.Collector>? branchIssues = null;
+        IRenderable manualBody = context.Screen.ScreenType.Unit;
         foreach( var b in _info.Branches )
         {
             if( !b.Exists ) continue;
-            var ev = new ContentIssueEvent( monitor, b, _info.ShallowSolutionPlugin );
+            var ev = new ContentIssueEventArgs( monitor, context, b, _info.ShallowSolutionPlugin );
 
             if( !_eventSender( monitor, ev ) )
             {
@@ -37,7 +37,7 @@ public sealed partial class ContentIssueBuilder
             manualBody = ev.Issues.AppendManualDescription( manualBody );
             if( ev.Issues.AutoCount > 0 )
             {
-                branchIssues ??= new List<ContentIssueEvent.Collector>();
+                branchIssues ??= new List<ContentIssueEventArgs.Collector>();
                 branchIssues.Add( ev.Issues );
             }
         }
@@ -47,7 +47,7 @@ public sealed partial class ContentIssueBuilder
         }
         if( branchIssues != null )
         {
-            IRenderable body = screenType.Unit;
+            IRenderable body = context.Screen.ScreenType.Unit;
             foreach( var issues in branchIssues )
             {
                 body = issues.AppendBranchDescription( body );

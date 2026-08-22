@@ -5,7 +5,7 @@ using System.IO;
 
 namespace CKli.BranchModel.Plugin;
 
-public sealed partial class ContentIssueEvent
+public sealed partial class ContentIssueEventArgs
 {
     public sealed partial class Collector
     {

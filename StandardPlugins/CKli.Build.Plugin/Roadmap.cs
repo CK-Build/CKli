@@ -29,6 +29,8 @@ public sealed partial class Roadmap
 {
     readonly HotGraph _graph;
     readonly CIBuildMode _ciBuildMode;
+    readonly bool _mustPublish;
+    readonly bool _dryRun;
     readonly bool _isPullBuild;
     readonly ImmutableArray<BuildSolution> _orderedSolutions;
     readonly ImmutableArray<BuildSolution> _pivots;
@@ -37,7 +39,6 @@ public sealed partial class Roadmap
     readonly Mapping _packageMapping;
     int _buildSolutionCount;
     PublishableStatus _publishable;
-    PublishInfo? _publishInfo;
 
     [Obsolete]
     int _publishSolutionCount;
@@ -46,12 +47,15 @@ public sealed partial class Roadmap
              HotGraph.PackageUpdater packageUpdater,
              bool isPullBuild,
              CIBuildMode ciBuildMode,
-             bool mustPublish )
+             bool mustPublish,
+             bool dryRun )
     {
         _graph = graph;
         _packageUpdater = packageUpdater;
         _isPullBuild = isPullBuild;
         _ciBuildMode = ciBuildMode;
+        _mustPublish = mustPublish;
+        _dryRun = dryRun;
         var buildSolutions = new BuildSolution[graph.Solutions.Count];
         var pivots = graph.HasPivots ? new BuildSolution[graph.Pivots.Count] : buildSolutions;
         int iPivot = 0;
@@ -78,7 +82,8 @@ public sealed partial class Roadmap
                                      HotGraph graph,
                                      bool isPullBuild,
                                      CIBuildMode ciBuildMode,
-                                     bool mustPublish )
+                                     bool mustPublish,
+                                     bool dryRun )
     {
 
         // Refactor this?...
@@ -103,7 +108,7 @@ public sealed partial class Roadmap
             var packageUpdater = graph.GetPackageUpdater( monitor, versionTag );
             if( packageUpdater == null ) return null;
 
-            roadmap = new Roadmap( graph, packageUpdater, isPullBuild, ciBuildMode, mustPublish );
+            roadmap = new Roadmap( graph, packageUpdater, isPullBuild, ciBuildMode, mustPublish, dryRun );
             if( !roadmap.Initialize( monitor ) )
             {
                 return null;
@@ -122,7 +127,6 @@ public sealed partial class Roadmap
         }
         return roadmap;
     }
-
 
     /// <summary>
     /// Gets the build solutions indexed by <see cref="Repo"/> and ordered by <see cref="Repo.Index"/>.
@@ -154,9 +158,10 @@ public sealed partial class Roadmap
     public int SolutionBuildCount => _buildSolutionCount;
 
     /// <summary>
-    /// Gets the publishable status.
+    /// Gets the publishable status: this combines all the <see cref="BuildSolution.PublishableStatus"/>.
+    /// See <see cref="Plugin.PublishableStatus"/>.
     /// </summary>
-    internal PublishableStatus Publishable => _publishable;
+    public PublishableStatus PublishableStatus => _publishable;
 
     /// <summary>
     /// Gets the number of solutions that must be published: their <see cref="BuildSolution.MustBuild"/> is true
@@ -170,11 +175,6 @@ public sealed partial class Roadmap
     public bool IsCIBuild => _ciBuildMode != CIBuildMode.None;
 
     /// <summary>
-    /// Gets a non null publish info if this roadmap must eventually be published.
-    /// </summary>
-    public PublishInfo? Publish => _publishInfo;
-
-    /// <summary>
     /// Gets the package mapping.
     /// <para>
     /// Packages produced by the World are either mapped to already built versions or to build target versions and
@@ -183,6 +183,16 @@ public sealed partial class Roadmap
     /// </para>
     /// </summary>
     public IPackageMapping PackageMapping => _packageMapping;
+
+    /// <summary>
+    /// Gets whether a publication should follow the build.
+    /// </summary>
+    public bool MustPublish => _mustPublish;
+
+    /// <summary>
+    /// Gets whether this is a --dry-run: no real build or publication must be done.
+    /// </summary>
+    public bool DryRun => _dryRun;
 
     internal bool Initialize( IActivityMonitor monitor )
     {
@@ -203,21 +213,13 @@ public sealed partial class Roadmap
                                  bool mustPublish )
     {
         bool success = true;
-        var publishableStatus = PublishableStatus.None;
+        var publishableStatus = PublishableStatus.AlreadyPublished;
         int idxBuildNumber = 1;
         foreach( var s in _orderedSolutions )
         {
             success &= s.ConcludeInitialization( monitor, artifactHandler, ref idxBuildNumber, ref publishableStatus );
         }
         _publishable = publishableStatus;
-        if( mustPublish )
-        {
-            _publishInfo = PublishInfo.Create( monitor, this, versionTag );
-            if( _publishInfo == null )
-            {
-                return false;
-            }
-        }
         return success;
     }
 
@@ -341,7 +343,7 @@ public sealed partial class Roadmap
                                 _graph.HasPivots,
                                 _pivots.Length,
                                 _isPullBuild,
-                                _publishInfo != null );
+                                _mustPublish );
         var renderables = ImmutableArray.CreateBuilder<IRenderable>( _orderedSolutions.Length );
 
         var indexAndRank = new BuildIndexAndRankDisplayState( screen,

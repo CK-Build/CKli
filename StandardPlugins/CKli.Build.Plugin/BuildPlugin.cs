@@ -92,8 +92,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     }
 
     /// <summary>
-    /// Raised whenever a <see cref="Roadmap"/> has been successfully built.
+    /// Raised whenever a <see cref="Roadmap"/> has been successfully built or when <see cref="Roadmap.DryRun"/> is true (no real build must be done).
+    /// <para>
     /// Note that <see cref="Roadmap.SolutionBuildCount"/> can be 0 (everything was already built and locally available).
+    /// </para>
     /// </summary>
     public PerfectEvent<RoadmapBuildEventArgs> OnRoadmapBuild => _onRoadmapBuild.PerfectEvent;
 
@@ -295,16 +297,14 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return Task.FromResult( false );
         }
-        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all );
+        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all, dryRun );
         if( roadmap == null )
         {
             return Task.FromResult( false );
         }
-        if( dryRun )
-        {
-            return Task.FromResult( true );
-        }
-        return DoRunAsync( monitor, context, vMaxDoP, runTest, roadmap );
+        return dryRun
+                ? RaiseRoadmapBuildEvent( monitor, context, roadmap )
+                : DoRunAsync( monitor, context, vMaxDoP, runTest, roadmap );
     }
 
     Task<bool> DoNonCIAsync( IActivityMonitor monitor,
@@ -322,17 +322,14 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             monitor.Info( ScreenType.CKliScreenTag, "The --skip-tests option is ignored when building a non CI version." );
         }
-        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.None, mustPublish: publish, branch, all );
+        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.None, mustPublish: publish, branch, all, dryRun );
         if( roadmap == null || !ParseInteger( monitor, "--max-dop", maxDop, out var vMaDxDop, 4 ) )
         {
             return Task.FromResult( false );
         }
-        if( dryRun )
-        {
-            return Task.FromResult( true );
-        }
-        bool? runTest = forceTests ? true : null;
-        return DoRunAsync( monitor, context, vMaDxDop, runTest, roadmap );
+        return dryRun
+                ? RaiseRoadmapBuildEvent( monitor, context, roadmap )
+                : DoRunAsync( monitor, context, vMaDxDop, runTest: forceTests ? true : null, roadmap );
     }
 
     async Task<bool> DoRunAsync( IActivityMonitor monitor, CKliEnv context, int vMaxDoP, bool? runTest, Roadmap roadmap )
@@ -342,13 +339,18 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return false;
         }
+        return await RaiseRoadmapBuildEvent( monitor, context, roadmap ).ConfigureAwait( false );
+    }
+
+    async Task<bool> RaiseRoadmapBuildEvent( IActivityMonitor monitor, CKliEnv context, Roadmap roadmap )
+    {
         // Here, results.Length can be 0: everything was already built, we blindly raise the event,
-        // it's up to the listeners to handle this (roadmap.SolutionBuildCount and SolutionPublishCount can be 0).
+        // it's up to the listeners to handle this (roadmap.SolutionBuildCount can be 0).
         if( _onRoadmapBuild.HasHandlers )
         {
             using( monitor.OpenTrace( $"Raising RoadmapBuild event." ) )
             {
-                var e = new RoadmapBuildEventArgs( monitor, roadmap );
+                var e = new RoadmapBuildEventArgs( monitor, context, World, roadmap );
                 if( !await _onRoadmapBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) || !e.Success )
                 {
                     return false;
@@ -368,7 +370,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                        CIBuildMode ciBuildMode,
                                        bool mustPublish,
                                        string? branch,
-                                       bool all )
+                                       bool all,
+                                       bool dryRun )
     {
         // Consider the repositories selected by current path as the Pivots.
         var pivots = all
@@ -417,7 +420,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         var hotGraph = _hotZone.GetHotGraph( monitor, branchName, ciBuildMode != CIBuildMode.None, pivots );
         if( hotGraph == null ) return null;
 
-        var roadmap = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish );
+        var roadmap = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish, dryRun );
         if( roadmap != null  )
         {
             context.Screen.Display( roadmap.ToRenderable );

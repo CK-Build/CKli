@@ -335,7 +335,7 @@ public sealed partial class Roadmap
                         }
                         else
                         {
-                            _publishable = PublishableStatus.PublishRequiredBaseBranch;
+                            _publishable = PublishableStatus.IndirectPublishRequired;
                         }
                     }
                     else if( _buildInfo.TargetVersion.IsBuilding() )
@@ -475,9 +475,9 @@ public sealed partial class Roadmap
         public int BuildNumber => _buildNumber;
 
         /// <summary>
-        /// Gets the publishable status.
+        /// Gets the publishable status of this solution.
         /// </summary>
-        internal PublishableStatus Publishable => _publishable;
+        public PublishableStatus PublishableStatus => _publishable;
 
         internal IRenderable ToRenderable(  ref BuildIndexAndRankDisplayState head, ref RStats stats )
         {

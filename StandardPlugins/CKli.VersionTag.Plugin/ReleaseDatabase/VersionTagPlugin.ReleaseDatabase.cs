@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
+using CKli.BranchModel.Plugin;
 using CKli.Core;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -29,6 +30,8 @@ public sealed partial class VersionTagPlugin
         }
 
         internal ArtifactHandlerPlugin ArtifactHandlerPlugin => _versionTagPlugin._artifactHandlerPlugin;
+
+        internal BranchModelPlugin BranchModelPlugin => _versionTagPlugin._branchModel;
 
         /// <summary>
         /// Gets the <see cref="RepoReleaseInfo"/> for a <see cref="TagCommit.Version"/> or its <see cref="TagCommit.CI0Version"/>.

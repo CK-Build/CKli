@@ -50,7 +50,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         } );
     }
 
-    void IssueRequested( IssueEvent e )
+    void IssueRequested( IssueEventArgs e )
     {
         var monitor = e.Monitor;
         bool hasSevereIssue = false;
@@ -67,7 +67,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
                 {
                     var info = Get( monitor, r );
                     var issueBuilder = new ContentIssueBuilder( info, RaiseContentIssue );
-                    if( !issueBuilder.CreateIssue( monitor, e.ScreenType, e.Add ) )
+                    if( !issueBuilder.CreateIssue( monitor, e.Context, e.Add ) )
                     {
                         monitor.CloseGroup( $"ContentIssue event handling failed." );
                         // Stop on the first error.
@@ -78,7 +78,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         }
     }
 
-    bool RaiseContentIssue( IActivityMonitor monitor, ContentIssueEvent e )
+    bool RaiseContentIssue( IActivityMonitor monitor, ContentIssueEventArgs e )
     {
         Throw.DebugAssert( ContentIssue != null );
         bool success = true;
@@ -101,7 +101,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     /// is detected as an error that fails the issue command.
     /// </para>
     /// </summary>
-    public event Action<ContentIssueEvent>? ContentIssue;
+    public event Action<ContentIssueEventArgs>? ContentIssue;
 
     /// <summary>
     /// Sets the <see cref="ITagCommitProvider"/> required to support <see cref="HotBranch.Synchronize(IActivityMonitor, ITagCommitProvider, BranchLinkType)"/>

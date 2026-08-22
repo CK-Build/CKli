@@ -9,7 +9,7 @@ using System.Linq;
 
 namespace CKli.BranchModel.Plugin;
 
-public sealed partial class ContentIssueEvent
+public sealed partial class ContentIssueEventArgs
 {
     /// <summary>
     /// Collector for content issue.

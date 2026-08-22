@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -10,7 +11,7 @@ namespace CKli.VersionTag.Plugin;
 /// Captures the information for the release of a <see cref="Repo"/> in a <see cref="Version"/>.
 /// </summary>
 [DebuggerDisplay( "{ToString(),nq}" )]
-public sealed class RepoReleaseInfo
+public sealed class RepoReleaseInfo : IEquatable<RepoReleaseInfo>
 {
     readonly VersionTagPlugin.ReleaseDatabase _releaseDatabase;
     readonly RepoKey _repoKey;
@@ -112,4 +113,9 @@ public sealed class RepoReleaseInfo
     /// <returns>Repo display path/v{Released version}.</returns>
     public override string ToString() => $"{Repo.DisplayPath}/{Version.ParsedPrefix}v{Version}";
 
+    public bool Equals( RepoReleaseInfo? other ) => other != null && _repoKey.Equals( other._repoKey );
+
+    public override bool Equals( object? obj ) => Equals( obj as RepoReleaseInfo );
+
+    public override int GetHashCode() => _repoKey.GetHashCode();
 }

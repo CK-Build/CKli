@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
+using CKli.Core;
 using CKli.VersionTag.Plugin;
 using System.Threading;
 
@@ -13,7 +14,7 @@ namespace CKli.Build.Plugin;
 /// This can hook the build thanks to the <see cref="ResultHook"/>.
 /// </para>
 /// </summary>
-public sealed class CoreBuildEventArgs : EventMonitoredArgs
+public sealed class CoreBuildEventArgs : WorldEventArgs
 {
     readonly CancellationToken _cancellation;
     readonly CommitBuildInfo _buildInfo;
@@ -21,11 +22,12 @@ public sealed class CoreBuildEventArgs : EventMonitoredArgs
     readonly bool _runTest;
 
     internal CoreBuildEventArgs( IActivityMonitor monitor,
+                                 CKliEnv context,
                                  CommitBuildInfo buildInfo,
                                  string outputPath,
                                  bool runTest,
                                  CancellationToken cancellation )
-        : base( monitor )
+        : base( monitor, context, buildInfo.Repo.World )
     {
         _cancellation = cancellation;
         _buildInfo = buildInfo;

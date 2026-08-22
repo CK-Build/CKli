@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
+using CKli.Core;
 using CKli.HotZone.Plugin;
 using System.Collections.Immutable;
 
@@ -16,12 +17,13 @@ public sealed class FixBuildEventArgs : BuildBaseEventArgs
     readonly bool _isCIBuild;
 
     internal FixBuildEventArgs( IActivityMonitor monitor,
+                                CKliEnv context,
                                 FixWorkflow fix,
                                 bool isCIBuild,
                                 ImmutableArray<BuildResult> results,
                                 bool shouldPublish,
                                 bool keepBranchOnSuccessfulPublish )
-        : base( monitor, shouldPublish )
+        : base( monitor, context, fix.World, shouldPublish )
     {
         _fix = fix;
         _isCIBuild = isCIBuild;

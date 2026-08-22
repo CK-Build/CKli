@@ -36,10 +36,10 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
     /// <para>
     /// Any <see cref="CK.Core.LogLevel.Error"/> or <see cref="CK.Core.LogLevel.Fatal"/> emitted in <see cref="EventMonitoredArgs.Monitor">CommonFileTemplateEvent.Monitor</see>
     /// is detected as an error that fails the issue command.
-    /// If the <see cref="CommonFileTemplateEvent.Handled"/> is eventually false, this is an error: all template file must be handled.
+    /// If the <see cref="CommonFileTemplateEventArgs.Handled"/> is eventually false, this is an error: all template file must be handled.
     /// </para>
     /// </summary>
-    public event Action<CommonFileTemplateEvent>? TemplateRequired;
+    public event Action<CommonFileTemplateEventArgs>? TemplateRequired;
 
     NormalizedPath CommonFolder => _commonFolder.IsEmptyPath
                                     ? (_commonFolder = PrimaryPluginContext.World.Name.SharedDataFolder.AppendPart( "Common" ))
@@ -47,7 +47,7 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
 
     List<(string SourcePath, string RelativeTargetPath, FileType Action)> GetFolderContent( IActivityMonitor monitor ) => _folderContent ??= ReadCommonFolder( CommonFolder );
 
-    void ContentIssueRequested( ContentIssueEvent ev )
+    void ContentIssueRequested( ContentIssueEventArgs ev )
     {
         var content = GetFolderContent( ev.Monitor );
         foreach( var item in content )
@@ -127,7 +127,7 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         }
     }
 
-    static void CopyFile( ContentIssueEvent ev, string sourcePath, string relativeTargetPath )
+    static void CopyFile( ContentIssueEventArgs ev, string sourcePath, string relativeTargetPath )
     {
         var fileContent = File.ReadAllBytes( sourcePath );
         var info = ev.Content.GetFileInfo( relativeTargetPath );
@@ -145,7 +145,7 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         }
     }
 
-    static void InitializeFile( ContentIssueEvent ev, string sourcePath, string relativeTargetPath )
+    static void InitializeFile( ContentIssueEventArgs ev, string sourcePath, string relativeTargetPath )
     {
         var info = ev.Content.GetFileInfo( relativeTargetPath );
         if( info == null )
@@ -166,9 +166,9 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         }
     }
 
-    void HandleFileTemplate( ContentIssueEvent ev, string sourcePath, string relativeTargetPath )
+    void HandleFileTemplate( ContentIssueEventArgs ev, string sourcePath, string relativeTargetPath )
     {
-        var templateEvent = new CommonFileTemplateEvent( ev, sourcePath, relativeTargetPath );
+        var templateEvent = new CommonFileTemplateEventArgs( ev, sourcePath, relativeTargetPath );
         TemplateRequired?.Invoke( templateEvent );
         if( !templateEvent.Handled )
         {
