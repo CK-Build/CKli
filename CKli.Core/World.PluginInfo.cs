@@ -66,7 +66,7 @@ public sealed partial class World
             headerText += $" (CompileMode: {_definitionFile.CompileMode})";
         }
         // Even if something fails, we want to display the plugin information.
-        return loaded.Count == 0 || _events.SafeRaiseEvent( monitor, new PluginInfoEvent( monitor, this, infos ) );
+        return loaded.Count == 0 || _events.SafeRaiseEvent( monitor, new PluginInfoEventArgs( monitor, _stackRepository.Context, this, infos ) );
     }
 
     internal string? GetDisabledPluginsHeader() => _plugins == null

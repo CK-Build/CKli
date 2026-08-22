@@ -7,12 +7,12 @@ namespace CKli.Core;
 /// <summary>
 /// Event raised by "ckli plugin" command to collect plugin information.
 /// </summary>
-public sealed class PluginInfoEvent : WorldEvent
+public sealed class PluginInfoEventArgs : WorldEventArgs
 {
     readonly List<World.DisplayInfoPlugin> _display;
 
-    internal PluginInfoEvent( IActivityMonitor monitor, World world, List<World.DisplayInfoPlugin> display )
-        : base( monitor, world )
+    internal PluginInfoEventArgs( IActivityMonitor monitor, CKliEnv context, World world, List<World.DisplayInfoPlugin> display )
+        : base( monitor, context, world )
     {
         _display = display;
     }

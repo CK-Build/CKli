@@ -6,16 +6,17 @@ namespace CKli.Core;
 /// <summary>
 /// Raised by the "ckli issue" command.
 /// </summary>
-public sealed class IssueEvent : WorldEvent
+public sealed class IssueEventArgs : WorldEventArgs
 {
     readonly IReadOnlyList<Repo> _repos;
     readonly List<World.Issue> _issues;
 
-    internal IssueEvent( IActivityMonitor monitor,
-                         World world,
-                         IReadOnlyList<Repo> repos,
-                         List<World.Issue> issues )
-        : base( monitor, world )
+    internal IssueEventArgs( IActivityMonitor monitor,
+                             CKliEnv context,
+                             World world,
+                             IReadOnlyList<Repo> repos,
+                             List<World.Issue> issues )
+        : base( monitor, context, world )
     {
         _repos = repos;
         _issues = issues;

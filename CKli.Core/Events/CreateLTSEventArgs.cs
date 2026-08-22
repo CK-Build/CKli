@@ -6,16 +6,17 @@ namespace CKli.Core;
 /// <summary>
 /// Raised by the "ckli lts create" command. 
 /// </summary>
-public sealed class CreateLTSEvent : WorldEvent
+public sealed class CreateLTSEventArgs : WorldEventArgs
 {
     readonly string _ltsName;
     readonly XElement _ltsDefinition;
 
-    internal CreateLTSEvent( IActivityMonitor monitor,
-                             World world,
-                             string ltsName,
-                             XElement ltsDefinition )
-        : base( monitor, world )
+    internal CreateLTSEventArgs( IActivityMonitor monitor,
+                                 CKliEnv context,
+                                 World world,
+                                 string ltsName,
+                                 XElement ltsDefinition )
+        : base( monitor, context, world )
     {
         _ltsName = ltsName;
         _ltsDefinition = ltsDefinition;

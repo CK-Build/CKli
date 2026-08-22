@@ -6,16 +6,17 @@ namespace CKli.Core;
 /// <summary>
 /// Raised by the "ckli repo add" or "ckli repo create" commands.
 /// </summary>
-public sealed class RepoAddedEvent : WorldEvent
+public sealed class RepoAddedEventArgs : WorldEventArgs
 {
     readonly GitRepository _gitRepository;
     readonly XElement _repoDefinition;
 
-    internal RepoAddedEvent( IActivityMonitor monitor,
-                             World world,
-                             GitRepository gitRepository,
-                             XElement repoDefinition )
-        : base( monitor, world )
+    internal RepoAddedEventArgs( IActivityMonitor monitor,
+                                 CKliEnv context,
+                                 World world,
+                                 GitRepository gitRepository,
+                                 XElement repoDefinition )
+        : base( monitor, context, world )
     {
         _gitRepository = gitRepository;
         _repoDefinition = repoDefinition;

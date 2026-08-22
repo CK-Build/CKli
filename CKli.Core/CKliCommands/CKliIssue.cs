@@ -76,7 +76,7 @@ public sealed class CKliIssue : Command
             if( repos == null ) return false;
 
             if( repos.Count > 0
-                && !world.Events.SafeRaiseEvent( monitor, new IssueEvent( monitor, world, repos, issues ) ) )
+                && !world.Events.SafeRaiseEvent( monitor, new IssueEventArgs( monitor, context, world, repos, issues ) ) )
             {
                 return false;
             }

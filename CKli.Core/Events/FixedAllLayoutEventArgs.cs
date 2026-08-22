@@ -6,12 +6,12 @@ namespace CKli.Core;
 /// <summary>
 /// Event raised by "ckli layout fix" when the world's layout has been fixed.
 /// </summary>
-public sealed class FixedAllLayoutEvent : WorldEvent
+public sealed class FixedAllLayoutEventArgs : WorldEventArgs
 {
     readonly IReadOnlyList<Repo> _newClones;
 
-    internal FixedAllLayoutEvent( IActivityMonitor monitor, World world, IReadOnlyList<Repo> newClones )
-        : base( monitor, world )
+    internal FixedAllLayoutEventArgs( IActivityMonitor monitor, CKliEnv context, World world, IReadOnlyList<Repo> newClones )
+        : base( monitor, context, world )
     {
         _newClones = newClones;
     }

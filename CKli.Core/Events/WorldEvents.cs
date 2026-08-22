@@ -9,13 +9,13 @@ namespace CKli.Core;
 /// </summary>
 public sealed class WorldEvents
 {
-    internal readonly PerfectEventSender<RepoAddedEvent> RepoAddedEventSender;
-    internal readonly PerfectEventSender<CreateLTSEvent> CreateLTSEventSender;
+    internal readonly PerfectEventSender<RepoAddedEventArgs> RepoAddedEventSender;
+    internal readonly PerfectEventSender<CreateLTSEventArgs> CreateLTSEventSender;
 
     internal WorldEvents()
     {
-        RepoAddedEventSender = new PerfectEventSender<RepoAddedEvent>();
-        CreateLTSEventSender = new PerfectEventSender<CreateLTSEvent>();
+        RepoAddedEventSender = new PerfectEventSender<RepoAddedEventArgs>();
+        CreateLTSEventSender = new PerfectEventSender<CreateLTSEventArgs>();
     }
 
     internal void ReleaseEvents()
@@ -27,14 +27,13 @@ public sealed class WorldEvents
         CreateLTSEventSender.RemoveAll();
     }
 
-    static bool Raise<T>( IActivityMonitor monitor, Action<T>? handler, T e ) where T : WorldEvent
+    static bool Raise<T>( IActivityMonitor monitor, Action<T>? handler, T e ) where T : WorldEventArgs
     {
         if( handler != null )
         {
             try
             {
                 handler( e );
-                return e.Success;
             }
             catch( Exception ex )
             {
@@ -48,32 +47,32 @@ public sealed class WorldEvents
     /// <summary>
     /// Raised when <see cref="World.FixLayout"/> has been successfully called.
     /// </summary>
-    public event Action<FixedAllLayoutEvent>? FixedLayout;
+    public event Action<FixedAllLayoutEventArgs>? FixedLayout;
 
-    internal bool SafeRaiseEvent( IActivityMonitor monitor, FixedAllLayoutEvent e ) => Raise( monitor, FixedLayout, e );
+    internal bool SafeRaiseEvent( IActivityMonitor monitor, FixedAllLayoutEventArgs e ) => Raise( monitor, FixedLayout, e );
 
     /// <summary>
     /// Raised when plugin information is required.
     /// </summary>
-    public event Action<PluginInfoEvent>? PluginInfo;
+    public event Action<PluginInfoEventArgs>? PluginInfo;
 
-    internal bool SafeRaiseEvent( IActivityMonitor monitor, PluginInfoEvent e ) => Raise( monitor, PluginInfo, e );
+    internal bool SafeRaiseEvent( IActivityMonitor monitor, PluginInfoEventArgs e ) => Raise( monitor, PluginInfo, e );
 
     /// <summary>
     /// Raised by "ckli issue".
     /// </summary>
-    public event Action<IssueEvent>? Issue;
+    public event Action<IssueEventArgs>? Issue;
 
-    internal bool SafeRaiseEvent( IActivityMonitor monitor, IssueEvent e ) => Raise( monitor, Issue, e );
+    internal bool SafeRaiseEvent( IActivityMonitor monitor, IssueEventArgs e ) => Raise( monitor, Issue, e );
 
     /// <summary>
     /// Raised by "ckli repo add" and "ckli repo create" commands.
     /// </summary>
-    public PerfectEvent<RepoAddedEvent> RepoAdded => RepoAddedEventSender.PerfectEvent;
+    public PerfectEvent<RepoAddedEventArgs> RepoAdded => RepoAddedEventSender.PerfectEvent;
 
     /// <summary>
     /// Raised by "ckli lts create" command.
     /// </summary>
-    public PerfectEvent<CreateLTSEvent> CreateLTS => CreateLTSEventSender.PerfectEvent;
+    public PerfectEvent<CreateLTSEventArgs> CreateLTS => CreateLTSEventSender.PerfectEvent;
 
 }

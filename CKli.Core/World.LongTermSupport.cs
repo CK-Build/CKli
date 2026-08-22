@@ -12,7 +12,7 @@ public sealed partial class World
     /// <see cref="PluginMachinery.CKliPluginsFolderName"/>).
     /// <para>
     /// This creates LTS world by cloning the current one: the <see cref="WorldDefinitionFile.XmlRoot"/> is cloned,
-    /// the <see cref="WorldEvents.CreateLTS"/> event is raised (the plugins must handle the <see cref="CreateLTSEvent.LTSDefinition"/>
+    /// the <see cref="WorldEvents.CreateLTS"/> event is raised (the plugins must handle the <see cref="CreateLTSEventArgs.LTSDefinition"/>
     /// file) and the "CKli.Plugins/" solution folder is copied.
     /// </para>
     /// </summary>
@@ -44,7 +44,7 @@ public sealed partial class World
         newDefinition.Name = ltsName;
         if( _events.CreateLTSEventSender.HasHandlers )
         {
-            if( !await _events.CreateLTSEventSender.SafeRaiseAsync( monitor, new CreateLTSEvent( monitor, this, ltsName, newDefinition ) ).ConfigureAwait( false ) )
+            if( !await _events.CreateLTSEventSender.SafeRaiseAsync( monitor, new CreateLTSEventArgs( monitor, context, this, ltsName, newDefinition ) ).ConfigureAwait( false ) )
             {
                 return false;
             }

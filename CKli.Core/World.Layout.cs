@@ -130,7 +130,7 @@ sealed partial class World
             // We raise the RepoAdded event here: the plugins can play with the GitRepository.
             if( _events.RepoAddedEventSender.HasHandlers )
             {
-                if( !await _events.RepoAddedEventSender.SafeRaiseAsync( monitor, new RepoAddedEvent( monitor, this, gitRepository, xRepo ) ).ConfigureAwait( false ) )
+                if( !await _events.RepoAddedEventSender.SafeRaiseAsync( monitor, new RepoAddedEventArgs( monitor, _stackRepository.Context, this, gitRepository, xRepo ) ).ConfigureAwait( false ) )
                 {
                     return false;
                 }
@@ -237,7 +237,7 @@ sealed partial class World
         {
             DeletePotentiallyEmptyFolders( monitor, potentiallyEmptyFolders );
         }
-        return _events.SafeRaiseEvent( monitor, new FixedAllLayoutEvent( monitor, this, newClones ) );
+        return _events.SafeRaiseEvent( monitor, new FixedAllLayoutEventArgs( monitor, _stackRepository.Context, this, newClones ) );
 
         static bool ExecuteMoves( IActivityMonitor monitor,
                                   World world,
