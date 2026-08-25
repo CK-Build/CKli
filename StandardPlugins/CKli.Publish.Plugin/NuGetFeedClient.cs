@@ -283,18 +283,18 @@ public sealed partial class NuGetFeedClient : IDisposable
                 // internally with null settings for file:// sources, which throws ArgumentNullException.
                 // OfflineFeedUtility is the proper NuGet API for local V3 feeds.
                 var extractionContext = new PackageExtractionContext( PackageSaveMode.Defaultv3,
-                                                                     XmlDocFileSaveMode.None,
-                                                                     clientPolicyContext: null,
-                                                                     logger: nugetLogger );
+                                                                      XmlDocFileSaveMode.None,
+                                                                      clientPolicyContext: null,
+                                                                      logger: nugetLogger );
                 foreach( var path in paths )
                 {
                     var addContext = new OfflineFeedAddContext( path,
-                                                               _localPath,
-                                                               nugetLogger,
-                                                               throwIfSourcePackageIsInvalid: true,
-                                                               throwIfPackageExistsAndInvalid: true,
-                                                               throwIfPackageExists: !skipDuplicate,
-                                                               extractionContext );
+                                                                _localPath,
+                                                                nugetLogger,
+                                                                throwIfSourcePackageIsInvalid: true,
+                                                                throwIfPackageExistsAndInvalid: true,
+                                                                throwIfPackageExists: !skipDuplicate,
+                                                                extractionContext );
                     await OfflineFeedUtility.AddPackageToSource( addContext, cancellationToken );
                 }
             }

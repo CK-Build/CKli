@@ -12,7 +12,7 @@ public sealed class NuGetFeed
     readonly NormalizedPath _url;
     readonly NuGetFeedCredentials? _pushCredentials;
     readonly NuGetFeedCredentials? _fakeReadCredentials;
-    readonly SVersionQualityFilter _pushQualityFilter;
+    readonly CSVersionKindFilter _pushQualityFilter;
 
     /// <summary>
     /// Initializes a new NuGet feed.
@@ -25,7 +25,7 @@ public sealed class NuGetFeed
     public NuGetFeed( string name,
                       NormalizedPath url,
                       NuGetFeedCredentials? pushCredentials,
-                      SVersionQualityFilter pushQualityFilter,
+                      CSVersionKindFilter pushQualityFilter,
                       NuGetFeedCredentials? fakeReadCredentials )
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( name );
@@ -43,9 +43,9 @@ public sealed class NuGetFeed
     {
         var name = (string)e.Attribute( XNames.Name )!;
         var url = (string?)e.Attribute( XNames.Url );
-        SVersionQualityFilter q = default;
+        CSVersionKindFilter q = default;
         var sQ = (string?)e.Attribute( XNames.PushQualityFilter );
-        if( !string.IsNullOrWhiteSpace( sQ ) && !SVersionQualityFilter.TryParse( sQ, out q ) )
+        if( !string.IsNullOrWhiteSpace( sQ ) && !CSVersionKindFilter.TryParse( sQ, out q ) )
         {
             Throw.ArgumentException( nameof( PushQualityFilter ) );
         }
@@ -103,7 +103,7 @@ public sealed class NuGetFeed
     /// Gets the filter that can restrict pushed versions of packages into this feed.
     /// Defaults to "[,].ci": the feed accepts all versions.
     /// </summary>
-    public SVersionQualityFilter PushQualityFilter => _pushQualityFilter;
+    public CSVersionKindFilter PushQualityFilter => _pushQualityFilter;
 
     /// <summary>
     /// Returns the "Name (Url)".

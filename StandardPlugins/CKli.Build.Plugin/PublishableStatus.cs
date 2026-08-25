@@ -29,8 +29,8 @@ namespace CKli.Build.Plugin;
 public enum PublishableStatus
 {
     /// <summary>
-    /// Not relevant: the <see cref="BuildSolution"/> is not in the scope of the <see cref="Roadmap.Pivots"/>.
-    /// <see cref="BuildSolution.BuildInfo"/> is null.
+    /// Not relevant: the <see cref="Roadmap.BuildSolution"/> is not in the scope of the <see cref="Roadmap.Pivots"/>.
+    /// <see cref="Roadmap.BuildSolution.BuildInfo"/> is null.
     /// </summary>
     None = 0,
 
@@ -47,7 +47,7 @@ public enum PublishableStatus
     PublishRequired = 2,
 
     /// <summary>
-    /// The solution can be published because <see cref="BuildSolution.MustBuild"/> is true: the <see cref="BuildInfo.TargetVersion"/>
+    /// The solution can be published because <see cref="Roadmap.BuildSolution.MustBuild"/> is true: the <see cref="Roadmap.BuildInfo.TargetVersion"/>
     /// will be publishable.
     /// </summary>
     Build = 3,

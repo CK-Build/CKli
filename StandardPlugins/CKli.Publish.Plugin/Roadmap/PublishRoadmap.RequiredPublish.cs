@@ -2,12 +2,15 @@ using CKli.VersionTag.Plugin;
 
 namespace CKli.Publish.Plugin;
 
-public sealed partial class PublishRoadmap
+sealed partial class PublishRoadmap
 {
     /// <summary>
-    /// Captures an indirect required publication: the <see cref="Origin"/> is a "local/" <see cref="BuildSolution.LastBuild"/>
-    /// that is not on the <see cref="HotGraph.BranchName"/> and the <see cref="Required"/> is also a "local/".
+    /// Captures a required publication: the <see cref="Origin"/> is a "local/" <see cref="Build.Plugin.Roadmap.BuildSolution.LastBuild"/>
+    /// - not on the <see cref="HotGraph.BranchName"/> - or the <see cref="Build.Plugin.Roadmap.BuildInfo.TargetVersion"/> and
+    /// the <see cref="Required"/> is also a "local/".
+    /// <para>
     /// Required can be the Origin itself, one of its consumer or a producer.
+    /// </para>
     /// </summary>
     /// <param name="Origin">The initially referenced release by the roadmap's pivots.</param>
     /// <param name="Required">The "local/" Repo/Version that must be published.</param>
@@ -15,7 +18,7 @@ public sealed partial class PublishRoadmap
     {
         /// <summary>
         /// Gets whether the <see cref="Required"/> is a producer of this <see cref="Origin"/>.
-        /// If it's not a producer that it can be a consumer or the Origin itself.
+        /// If it's not a producer then it can be a consumer or the Origin itself.
         /// </summary>
         public bool IsProducer => Origin.AllProducers.Contains( Required );
     }

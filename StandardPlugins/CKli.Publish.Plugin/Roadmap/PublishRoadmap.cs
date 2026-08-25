@@ -1,4 +1,5 @@
 using CK.Core;
+using CKli.ArtifactHandler.Plugin;
 using CKli.Build.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
@@ -6,7 +7,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Net;
+using System.Runtime.InteropServices.Marshalling;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CKli.Publish.Plugin;
@@ -14,12 +16,12 @@ namespace CKli.Publish.Plugin;
 /// <summary>
 /// The associated <see cref="Roadmap.Publish"/> if the roadmap must be published.
 /// </summary>
-public sealed partial class PublishRoadmap
+sealed partial class PublishRoadmap
 {
     readonly Roadmap _roadmap;
+    readonly IReadOnlyList<RequiredPublish> _buildingAliens;
     readonly ImmutableArray<RequiredPublish> _requiredPublications;
     readonly IReadOnlyList<RequiredPublish> _alreadyPublished;
-    readonly IReadOnlyList<RequiredPublish> _buildingAliens;
 
     /// <summary>
     /// Gets the roadmap (<see cref="Roadmap.MustPublish"/> is true).
@@ -71,15 +73,27 @@ public sealed partial class PublishRoadmap
     /// </summary>
     public ImmutableArray<RequiredPublish> IndirectRequiredPublications => _requiredPublications;
 
-
     internal IRenderable ToRenderable( ScreenType screen )
     {
-        return screen.Text( "Publish Info" );
+        return screen.Unit;
     }
 
-    internal async Task PublishAsync( IActivityMonitor monitor )
+    internal async Task<bool> PublishAsync( IActivityMonitor monitor,
+                                            PackageSender packageSender,
+                                            ArtifactHandlerPlugin artifactHandler,
+                                            CancellationToken cancellation )
     {
-        throw new NotImplementedException();
+        Throw.DebugAssert( CanPublish );
+        if( _requiredPublications.Length > 0 )
+        {
+            throw new NotImplementedException();
+        }
+        if( _roadmap.DirectPublishCount == 0 )
+        {
+            return true;
+        }
+        var directPublisher = DirectPublisher.Create( monitor, _roadmap );
+        return await directPublisher.PublishAsync( monitor, packageSender, artifactHandler, cancellation ).ConfigureAwait( false );
     }
 
     PublishRoadmap( Roadmap roadmap,
@@ -154,7 +168,6 @@ public sealed partial class PublishRoadmap
                 }
             }
         }
-
         return new PublishRoadmap( roadmap, alreadyPublished, buildingAliens, requiredPublishes );
     }
 

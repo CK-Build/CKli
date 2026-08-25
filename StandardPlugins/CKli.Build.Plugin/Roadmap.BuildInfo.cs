@@ -133,7 +133,8 @@ public sealed partial class Roadmap
         /// Gets the <see cref="HotBranch"/> that must be built: it corresponds to the "theoretical branch name"
         /// that is the <see cref="HotGraph.BranchName"/>. Always null when <see cref="MustBuild"/> is false.
         /// <para>
-        /// This branch may not <see cref="HotBranch.Exists"/> until <see cref="Roadmap.BuildAsync"/> is called. 
+        /// This branch may not <see cref="HotBranch.Exists"/> until a successful build of the
+        /// roadmap (<see cref="Roadmap.BuildSuccess"/> is true). 
         /// </para>
         /// </summary>
         public HotBranch? BuildBranch => _buildBranch;
@@ -212,7 +213,8 @@ public sealed partial class Roadmap
             }
             else
             {
-                Throw.DebugAssert( ReferenceEquals( _targetVersion, _solution.LastBuild.TagCommit.Version ) || ReferenceEquals( _targetVersion, _solution.LastBuild.TagCommit.CI0Version ) );
+                Throw.DebugAssert( ReferenceEquals( _targetVersion, _solution.LastBuild.TagCommit.Version )
+                                                    || ReferenceEquals( _targetVersion, _solution.LastBuild.TagCommit.CI0Version ) );
                 if( _targetVersion.IsBuilding() )
                 {
                     bool isCI0 = ReferenceEquals( _targetVersion, _solution.LastBuild.TagCommit.CI0Version );

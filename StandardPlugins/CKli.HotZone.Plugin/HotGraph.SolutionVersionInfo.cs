@@ -3,6 +3,7 @@ using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
+using LibGit2Sharp;
 
 namespace CKli.HotZone.Plugin;
 
@@ -49,15 +50,16 @@ public sealed partial class HotGraph
         {
             readonly SolutionVersionInfo _info;
             readonly TagCommit _tagCommit;
-            readonly SVersion _version;
             readonly BranchName _branchName;
+            readonly bool _isCI0;
 
             internal LastBuiltVersion( SolutionVersionInfo info, in (TagCommit Commit, SVersion Version, BranchName Branch) bestBuild )
             {
                 _info = info;
                 _tagCommit = bestBuild.Commit;
-                _version = bestBuild.Version;
                 _branchName = bestBuild.Branch;
+                Throw.DebugAssert( ReferenceEquals( bestBuild.Version, _tagCommit.Version ) || ReferenceEquals( bestBuild.Version, _tagCommit.CI0Version ) );
+                _isCI0 = bestBuild.Version == _tagCommit.CI0Version;
             }
 
             /// <summary>
@@ -68,7 +70,12 @@ public sealed partial class HotGraph
             /// <summary>
             /// Gets the built version (either <see cref="TagCommit.Version"/> or <see cref="TagCommit.CI0Version"/>).
             /// </summary>
-            public SVersion Version => _version;
+            public SVersion Version => _isCI0 ? _tagCommit.CI0Version! : _tagCommit.Version;
+
+            /// <summary>
+            /// Gets the Git tag (either <see cref="TagCommit.Tag"/> or <see cref="TagCommit.CI0VersionTag"/>).
+            /// </summary>
+            public Tag Tag => _isCI0 ? _tagCommit.CI0VersionTag! : _tagCommit.Tag;
 
             /// <summary>
             /// Gets the closest branch name to <see cref="Solution.Branch"/> from which this <see cref="TagCommit"/> is available.
@@ -90,7 +97,7 @@ public sealed partial class HotGraph
             /// This MAY be handled one day but this has been considered too fragile: a "+fake" version is currently not skippable.
             /// </para>
             /// </remarks>
-            public bool VersionMustBuild => _version.BuildMetaData.Length > 0;
+            public bool VersionMustBuild => Version.BuildMetaData.Length > 0;
 
             /// <summary>
             /// Gets whether a build is required because <see cref="TagCommit"/>'s content is not the same as

@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
+using CKli.BranchModel.Plugin;
 using CKli.Build.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
@@ -18,6 +19,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
 {
     readonly BuildPlugin _build;
     readonly ArtifactHandlerPlugin _artifactHandler;
+    readonly BranchModelPlugin _branchModel;
     readonly VersionTagPlugin _versionTag;
 
     /// <summary>
@@ -30,11 +32,13 @@ public sealed class PublishPlugin : PrimaryPluginBase
     public PublishPlugin( PrimaryPluginContext primaryContext,
                           BuildPlugin build,
                           ArtifactHandlerPlugin artifactHandler,
+                          BranchModelPlugin branchModel,
                           VersionTagPlugin versionTag )
         : base( primaryContext )
     {
         _build = build;
         _artifactHandler = artifactHandler;
+        _branchModel = branchModel;
         _versionTag = versionTag;
         _build.OnRoadmapBuild.Async += OnRoadmapBuildAsync;
         _build.OnFixBuild.Async += OnFixBuildAsync;
@@ -47,8 +51,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
             if( !await PublishAsync( monitor,
                                      World,
                                      _artifactHandler,
-                                     _versionTag,
-                                     e.BuildDate,
+                                     _branchModel,
                                      e.FixWorkflow,
                                      e.IsCIBuild,
                                      e.KeepBranchOnSuccessfulPublish,
@@ -62,28 +65,20 @@ public sealed class PublishPlugin : PrimaryPluginBase
         static async Task<bool> PublishAsync( IActivityMonitor monitor,
                                               World world,
                                               ArtifactHandlerPlugin artifactHandler,
-                                              VersionTagPlugin versionTag,
-                                              DateTime buildDate,
+                                              BranchModelPlugin branchModel,
                                               FixWorkflow fixWorkflow,
                                               bool ciBuild,
                                               bool keepBranchOnSuccessfulPublish,
                                               ImmutableArray<BuildResult> results,
                                               CancellationToken cancel )
         {
-            // A fix is on the stable branch.
-            var packageSender = PackageSender.Create( monitor,
-                                                      prereleaseName: "",
-                                                      ciBuild,
-                                                      artifactHandler,
-                                                      world.StackRepository.SecretsStore );
+
+            var publisher = DirectPublisher.Create( fixWorkflow, results );
+
+            var packageSender = PackageSender.Create( monitor, artifactHandler, branchModel, world.StackRepository.SecretsStore );
             if( packageSender == null ) return false;
 
-            var state = new PublishState( world );
-            var newOne = WorldReleaseInfo.Create( buildDate, fixWorkflow, results );
-            state.Add( monitor, newOne );
-
-            var publisher = new SimplePublisher( state, packageSender, artifactHandler, versionTag );
-            if( await publisher.RunAsync( monitor, cancel ) )
+            if( await publisher.PublishAsync( monitor, packageSender, artifactHandler, cancel ).ConfigureAwait( false ) )
             {
                 if( !ciBuild )
                 {
@@ -94,7 +89,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                     if( !keepBranchOnSuccessfulPublish )
                     {
                         // We ignore any errors here (they are only logged).
-                        foreach( var p in newOne.Repos )
+                        foreach( var p in publisher.Repos )
                         {
                             var r = p.Repo.GitRepository;
                             var b = r.Repository.Branches[p.BranchName];
@@ -113,54 +108,30 @@ public sealed class PublishPlugin : PrimaryPluginBase
     }
 
 
-    async Task OnRoadmapBuildAsync( IActivityMonitor monitor, RoadmapBuildEventArgs e, CancellationToken cancel )
+    async Task OnRoadmapBuildAsync( IActivityMonitor monitor, RoadmapBuildEventArgs e, CancellationToken cancellation )
     {
         if( e.ShouldPublish )
         {
             var roadmap = e.Roadmap;
             Throw.DebugAssert( roadmap.PublishableStatus > PublishableStatus.None );
-            if( roadmap.PublishableStatus > PublishableStatus.AlreadyPublished )
+            if( roadmap.PublishableStatus is > PublishableStatus.AlreadyPublished and < PublishableStatus.BuildingPending )
             {
-                //var publish = PublishRoadmap.Create( e.Monitor, roadmap, _versionTag );
-                //if( publish != null )
-                //{
-                //    e.Screen.Display( publish.ToRenderable );
-                //    if( !roadmap.DryRun )
-                //    {
-                //        await publish.PublishAsync( e.Monitor );
-                //    }
-                //}
-
-                if( !await PublishAsync( monitor, World, _artifactHandler, _versionTag, e.BuildDate, e.Roadmap, cancel ).ConfigureAwait( false ) )
+                var publish = PublishRoadmap.Create( e.Monitor, roadmap, _versionTag );
+                if( publish != null )
                 {
-                    e.SetFailed();
+                    e.Screen.Display( publish.ToRenderable );
+                    if( !roadmap.DryRun )
+                    {
+                        var packageSender = PackageSender.Create( monitor, _artifactHandler, _branchModel, e.Context.SecretsStore );
+                        if( packageSender == null || !await publish.PublishAsync( e.Monitor, packageSender, _artifactHandler, cancellation ).ConfigureAwait( false ) )
+                        {
+                            e.SetFailed();
+                        }
+                    }
                 }
             }
         }
 
-        [Obsolete( "Should use the more complex PublishRoadmap now..." )]
-        static Task<bool> PublishAsync( IActivityMonitor monitor,
-                                        World world,
-                                        ArtifactHandlerPlugin artifactHandler,
-                                        VersionTagPlugin versionTag,
-                                        DateTime buildDate,
-                                        Roadmap roadmap,
-                                        CancellationToken cancel )
-        {
-            var packageSender = PackageSender.Create( monitor,
-                                                      roadmap.Graph.BranchName.Name,
-                                                      roadmap.IsCIBuild,
-                                                      artifactHandler,
-                                                      world.StackRepository.SecretsStore );
-            if( packageSender == null ) return Task.FromResult( false );
-
-            var state = new PublishState( world );
-            var newOne = WorldReleaseInfo.Create( monitor, buildDate, roadmap );
-            state.Add( monitor, newOne );
-
-            var publisher = new SimplePublisher( state, packageSender, artifactHandler, versionTag );
-            return publisher.RunAsync( monitor, cancel );
-        }
     }
 
 }

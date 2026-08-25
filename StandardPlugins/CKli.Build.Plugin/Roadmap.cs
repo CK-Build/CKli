@@ -4,7 +4,9 @@ using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
+using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -38,10 +40,9 @@ public sealed partial class Roadmap
     readonly HotGraph.PackageUpdater _packageUpdater;
     readonly Mapping _packageMapping;
     int _buildSolutionCount;
+    int _directPublishCount;
     PublishableStatus _publishable;
-
-    [Obsolete]
-    int _publishSolutionCount;
+    bool? _buildSuccess;
 
     Roadmap( HotGraph graph,
              HotGraph.PackageUpdater packageUpdater,
@@ -121,7 +122,7 @@ public sealed partial class Roadmap
         }
         while( hasChanged );
 
-        if( !roadmap.ConcludeInitialization( monitor, artifactHandler, versionTag, mustPublish ) )
+        if( !roadmap.ConcludeInitialization( monitor, artifactHandler ) )
         {
             return null;
         }
@@ -159,15 +160,17 @@ public sealed partial class Roadmap
 
     /// <summary>
     /// Gets the publishable status: this combines all the <see cref="BuildSolution.PublishableStatus"/>.
-    /// See <see cref="Plugin.PublishableStatus"/>.
+    /// This is always computed even when <see cref="MustPublish"/> is false and is at
+    /// least <see cref="Plugin.PublishableStatus.AlreadyPublished"/>.
     /// </summary>
     public PublishableStatus PublishableStatus => _publishable;
 
     /// <summary>
-    /// Gets the number of solutions that must be published: their <see cref="BuildSolution.MustBuild"/> is true
-    /// or the <see cref="BuildSolution.CurrentVersion"/> is not in the published database.
+    /// Gets the count of <see cref="OrderedSolutions"/> that must published their build outcome (on the <see cref="HotGraph.BranchName"/>):
+    /// their <see cref="BuildSolution.PublishableStatus"/> is either <see cref="PublishableStatus.Build"/>
+    /// or <see cref="PublishableStatus.PublishRequired"/> (when already built).
     /// </summary>
-    public int SolutionPublishCount => _publishSolutionCount;
+    public int DirectPublishCount => _directPublishCount;
 
     /// <summary>
     /// Gets whether this is a build on the "dev/" branch (produces CI packages).
@@ -194,6 +197,11 @@ public sealed partial class Roadmap
     /// </summary>
     public bool DryRun => _dryRun;
 
+    /// <summary>
+    /// Gets whether this roadmap has been built. Always null when <see cref="DryRun"/> is true.
+    /// </summary>
+    public bool? BuildSuccess => _buildSuccess;
+
     internal bool Initialize( IActivityMonitor monitor )
     {
         foreach( var s in _orderedSolutions )
@@ -207,10 +215,7 @@ public sealed partial class Roadmap
         return true;
     }
 
-    bool ConcludeInitialization( IActivityMonitor monitor,
-                                 ArtifactHandlerPlugin artifactHandler,
-                                 VersionTagPlugin versionTag,
-                                 bool mustPublish )
+    bool ConcludeInitialization( IActivityMonitor monitor, ArtifactHandlerPlugin artifactHandler )
     {
         bool success = true;
         var publishableStatus = PublishableStatus.AlreadyPublished;
@@ -218,22 +223,28 @@ public sealed partial class Roadmap
         foreach( var s in _orderedSolutions )
         {
             success &= s.ConcludeInitialization( monitor, artifactHandler, ref idxBuildNumber, ref publishableStatus );
+            if( s.PublishableStatus is PublishableStatus.Build or PublishableStatus.PublishRequired )
+            {
+                _directPublishCount++;
+            }
         }
         _publishable = publishableStatus;
         return success;
     }
 
-    internal Task<BuildResult[]?> BuildAsync( IActivityMonitor monitor,
-                                              CKliEnv context,
-                                              BuildPlugin buildPlugin,
-                                              bool? runTest,
-                                              int maxDop,
-                                              CancellationToken cancellation )
+    internal async Task<BuildResult[]?> BuildAsync( IActivityMonitor monitor,
+                                                    CKliEnv context,
+                                                    BuildPlugin buildPlugin,
+                                                    bool? runTest,
+                                                    int maxDop,
+                                                    CancellationToken cancellation )
     {
+        Throw.DebugAssert( _buildSuccess is null && !_dryRun );
         if( _buildSolutionCount == 0 )
         {
             monitor.Info( ScreenType.CKliScreenTag, "No repositories need to be built." );
-            return Task.FromResult( Array.Empty<BuildResult>() )!;
+            _buildSuccess = true;
+            return [];
         }
         foreach( var s in _orderedSolutions )
         {
@@ -249,11 +260,17 @@ public sealed partial class Roadmap
                             Git repository '{_orderedSolutions.First( s => s.Repo.GitStatus.IsDirty ).Repo.DisplayPath.Path}' is dirty.
                             Changes must be committed first.
                             """ );
-                return Task.FromResult( (BuildResult[]?)null );
+                _buildSuccess = false;
+                return null;
             }
         }
         var builder = new BuildPlugin.RoadmapExecutor( buildPlugin, context, this, runTest, maxDop, cancellation );
-        return builder.BuildAsync( monitor );
+        var result = await builder.BuildAsync( monitor );
+        if( result != null )
+        {
+            _buildSuccess = true;
+        }
+        return result;
     }
 
     internal struct RStats( int repositoryCount,
@@ -261,7 +278,10 @@ public sealed partial class Roadmap
                             bool hasPivots,
                             int pivotsCount,
                             bool isPullBuild,
-                            bool isPublish )
+                            bool isPublish,
+                            PublishableStatus publishableStatus,
+                            int directPublishCount,
+                            IEnumerable<BuildSolution> buildingPending )
     {
         IRenderable? _uDepHead;
         IRenderable? _cDepHead;
@@ -276,17 +296,29 @@ public sealed partial class Roadmap
 
         readonly string Action => isPublish ? "publish" : "build";
 
-        public IRenderable Render( ScreenType screen )
+        public readonly IRenderable Render( ScreenType screen )
         {
             Throw.DebugAssert( (_uDepHead != null) == (UDepUpdates > 0) );
             Throw.DebugAssert( (_cDepHead != null) == (CDepUpdates > 0) );
             Throw.DebugAssert( (_dDepHead != null) == (DDepUpdates > 0) );
+
             IRenderable r;
             if( buildSolutionCount == 0 )
             {
-                r = hasPivots
-                    ? screen.Text( $"There is nothing to build from the {pivotsCount} pivots out of {repositoryCount} repositories." )
-                    : screen.Text( $"There is nothing to build across the {repositoryCount} repositories." );
+                var pub = publishableStatus switch
+                {
+                    PublishableStatus.AlreadyPublished => "and nothing to publish",
+                    PublishableStatus.PublishRequired or PublishableStatus.Build => $"but {directPublishCount} can be published",
+                    PublishableStatus.IndirectPublishRequired => "(publishing requires publications from other branches)",
+                    _ /*PublishableStatus.BuildingPending*/ => "(unable to publish as at least one pending build exist)"
+                };
+
+                r = screen.Text( hasPivots
+                                 ? pivotsCount > 1
+                                   ? $"There is nothing to build from the {pivotsCount} pivots out of {repositoryCount} repositories {pub}."
+                                   : $"There is nothing to build from the single pivot out of {repositoryCount} repositories {pub}."
+                                 : $"There is nothing to build across the {repositoryCount} repositories {pub}." );
+
                 if( !isPullBuild && hasPivots )
                 {
                     r = r.AddBelow( screen.Text( $"(Using '*{Action}' may detect required builds in upstreams repositories.)", TextEffect.Italic ) );
@@ -294,9 +326,19 @@ public sealed partial class Roadmap
             }
             else
             {
-                r = hasPivots
-                        ? screen.Text( $"Required build for {buildSolutionCount} from the {pivotsCount} pivots out of {repositoryCount} repositories." )
-                        : screen.Text( $"Required build for {buildSolutionCount} repositories across the {repositoryCount} repositories." );
+                var pub = publishableStatus switch
+                {
+                    PublishableStatus.AlreadyPublished => "and nothing to publish",
+                    PublishableStatus.PublishRequired or PublishableStatus.Build => $"and {directPublishCount} can be published",
+                    PublishableStatus.IndirectPublishRequired => "(publishing requires publications from other branches)",
+                    _ /*PublishableStatus.BuildingPending*/ => "(unable to publish as at least one pending build exist)"
+                };
+
+                r = screen.Text( hasPivots
+                                 ? pivotsCount > 1
+                                    ? $"Required build for {buildSolutionCount} from the {pivotsCount} pivots out of {repositoryCount} repositories {pub}."
+                                    : $"Required build for {buildSolutionCount} from the single pivot out of {repositoryCount} repositories {pub}."
+                                 : $"Required build for {buildSolutionCount} repositories across the {repositoryCount} repositories {pub}." );
                 if( _uDepHead == null && _cDepHead == null && _dDepHead == null )
                 {
                     r = r.AddBelow( screen.Text( $"(No dependency updates other than the ones from the upstreams are needed.)", TextEffect.Italic ) );
@@ -316,6 +358,11 @@ public sealed partial class Roadmap
                         r = r.AddBelow( _dDepHead.AddRight( screen.Text( $"{DDepUpdates} updates to fix external dependencies discrepancies." ) ) );
                     }
                 }
+            }
+
+            if( isPublish && publishableStatus is PublishableStatus.BuildingPending )
+            {
+                r = r.AddBelow( screen.Text( $"⚠ Publish blocked by unsuccessful build: '{buildingPending.Select( s => $"{s.Repo.DisplayPath}/v{s.LastBuild.Version}" ).Concatenate("', '")}'.", foreColor: ConsoleColor.Red ) );
             }
             return r;
         }
@@ -343,7 +390,10 @@ public sealed partial class Roadmap
                                 _graph.HasPivots,
                                 _pivots.Length,
                                 _isPullBuild,
-                                _mustPublish );
+                                _mustPublish,
+                                _publishable,
+                                _directPublishCount,
+                                _buildSolutions.Where( s => s.PublishableStatus == PublishableStatus.BuildingPending ) );
         var renderables = ImmutableArray.CreateBuilder<IRenderable>( _orderedSolutions.Length );
 
         var indexAndRank = new BuildIndexAndRankDisplayState( screen,

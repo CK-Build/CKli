@@ -25,11 +25,6 @@ public sealed partial class Roadmap
         int _buildNumber;
         PublishableStatus _publishable;
 
-        [Obsolete]
-        BuildContentInfo? _lastBuildToPublish;
-        [Obsolete]
-        bool _mustPublish;
-
         internal BuildSolution( Roadmap roadmap, HotGraph.Solution solution, HotGraph.SolutionVersionInfo versionInfo )
         {
             _roadmap = roadmap;
@@ -178,7 +173,7 @@ public sealed partial class Roadmap
                     //  _roadmap._ciBuildMode == CIBuildMode.CIForce && !canSkip => vTarget is CI and if ci.0 then it is the TagCommit.CI0Version.
                     //
                     Throw.DebugAssert( !(_roadmap._ciBuildMode == CIBuildMode.CIForce && !canSkip)
-                                        || (vTarget.CINumber > 0 || (vTarget.CINumber == 0 && vTarget == _lastBuild.TagCommit.CI0Version)) );
+                                        || (vTarget.CINumber > 0 || (vTarget.CINumber == 0 && ReferenceEquals( vTarget, _lastBuild.TagCommit.CI0Version ))) );
 
                     // We compute the version change not for us (this solution will not be built) but for
                     // the downstream solutions to correctly propagate the change level (here it may be None).
@@ -340,7 +335,14 @@ public sealed partial class Roadmap
                     }
                     else if( _buildInfo.TargetVersion.IsBuilding() )
                     {
-                        _publishable = PublishableStatus.BuildingPending;
+                        if( Solution.IsPivotUpstream || !_roadmap._graph.BranchName.Match( _buildInfo.TargetVersion ) )
+                        {
+                            _publishable = PublishableStatus.BuildingPending;
+                        }
+                        else
+                        {
+                            _publishable = PublishableStatus.PublishRequired;
+                        }
                     }
                     else 
                     {
@@ -350,50 +352,8 @@ public sealed partial class Roadmap
 
                 if( publishable < _publishable )
                 {
-                    _publishable = publishable;
+                    publishable = _publishable;
                 }
-            }
-
-            // Obsolete.
-            if( MustBuild )
-            {
-                //Throw.DebugAssert( _buildNumber == 0 && idxBuildNumber >= 1 );
-                //_buildNumber = idxBuildNumber++;
-                _mustPublish = true;
-                ++_roadmap._publishSolutionCount;
-            }
-            else
-            {
-                // The CurrentVersion may already be published (not "local/" anymore).
-                // If the CurrentVersion (that is the last built version) is "local/", we must publish it (it comes from a
-                // previous build) but only if this version is from the "theoretical branch name".
-                //
-                // But, in order to publish it, its artifacts must be locally available... If not, we must rebuild this version (and
-                // eventually publish it).
-                // This is an unusual situation as this version should be available somewhere!
-                // First idea was to consider that this must be fixed here (and without the "upstream pivot condition"):
-                // even if this happens in an upstream of a Pivot, we must trigger the build of this solution.
-                // However, this looks more like an issue that can be detected at the VersionTagInfo level (when "ckli issue" is
-                // executed - not preemptively?) AND it is a weird state (should barely happen), so we error here and ask the
-                // user to use "maintenance rebuild version".
-                // This avoid the "_mustPublish" to appear in the Initialize step and scopes it only here in the ConcludeInitialization step.
-                //
-                _mustPublish = CurrentVersion.IsBuildingOrLocal() && _roadmap.Graph.BranchName.Match( CurrentVersion );
-                if( _mustPublish )
-                {
-                    _lastBuildToPublish = _lastBuild.TagCommit.BuildContentInfo;
-                    Throw.DebugAssert( "Because CurrentVersion cannot be a +fake (MustBuild would be true).", _lastBuildToPublish != null ); 
-                    if( !artifactHandler.HasAllArtifacts( monitor, _solution.Repo, CurrentVersion, _lastBuildToPublish, out _ ) )
-                    {
-                        monitor.Error( $"""
-                                Repository '{Repo.DisplayPath}' must be published in existing version '{CurrentVersion}' but this version misses local artifacts.
-                                Use "maintenance rebuild version" to rebuild it.
-                                """ );
-                        return false;
-                    }
-                    ++_roadmap._publishSolutionCount;
-                }
-                Throw.DebugAssert( _buildNumber == 0 );
             }
 
             return true;
@@ -424,9 +384,6 @@ public sealed partial class Roadmap
         /// </summary>
         public SVersion BaseVersion => _versionInfo.BaseBuild.Version;
 
-        [Obsolete( "Use LastBuild" )]
-        public SVersion CurrentVersion => _lastBuild.TagCommit.Version;
-
         /// <summary>
         /// Gets the <see cref="HotGraph.SolutionVersionInfo.LastBuiltVersion"/>.
         /// </summary>
@@ -443,30 +400,6 @@ public sealed partial class Roadmap
         /// </summary>
         [MemberNotNullWhen( true, nameof( BuildInfo ), nameof( _buildInfo ) )]
         public bool MustBuild => _buildInfo != null && _buildInfo.MustBuild;
-
-        /// <summary>
-        /// Gets whether this solution should be published:
-        /// <see cref="MustBuild"/> is true (the <see cref="BuildInfo.TargetVersion"/> must be published) or
-        /// the <see cref="CurrentVersion"/> is a "local/" one that is on the "theoretical branch name" <see cref="HotGraph.BranchName"/>.
-        /// </summary>
-        public bool MustPublish => _mustPublish;
-
-        /// <summary>
-        /// Gets the version and content that must be published. This MUST be called only if <see cref="MustPublish"/> is
-        /// true and after a successful <see cref="Roadmap.BuildAsync"/>.
-        /// </summary>
-        /// <returns>The version and content to publish.</returns>
-        [Obsolete("Will be replaced by PublishInfo.")]
-        public (SVersion Version, Tag Tag, BuildContentInfo Content) GetFinalPublishInfo()
-        {
-            Throw.CheckState( MustPublish );
-            Throw.CheckState( "A successful build must have been done before.", !MustBuild || BuildInfo.BuildResult != null );
-
-            Throw.DebugAssert( MustBuild || _lastBuildToPublish != null );
-            return MustBuild
-                    ? (BuildInfo.BuildResult!.Version, BuildInfo.BuildResult!.VersionTag, BuildInfo.BuildResult!.Content)
-                    : (CurrentVersion, _lastBuild.TagCommit.Tag, _lastBuildToPublish!);
-        }
 
         /// <summary>
         /// Gets the 1-based build number in the order of the <see cref="HotGraph.Solution.OrderedIndex"/>.
@@ -577,9 +510,9 @@ public sealed partial class Roadmap
         /// </summary>
         /// <returns>A readable string.</returns>
         public override string ToString() => _buildInfo == null
-                                                ? $"{_solution} [out of scope]"
+                                                ? _solution.ToString()
                                                 : _buildInfo.MustBuild
-                                                    ? $"{_solution} [{CurrentVersion} => {_buildInfo.TargetVersion}]"
+                                                    ? $"{_solution} [{_lastBuild.Version} => {_buildInfo.TargetVersion}]"
                                                     : $"{_solution} [no build]";
     }
 }

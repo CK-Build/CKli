@@ -102,10 +102,10 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                     {h}
                     """ );
             }
-            if( CSVersionKindExtensions.TryParse( name, out _, StringComparison.Ordinal ) )
+            if( CSVersionKindExtensions.TryParse( name, out var kind, StringComparison.Ordinal ) && kind != CSVersionKind.Stable )
             {
                 throw new CKException( $"""
-                    Invalid root branch name in BranchModel MainLine configuration: '{name}' must not be one of the prerelease name.
+                    Invalid root branch name in BranchModel MainLine configuration: '{name}' must not be one of the prerelease name nor 'explo'.
                     It is typically 'stable' or 'main'.
                     """ );
             }

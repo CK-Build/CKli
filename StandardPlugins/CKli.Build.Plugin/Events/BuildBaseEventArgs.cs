@@ -18,6 +18,7 @@ public abstract class BuildBaseEventArgs : WorldEventArgs
     {
         _shouldPublish = shouldPublish;
         _buildDate = DateTime.UtcNow;
+        _success = true;
     }
 
     /// <summary>
