@@ -19,7 +19,7 @@ public sealed partial class VSSolutionSamplePlugin : PrimaryRepoPlugin<VSSolutio
         World.Events.Issue += OnIssue;
     }
 
-    void OnIssue( IssueEvent e )
+    void OnIssue( IssueEventArgs e )
     {
         foreach( var r in e.Repos )
         {

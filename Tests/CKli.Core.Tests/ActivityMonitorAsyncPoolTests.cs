@@ -123,7 +123,7 @@ public class ActivityMonitorAsyncPoolTests
         var success = await pool.ParallelAsync( Enumerable.Range( 0, total ),
                                                 ( monitor, value, cancellation ) =>
                                                 {
-                                                    Thread.Sleep( 100 );
+                                                    Thread.Sleep( 200 );
                                                     if( cancellation.IsCancellationRequested )
                                                     {
                                                         canceled.Add( value );
