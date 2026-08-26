@@ -39,20 +39,38 @@ If you installed CKli globally, you can run `ckli` in any command prompt to star
 ## The basics: Stack-World-Repo
 
 A World is a set of Git repositories. The set is described by a simple XML file that lists the
-repositories and can organizes them in a folder structure:
+repositories, organizes them in a folder structure and provides plugin configurations.
+Below is the CKli default world definition file (there is no folder structure here):
 ```xml
-<CK-Build>
-  <Repository Url="https://github.com/CK-Build/CSemVer-Net" />
-  <Repository Url="https://github.com/CK-Build/SGV-Net" />
-  <Folder Name="Cake">
-    <Repository Url="https://github.com/CK-Build/CodeCake" />
-  </Folder>
-</CK-Build>
+<CKli MinCKliVersion="0.10.0--ci.28">
+  <Plugins CompileMode="Debug">
+    <ArtifactHandler>
+      <NuGet>
+        <Feed Name="NuGet" Url="https://api.nuget.org/v3/index.json" PushQualityFilter="[papa,]">
+          <PushCredentials SecretKey="NUGET_ORG_PUSH_API_KEY" />
+        </Feed>
+        <Feed Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json">
+          <PushCredentials SecretKey="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+        </Feed>
+      </NuGet>
+    </ArtifactHandler>
+    <BranchModel />
+    <Build />
+    <CommonFiles />
+    <HotZone />
+    <Migration />
+    <Publish />
+    <ShallowSolution />
+    <VersionTag />
+  </Plugins>
+  <Repository Url="https://github.com/CK-Build/CKli" />
+  <Repository Url="https://github.com/CK-Build/CK-SVersion" />
+</CKli>
 ```
 This definition file is stored in the `main` branch of a Stack repository:
 
 ```
-ckli clone https://github.com/CK-Build/CK-Build-Stack
+ckli clone https://github.com/CK-Build/CKli-Stack
 ```
 
 A Stack contain at least one World: the default World that is the _current version of the Stack_.
@@ -371,24 +389,17 @@ As usual, this modification will be "published" when `push` (typically with `--s
 There are 2 possible approaches to develop and test CKli itself.
 
 ## Temporarily replaces the currently installed CKli tool.
-```bash
-# 1. Build and pack
-dotnet build CKli.sln -c Debug
-dotnet pack CKli/CKli.csproj -c Debug
 
-# 2. Install as global tool (uninstall first if already installed)
-dotnet tool uninstall -g CKli
-dotnet tool install -g CKli --source ./CKli/bin/Debug --version 0.0.0-0
+The [CompileAndInstallLocalCKli.ps1](CompileAndInstallLocalCKli.ps1) script fully rebuilds
+`CK-SVersion` and `CKLi` and installs the tool in the `0.0.0-0` version.
 
-# 3. Test your changes...
-ckli --help
-ckli log
-# 3bis. ..or enter debug mode before the command handling:
-ckli clone https://github.com/acme-corp/My-Stack --ckli-debug
+```powershell
+.\CompileAndInstallLocalCKli.ps1
+```
 
-# 4. When done, reinstall from NuGet
-dotnet tool uninstall -g CKli
-dotnet tool install -g CKli
+When done, reinstall the current version (here the latest prerelease if it exists) from NuGet:
+```powershell
+ckli update
 ```
 
 ## Using an independent context (thanks to launchSettings.json).

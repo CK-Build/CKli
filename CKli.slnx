@@ -2,6 +2,7 @@
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path=".gitignore" />
+    <File Path="CompileAndInstallLocalCKli.ps1" />
     <File Path="Directory.Build.props" />
     <File Path="global.json" />
     <File Path="nuget.config" />

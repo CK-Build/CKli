@@ -41,7 +41,7 @@ A local registry at `%LocalAppData%/CKli/StackRepositoryRegistry.v0.txt` tracks 
 
 A `StackRepository` instance is the entry point of the API. There are only 2 ways to obtain a `StackRepository`:
 - Calling `TryOpenFromPath`, `OpenFromPath`, `TryOpenWorldFromPath` or `OpenWorldFromPath` from any local path.
-- Calling `Clone` from the remote Uri of the stack.
+- Calling `CloneAsync` from the remote Uri of the stack.
 
 Once cloned, the folder contains the definition file of the default World and any number of LTS worlds, the plugins (source and
 compiled form), a `$Local` and `Logs` folders.
@@ -56,7 +56,7 @@ StackRoot/
 │   ├── Logs/               ← Per-stack log output.
 │   ├── CK-Build.xml        ← Default World definition file. Contains the repositories and the plugins configuration.
 │   ├── CK-Build@net8.xml   ← A LTS World definition file.
-│   └── .gitignore          ← Ignores $Local and Logs folders.
+│   └── .gitignore          ← Ignores $Local, Logs, .vs/, .idea/, and the generated CompiledPlugins.cs file.
 └── ... (cloned repositories)
 ```
 
@@ -81,7 +81,8 @@ The file lists repositories, can organize them into folders and contains configu
 </CK-Build>
 ```
 
-A Stack always has a **default World** (the current version). Long Term Support (LTS) Worlds can be derived from it (e.g. `CK-Build@net8`). World names follow the pattern `StackName[@ltsName]`.
+A Stack always has a **default World** (the current version). Long Term Support (LTS) Worlds can be derived from it (e.g. `CK-Build@net8`).
+World names follow the pattern `StackName[@ltsName]`.
 
 The `World` type is the primary type of the CKli API and the most complex one because it handles the plugins life cycle (loading, compiling, unloading).
 
@@ -98,19 +99,19 @@ Interactions with the Git repository itself is done through the  [`GitRepository
 wrapper around the LibGit2Sharp's `Repository` instance.
 
 The `GitRepository` provides numerous helpers that unifies the work with the LibGit2Sharp API (that can be complex)
-and provides validations, normalizations and access control thanks to the `GitRepositoryKey` that separates read and write credentials
-(with `ToPublicAccessKey()` / `ToPrivateAccessKey()` to switch modes).
+and provides validations, normalizations and access control thanks to the `GitRepositoryKey` that separates read and write credentials.
+Its `AccessKey` (an `IGitRepositoryAccessKey`) exposes `ToPublicAccessKey()` / `ToPrivateAccessKey()` to switch modes.
 
 Access to private repositories (or to be able to push to public ones) uses Personal Access Tokens (PATs) resolved at runtime through `ISecretsStore`:
 
 ```csharp
 public interface ISecretsStore
 {
-    string? TryGetRequiredSecret(IActivityMonitor monitor, string[] keys);
+    string? TryGetRequiredSecret(IActivityMonitor monitor, IEnumerable<string> keys);
 }
 ```
 
-The default implementation (`DotNetUserSecretsStore`) uses the standard .NET user secrets mechanism. PAT key names follow the convention `PREFIX_<org>_PAT` (e.g. `GITHUB_CK_BUILD_PAT`)
+The default implementation (`DotNetUserSecretsStore`) uses the standard .NET user secrets mechanism. PAT key names follow the convention `{Prefix}_READ_PAT` / `{Prefix}_WRITE_PAT` (e.g. `GITHUB_CK-Build_READ_PAT`)
 but this is eventually under control of the `GitHostingProvider`.
 
 ---
@@ -125,9 +126,13 @@ Task<HostedRepositoryInfo?> CreateRepositoryAsync(...)
 Task<bool> DeleteRepositoryAsync(...)
 Task<bool> ArchiveRepositoryAsync(...)
 Task<string?> CreateDraftReleaseAsync(...)
-Task AddReleaseAssetAsync(...)
-Task FinalizeReleaseAsync(...)
+Task<bool> AddReleaseAssetAsync(...)
+Task<bool> FinalizeReleaseAsync(...)
 ```
+
+HTTP-based providers extend `HttpGitHostingProvider`, which handles authentication, per-request `HttpClient` lifecycle, and retry hooks via `OnSendHookAsync`.
+
+`HostedRepositoryInfo` (sealed record) carries: `RepoPath`, `Exists`, `IsPrivate`, `IsArchived`, `Description`, `CloneUrl`, `WebUrl`, `CreatedAt`, `UpdatedAt`.
 
 Built-in providers:
 
@@ -137,10 +142,6 @@ Built-in providers:
 | GitLab (cloud + self-hosted) | `GitLabProvider` | |
 | Gitea | `GiteaProvider` | |
 | Local filesystem | `FileSystemProvider` | For bare repos; used in tests |
-
-HTTP-based providers extend `HttpGitHostingProvider`, which handles authentication, per-request `HttpClient` lifecycle, and retry hooks via `OnSendHookAsync`.
-
-`HostedRepositoryInfo` (sealed record) carries: `RepoPath`, `Exists`, `IsPrivate`, `IsArchived`, `Description`, `CloneUrl`, `WebUrl`, `CreatedAt`, `UpdatedAt`.
 
 ---
 
@@ -159,7 +160,7 @@ A Plugin has a `PluginStatus` that can be `Available`, `DisabledByConfiguration`
 | Class | Role |
 |---|---|
 | `PluginBase` | Basic plugins receives `World` reference. Plugin types that only specialize this type are only instantiated if used by a `PrimaryPluginBase` plugin. |
-| `PrimaryPluginBase` | Specialized `PluginBale` that receives a `PrimaryPluginContext`: these plugins are always instantiated. |
+| `PrimaryPluginBase` | Specialized `PluginBase` that receives a `PrimaryPluginContext`: these plugins are always instantiated. |
 | `PrimaryRepoPlugin<T>` | Base type for primary plugins that create and cache per-`Repo` typed information (`T : RepoInfo`). |
 | `RepoPluginBase<T>` | Base type for basic plugins that create and cache per-`Repo` typed information. |
 
@@ -210,13 +211,19 @@ that describes and implements a CKli command:
 ```csharp
 public abstract class Command
 {
-    public abstract string CommandPath { get; }
-    public abstract string Description { get; }
+    protected Command( string commandPath, string description, ... ) { ... }
+
+    public string CommandPath { get; }
+    public string Description { get; }
     // Arguments, Options, Flags, InteractiveMode...
-    public abstract Task<bool> HandleCommandAsync(IActivityMonitor, CKliEnv, CommandLineArguments);
+    internal protected abstract ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
+                                                                      CKliEnv context,
+                                                                      CommandLineArguments arguments,
+                                                                      CancellationToken scopeAlive );
 }
 ```
-This abstract class is only used from inside CKli.Core to implement the intrinsic commands. Non intrinsic commands are implemented by Plugins as
+`CommandPath` and `Description` are set once through the constructor rather than being abstract members, and `HandleCommandAsync` also receives a `CancellationToken`
+that tracks the current interruptible scope (see `InterruptibleScope`). This abstract class is only used from inside CKli.Core to implement the intrinsic commands. Non intrinsic commands are implemented by Plugins as
 `[CommandPath( "..." )]` decorated methods and the `Command` instance is either dynamic (when reflection is used) or is code generated as
 an adapter on the command method.
 
@@ -245,40 +252,46 @@ and allows command implementation to be as complex as required regarding paramet
 A `[Description( "..." )]` attribute can decorate the method and the parameters.
 A `[OptionName("<names>")]` can override the snake-case parameter name computed by default and add short forms (see below: `[OptionName("--dry-run, -d")]`).
 
+These two examples are taken from actual Plugins in this ecosystem (`CKli.BranchModel.Plugin` and `CKli.Build.Plugin`):
+
 ```csharp
 [Description( "Switch the working folder to the given branch." )]
-[CommandPath( "checkout" )]
-public bool Checkout( IActivityMonitor monitor,
-                      CKliEnv context,
-                      [Description( "Branch name to checkout." )]
-                      string branchName,
-                      [Description( "Creates the branch if it doesn't exist." )]
-                      bool create = false,
-                      [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
-                      bool all = false )
+[CommandPath( "branch switch" )]
+public bool BranchSwitch( IActivityMonitor monitor,
+                          CKliEnv context,
+                          [Description( "Branch name to checkout." )]
+                          string branch,
+                          [Description( "Create and synchronize the branch if it doesn't exist, instead of switching to the closest existing one." )]
+                          [OptionName("--create,-c")]
+                          bool create = false,
+                          [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
+                          bool all = false )
 {
     // ...
 }
 
 [Description( "Build-Test-Package the consumers of the current repositories, propagates packages to their consumers and publishes all the artifacts." )]
 [CommandPath( "*publish" )]
-public Task<bool> StarPublish( IActivityMonitor monitor,
+public Task<bool> StarPublishAsync( IActivityMonitor monitor,
                                 CKliEnv context,
                                 [Description( "Specify the branch to consider. By default, the current head is considered when in a Repo." )]
                                 [OptionName( "--branch,-b" )]
                                 string? branch = null,
                                 [Description( "Maximal Degree of Parallelism. Defaults to 4." )]
                                 string? maxDop = null,
-                                [Description( "Publish all the Repos, not only the ones that consume or produce the current repositories." )]
-                                bool all = false,
+                                [Description( "Consider CI builds (prerelease tags) as buildable versions." )]
+                                [OptionName( "--ci" )]
+                                bool ci = false,
+                                [Description( "Force a new CI build even if the last one already covers the current commit." )]
+                                bool ciForce = false,
+                                [Description( "Skip running tests altogether." )]
+                                bool skipTests = false,
                                 [Description( "Run tests even if they have already run successfully on the commit." )]
                                 bool forceTests = false,
-                                [Description( "Don't publish the generated packages and asset files." )]
-                                [OptionName("--no-publish")]
-                                bool noPublish = false,
                                 [Description( "Only display the build roadmap." )]
                                 [OptionName("--dry-run, -d")]
-                                bool dryRun = false )
+                                bool dryRun = false,
+                                bool all = false )
 {
     // ...
 }
