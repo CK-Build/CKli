@@ -9,6 +9,8 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/StandardPlugins/">
+    <File Path="StandardPlugins/Fix-Workflow.md" />
+    <File Path="StandardPlugins/HotZone-Workflow.md" />
     <Project Path="StandardPlugins/CKli.ArtifactHandler.Plugin/CKli.ArtifactHandler.Plugin.csproj" />
     <Project Path="StandardPlugins/CKli.BranchModel.Plugin/CKli.BranchModel.Plugin.csproj" />
     <Project Path="StandardPlugins/CKli.Build.Plugin/CKli.Build.Plugin.csproj" />

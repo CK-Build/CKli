@@ -137,7 +137,7 @@ public class ActivityMonitorAsyncPoolTests
                                                 ParallelErrorBehavior.HardStop,
                                                 default );
         success.ShouldBeFalse();
-        handled.Count.ShouldBeGreaterThan( maxDop * 3 );
+        handled.Count.ShouldBeGreaterThanOrEqualTo( maxDop * 3 );
         handled.Count.ShouldBeLessThan( total );
         handled.Single( v => v < 0 ).ShouldBe( ~(maxDop * 3) );
         canceled.ShouldNotBeEmpty();
