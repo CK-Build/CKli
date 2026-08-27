@@ -16,9 +16,9 @@
   <PropertyGroup>
     <PackageReadmeFile>Package.md</PackageReadmeFile>
   </PropertyGroup>
-  <ItemGroup>
-    <None Include="docs\Package.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
+  <!-- The actual inclusion of Doc\Package.md (conditioned on IsPackable) is in Directory.Build.targets:
+       IsPackable is not yet resolved at this point (Directory.Build.props is imported before the
+       csproj body and the Sdk sets its default), so the condition has to live in the .targets file. -->
   <!--</Doc>-->
 
   <!--<ReproducibleBuilds>:https://github.com/dotnet/reproducible-builds. SourceLink is automatically managed by this package.-->
@@ -43,7 +43,7 @@
 
   <!--<StandardProperties>-->
   <PropertyGroup>
-    <ProductName>CKomposable</ProductName>
+    <ProductName>CK</ProductName>
     <Company>Signature Code</Company>
     <Authors>Signature Code</Authors>
     <Copyright>Copyright Signature-Code 2007-$([System.DateTime]::UtcNow.ToString("yyyy"))</Copyright>

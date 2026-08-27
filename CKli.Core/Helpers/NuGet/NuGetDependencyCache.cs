@@ -16,8 +16,8 @@ namespace CKli.Core;
 /// </summary>
 public sealed class NuGetDependencyCache
 {
-    readonly HashSet<PackageInstance.WithDependencies> _cache;
-    readonly HashSet<PackageInstance.WithDependencies>.AlternateLookup<(string, SVersion)> _altLookup;
+    readonly HashSet<NuGetPackageInstance> _cache;
+    readonly HashSet<NuGetPackageInstance>.AlternateLookup<(string, SVersion)> _altLookup;
     readonly List<MissingLink> _missingLinks;
     readonly HashSet<PackageInstance> _missingDeps;
 
@@ -28,19 +28,19 @@ public sealed class NuGetDependencyCache
         IgnoreWhitespace = true
     };
 
-    sealed class Comp : IEqualityComparer<PackageInstance.WithDependencies>, IAlternateEqualityComparer<(string, SVersion), PackageInstance.WithDependencies>
+    sealed class Comp : IEqualityComparer<NuGetPackageInstance>, IAlternateEqualityComparer<(string, SVersion), NuGetPackageInstance>
     {
         public readonly static Comp Instance = new Comp();
 
-        public bool Equals( PackageInstance.WithDependencies? x, PackageInstance.WithDependencies? y ) => x == y;
+        public bool Equals( NuGetPackageInstance? x, NuGetPackageInstance? y ) => x == y;
 
-        public int GetHashCode( [DisallowNull] PackageInstance.WithDependencies obj ) => obj.GetHashCode();
+        public int GetHashCode( [DisallowNull] NuGetPackageInstance obj ) => obj.GetHashCode();
 
         public int GetHashCode( (string, SVersion) a ) => HashCode.Combine( StringComparer.OrdinalIgnoreCase.GetHashCode( a.Item1 ), a.Item2.GetHashCode() );
 
-        public bool Equals( (string, SVersion) a, PackageInstance.WithDependencies o ) => StringComparer.OrdinalIgnoreCase.Equals( o.PackageId, a.Item1 ) && o.Version == a.Item2;
+        public bool Equals( (string, SVersion) a, NuGetPackageInstance o ) => StringComparer.OrdinalIgnoreCase.Equals( o.PackageId, a.Item1 ) && o.Version == a.Item2;
 
-        public PackageInstance.WithDependencies Create( (string, SVersion) alternate ) => throw new System.NotSupportedException();
+        public NuGetPackageInstance Create( (string, SVersion) alternate ) => throw new System.NotSupportedException();
 
     }
 
@@ -49,15 +49,15 @@ public sealed class NuGetDependencyCache
     /// </summary>
     /// <param name="From">The source of the reference.</param>
     /// <param name="TargetFramework">The target framework of the dependency.</param>
-    /// <param name="Missing">The missing package. It appears in the From's <see cref="PackageInstance.WithDependencies.Dependencies"/>.</param>
-    public sealed record MissingLink( PackageInstance.WithDependencies From, string TargetFramework, PackageInstance.WithDependencies Missing );
+    /// <param name="Missing">The missing package. It appears in the From's <see cref="NuGetPackageInstance.Dependencies"/>.</param>
+    public sealed record MissingLink( NuGetPackageInstance From, string TargetFramework, NuGetPackageInstance Missing );
 
     /// <summary>
     /// Initializes a new empty cache.
     /// </summary>
     public NuGetDependencyCache()
     {
-        _cache = new HashSet<PackageInstance.WithDependencies>( Comp.Instance );
+        _cache = new HashSet<NuGetPackageInstance>( Comp.Instance );
         _altLookup = _cache.GetAlternateLookup<(string, SVersion)>();
         _missingLinks = new List<MissingLink>();
         _missingDeps = new HashSet<PackageInstance>();
@@ -74,7 +74,7 @@ public sealed class NuGetDependencyCache
     public IReadOnlySet<PackageInstance> Missing => _missingDeps;
 
     /// <summary>
-    /// Gets a <see cref="PackageInstance.WithDependencies"/> or returns false and logs an error.
+    /// Gets a <see cref="NuGetPackageInstance"/> or returns false and logs an error.
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="packageId">The package identifier. Lookup is case insensitive.</param>
@@ -84,7 +84,7 @@ public sealed class NuGetDependencyCache
     public bool GetRequired( IActivityMonitor monitor,
                              string packageId,
                              SVersion version,
-                             [NotNullWhen( true )] out PackageInstance.WithDependencies? package )
+                             [NotNullWhen( true )] out NuGetPackageInstance? package )
     {
         if( Get( monitor, packageId, version, out package ) )
         {
@@ -95,14 +95,14 @@ public sealed class NuGetDependencyCache
     }
 
     /// <summary>
-    /// Gets a <see cref="PackageInstance.WithDependencies"/> if it exists.
+    /// Gets a <see cref="NuGetPackageInstance"/> if it exists.
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="packageId">The package identifier. Lookup is case insensitive.</param>
     /// <param name="version">The package version.</param>
     /// <param name="package">On success and if found, the package instance with its dependencies. Null otherwise.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool Get( IActivityMonitor monitor, string packageId, SVersion version, out PackageInstance.WithDependencies? package )
+    public bool Get( IActivityMonitor monitor, string packageId, SVersion version, out NuGetPackageInstance? package )
     {
         if( !_altLookup.TryGetValue( (packageId, version), out package ) )
         {
@@ -110,8 +110,8 @@ public sealed class NuGetDependencyCache
             var path = Path.Combine( NuGetHelper.Cache.GetGlobalCachePath( monitor), packageId, version.ToString(), packageId ) + ".nuspec";
             if( File.Exists( path ) )
             {
-                var dependencies = ImmutableArray.CreateBuilder<PackageInstance.WithDependencies>();
-                List<(string TargetFramework, PackageInstance.WithDependencies Missing)>? missingDeps = null;
+                var dependencies = ImmutableArray.CreateBuilder<NuGetPackageInstance>();
+                List<(string TargetFramework, NuGetPackageInstance Missing)>? missingDeps = null;
                 string? actualPackageId;
                 using( var f = File.OpenRead( path ) )
                 using( var r = XmlReader.Create( f, _readerSettings ) )
@@ -122,7 +122,7 @@ public sealed class NuGetDependencyCache
                         return false;
                     }
                 }
-                package = new PackageInstance.WithDependencies( actualPackageId, version, dependencies.DrainToImmutable() );
+                package = new NuGetPackageInstance( actualPackageId, version, dependencies.DrainToImmutable() );
                 if( missingDeps != null )
                 {
                     foreach( var dep in missingDeps )
@@ -138,8 +138,8 @@ public sealed class NuGetDependencyCache
         string? ReadNuspec( IActivityMonitor monitor,
                             string path,
                             XmlReader r,
-                            ImmutableArray<PackageInstance.WithDependencies>.Builder dependencies,
-                            ref List<(string TargetFramework, PackageInstance.WithDependencies Missing)>? missingDeps )
+                            ImmutableArray<NuGetPackageInstance>.Builder dependencies,
+                            ref List<(string TargetFramework, NuGetPackageInstance Missing)>? missingDeps )
         {
             if( r.MoveToContent() != XmlNodeType.Element
                 || !r.ReadToDescendant( "id" )
@@ -174,7 +174,7 @@ public sealed class NuGetDependencyCache
                         bool isMissing = false;
                         if( dep == null )
                         {
-                            dep = new PackageInstance.WithDependencies( id, v, [] );
+                            dep = new NuGetPackageInstance( id, v, [] );
                             isMissing = true;
                             _missingDeps.Add( dep );
                         }
@@ -184,7 +184,7 @@ public sealed class NuGetDependencyCache
                         }
                         if( isMissing )
                         {
-                            missingDeps ??= new List<(string TargetFramework, PackageInstance.WithDependencies Missing)>();
+                            missingDeps ??= new List<(string TargetFramework, NuGetPackageInstance Missing)>();
                             missingDeps.Add( (targetFramework, dep) );
                         }
                         dependencies.Add( dep );

@@ -72,75 +72,182 @@ public class ActivityMonitorAsyncPoolTests
         (failedCount + successCount).ShouldBe( total );
     }
 
-    [TestCase( 1 )]
+    [TestCase( 2 )]
     [TestCase( 10 )]
-    public async Task parallel_soft_error_Async( int maxDop )
+    public async Task parallel_soft_error_lets_the_running_tasks_finish_Async( int maxDop )
     {
         const int total = 200;
 
-        var handled = new ConcurrentBag<int>();
-        var canceled = new ConcurrentBag<int>();
-        var pool = new ActivityMonitorAsyncPool( maxDop <= 0 ? int.MaxValue : maxDop );
-        // The number maxDop * 3 fails. Others succeed.
-        // In SoftStop we don't cancel the ones that have been started: the canceled bag
-        // must be empty but we must have more handled than maxDop * 3 but far less than total
-        // (for maxDop = 10, we stop at .
+        // This is what SoftStop does that HardStop doesn't: the actions that are ALREADY running
+        // are left alone. They receive the caller's token, not the internal one that ParallelAsync
+        // cancels to stop the pending actions. Observing this requires at least 2 actions to run
+        // concurrently, hence no maxDop = 1 case here (see parallel_soft_error_stops_pending_tasks_Async).
+        //
+        // The choreography is ordered by rendezvous, not by delays (no Thread.Sleep, nothing depends
+        // on the wall clock):
+        //  - The first action entered is the "observer": it captures the token it was given, signals
+        //    that it is inside the action, then waits for the failer to have failed - so it is
+        //    provably still running when the failure occurs.
+        //  - The second one is the "failer": it waits for the observer to be inside the action and
+        //    only then returns false.
+        //
+        // The captured token is asserted AFTER ParallelAsync returned. By then the internal
+        // cancellation has necessarily happened: it is what stopped the pending actions, which the
+        // last assertion checks. So if SoftStop wrongly handed out that internal token, the captured
+        // one would be canceled. No timing is involved in that verdict.
+        using var observerIsInside = new ManualResetEventSlim( false );
+        using var failerHasFailed = new ManualResetEventSlim( false );
+        CancellationToken observerToken = default;
+        int arrival = -1;
+        var entered = new ConcurrentBag<int>();
+
+        var pool = new ActivityMonitorAsyncPool( maxDop );
         var success = await pool.ParallelAsync( Enumerable.Range( 0, total ),
                                                 ( monitor, value, cancellation ) =>
                                                 {
-                                                    Thread.Sleep( 100 );
-                                                    if( cancellation.IsCancellationRequested )
+                                                    entered.Add( value );
+                                                    switch( Interlocked.Increment( ref arrival ) )
                                                     {
-                                                        canceled.Add( value );
-                                                        return false;
+                                                        case 0:
+                                                            observerToken = cancellation;
+                                                            observerIsInside.Set();
+                                                            // Deliberately NOT the cancellation token: this wait must not be
+                                                            // interruptible, this action must outlive the failure.
+                                                            failerHasFailed.Wait( CancellationToken.None );
+                                                            monitor.Info( $"n°{value}: observer." );
+                                                            return true;
+                                                        case 1:
+                                                            observerIsInside.Wait( CancellationToken.None );
+                                                            monitor.Info( $"n°{value}: soft error." );
+                                                            failerHasFailed.Set();
+                                                            return false;
+                                                        default:
+                                                            monitor.Info( $"n°{value}: true." );
+                                                            return true;
                                                     }
-                                                    bool success = value != maxDop * 3;
+                                                },
+                                                ParallelErrorBehavior.SoftStop,
+                                                default );
+        success.ShouldBeFalse();
+        observerToken.IsCancellationRequested.ShouldBeFalse( "SoftStop must not cancel the actions that are already running." );
+        entered.Count.ShouldBeLessThan( total, "The pending actions must not have been started." );
+    }
+
+    [TestCase( 1 )]
+    [TestCase( 2 )]
+    [TestCase( 10 )]
+    public async Task parallel_soft_error_stops_pending_tasks_Async( int maxDop )
+    {
+        const int total = 200;
+
+        // Same as parallel_hard_error_stops_pending_tasks_Async: not starting the pending actions is
+        // the behavior SoftStop and HardStop share. Here too, a few actions may already be racing for
+        // a monitor when the cancellation occurs: the guarantee is that the enumeration stops early,
+        // not that a precise number of actions ran.
+        int arrival = -1;
+        var entered = new ConcurrentBag<int>();
+
+        var pool = new ActivityMonitorAsyncPool( maxDop );
+        var success = await pool.ParallelAsync( Enumerable.Range( 0, total ),
+                                                ( monitor, value, cancellation ) =>
+                                                {
+                                                    entered.Add( value );
+                                                    bool success = Interlocked.Increment( ref arrival ) != 0;
                                                     monitor.Info( $"n°{value}: {success}." );
-                                                    handled.Add( success ? value : ~value );
                                                     return success;
                                                 },
                                                 ParallelErrorBehavior.SoftStop,
                                                 default );
         success.ShouldBeFalse();
-        handled.Count.ShouldBeGreaterThan( maxDop * 3 );
-        handled.Count.ShouldBeLessThan( total );
-        handled.Single( v => v < 0 ).ShouldBe( ~(maxDop * 3) );
-        canceled.ShouldBeEmpty();
+        entered.Count.ShouldBeLessThan( total );
     }
 
-    [TestCase( 1 )]
+    // Failure guard for the choreographed wait below. On success this wait is released by the
+    // cancellation itself, never by this timeout: it only bounds the test if a regression breaks
+    // the cancellation propagation (instead of hanging the test run forever).
+    const int _cancellationGuardMs = 10_000;
+
+    [TestCase( 2 )]
     [TestCase( 10 )]
-    public async Task parallel_hard_error_Async( int maxDop )
+    public async Task parallel_hard_error_cancels_the_running_tasks_Async( int maxDop )
     {
         const int total = 200;
 
-        var handled = new ConcurrentBag<int>();
-        var canceled = new ConcurrentBag<int>();
-        var pool = new ActivityMonitorAsyncPool( maxDop <= 0 ? int.MaxValue : maxDop );
-        // The number maxDop * 3 fails. Others succeed.
-        // In HardStop we cancel the ones that have been started: the canceled bag must NOT be empty
-        // and we must have more handled than maxDop * 3 but less than total.
+        // This is what HardStop does that SoftStop doesn't: the cancellation token handed to the
+        // actions that are ALREADY running gets signaled. Observing it requires at least 2 actions
+        // to run concurrently, hence no maxDop = 1 case here: with a single monitor no action can
+        // ever be running when another one fails (see parallel_hard_error_stops_pending_tasks_Async).
+        //
+        // The choreography below is ordered by rendezvous, not by delays (no Thread.Sleep, nothing
+        // depends on the wall clock on the success path):
+        //  - The first action entered is the "observer": it signals that it is inside the action,
+        //    then waits for its own cancellation token to be signaled.
+        //  - The second one is the "failer": it first waits for the observer to be inside the
+        //    action - so the observer is provably running - and only then returns false.
+        //  - ParallelAsync must react to that failure by canceling, which is what releases the
+        //    observer. If it didn't, the observer would only be released by the guard timeout.
+        using var observerIsInside = new ManualResetEventSlim( false );
+        bool observerSawCancellation = false;
+        int arrival = -1;
+        var entered = new ConcurrentBag<int>();
+
+        var pool = new ActivityMonitorAsyncPool( maxDop );
         var success = await pool.ParallelAsync( Enumerable.Range( 0, total ),
                                                 ( monitor, value, cancellation ) =>
                                                 {
-                                                    Thread.Sleep( 200 );
-                                                    if( cancellation.IsCancellationRequested )
+                                                    entered.Add( value );
+                                                    switch( Interlocked.Increment( ref arrival ) )
                                                     {
-                                                        canceled.Add( value );
-                                                        return false;
+                                                        case 0:
+                                                            observerIsInside.Set();
+                                                            observerSawCancellation = cancellation.WaitHandle.WaitOne( _cancellationGuardMs );
+                                                            monitor.Info( $"n°{value}: observer, canceled: {observerSawCancellation}." );
+                                                            return false;
+                                                        case 1:
+                                                            // Deliberately NOT the cancellation token: this wait must not be
+                                                            // interruptible, the failer has to see the observer running.
+                                                            observerIsInside.Wait( CancellationToken.None );
+                                                            monitor.Info( $"n°{value}: hard error." );
+                                                            return false;
+                                                        default:
+                                                            monitor.Info( $"n°{value}: true." );
+                                                            return true;
                                                     }
-                                                    bool success = value != maxDop * 3;
+                                                },
+                                                ParallelErrorBehavior.HardStop,
+                                                default );
+        success.ShouldBeFalse();
+        observerSawCancellation.ShouldBeTrue( "HardStop must cancel the actions that are already running." );
+        entered.Count.ShouldBeLessThan( total, "The pending actions must not have been started." );
+    }
+
+    [TestCase( 1 )]
+    [TestCase( 2 )]
+    [TestCase( 10 )]
+    public async Task parallel_hard_error_stops_pending_tasks_Async( int maxDop )
+    {
+        const int total = 200;
+
+        // The first action entered fails: whatever the maxDop, the pending actions must not be
+        // started. Note that a few actions may already be racing for a monitor when the
+        // cancellation occurs: the guarantee is that the enumeration stops early, not that a
+        // precise number of actions ran (this is why no exact count is asserted here).
+        int arrival = -1;
+        var entered = new ConcurrentBag<int>();
+
+        var pool = new ActivityMonitorAsyncPool( maxDop );
+        var success = await pool.ParallelAsync( Enumerable.Range( 0, total ),
+                                                ( monitor, value, cancellation ) =>
+                                                {
+                                                    entered.Add( value );
+                                                    bool success = Interlocked.Increment( ref arrival ) != 0;
                                                     monitor.Info( $"n°{value}: {success}." );
-                                                    handled.Add( success ? value : ~value );
                                                     return success;
                                                 },
                                                 ParallelErrorBehavior.HardStop,
                                                 default );
         success.ShouldBeFalse();
-        handled.Count.ShouldBeGreaterThanOrEqualTo( maxDop * 3 );
-        handled.Count.ShouldBeLessThan( total );
-        handled.Single( v => v < 0 ).ShouldBe( ~(maxDop * 3) );
-        canceled.ShouldNotBeEmpty();
+        entered.Count.ShouldBeLessThan( total );
     }
 
 }

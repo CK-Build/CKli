@@ -28,5 +28,8 @@
     <None Include="$(Content);Remotes\**;Cloned\**;PackagedPlugins\**" />
     <Compile Remove="Remotes\**;Cloned\**;PackagedPlugins\**" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="PackagedPlugins\CKli.CommandSample.Plugin\docs\" />
+  </ItemGroup>
 
 </Project>
