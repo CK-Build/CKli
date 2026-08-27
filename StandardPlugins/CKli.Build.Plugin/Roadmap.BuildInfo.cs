@@ -83,9 +83,14 @@ public sealed partial class Roadmap
         }
 
         /// <summary>
-        /// Gets the solution.
+        /// Gets the build solution.
         /// </summary>
         public BuildSolution Solution => _solution;
+
+        /// <summary>
+        /// Gets the <see cref="HotGraph"/> version related information.
+        /// </summary>
+        public HotGraph.SolutionVersionInfo VersionInfo => _solution.VersionInfo;
 
         /// <summary>
         /// Gets whether this solution must be built.

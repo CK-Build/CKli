@@ -193,6 +193,8 @@ public sealed partial class Roadmap
                                                 packageUpdates.Updates,
                                                 packageUpdates.Configuration,
                                                 packageUpdates.Discrepancies );
+                    Throw.DebugAssert( "A package can only depend on a package produced on the same branch or one of its ancestors (BranchName.HasChild).",
+                                        CheckDependencyBranches( monitor, vTarget, directRequirements ) );
                     return true;
                 }
             }
@@ -244,6 +246,8 @@ public sealed partial class Roadmap
                                         packageUpdates.Updates,
                                         packageUpdates.Configuration,
                                         packageUpdates.Discrepancies );
+            Throw.DebugAssert( "A package can only depend on a package produced on the same branch or one of its ancestors (BranchName.HasChild).",
+                                CheckDependencyBranches( monitor, targetVersion, directRequirements ) );
             _roadmap._buildSolutionCount++;
             return true;
 
@@ -271,6 +275,36 @@ public sealed partial class Roadmap
                     buildReason |= MustBuildReason.CI0;
                 }
             }
+        }
+
+        /// <summary>
+        /// Checks that every direct requirement's produced version is on the same branch as
+        /// <paramref name="version"/> or on one of its ancestor branches (<see cref="BranchName.HasChild"/>):
+        /// a package can never depend on a package produced on a "hotter" (more specific) branch than its own.
+        /// This is guaranteed by construction of the Roadmap (see <see cref="MustBuildReason.UpstreamBuild"/>
+        /// and <see cref="MustBuildReason.UpstreamVersion"/> propagation), this is a Debug-only safety net.
+        /// </summary>
+        bool CheckDependencyBranches( IActivityMonitor monitor, SVersion version, BuildSolution[] requirements )
+        {
+            var ns = _solution.BranchInfo.Namespace;
+            var branch = ns.Find( version );
+            if( branch == null ) return true;
+            bool success = true;
+            foreach( var r in requirements )
+            {
+                var reqVersion = r.BuildInfo!.TargetVersion;
+                var reqBranch = ns.Find( reqVersion );
+                if( reqBranch != null && reqBranch != branch && !reqBranch.HasChild( branch ) )
+                {
+                    monitor.Error( $"""
+                        Branch invariant violated: '{_solution}' produces version '{version}' on branch '{branch}' but
+                        depends on '{r._solution}' version '{reqVersion}' on branch '{reqBranch}', which is neither
+                        '{branch}' nor one of its ancestors.
+                        """ );
+                    success = false;
+                }
+            }
+            return success;
         }
 
         bool InitializeUpstreams( IActivityMonitor monitor,
@@ -375,7 +409,7 @@ public sealed partial class Roadmap
         public HotGraph.Solution Solution => _solution;
 
         /// <summary>
-        /// Gets the version related information.
+        /// Gets the <see cref="HotGraph"/> version related information.
         /// </summary>
         public HotGraph.SolutionVersionInfo VersionInfo => _versionInfo;
 

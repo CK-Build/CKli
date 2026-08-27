@@ -111,7 +111,7 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
             }
             result.Add( (new string( name ), CSVersionKind.Stable, BranchLinkType.None) );
 
-            CSVersionKind prevKind = CSVersionKind.None;
+            CSVersionKind prevKind = CSVersionKind.Stable;
             while( h.SkipWhiteSpaces() && h.Length > 0 )
             {
                 BranchLinkType linkType = BranchLinkType.CI;
@@ -133,12 +133,13 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                         {h}
                         """ );
                 }
-                if( prevKind >= csKind )
+                if( prevKind <= csKind )
                 {
                     throw new CKException( $"""
                         Invalid prelease ordering in BranchModel MainLine configuration: '{prevKind.ToBranchName()}' must appear before '{csKind.ToBranchName()}'.
                         """ );
                 }
+                prevKind = csKind;
                 result.Add( (csKind.ToBranchName(), csKind, linkType) );
             }
             return result;

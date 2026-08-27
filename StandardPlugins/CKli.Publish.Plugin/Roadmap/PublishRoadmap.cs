@@ -3,6 +3,7 @@ using CKli.ArtifactHandler.Plugin;
 using CKli.Build.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
+using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -79,8 +80,7 @@ sealed partial class PublishRoadmap
     }
 
     internal async Task<bool> PublishAsync( IActivityMonitor monitor,
-                                            PackageSender packageSender,
-                                            ArtifactHandlerPlugin artifactHandler,
+                                            RoadmapPublisher publisher,
                                             CancellationToken cancellation )
     {
         Throw.DebugAssert( CanPublish );
@@ -92,8 +92,17 @@ sealed partial class PublishRoadmap
         {
             return true;
         }
-        var directPublisher = DirectPublisher.Create( monitor, _roadmap );
-        return await directPublisher.PublishAsync( monitor, packageSender, artifactHandler, cancellation ).ConfigureAwait( false );
+
+        foreach( var s in _roadmap.OrderedSolutions )
+        {
+            // Now that any required already built versions are published, we can publish the "current" one.
+            if( s.PublishableStatus is PublishableStatus.Build or PublishableStatus.PublishRequired
+                && !await publisher.PublishAsync( monitor, s, cancellation ).ConfigureAwait( false ) )
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     PublishRoadmap( Roadmap roadmap,

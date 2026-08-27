@@ -134,6 +134,11 @@ public sealed partial class HotGraph
         public GitSolution GitSolution => _solution.GitSolution;
 
         /// <summary>
+        /// Gets the repository HotZone information.
+        /// </summary>
+        public VersionTagInfo.HotZoneInfo HotZone => _info.HotZone!;
+
+        /// <summary>
         /// Gets the version info of the <see cref="Repo"/>.
         /// </summary>
         public VersionTagInfo VersionTagInfo => _info;

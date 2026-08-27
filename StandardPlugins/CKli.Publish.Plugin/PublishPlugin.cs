@@ -72,38 +72,44 @@ public sealed class PublishPlugin : PrimaryPluginBase
                                               ImmutableArray<BuildResult> results,
                                               CancellationToken cancel )
         {
-
-            var publisher = DirectPublisher.Create( fixWorkflow, results );
-
             var packageSender = PackageSender.Create( monitor, artifactHandler, branchModel, world.StackRepository.SecretsStore );
             if( packageSender == null ) return false;
 
-            if( await publisher.PublishAsync( monitor, packageSender, artifactHandler, cancel ).ConfigureAwait( false ) )
+            var publisher = new FixPublisher( packageSender, artifactHandler );
+
+            for( int i = 0; i < results.Length; i++ )
             {
-                if( !ciBuild )
+                var result = results[i];
+                var branchName = fixWorkflow.Targets[i].BranchName;
+                if( !await publisher.PublishAsync( monitor, result.Repo, branchName, result.Version, result.VersionTag, result.Content, cancel ).ConfigureAwait( false ) )
                 {
-                    // Instead of complicating the SimplePublisher with this capability that makes sense
-                    // only for successful non-CI fix publish, we implement this here as a post-operation:
-                    // intermediate publications (halted on error) always keep the already pushed remote
-                    // branches. Only the very last successful fix publish applies this default behavior.
-                    if( !keepBranchOnSuccessfulPublish )
+                    return false;
+                }
+            }
+            world.StackRepository.PushChanges( monitor );
+
+            if( !ciBuild )
+            {
+                // Instead of complicating FixPublisher with this capability that makes sense
+                // only for successful non-CI fix publish, we implement this here as a post-operation:
+                // intermediate publications (halted on error) always keep the already pushed remote
+                // branches. Only the very last successful fix publish applies this default behavior.
+                if( !keepBranchOnSuccessfulPublish )
+                {
+                    // We ignore any errors here (they are only logged).
+                    for( int i = 0; i < results.Length; i++ )
                     {
-                        // We ignore any errors here (they are only logged).
-                        foreach( var p in publisher.Repos )
+                        var r = results[i].Repo.GitRepository;
+                        var b = r.Repository.Branches[fixWorkflow.Targets[i].BranchName];
+                        if( b != null )
                         {
-                            var r = p.Repo.GitRepository;
-                            var b = r.Repository.Branches[p.BranchName];
-                            if( b != null )
-                            {
-                                r.DeleteBranch( monitor, b, DeleteGitBranchMode.WithTrackedAndRemoteBranch );
-                            }
+                            r.DeleteBranch( monitor, b, DeleteGitBranchMode.WithTrackedAndRemoteBranch );
                         }
                     }
-                    FixWorkflow.DeleteCurrent( monitor, world );
                 }
-                return true;
+                FixWorkflow.DeleteCurrent( monitor, world );
             }
-            return false;
+            return true;
         }
     }
 
@@ -123,9 +129,14 @@ public sealed class PublishPlugin : PrimaryPluginBase
                     if( !roadmap.DryRun )
                     {
                         var packageSender = PackageSender.Create( monitor, _artifactHandler, _branchModel, e.Context.SecretsStore );
-                        if( packageSender == null || !await publish.PublishAsync( e.Monitor, packageSender, _artifactHandler, cancellation ).ConfigureAwait( false ) )
+                        var roadmapPublisher = packageSender == null ? null : new RoadmapPublisher( packageSender, _artifactHandler, _branchModel );
+                        if( roadmapPublisher == null || !await publish.PublishAsync( e.Monitor, roadmapPublisher, cancellation ).ConfigureAwait( false ) )
                         {
                             e.SetFailed();
+                        }
+                        else
+                        {
+                            World.StackRepository.PushChanges( monitor );
                         }
                     }
                 }
