@@ -196,7 +196,7 @@ public sealed partial class ContentIssueEventArgs
         {
             Throw.DebugAssert( AutoCount > 0 );
             var h = r.ScreenType.Text( "Branch:" ).Box( marginRight: 1 )
-                                .AddRight( r.ScreenType.Text( _branch.BranchName.Name ).Box( foreColor: ConsoleColor.Magenta, marginRight: 1 ) )
+                                .AddRight( r.ScreenType.Text( _gitContentBranch.FriendlyName ).Box( foreColor: ConsoleColor.Magenta, marginRight: 1 ) )
                                 .AddRight( r.ScreenType.Text( AutoCount == 1 ? "(1 content issue)" : $"({AutoCount} content issues)" ) );
             if( _deleteFiles != null )
             {

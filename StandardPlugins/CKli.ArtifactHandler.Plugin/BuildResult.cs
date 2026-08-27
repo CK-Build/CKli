@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 
 namespace CKli.ArtifactHandler.Plugin;
 
@@ -196,8 +197,103 @@ public sealed partial class BuildResult
             packages = [];
             return false;
         }
-        return PackageInstance.ReadConsumedPackages( monitor, stdOut.ToString(), buildInfo, out packages );
+        return ReadConsumedPackages( monitor, stdOut.ToString(), buildInfo, out packages );
     }
+
+    /// <summary>
+    /// Parses the result of a "dotnet package list" call.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="jsonPackageList">The json string to parse.</param>
+    /// <param name="buildInfo">Any object: its ToString() method will be used for error and warning logs.</param>
+    /// <param name="packages">The consumed package instances.</param>
+    /// <returns>True on success, false on error.</returns>
+    public static bool ReadConsumedPackages( IActivityMonitor monitor,
+                                             string jsonPackageList,
+                                             object buildInfo,
+                                             out ImmutableArray<PackageInstance> packages )
+    {
+        try
+        {
+            using var d = JsonDocument.Parse( jsonPackageList );
+            if( !ReadProblems( monitor, buildInfo, d ) )
+            {
+                packages = [];
+                return false;
+            }
+            packages = ReadPackages( d );
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While reading Package list for '{buildInfo}'.", ex );
+            packages = [];
+            return false;
+        }
+
+        static bool ReadProblems( IActivityMonitor monitor, object buildInfo, JsonDocument d )
+        {
+            bool hasWarning = false;
+            if( d.RootElement.TryGetProperty( "problems"u8, out var problems ) )
+            {
+                foreach( var p in problems.EnumerateArray() )
+                {
+                    if( p.GetProperty( "level"u8 ).GetString() == "error" )
+                    {
+                        monitor.Error( $"Package list for '{buildInfo}' has errors. See logs." );
+                        return false;
+                    }
+                    else
+                    {
+                        hasWarning = true;
+                    }
+                }
+            }
+            if( hasWarning )
+            {
+                monitor.Warn( $"Package list for '{buildInfo}' has warnings. See logs." );
+            }
+            return true;
+        }
+
+        static ImmutableArray<PackageInstance> ReadPackages( JsonDocument d )
+        {
+            var result = new SortedSet<PackageInstance>();
+            if( d.RootElement.TryGetProperty( "projects"u8, out var projects ) )
+            {
+                foreach( var p in projects.EnumerateArray() )
+                {
+                    if( p.TryGetProperty( "frameworks"u8, out var frameworks ) )
+                    {
+                        foreach( var f in frameworks.EnumerateArray() )
+                        {
+                            if( f.TryGetProperty( "topLevelPackages"u8, out var topLevelPackages ) )
+                            {
+                                foreach( var package in topLevelPackages.EnumerateArray() )
+                                {
+                                    string? packageId;
+                                    if( !package.TryGetProperty( "id"u8, out var eId )
+                                        || string.IsNullOrWhiteSpace( packageId = eId.GetString() ) )
+                                    {
+                                        Throw.InvalidDataException( $"Missing, null or empty 'topLevelPackages.id' property." );
+                                    }
+                                    else
+                                    {
+                                        result.Add( new PackageInstance( packageId,
+                                                                         SVersion.Parse( package.GetProperty( "resolvedVersion"u8 ).GetString() ) ) );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return result.ToImmutableArray();
+        }
+
+    }
+
+
 }
 
 

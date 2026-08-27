@@ -52,7 +52,7 @@ public sealed partial class ContentIssueEventArgs : WorldEventArgs
     /// <summary>
     /// Gets the content of the <see cref="Branch"/> from <see cref="GitContentBranch"/>.
     /// </summary>
-    public INormalizedFileProvider Content => _content ??= _shallowSolution.GetFiles( GitContentBranch.Tip, useWorkingFolder: false );
+    public INormalizedFileProvider Content => _content ??= _shallowSolution.GetFiles( GitContentBranch.Tip, useWorkingFolder: true );
 
     /// <summary>
     /// Gets the <see cref="GitSolution"/> from the <see cref="GitContentBranch"/> if the ".slnx" exists
