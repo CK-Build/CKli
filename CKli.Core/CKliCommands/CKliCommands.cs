@@ -117,7 +117,7 @@ public static class CKliCommands
         using var interruptibleScope = InterruptibleScope.Create();
         if( interruptibleScope == null ) return false;
 
-        monitor.Info( $"Executing '{cmdLine.InitialAsStringArguments}'." );
+        monitor.Info( $"Executing 'ckli {cmdLine.InitialAsStringArguments}'." );
         context.OnStartCommandHandling();
 
         // Honor the "ckli i" if specified.
