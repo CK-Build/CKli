@@ -1,9 +1,11 @@
 using CKli.VersionTag.Plugin;
+using System;
 
 namespace CKli.Publish.Plugin;
 
 sealed partial class PublishRoadmap
 {
+    [Obsolete("Superseded by PublishedPackageInfo.")]
     /// <summary>
     /// Captures a required publication: the <see cref="Origin"/> is a "local/" <see cref="Build.Plugin.Roadmap.BuildSolution.LastBuild"/>
     /// - not on the <see cref="HotGraph.BranchName"/> - or the <see cref="Build.Plugin.Roadmap.BuildInfo.TargetVersion"/> and

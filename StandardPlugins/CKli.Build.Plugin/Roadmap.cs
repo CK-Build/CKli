@@ -4,7 +4,6 @@ using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -319,6 +318,13 @@ public sealed partial class Roadmap
                                    : $"There is nothing to build from the single pivot out of {repositoryCount} repositories {pub}."
                                  : $"There is nothing to build across the {repositoryCount} repositories {pub}." );
 
+                // Nothing is built: no 'C' nor 'D' update can exist (they always trigger a build) but skipped
+                // solutions may have pending 'U' updates.
+                Throw.DebugAssert( _cDepHead == null && _dDepHead == null );
+                if( _uDepHead != null )
+                {
+                    r = r.AddBelow( _uDepHead.AddRight( screen.Text( $"{UDepUpdates} update{(UDepUpdates > 1 ? "s" : "")} from upstreams left pending in skipped repositories." ) ) );
+                }
                 if( !isPullBuild && hasPivots )
                 {
                     r = r.AddBelow( screen.Text( $"(Using '*{Action}' may detect required builds in upstreams repositories.)", TextEffect.Italic ) );
@@ -347,15 +353,15 @@ public sealed partial class Roadmap
                 {
                     if( _uDepHead != null )
                     {
-                        r = r.AddBelow( _uDepHead.AddRight( screen.Text( $"{UDepUpdates} updates from upstreams (not using '*{Action}' here)." ) ) );
+                        r = r.AddBelow( _uDepHead.AddRight( screen.Text( $"{UDepUpdates} update{(UDepUpdates > 1 ? "s" : "")} from upstreams." ) ) );
                     }
                     if( _cDepHead != null )
                     {
-                        r = r.AddBelow( _cDepHead.AddRight( screen.Text( $"{CDepUpdates} updates from <VersionTag> plugin configuration." ) ) );
+                        r = r.AddBelow( _cDepHead.AddRight( screen.Text( $"{CDepUpdates} update{(CDepUpdates > 1 ? "s" : "")} from <VersionTag> plugin configuration." ) ) );
                     }
                     if( _dDepHead != null )
                     {
-                        r = r.AddBelow( _dDepHead.AddRight( screen.Text( $"{DDepUpdates} updates to fix external dependencies discrepancies." ) ) );
+                        r = r.AddBelow( _dDepHead.AddRight( screen.Text( $"{DDepUpdates} update{(DDepUpdates > 1 ? "s" : "")} to fix external dependencies discrepancies." ) ) );
                     }
                 }
             }

@@ -152,14 +152,21 @@ public sealed partial class Roadmap
                 }
                 if( buildReason == MustBuildReason.None )
                 {
-                    // 
+                    // This solution is skipped and its only pending updates are 'U' ones: its sources reference packages
+                    // produced by this World in versions that have been superseded.
+                    // This is not an error: since this solution is not built, nothing it produces enters this build and the
+                    // build outcome is unaffected. The updates are kept in the BuildInfo below (and rendered) so that the
+                    // pending misalignment is visible: building this solution (or using a '*build') will align its sources.
                     if( packageUpdates.Updates != null )
                     {
-                        monitor.Error( $"""
-                            '{_solution}' should not be built but requires dependency updates ({packageUpdates.Updates}).
-                            This situation should not happen and reflects a bad repository topology or weird manual modifications that should be fixed manually.
+                        Throw.DebugAssert( "Otherwise UpdateSkippableBuildReason would have turned the 'U' updates into a DependencyUpdate reason.",
+                                            canSkip );
+                        // PackageMapper.ToString() ends each mapping with a new line: it must come last (trimmed).
+                        monitor.Warn( $"""
+                            '{_solution}' is skipped but its sources require dependency updates.
+                            Nothing it produces enters this build. Build it explicitly (or use a '*build') to align its sources.
+                            {packageUpdates.Updates.ToString().TrimEnd()}
                             """ );
-                        return false;
                     }
                     // The version target is the last built one.
                     var vTarget = _lastBuild.Version;
@@ -436,6 +443,20 @@ public sealed partial class Roadmap
         public bool MustBuild => _buildInfo != null && _buildInfo.MustBuild;
 
         /// <summary>
+        /// Gets whether this solution is not built but its sources reference packages produced by this World in
+        /// versions that have been superseded: these <see cref="BuildInfo.UUpdates"/> are left pending by this
+        /// roadmap and only a build of this solution can align them.
+        /// <para>
+        /// This can only be true for a skipped solution: a non-pivot solution of a "build"/"publish" roadmap that
+        /// has pivots. A "*build"/"*publish" (or an "--all"/stack root roadmap, where no solution is a pivot) never
+        /// skips anything, so such pending updates always become a <see cref="MustBuildReason.DependencyUpdate"/>
+        /// there. 'C' and 'D' updates always trigger a build: only 'U' ones can be left pending.
+        /// </para>
+        /// </summary>
+        [MemberNotNullWhen( true, nameof( BuildInfo ), nameof( _buildInfo ) )]
+        public bool HasPendingUpdates => _buildInfo != null && !_buildInfo.MustBuild && _buildInfo.UUpdates != null;
+
+        /// <summary>
         /// Gets the 1-based build number in the order of the <see cref="HotGraph.Solution.OrderedIndex"/>.
         /// 0 when <see cref="MustBuild"/> is false.
         /// </summary>
@@ -477,6 +498,10 @@ public sealed partial class Roadmap
                 {
                     var sCurrentVersion = currentVersion.IsBuildingOrLocal() ? $"⏚/v{currentVersion}" : $"v{currentVersion}";
                     r = r.AddRight( head.Screen.Text( sCurrentVersion, currentVersion.IsBuildingOrLocal() ? ConsoleColor.Blue : ConsoleColor.DarkBlue ) );
+                    if( HasPendingUpdates )
+                    {
+                        r = r.AddRight( _buildInfo.RenderPendingUpdates( head.Screen, ref stats ).Box( marginLeft: 1 ) );
+                    }
                 }
             }
             else

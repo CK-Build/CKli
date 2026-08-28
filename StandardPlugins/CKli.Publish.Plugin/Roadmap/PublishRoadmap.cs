@@ -11,6 +11,7 @@ using System.Linq;
 using System.Runtime.InteropServices.Marshalling;
 using System.Threading;
 using System.Threading.Tasks;
+using static CKli.Publish.Plugin.PublishedPackageInfo;
 
 namespace CKli.Publish.Plugin;
 
@@ -117,8 +118,42 @@ sealed partial class PublishRoadmap
         _requiredPublications = requiredPublishes;
     }
 
+    sealed class PublishedProfileBuilder
+    {
+        readonly Dictionary<string, PublishedPackageInfo> _profile;
+        int _conflictCount;
+
+        public PublishedProfileBuilder()
+        {
+            _profile = new Dictionary<string, PublishedPackageInfo>();
+        }
+
+        public int ConflictCount => _conflictCount;
+
+        public bool Add( string packageId, SVersion version, Reason reason )
+        {
+            if( _profile.TryGetValue( packageId, out var already ) )
+            {
+                if( !already.Add( version, reason ) )
+                {
+                    ++_conflictCount;
+                    return false;
+                }
+                return true;
+            }
+            _profile.Add( packageId, new PublishedPackageInfo( packageId, version, reason ) );
+            return true;
+        }
+    }
+
     internal static PublishRoadmap? Create( IActivityMonitor monitor, Roadmap roadmap, VersionTagPlugin versionTag )
     {
+        var profile = new PublishedProfileBuilder();
+        foreach( var s in roadmap.OrderedSolutions )
+        {
+            
+        }
+
         // These are warnings.
         List<RequiredPublish>? alreadyPublished = null;
         // These are errors.

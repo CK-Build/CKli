@@ -83,7 +83,7 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     public bool IsOrHasFakeVersion => _version.HasFakeMetadata || _fakeVersion != null;
 
     /// <summary>
-    /// Gets whether this version is a "building" or "local/" one.
+    /// Gets whether this version is a "building/" or "local/" one.
     /// </summary>
     public bool IsBuildingOrLocal => _version.IsBuildingOrLocal();
 

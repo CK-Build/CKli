@@ -65,8 +65,14 @@ public sealed partial class Roadmap
 
             Throw.DebugAssert( "Currently the version can never be a +fake (the +fake is not skippable).", !_targetVersion.HasFakeMetadata );
 
-            Throw.DebugAssert( "Any dependency updates appear in the BuildReason.",
-                                (uUpdates != null || cUpdates != null || dUpdates != null) == ((_buildReason & MustBuildReason.DependencyUpdate) != 0) );
+            // A skipped solution (out of the pivots scope) keeps its pending 'U' updates without any build reason:
+            // its sources reference packages produced by this World in superseded versions but since it is not built,
+            // nothing it produces enters the build. 'C' and 'D' updates always trigger a build: they can only appear
+            // along with the DependencyUpdate reason.
+            Throw.DebugAssert( "Any dependency updates appear in the BuildReason (except the 'U' ones of a skipped solution).",
+                                _buildReason == MustBuildReason.None
+                                    ? cUpdates == null && dUpdates == null
+                                    : (uUpdates != null || cUpdates != null || dUpdates != null) == ((_buildReason & MustBuildReason.DependencyUpdate) != 0) );
 
             Throw.DebugAssert( "When we must build then version changes at least the Patch.",
                                 buildReason == MustBuildReason.None || versionChange >= SVersionChange.Patch );
@@ -206,6 +212,23 @@ public sealed partial class Roadmap
                 stats.DDepUpdates += _dUpdates.Count;
             }
             return r;
+        }
+
+        /// <summary>
+        /// Renders the 'U' updates that this roadmap leaves pending: this solution is not built but its sources reference
+        /// packages produced by this World in versions that have been superseded. There is no build reason to render here,
+        /// only the pending updates.
+        /// <para>
+        /// Must be called only when <see cref="BuildSolution.HasPendingUpdates"/> is true.
+        /// </para>
+        /// </summary>
+        internal IRenderable RenderPendingUpdates( ScreenType screen, ref RStats stats )
+        {
+            Throw.DebugAssert( _solution.HasPendingUpdates );
+            Throw.DebugAssert( "'C' and 'D' updates always trigger a build.", _cUpdates == null && _dUpdates == null );
+            Throw.DebugAssert( _uUpdates != null );
+            stats.UDepUpdates += _uUpdates.Count;
+            return stats.GetUDepHead( screen ).AddRight( screen.Text( _uUpdates.ToString(), ConsoleColor.DarkGray ) );
         }
 
 

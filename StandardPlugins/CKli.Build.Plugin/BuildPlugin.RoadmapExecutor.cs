@@ -364,12 +364,6 @@ public sealed partial class BuildPlugin
                         // canAmend == a new merge commit has been created. 
                         canAmend = buildBranch.GitBranch.Tip.Sha != before;
                     }
-                    // This is too risky to do this here: this is done by the Publish plugin only
-                    // when everything went right.
-                    //  // Whether the "dev/" branch exists or not, IF a git push occurs, then remove
-                    //  // the remote branch.
-                    //  gitRepository.DeferredPushRefSpecs.Add( $":refs/heads/{buildBranch.BranchName.DevName}" );
-
                     workingBranch = buildBranch.GitBranch;
                 }
                 if( !gitRepository.Checkout( monitor, workingBranch ) )
