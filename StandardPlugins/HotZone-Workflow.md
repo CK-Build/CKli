@@ -184,6 +184,15 @@ branch of the version about to be produced must equal, or be a descendant of, th
 dependency's version. It only runs in Debug builds and exists as a safety net against a regression in
 the mechanisms above — it does not implement the guarantee itself.
 
+At publication time, `CKli.Publish.Plugin`'s **publication gate** checks the version-level
+strengthening of this invariant: not merely that a package depends on a comparable, cooler-or-equal
+branch, but that it depends on exactly the version the branch's profile offers. That check runs
+before anything is pushed, which makes it preventive where the mechanisms above are self-healing.
+It is per branch, and only the branch being published is gated: a publication on a cooler branch
+necessarily invalidates the profiles of the hotter ones — they still reference the version it
+supersedes — and those heal through their own next build, by (2bis). See
+[`CKli.Publish.Plugin/README.md`](CKli.Publish.Plugin/README.md).
+
 ## How this relates to the Fix Workflow
 
 This workflow owns "the current hot zone" — anything at or ahead of the last published stable version,

@@ -28,7 +28,6 @@ public sealed partial class HotGraph
     readonly BranchName _branchName;
     readonly IReadOnlyList<Repo> _allRepos;
     readonly IReadOnlyList<Repo> _pivots;
-    readonly VersionTagPlugin _versionTags;
     readonly IReadOnlyDictionary<string, SVersion> _externalPackages;
     readonly ShallowSolutionPlugin _shallowSolution;
     readonly DevSolutionCollection _devSolutions;
@@ -61,7 +60,6 @@ public sealed partial class HotGraph
     internal HotGraph( BranchName branchName,
                        IReadOnlyList<Repo> allRepos,
                        IReadOnlyList<Repo> pivots,
-                       VersionTagPlugin versionTags,
                        ShallowSolutionPlugin shallowSolution,
                        IReadOnlyDictionary<string, SVersion> externalPackages )
     {
@@ -70,7 +68,6 @@ public sealed partial class HotGraph
         _branchName = branchName;
         _allRepos = allRepos;
         _pivots = pivots;
-        _versionTags = versionTags;
         _shallowSolution = shallowSolution;
         _externalPackages = externalPackages;
         _devSolutions = new DevSolutionCollection( this );

@@ -29,8 +29,8 @@ namespace CKli.Build.Plugin;
 public enum PublishableStatus
 {
     /// <summary>
-    /// Not relevant: the <see cref="Roadmap.BuildSolution"/> is not in the scope of the <see cref="Roadmap.Pivots"/>.
-    /// <see cref="Roadmap.BuildSolution.BuildInfo"/> is null.
+    /// Not computed yet: the initial value, before <see cref="Roadmap.BuildSolution.ConcludeInitialization"/> ran.
+    /// Every solution of an initialized roadmap has a greater status.
     /// </summary>
     None = 0,
 

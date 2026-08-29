@@ -8,7 +8,7 @@ It is a *service* plugin: unlike most Standard Plugins, it exposes no `[CommandP
 |---|---|
 | `CKli.Build.Plugin` (`RepoBuilder`, `RepositoryBuilderPlugin`) | After a repository build, calls `PublishToNuGetLocalFeed` and `PublishGeneratedAssets` to move the produced `.nupkg`s and `Deployment/Assets` files into the local feed/assets folders. |
 | `CKli.VersionTag.Plugin` | Reads/writes the `BuildContentInfo` text form to/from version tag annotations, calls `HasAllArtifacts` to decide whether a tagged version needs rebuilding, and `DestroyLocalRelease` when a release is deprecated. |
-| `CKli.Publish.Plugin` (`PackageSender`, `DirectPublisher`) | Reads `GetConfiguredNuGetFeeds` to know where and with which credentials to push packages, reads assets via `GetAssetsFolder`, and calls `DestroyLocalRelease` once a release has been fully published. |
+| `CKli.Publish.Plugin` (`PackageSender`, `BasePublisher`) | Reads `GetConfiguredNuGetFeeds` to know where and with which credentials to push packages, reads assets via `GetAssetsFolder`, and calls `DestroyLocalRelease` once a release has been fully published. |
 
 So while `CKli.VersionTag.Plugin` owns the release/tag lifecycle and `CKli.Publish.Plugin` owns pushing to remote feeds/releases, `CKli.ArtifactHandler.Plugin` is the shared layer underneath both (and under `CKli.Build.Plugin`) that owns the local artifact storage and the NuGet feed configuration.
 

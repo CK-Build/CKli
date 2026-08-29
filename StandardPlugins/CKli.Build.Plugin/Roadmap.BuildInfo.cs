@@ -1,4 +1,4 @@
-using CK.Core;
+﻿using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
@@ -19,8 +19,7 @@ public sealed partial class Roadmap
     /// <summary>
     /// Detailed build related status associated of a <see cref="BuildSolution"/> in a <see cref="Roadmap"/>.
     /// <para>
-    /// Available on <see cref="BuildSolution.BuildInfo"/> when the solution belongs to the pivots scope and is
-    /// not ignored. 
+    /// Available on <see cref="BuildSolution.BuildInfo"/> for every solution of an initialized roadmap.
     /// </para>
     /// <para>
     /// After a successful build and if <see cref="MustBuild"/> is true, then the non null <see cref="BuildResult"/> is available.
@@ -178,7 +177,7 @@ public sealed partial class Roadmap
             if( _directRequirements.Length > 0 )
             {
                 // Checks that all required builds went fine (or return null).
-                var all = _directRequirements.Where( s => s.MustBuild ).Select( s => s.BuildInfo!.BuildAsync( builder ) ).ToArray();
+                var all = _directRequirements.Where( s => s.MustBuild ).Select( s => s.BuildInfo.BuildAsync( builder ) ).ToArray();
                 BuildResult?[] req = await Task.WhenAll( all ).ConfigureAwait( false );
                 foreach( var r in req )
                 {

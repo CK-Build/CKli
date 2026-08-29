@@ -1,4 +1,4 @@
-using CK.Core;
+﻿using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;
 using CKli.Build.Plugin;
@@ -6,7 +6,6 @@ using CKli.Core;
 using LibGit2Sharp;
 using System.Collections.Immutable;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using LogLevel = CK.Core.LogLevel;
 
@@ -38,8 +37,6 @@ sealed class RoadmapPublisher : BasePublisher
     {
         Throw.CheckArgument( solution.PublishableStatus is PublishableStatus.Build or PublishableStatus.PublishRequired );
         Throw.CheckState( "A successful build must have been done before.", !solution.MustBuild || solution.BuildInfo.BuildResult != null );
-
-        Throw.DebugAssert( "Otherwise solution's status wouldn't be PublishableStatus.Build or PublishRequired.", solution.BuildInfo != null );
 
         var buildInfo = solution.BuildInfo;
         

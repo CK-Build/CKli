@@ -5,7 +5,6 @@ using CKli.Build.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.VersionTag.Plugin;
-using System;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
@@ -125,12 +124,27 @@ public sealed class PublishPlugin : PrimaryPluginBase
                 var publish = PublishRoadmap.Create( e.Monitor, roadmap, _versionTag );
                 if( publish != null )
                 {
+                    // Always displays the verdict (this is the only output of a --dry-run). Mirroring how a
+                    // PublishableStatus.BuildingPending roadmap is handled, a --dry-run only reports: it is the real
+                    // publication that fails when the gate is closed.
                     e.Screen.Display( publish.ToRenderable );
                     if( !roadmap.DryRun )
                     {
+                        if( !publish.CanPublish )
+                        {
+                            monitor.Error( $"Unable to publish: the profile of branch '{roadmap.Graph.BranchName}' would be incoherent." );
+                            e.SetFailed();
+                            return;
+                        }
                         var packageSender = PackageSender.Create( monitor, _artifactHandler, _branchModel, e.Context.SecretsStore );
-                        var roadmapPublisher = packageSender == null ? null : new RoadmapPublisher( packageSender, _artifactHandler, _branchModel );
-                        if( roadmapPublisher == null || !await publish.PublishAsync( e.Monitor, roadmapPublisher, cancellation ).ConfigureAwait( false ) )
+                        if( packageSender == null )
+                        {
+                            e.SetFailed();
+                            return;
+                        }
+                        var roadmapPublisher = new RoadmapPublisher( packageSender, _artifactHandler, _branchModel );
+                        var indirectPublisher = new IndirectPublisher( packageSender, _artifactHandler, _branchModel );
+                        if( !await publish.PublishAsync( e.Monitor, roadmapPublisher, indirectPublisher, cancellation ).ConfigureAwait( false ) )
                         {
                             e.SetFailed();
                         }

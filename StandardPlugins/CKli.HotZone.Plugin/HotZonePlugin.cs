@@ -108,7 +108,7 @@ public sealed partial class HotZonePlugin : PrimaryPluginBase
                 var externalPackages = _versionTag.GetPackagesConfiguration( monitor );
                 if( externalPackages == null ) return null;
 
-                var graph = new HotGraph( branchName, allRepos, pivots, _versionTag, _shallowSolution, externalPackages );
+                var graph = new HotGraph( branchName, allRepos, pivots, _shallowSolution, externalPackages );
                 Throw.DebugAssert( graph.HasPivots == hasPivots );
                 // We must start from the pivots, from their "dev/" branch if it exists. From the solution in the "dev/" branch,
                 // we read their produced projects and fill the graph Dictionary<string, Solution> ProducedPackages.

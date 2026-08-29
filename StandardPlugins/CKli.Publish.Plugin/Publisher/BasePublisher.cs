@@ -4,7 +4,6 @@ using CKli.Core;
 using LibGit2Sharp;
 using System;
 using System.Collections.Immutable;
-using System.Reflection.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 using LogLevel = CK.Core.LogLevel;
@@ -137,7 +136,7 @@ abstract class BasePublisher
 
         // Housekeeping: trick here for the tests, we don't cleanup the $Local when testing so that
         // the version a build has produced remains available.
-        if( !CKliRootEnv.DefaultCKliEnv.CurrentDirectory.Path.Contains( "CK/.PublicStack/CK-Plugins/Tests/Plugins.Tests" ) )
+        if( !CKliRootEnv.DefaultCKliEnv.CurrentDirectory.Path.Contains( "/.PublicStack/CK-Plugins/Tests/Plugins.Tests" ) )
         {
             // If the cleanup fails, we still consider this release done.
             _artifactHandler.DestroyLocalRelease( monitor, repo, version, content, removeFromNuGetGlobalCache: false );

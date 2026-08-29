@@ -66,18 +66,22 @@ When `e.ShouldPublish` is true, and the roadmap's `PublishableStatus` is strictl
 `AlreadyPublished` and `BuildingPending` (i.e. there is something publishable and nothing is
 blocking it):
 
-1. `PublishRoadmap.Create(monitor, roadmap, versionTag)` builds a `PublishRoadmap` — computing
-   which solutions require **indirect** publication (see below) — and renders it to the screen.
-2. Unless `roadmap.DryRun` is set, a `PackageSender` is created from the World's configured NuGet
-   feeds, and `PublishRoadmap.PublishAsync` runs the actual publication.
-3. On failure (`packageSender == null` or `PublishAsync` returns `false`), `e.SetFailed()` is
-   called, which fails the owning command.
+1. `PublishRoadmap.Create(monitor, roadmap, versionTag)` computes the **publication gate** (see
+   below) and renders its verdict to the screen.
+2. Unless `roadmap.DryRun` is set: the gate must be open (`publish.CanPublish`), a `PackageSender`
+   is created from the World's configured NuGet feeds, and `PublishRoadmap.PublishAsync` runs the
+   actual publication with a `RoadmapPublisher` and an `IndirectPublisher`.
+3. On failure (closed gate, `packageSender == null`, or `PublishAsync` returning `false`),
+   `e.SetFailed()` is called, which fails the owning command.
+
+A `--dry-run` stops after step 1: it only reports. This mirrors how a `BuildingPending` roadmap is
+handled — the verdict is displayed, and it is the real publication that fails.
 
 #### `OnFixBuildAsync` — `fix build` / `fix publish`
 
-When `e.ShouldPublish` is true, it builds a `DirectPublisher` directly from the `FixWorkflow` and
-its `BuildResult`s (a fix workflow is always a flat list of targets, never a dependency roadmap)
-and runs `PublishAsync`. On success, and only for a non-CI build:
+When `e.ShouldPublish` is true, it builds a `FixPublisher` and publishes each `FixWorkflow` target
+with its `BuildResult` (a fix workflow is always a flat list of targets, never a dependency
+roadmap). On success, and only for a non-CI build:
 
 - Unless `e.KeepBranchOnSuccessfulPublish` is set, every target's local+remote+tracked
   `fix/vMajor.Minor` branch is deleted (`DeleteGitBranchMode.WithTrackedAndRemoteBranch`) — errors
@@ -87,83 +91,96 @@ and runs `PublishAsync`. On success, and only for a non-CI build:
 
 On failure, `e.SetFailed()` is called.
 
-### `PublishRoadmap` — resolving what a `Roadmap` needs to publish
+### `PublishRoadmap` — the gate and the publish loop
 
-`PublishRoadmap` (in `Roadmap/PublishRoadmap.cs`) wraps a built `Roadmap` and classifies its
-publication prerequisites:
+`PublishRoadmap` (in `Roadmap/PublishRoadmap.cs`) wraps a `Roadmap` with its publication gate:
 
 | Member | Meaning |
 |---|---|
-| `CanPublish` | `Status < PublishableStatus.BuildingPending` and no `IndirectBuildingAliens`. |
+| `Gate` (`PublishedProfileBuilder`) | Whether the profile this publication would leave on the roadmap's branch is coherent, and what must happen for it to be. |
+| `CanPublish` | `Status < PublishableStatus.BuildingPending` and `Gate.IsValid`. |
+| `FinalProfile` (`PublishedProfile?`) | The profile this publication offers. Available once `PublishAsync` has run. |
 | `DirectBuildingAliens` / `DirectAlreadyPublished` | Solutions directly blocking (`BuildingPending`) or already done. |
-| `IndirectRequiredPublications` (`ImmutableArray<RequiredPublish>`) | Upstream `local/` repo/versions (outside the current branch) that must be published *before* the roadmap itself, discovered by walking `VersionTagPlugin`'s release-info graph (producers + consumers of each `IndirectPublishRequired` solution). |
-| `IndirectBuildingAliens` / `IndirectAlreadyPublished` | Same walk, but for dependencies that are still `building/` (blocking, error) or already published (unexpected, warning only). |
 
-`RequiredPublish` is a `readonly record struct(RepoReleaseInfo Origin, RepoReleaseInfo Required)`
-with an `IsProducer` helper (`Origin.AllProducers.Contains(Required)`).
+`PublishAsync` runs three steps, and pushes nothing until all of them are satisfied:
 
-`PublishRoadmap.Create` only does this graph walk when
-`roadmap.PublishableStatus == PublishableStatus.IndirectPublishRequired`; otherwise
-`IndirectRequiredPublications` is empty. **`PublishAsync` currently throws
-`NotImplementedException` if any indirect required publications are found** — publishing a
-roadmap whose upstream dependencies are on other branches and not yet published is not yet
-implemented; only the direct case (`roadmap.DirectPublishCount > 0`, i.e. `Build` or
-`PublishRequired` solutions) is handled by delegating to `DirectPublisher.Create(monitor, roadmap)`.
-`ToRenderable` is currently a stub that returns `screen.Unit` (no roadmap summary is actually
-rendered yet).
+1. `Gate.BuildFinalProfile` builds the profile from the real build and tag content. A conflict here
+   aborts the publication.
+2. Every `Gate.RequiredPublications` release is published by the `IndirectPublisher`, producers
+   first.
+3. Every solution whose `PublishableStatus` is `Build` or `PublishRequired` is published by the
+   `RoadmapPublisher`, in `OrderedSolutions` order.
 
-`PublishRepoInfo` (`Roadmap/PublishRepoInfo.cs`) is a thin, seemingly unfinished wrapper around a
-`Roadmap.BuildSolution` exposing only `Repo`; it isn't referenced elsewhere in this plugin.
+### `PublishedProfileBuilder` — the publication gate
 
-### `DirectPublisher` — the actual publish loop
+A World's **published profile** on a branch is the set of packages it offers there: exactly one
+version per package identifier, with every version required by one of them being the one the
+profile offers. `PublishedProfileBuilder` (`Roadmap/PublishedProfileBuilder.cs`) decides whether
+publishing a roadmap would leave that profile coherent.
 
-`DirectPublisher` (partial class split across `DirectPublisher.cs`, `.RepoInfo.cs`, `.Cursor.cs`,
-`.Publish.cs`) is the workhorse: it flattens "what needs publishing" into an ordered, resumable
-sequence of steps and drives them one by one.
+The gate works at the **solution** level. Every package a solution produces carries that solution's
+single version, and a package identifier is produced by exactly one solution
+(`HotGraph.ProducedPackages`), so the version a package is offered in is a function of its producing
+solution — `Roadmap.BuildSolution.TargetVersion`. Package identifiers are only the join key: the
+version a consumer was built against comes from its recorded `BuildContentInfo.Consumed` and is
+mapped back to the solution that produces it.
 
-**Construction.** Two factory methods build the list of `RepoInfo` to publish:
+`Create(monitor, roadmap, versionTag)` runs **before any build**, so a `--dry-run` gets the same
+verdict as a real publication:
 
-- `Create(FixWorkflow fixWorkflow, ImmutableArray<BuildResult> results)` — one `RepoInfo` per
-  fix target, branch name taken from the workflow's targets, no branch-push ref-specs.
-- `Create(IActivityMonitor monitor, Roadmap roadmap)` — one `RepoInfo` per solution whose
-  `PublishableStatus` is `Build` or `PublishRequired`, in `roadmap.OrderedSolutions` order. For
-  each solution it picks the version/tag/content either from the just-completed `BuildResult`
-  (`s.MustBuild`) or from `s.LastBuild` (already built, publish-only), and computes the branch to
-  push and the `BranchPushRefSpecs`:
-  - CI build (`roadmap.IsCIBuild`): pushes the `dev/` branch; if the regular branch has no
-    tracked remote yet (brand-new repo), it also configures and pushes it.
-  - Non-CI build: pushes the regular branch and includes a ref-spec that deletes the remote
-    `dev/` branch (`:refs/heads/dev/...`) that was just integrated.
-
-**`RepoInfo`** (`DirectPublisher.RepoInfo.cs`) carries, per repository: `Repo`, `BranchName`,
-`Index`, `PublishVersion` (`SVersion`), `PublishTag` (`LibGit2Sharp.Tag`), `BuildContentInfo`
-(the produced `.nupkg` names + asset file names), `BranchPushRefSpecs`, and a computed
-`PublishedLength` = `1 (start) + packages + assets + 1 (end)` — the number of logical steps this
-repo contributes.
-
-**`Cursor`** (`DirectPublisher.Cursor.cs`) is an immutable position in the publish sequence, one
-of `BegOfRepo → InPackage[0..n) → InFile[0..m) → EndOfRepo → … → EndOfWorld → EndOfState`. It
-supports `Forward()` (one step) and `Forward(offset)` (many steps at once — used to skip an empty
-package/file range), plus `GetPosition()` for progress reporting. `DirectPublisher.PrimaryCursor`
-holds the live cursor; `ForwardPrimaryCursor` advances it.
-
-**`Publisher` (`DirectPublisher.Publish.cs`)** drives the cursor through a state machine
-(`RunAsync`), one repo at a time:
-
-| Cursor location | Action |
+| Member | Meaning |
 |---|---|
-| `BegOfRepo` | Resolves the `GitHostingProvider` for the repo (`RepositoryKey.TryGetHostingInfo`). If there are no packages to push, creates the release immediately; otherwise defers to `InPackage`. |
-| `InPackage` | `PackageSender.SendAsync` pushes all of `BuildContentInfo.Produced` to the configured feeds, then creates the release. |
-| *(release creation)* | Re-applies the tag locally if the version `IsLocal()` (fake/dirty tag replaced with the final `v{version}` annotated tag), pushes the tag, calls `GitHostingProvider.CreateDraftReleaseAsync`, then pushes the branch (`GitRepository.PushBranch`, `autoCreateRemoteBranch: true`) together with the `DeferredPushRefSpecs`. If the branch push fails, the draft release is deleted (compensation); if the release itself couldn't be created, the pushed tag is removed from `origin` (best-effort compensation, logged if it fails). |
-| `InFile` | For each produced asset file, `GitHostingProvider.AddReleaseAssetsAsync` uploads the assets folder returned by `ArtifactHandlerPlugin.GetAssetsFolder`. |
-| `EndOfRepo` | `GitHostingProvider.FinalizeReleaseAsync` (un-drafts the release), then `ArtifactHandlerPlugin.DestroyLocalRelease` cleans up the local `$Local` copy (skipped under the plugin's own test path, to keep produced versions around for test assertions). |
-| `EndOfWorld` | Logs completion. |
+| `IsValid` | No `Discrepancies`, no `BuildingAliens`, no `MissingArtifacts`. |
+| `Discrepancies` (`ImmutableArray<Discrepancy>`) | `(Consumer, Producer, Required, Offered)`: a solution that is not built recorded a requirement that disagrees with the version its producer will offer. Only solutions that are *not* built can disagree — a built solution has its World references rewritten from the `Roadmap.PackageMapping`, which is that very offer. |
+| `SolutionsToBuild` | The `Discrepancy.Consumer` solutions. Building them realigns their references. |
+| `RequiredPublications` (`ImmutableArray<RepoReleaseInfo>`) | The `local/` releases (built but unpublished, on another branch) that must be published first, discovered by walking `VersionTagPlugin`'s release-info graph from each `IndirectPublishRequired` solution. Ordered producers first. |
+| `BuildingAliens` | `building/` releases found in that closure — a failed or incomplete build, nothing to publish. Blocking. |
+| `MissingArtifacts` | `local/` releases whose artifacts are gone from `$Local` (`RepoReleaseInfo.HasAllLocalArtifacts`): only a rebuild can fix them. Blocking. |
+| `AlreadyPublishedAliens` | Already published releases found in that closure — a previous publication was incomplete. Warning only. |
 
-After the whole cursor reaches `EndOfState`, `RunAsync` finishes by calling
-`World.StackRepository.PushChanges` — publication also pushes whatever the Stack repository
-itself accumulated (World file edits, version-tag bookkeeping, etc.).
+The gate is **per branch**, and only the branch being published is gated: a publication on a cooler
+branch always invalidates the profiles of the hotter ones, which heal through their own next build
+(`MustBuildReason.UpstreamVersion`). Packages this World does not produce are out of scope — their
+alignment belongs to the 'D' discrepancies mapping. This is the version-level counterpart of the
+branch invariant demonstrated in [`HotZone-Workflow.md`](../HotZone-Workflow.md): that invariant
+heals after the fact, and checking the profile before publishing makes it preventive.
 
-Any step returning `null` aborts the whole run and `PublishAsync` returns `false`.
+`ToRenderable` returns the verdict, or null when there is nothing to report.
+
+### `PublishedProfile` — the published profile
+
+`BuildFinalProfile(monitor, roadmap)` builds the profile from the **real** content: `BuildResult`
+for built solutions, version tags for the others. The set of package identifiers a solution produces
+is only known once it has been built, so this is the only place a complete profile exists.
+
+Building it is also the final check: a conflict means the publication would offer two versions of
+one package identifier — which `Roadmap.PackageMapping`, a function of the package identifier,
+cannot express (a single repository consuming the same package identifier in two versions through
+conditional package references across target frameworks, in particular). `PublishedProfile.Builder`
+returns null in that case, so a profile never exists in a conflicting state.
+
+Each entry is a `PublishedPackageInfo : PackageInstance` carrying its `Reason`s
+(`PublishedByRoadmap` / `RequiredBySolution`) and any `Conflicts`.
+
+### The publishers — the actual publish loop
+
+`BasePublisher` (`Publisher/BasePublisher.cs`) holds the shared mechanics for one repository's
+release, in this order: resolve the `GitHostingProvider`, check `HasAllArtifacts`, push the produced
+packages through `PackageSender`, re-apply the `local/` tag as the final `v{version}` one, push the
+tag, create a draft release, push the branch (with any deferred ref-specs), upload the asset files,
+finalize the release, and finally `DestroyLocalRelease` to clean up `$Local`. Every failure after
+the tag is pushed compensates: the draft release is deleted and the pushed tag removed.
+
+The three concrete publishers differ only in which Git branch they push, and how:
+
+| Publisher | Branch | Branch handling |
+|---|---|---|
+| `RoadmapPublisher` | Resolved from the version through the World's `BranchNamespace` (`dev/` for a CI build, the regular one otherwise). | Non-CI: pushes the regular branch and deletes the remote `dev/` branch that was just integrated. CI: ensures the regular branch is tracked if the repository is brand new. Also pushes the `+fake` base tag when the version is a prerelease or CI one. |
+| `FixPublisher` | The explicit `fix/vMajor.Minor` branch of the Fix Workflow, which is not resolvable from the version. | None: no `dev/` cleanup, no defensive push, no extra tag. |
+| `IndirectPublisher` | Resolved from the version like `RoadmapPublisher`. | None, deliberately: these releases belong to a branch the current operation is not working on, so touching its branches would be a side effect nobody asked for. |
+
+`World.StackRepository.PushChanges` is called by `PublishPlugin` after a successful publication —
+publishing also pushes whatever the Stack repository itself accumulated.
 
 ### `PackageSender` — routing packages to NuGet feeds
 
@@ -243,14 +260,13 @@ likewise resolved through `GitRepositoryKey` / `ISecretsStore`, documented in `C
 
 ## Known rough edges (from the code)
 
-- `PublishRoadmap.PublishAsync` throws `NotImplementedException` when a roadmap has any
-  `IndirectRequiredPublications` — publishing across branches when an upstream dependency on
-  another branch hasn't been published yet is detected but not yet actually performed.
-- `PublishRoadmap.ToRenderable` is a stub (`screen.Unit`): no publish roadmap summary is rendered
-  to the screen yet, despite `PublishPlugin.OnRoadmapBuildAsync` calling `e.Screen.Display(...)`
-  with it.
-- `PublishRepoInfo` (`Roadmap/PublishRepoInfo.cs`) is minimal (`Repo` only) and unused elsewhere in
-  the plugin — it looks like a placeholder for future per-repo roadmap-publish reporting.
-- `NuGetFeedClient.DeleteAsync` is fully implemented but never invoked by `PackageSender` or
-  `DirectPublisher` — there is currently no CKli-level command that deletes/unlists a published
-  package version through this plugin.
+- The gate's failure paths have no integration test coverage: `Tests/Plugins.Tests` never reaches
+  `PublishableStatus.IndirectPublishRequired`, so the `RequiredPublications` closure, its
+  producers-first ordering, `IndirectPublisher`, and `BuildFinalProfile`'s conflict branch are all
+  exercised only by reasoning. Constructing that state needs a fixture with a second configured
+  branch.
+- `NuGetFeedClient.DeleteAsync` is fully implemented but never invoked by `PackageSender` or any
+  publisher — there is currently no CKli-level command that deletes/unlists a published package
+  version through this plugin.
+- `BasePublisher`'s `$Local` cleanup is skipped under a hard-coded test path
+  (`/.PublicStack/CK-Plugins/Tests/Plugins.Tests`), so it applies to one stack's harness only.

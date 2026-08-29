@@ -16,16 +16,16 @@ sealed class PublishedPackageInfo : PackageInstance
     public abstract record Reason();
 
     /// <summary>
-    /// Reason for packages produced by a <see cref="Roadmap"/>.
+    /// Reason for packages produced by a <see cref="Roadmap"/>: this is the version the profile offers.
     /// </summary>
-    /// <param name="s">The solution that produced this package.</param>
-    public record PublishedByRoadmap( Roadmap.BuildSolution s ) : Reason;
+    /// <param name="Solution">The solution that produces this package.</param>
+    public record PublishedByRoadmap( Roadmap.BuildSolution Solution ) : Reason;
 
     /// <summary>
-    /// Reason for packages required by packages produced by a <see cref="Roadmap"/>.
+    /// Reason for a version required by a solution of the <see cref="Roadmap"/>.
     /// </summary>
-    /// <param name="Consumer">The consumer package.</param>
-    public record RequiredByPackage( PublishedPackageInfo Consumer ) : Reason;
+    /// <param name="Consumer">The solution that requires this version.</param>
+    public record RequiredBySolution( Roadmap.BuildSolution Consumer ) : Reason;
 
     internal PublishedPackageInfo( string packageId, SVersion version, Reason firstReason )
         : base( packageId, version )

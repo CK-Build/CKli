@@ -1,4 +1,4 @@
-using CK.Core;
+﻿using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
@@ -60,7 +60,7 @@ public sealed partial class BuildPlugin
             if( _singleBuild )
             {
                 var s = _roadmap.OrderedSolutions.Single( s => s.MustBuild );
-                Throw.DebugAssert( s.BuildInfo != null && !s.BuildInfo.DirectRequirements.Any( s => s.MustBuild ) );
+                Throw.DebugAssert( !s.BuildInfo.DirectRequirements.Any( s => s.MustBuild ) );
                 var r = await DoBuildAsync( monitor, s.BuildInfo );
                 result = r != null
                             ? s.BuildInfo.SetSingleBuildResult( r )
@@ -81,7 +81,7 @@ public sealed partial class BuildPlugin
                     {
                         foreach( var s in _roadmap.OrderedSolutions )
                         {
-                            s.BuildInfo?.CommitBuilding();
+                            s.BuildInfo.CommitBuilding();
                         }
                     }
                     catch( Exception ex )
@@ -171,7 +171,7 @@ public sealed partial class BuildPlugin
         {
             var buildTasks = new Task<bool>[_roadmap.SolutionBuildCount];
             BuildResult?[] req = await Task.WhenAll( _roadmap.OrderedSolutions.Where( s => s.MustBuild )
-                                                                       .Select( s => s.BuildInfo!.BuildAsync( this ) )
+                                                                       .Select( s => s.BuildInfo.BuildAsync( this ) )
                                                                        .ToArray() );
             _channel.Writer.TryWrite( req );
         }

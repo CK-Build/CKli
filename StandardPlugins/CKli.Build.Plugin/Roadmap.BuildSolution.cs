@@ -1,10 +1,9 @@
-using CK.Core;
+﻿using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
-using LibGit2Sharp;
 using System;
 using System.Diagnostics.CodeAnalysis;
 
@@ -20,6 +19,8 @@ public sealed partial class Roadmap
         readonly Roadmap _roadmap;
         readonly HotGraph.Solution _solution;
         readonly HotGraph.SolutionVersionInfo _versionInfo;
+        // Null only during the initialization phase: Initialize sets it on every solution before Roadmap.Create
+        // returns. It is exposed by the non nullable BuildInfo property.
         BuildInfo? _buildInfo;
         HotGraph.SolutionVersionInfo.LastBuiltVersion _lastBuild;
         int _buildNumber;
@@ -299,7 +300,7 @@ public sealed partial class Roadmap
             bool success = true;
             foreach( var r in requirements )
             {
-                var reqVersion = r.BuildInfo!.TargetVersion;
+                var reqVersion = r.TargetVersion;
                 var reqBranch = ns.Find( reqVersion );
                 if( reqBranch != null && reqBranch != branch && !reqBranch.HasChild( branch ) )
                 {
@@ -353,48 +354,36 @@ public sealed partial class Roadmap
                                               ref PublishableStatus publishable )
         {
             Throw.DebugAssert( _publishable is PublishableStatus.None );
-            if( _buildInfo != null )
+            if( MustBuild )
             {
-                if( _buildInfo.MustBuild )
+                Throw.DebugAssert( _buildNumber == 0 && idxBuildNumber >= 1 );
+                _buildNumber = idxBuildNumber++;
+                _publishable = PublishableStatus.Build;
+            }
+            else
+            {
+                var target = BuildInfo.TargetVersion;
+                if( target.IsLocal() )
                 {
-                    Throw.DebugAssert( _buildNumber == 0 && idxBuildNumber >= 1 );
-                    _buildNumber = idxBuildNumber++;
-                    _publishable = PublishableStatus.Build;
+                    _publishable = _roadmap._graph.BranchName.Match( target )
+                                    ? PublishableStatus.PublishRequired
+                                    : PublishableStatus.IndirectPublishRequired;
+                }
+                else if( target.IsBuilding() )
+                {
+                    _publishable = Solution.IsPivotUpstream || !_roadmap._graph.BranchName.Match( target )
+                                    ? PublishableStatus.BuildingPending
+                                    : PublishableStatus.PublishRequired;
                 }
                 else
                 {
-                    if( _buildInfo.TargetVersion.IsLocal() )
-                    {
-                        if( _roadmap._graph.BranchName.Match( _buildInfo.TargetVersion ) )
-                        {
-                            _publishable = PublishableStatus.PublishRequired;
-                        }
-                        else
-                        {
-                            _publishable = PublishableStatus.IndirectPublishRequired;
-                        }
-                    }
-                    else if( _buildInfo.TargetVersion.IsBuilding() )
-                    {
-                        if( Solution.IsPivotUpstream || !_roadmap._graph.BranchName.Match( _buildInfo.TargetVersion ) )
-                        {
-                            _publishable = PublishableStatus.BuildingPending;
-                        }
-                        else
-                        {
-                            _publishable = PublishableStatus.PublishRequired;
-                        }
-                    }
-                    else 
-                    {
-                        _publishable = PublishableStatus.AlreadyPublished;
-                    }
+                    _publishable = PublishableStatus.AlreadyPublished;
                 }
+            }
 
-                if( publishable < _publishable )
-                {
-                    publishable = _publishable;
-                }
+            if( publishable < _publishable )
+            {
+                publishable = _publishable;
             }
 
             return true;
@@ -431,16 +420,26 @@ public sealed partial class Roadmap
         public HotGraph.SolutionVersionInfo.LastBuiltVersion LastBuild => _lastBuild;
 
         /// <summary>
-        /// Gets the build info. This is null if this solution is not impacted
-        /// by any of the <see cref="Roadmap.Pivots"/>.
+        /// Gets the build info. Every solution of an initialized roadmap has one.
         /// </summary>
-        public BuildInfo? BuildInfo => _buildInfo;
+        public BuildInfo BuildInfo => _buildInfo!;
+
+        /// <summary>
+        /// Gets the version this solution will offer once this roadmap is done: the <see cref="Roadmap.BuildInfo.TargetVersion"/>,
+        /// which is the "building/" version when this solution is built and the branch resolved
+        /// <see cref="LastBuild"/> version otherwise (<see cref="HotGraph.SolutionVersionInfo.LastBuiltVersion.BranchName"/>
+        /// is the closest branch to the roadmap's one from which the tag is available).
+        /// <para>
+        /// <see cref="SVersion"/> equality ignores the "building/" prefix, so this compares directly with the versions
+        /// recorded by the consumers of this solution's packages.
+        /// </para>
+        /// </summary>
+        public SVersion TargetVersion => BuildInfo.TargetVersion;
 
         /// <summary>
         /// Gets whether this solution must be built.
         /// </summary>
-        [MemberNotNullWhen( true, nameof( BuildInfo ), nameof( _buildInfo ) )]
-        public bool MustBuild => _buildInfo != null && _buildInfo.MustBuild;
+        public bool MustBuild => BuildInfo.MustBuild;
 
         /// <summary>
         /// Gets whether this solution is not built but its sources reference packages produced by this World in
@@ -453,8 +452,7 @@ public sealed partial class Roadmap
         /// there. 'C' and 'D' updates always trigger a build: only 'U' ones can be left pending.
         /// </para>
         /// </summary>
-        [MemberNotNullWhen( true, nameof( BuildInfo ), nameof( _buildInfo ) )]
-        public bool HasPendingUpdates => _buildInfo != null && !_buildInfo.MustBuild && _buildInfo.UUpdates != null;
+        public bool HasPendingUpdates => !BuildInfo.MustBuild && BuildInfo.UUpdates != null;
 
         /// <summary>
         /// Gets the 1-based build number in the order of the <see cref="HotGraph.Solution.OrderedIndex"/>.
@@ -476,38 +474,30 @@ public sealed partial class Roadmap
                 r = r.AddRight( PivotPrefix( head.Screen, _solution, prefixStyle, marginLeft: 1 ) );
             }
 
-            var statusAndName = RepoName( head.Screen, Repo, MustBuild, BuildInfo == null );
+            var statusAndName = RepoName( head.Screen, Repo, MustBuild );
             r = r.AddRight( statusAndName );
 
             var currentVersion = _lastBuild.TagCommit.Version;
-            if( _buildInfo != null )
+            if( MustBuild )
             {
-                if( _buildInfo.MustBuild )
-                {
-                    Throw.DebugAssert( _buildInfo.BuildReason != MustBuildReason.None );
+                Throw.DebugAssert( BuildInfo.BuildReason != MustBuildReason.None );
 
-                    bool replace = currentVersion.IsBuildingOrLocal() && _roadmap.Graph.BranchName.Match( currentVersion );
+                bool replace = currentVersion.IsBuildingOrLocal() && _roadmap.Graph.BranchName.Match( currentVersion );
 
-                    r = r.AddRight( head.Screen.Text( replace ? $"(v{currentVersion})" : $"v{currentVersion}",
-                                                      replace ? ConsoleColor.Blue : ConsoleColor.DarkBlue,
-                                                      effect: replace ? TextEffect.Strikethrough : TextEffect.Ignore ),
-                                    head.Screen.Text( $"→ ⏚/v{_buildInfo.TargetVersion}", ConsoleColor.Green ).Box( marginLeft: 1, marginRight: 1 ),
-                                    _buildInfo.RenderBuildReason( head.Screen, ref stats ) );
-                }
-                else
-                {
-                    var sCurrentVersion = currentVersion.IsBuildingOrLocal() ? $"⏚/v{currentVersion}" : $"v{currentVersion}";
-                    r = r.AddRight( head.Screen.Text( sCurrentVersion, currentVersion.IsBuildingOrLocal() ? ConsoleColor.Blue : ConsoleColor.DarkBlue ) );
-                    if( HasPendingUpdates )
-                    {
-                        r = r.AddRight( _buildInfo.RenderPendingUpdates( head.Screen, ref stats ).Box( marginLeft: 1 ) );
-                    }
-                }
+                r = r.AddRight( head.Screen.Text( replace ? $"(v{currentVersion})" : $"v{currentVersion}",
+                                                  replace ? ConsoleColor.Blue : ConsoleColor.DarkBlue,
+                                                  effect: replace ? TextEffect.Strikethrough : TextEffect.Ignore ),
+                                head.Screen.Text( $"→ ⏚/v{BuildInfo.TargetVersion}", ConsoleColor.Green ).Box( marginLeft: 1, marginRight: 1 ),
+                                BuildInfo.RenderBuildReason( head.Screen, ref stats ) );
             }
             else
             {
                 var sCurrentVersion = currentVersion.IsBuildingOrLocal() ? $"⏚/v{currentVersion}" : $"v{currentVersion}";
-                r = r.AddRight( head.Screen.Text( sCurrentVersion, ConsoleColor.DarkBlue ) );
+                r = r.AddRight( head.Screen.Text( sCurrentVersion, currentVersion.IsBuildingOrLocal() ? ConsoleColor.Blue : ConsoleColor.DarkBlue ) );
+                if( HasPendingUpdates )
+                {
+                    r = r.AddRight( BuildInfo.RenderPendingUpdates( head.Screen, ref stats ).Box( marginLeft: 1 ) );
+                }
             }
             return r;
 
@@ -547,14 +537,12 @@ public sealed partial class Roadmap
                 return screen.EmptyString.Box( style, marginLeft: marginLeft, marginRight: 3 );
             }
 
-            static IRenderable RepoName( ScreenType screen, Repo repo, bool mustBuild, bool outOfScope )
+            static IRenderable RepoName( ScreenType screen, Repo repo, bool mustBuild )
             {
                 var status = repo.GitStatus;
                 var style = mustBuild
                                 ? new TextStyle( status.IsDirty ? ConsoleColor.Red : ConsoleColor.Green, ConsoleColor.Black )
-                                : outOfScope
-                                    ? new TextStyle( status.IsDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGray, ConsoleColor.Black, TextEffect.Strikethrough )
-                                    : new TextStyle( status.IsDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGray, ConsoleColor.Black );
+                                : new TextStyle( status.IsDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGray, ConsoleColor.Black );
                 // First Box.
                 IRenderable r = screen.Text( repo.DisplayPath, style ).HyperLink( new Uri( repo.WorkingFolder ) );
                 r = status.IsDirty
@@ -573,5 +561,7 @@ public sealed partial class Roadmap
                                                 : _buildInfo.MustBuild
                                                     ? $"{_solution} [{_lastBuild.Version} => {_buildInfo.TargetVersion}]"
                                                     : $"{_solution} [no build]";
+        // ToString must remain usable while the solution is being initialized (it is used by the traces of
+        // Initialize itself), hence the only test of the _buildInfo field's nullability outside Initialize.
     }
 }

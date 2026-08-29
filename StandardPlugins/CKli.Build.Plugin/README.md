@@ -149,12 +149,26 @@ For every `HotGraph.Solution` (ordered topologically, `OrderedSolutions`), a `Ro
 
 When `MustBuildReason.None`, the build is skipped and the `BuildSolution.BuildInfo.TargetVersion` is simply the last
 built version (so downstream solutions still see a consistent version). Otherwise `BuildInfo.TargetVersion` is computed
-via `TagCommitTree.ComputeTargetVersion` and stamped with a `"building/"` prefix pending a successful build.
+via `TagCommitTree.ComputeTargetVersion` and stamped with a `"building/"` prefix pending a successful build. Either way
+it is the version the solution will offer once the roadmap is done, exposed as `BuildSolution.TargetVersion`; since
+`SVersion` equality ignores the `"building/"` prefix, it compares directly with the versions recorded by consumers.
+
+Every solution of an initialized roadmap has a `BuildInfo`: `Initialize` sets one on each of them (the field is only
+null while that initialization runs).
 
 A solution can also be entirely **out of scope**: with `*build`/`*publish` pivots include upstream producers
 (`isPullBuild: true`); with plain `build`/`publish`, a non-pivot solution whose only reason to build would be a
 skippable one (`CodeChange`/`DependencyUpdate`("U")/`CI0`) is left un-built - this is the only place the "star" vs
-non-star distinction actually changes the outcome (`canSkip` in `BuildSolution.Initialize`).
+non-star distinction actually changes the outcome (`canSkip` in `BuildSolution.Initialize`). Skipping therefore only
+ever happens in the non-star, has-pivots case: `*build`/`*publish` and a stack-root/`--all` roadmap (where no solution
+is a pivot) never skip anything.
+
+A skipped solution can be left holding **pending "U" updates**: its sources reference packages produced by this World
+in versions that have been superseded. This is not an error - since the solution is not built, nothing it produces
+enters the build - so it is warned about, kept on its `BuildInfo` (`UUpdates`, surfaced as
+`BuildSolution.HasPendingUpdates`) and rendered on its row. The misalignment survives the build and is only resolved by
+building that solution, at which point the same "U" update becomes a `MustBuildReason.DependencyUpdate`. "C" and "D"
+updates always trigger a build, so only "U" ones can be left pending.
 
 `Roadmap.Create` loops `Initialize` + `HotGraph.ConsiderBuildImpact` until stable (`hasChanged == false`): considering
 that a solution must build can itself change the graph (e.g. surface additional `dev/` solutions), so the roadmap is
@@ -167,7 +181,12 @@ everything else it falls back to `HotGraph.PackageUpdater`'s World-configured an
 `Roadmap.PublishableStatus` / `BuildSolution.PublishableStatus` (`None` < `AlreadyPublished` < `PublishRequired` <
 `Build` < `IndirectPublishRequired` < `BuildingPending`, in that numeric/severity order) summarize, across all
 solutions, what publishing the roadmap would mean or why it can't be done yet (e.g. `BuildingPending` when an upstream's
-last build failed).
+last build failed). `None` is the value before `ConcludeInitialization` ran: every solution of an initialized roadmap
+has a greater one.
+
+Whether the roadmap may actually be published is decided beyond this status, by
+[`CKli.Publish.Plugin`](../CKli.Publish.Plugin)'s publication gate, which checks that the profile of packages the
+publication would leave on the branch is coherent.
 
 ### Building the roadmap: `RoadmapExecutor`
 
