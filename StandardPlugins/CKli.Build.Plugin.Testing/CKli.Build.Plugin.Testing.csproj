@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>true</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\CKli.Testing\CKli.Testing.csproj" />
+      <ProjectReference Include="..\CKli.Build.Plugin\CKli.Build.Plugin.csproj" />
+    </ItemGroup>
+
+    
+</Project>
