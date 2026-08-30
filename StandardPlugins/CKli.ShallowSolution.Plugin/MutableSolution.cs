@@ -91,12 +91,12 @@ public sealed class MutableSolution
         {
             if( Path.GetFileName( path.AsSpan() ).Equals( "Directory.Package.props", StringComparison.OrdinalIgnoreCase ) )
             {
-                foreach( var e in projectRoot.Descendants( "PackageVersion" ) )
+                foreach( var e in projectRoot.Descendants( XNames.PackageVersion ) )
                 {
                     var name = CommonSolution.GetIncludedName( monitor, path, e, LogLevel.Warn );
                     if( name != null && mapping.HasMapping( name ) )
                     {
-                        if( !UpdateVersion( monitor, path, e, name, "Version", "Version", mapping, updated ) )
+                        if( !UpdateVersion( monitor, path, e, name, XNames.Version, "Version", mapping, updated ) )
                         {
                             return false;
                         }
@@ -105,16 +105,16 @@ public sealed class MutableSolution
             }
             else
             {
-                foreach( var e in projectRoot.Descendants( "PackageReference" ) )
+                foreach( var e in projectRoot.Descendants( XNames.PackageReference ) )
                 {
                     var name = CommonSolution.GetIncludedName( monitor, path, e, LogLevel.Warn );
                     if( name != null && mapping.HasMapping( name ) )
                     {
-                        if( !UpdateVersion( monitor, path, e, name, "VersionOverride", null, mapping, updated ) )
+                        if( !UpdateVersion( monitor, path, e, name, XNames.VersionOverride, null, mapping, updated ) )
                         {
                             return false;
                         }
-                        if( !UpdateVersion( monitor, path, e, name, "Version", null, mapping, updated ) )
+                        if( !UpdateVersion( monitor, path, e, name, XNames.Version, null, mapping, updated ) )
                         {
                             return false;
                         }

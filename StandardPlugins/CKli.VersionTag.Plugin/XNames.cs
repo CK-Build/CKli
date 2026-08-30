@@ -10,8 +10,8 @@ public static class XNames
     #pragma warning disable 1591 //Missing XML comment for publicly visible type or member
     public static readonly XName InfVersion = XNamespace.None + "InfVersion";
     public static readonly XName SupVersion = XNamespace.None + "SupVersion";
-    public static readonly XName Version = XNamespace.None + "Version";
     public static readonly XName AutoFixRemovableTag = XNamespace.None + "AutoFixRemovableTag";
     public static readonly XName RemoveUselessFakeTag = XNamespace.None + "RemoveUselessFakeTag";
+    public static XName Version => CKli.ShallowSolution.Plugin.XNames.Version;
     public static XName Name => CKli.Core.XNames.Name;
 }
