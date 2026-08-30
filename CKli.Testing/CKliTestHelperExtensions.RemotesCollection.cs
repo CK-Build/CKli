@@ -14,34 +14,39 @@ namespace CKli;
 public static partial class CKliTestHelperExtensions
 {
     /// <summary>
-    /// Models a "Remotes/" folder that contains a stack repository and the repositories of the stack.
+    /// Models a "Remotes/" folder that contains a stack repository and the repositories of the stack:
+    /// this is a local folder that ends with the <see cref="FullName"/> and contains bare repositories.
     /// </summary>
-    public sealed partial class RemotesCollection
+    public class RemotesFolder
     {
-        readonly string _fullName;
-        readonly string[] _repositoryNames;
+        readonly NormalizedPath _barePath;
         readonly Uri _stackUri;
         readonly string _stackName;
 
-        internal RemotesCollection( string fullName, string[] repositoryNames )
+        /// <summary>
+        /// Initializes a new folder for remotes.
+        /// </summary>
+        /// <param name="barePath">The path where bare Git repositories exists.</param>
+        public RemotesFolder( NormalizedPath barePath )
         {
-            _fullName = fullName;
-            _repositoryNames = repositoryNames;
+            _barePath = barePath;
+            var fullName = barePath.LastPart;
             int idx = fullName.IndexOf( '(' );
-            Throw.DebugAssert( idx != 0 );
+            Throw.CheckArgument( "fullName must not start with a '('.", idx != 0 );
             _stackName = idx < 0 ? fullName : fullName.Substring( 0, idx );
-            _stackUri = GetUriFor( _stackName + "-Stack" );
+            var stack = _stackName + "-Stack";
+            _stackUri = GetUriFor( stack );
         }
+
+        /// <summary>
+        /// The root of the bare repositories. Ends with the <see cref="FullName"/>.
+        /// </summary>
+        public NormalizedPath BarePath => _barePath;
 
         /// <summary>
         /// Gets the full name (with the optional state name in parentheses).
         /// </summary>
-        public string FullName => _fullName;
-
-        /// <summary>
-        /// Gets the "XXX-Stack" folder in the <see cref="FullName"/> folder.
-        /// </summary>
-        public NormalizedPath StackLocalFolderPath => _remotesPath.AppendPart( _fullName ).AppendPart( _stackName+"-Stack" );
+        public string FullName => _barePath.LastPart;
 
         /// <summary>
         /// Gets the stack name. There must be a "StackName-Stack" repository folder that
@@ -50,17 +55,17 @@ public static partial class CKliTestHelperExtensions
         public string StackName => _stackName;
 
         /// <summary>
-        /// Gets the Url of the remote Stack repository (in the "Remotes/bare/" folder)..
+        /// Gets the Url of the remote Stack repository.
         /// </summary>
         public Uri StackUri => _stackUri;
 
         /// <summary>
         /// Gets all the repository names (including the "StackName-Stack").
         /// </summary>
-        public IReadOnlyList<string> Repositories => _repositoryNames;
+        public IEnumerable<string> Repositories => Directory.EnumerateDirectories( _barePath ).Select( Path.GetFileName )!;
 
         /// <summary>
-        /// Gets the Url for one of the <see cref="Repositories"/>.
+        /// Gets the Url for a repository.
         /// <para>
         /// When missing, a fake url "file:///Missing..." is returned that will trigger an error is used.
         /// </para>
@@ -69,11 +74,10 @@ public static partial class CKliTestHelperExtensions
         /// <returns>The url for the remote repository (in the "Remotes/bare/" folder).</returns>
         public Uri GetUriFor( string repositoryName )
         {
-            if( _repositoryNames.Contains( repositoryName ) )
-            {
-                return new Uri( _barePath.AppendPart( _fullName ).AppendPart( repositoryName ) );
-            }
-            return new Uri( "file:///Missing '" + repositoryName + "' repository in '" + _fullName + "' remotes" );
+            var p = _barePath.AppendPart( repositoryName );
+            return Directory.Exists( p )
+                    ? new Uri( p )
+                    : new Uri( "file:///Missing '" + repositoryName + "' repository in '" + FullName + "' remotes" );
         }
 
         /// <summary>
@@ -103,10 +107,10 @@ public static partial class CKliTestHelperExtensions
         /// Implementation of <see cref="CloneAsync(ClonedFolder, Action{IActivityMonitor, NormalizedPath, XElement}?, bool)"/> that can be used in
         /// sub folders of the <see cref="ClonedFolder"/> to work with multiple clones of the same remote.
         /// </summary>
+        /// <param name="folder">The cloned folder of the unit test or a subfolder of it.</param>
         /// <param name="allowDuplicateStack">
         /// First cloned repo can use false, but subsequent ones must specify true otherwise the duplicate is detected and an exception is thrown.
         /// </param>
-        /// <param name="folder">The cloned folder of the unit test or a subfolder of it.</param>
         /// <param name="pluginConfigurationEditor">
         /// Optional plugin configuration editor, the path is the cloned <see cref="StackRepository.StackRoot"/> and the XElement
         /// is the <c>&lt;Plugins&gt;</c> configuration.
@@ -155,7 +159,7 @@ public static partial class CKliTestHelperExtensions
                 stack.Dispose();
             }
             // Copy the $Local folder.
-            var local = _remotesPath.AppendPart( _fullName )
+            var local = _remotesPath.AppendPart( FullName )
                           .AppendPart( _stackName + "-Stack" )
                           .AppendPart( "$Local" );
             var source = new DirectoryInfo( local );
@@ -188,6 +192,8 @@ public static partial class CKliTestHelperExtensions
         /// Overridden to return the full name and the number of repositories.
         /// </summary>
         /// <returns>A readable string.</returns>
-        public override string ToString() => $"{_fullName} - {_repositoryNames.Length} repositories";
+        public override string ToString() => $"{FullName} - {Repositories.Count()} repositories";
     }
+
+
 }

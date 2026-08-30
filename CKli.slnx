@@ -13,6 +13,7 @@
     <File Path="StandardPlugins/HotZone-Workflow.md" />
     <Project Path="StandardPlugins/CKli.ArtifactHandler.Plugin/CKli.ArtifactHandler.Plugin.csproj" />
     <Project Path="StandardPlugins/CKli.BranchModel.Plugin/CKli.BranchModel.Plugin.csproj" />
+    <Project Path="StandardPlugins/CKli.Build.Plugin.Testing/CKli.Build.Plugin.Testing.csproj" Id="a580c894-1f59-4489-91b9-031fbf0fc7ee" />
     <Project Path="StandardPlugins/CKli.Build.Plugin/CKli.Build.Plugin.csproj" />
     <Project Path="StandardPlugins/CKli.CommonFiles.Plugin/CKli.CommonFiles.Plugin.csproj" />
     <Project Path="StandardPlugins/CKli.HotZone.Plugin/CKli.HotZone.Plugin.csproj" />
