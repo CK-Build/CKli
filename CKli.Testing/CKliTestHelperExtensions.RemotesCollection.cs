@@ -20,6 +20,7 @@ public static partial class CKliTestHelperExtensions
     public class RemotesFolder
     {
         readonly NormalizedPath _barePath;
+        readonly string _fullName;
         readonly Uri _stackUri;
         readonly string _stackName;
 
@@ -27,13 +28,14 @@ public static partial class CKliTestHelperExtensions
         /// Initializes a new folder for remotes.
         /// </summary>
         /// <param name="barePath">The path where bare Git repositories exists.</param>
-        public RemotesFolder( NormalizedPath barePath )
+        /// <param name="fullName">Name of the stack with the optional trailing "(some-state)" suffix. Defaults to <paramref name="barePath"/>.LastPart.</param>
+        public RemotesFolder( NormalizedPath barePath, string? fullName )
         {
             _barePath = barePath;
-            var fullName = barePath.LastPart;
-            int idx = fullName.IndexOf( '(' );
+            _fullName = fullName ?? barePath.LastPart;
+            int idx = _fullName.IndexOf( '(' );
             Throw.CheckArgument( "fullName must not start with a '('.", idx != 0 );
-            _stackName = idx < 0 ? fullName : fullName.Substring( 0, idx );
+            _stackName = idx < 0 ? _fullName : _fullName.Substring( 0, idx );
             var stack = _stackName + "-Stack";
             _stackUri = GetUriFor( stack );
         }
@@ -67,15 +69,17 @@ public static partial class CKliTestHelperExtensions
         /// <summary>
         /// Gets the Url for a repository.
         /// <para>
-        /// When missing, a fake url "file:///Missing..." is returned that will trigger an error is used.
+        /// When missing and <paramref name="mustExist"/> is let to true, a fake url "file:///Missing..." is returned
+        /// that will trigger an error is used.
         /// </para>
         /// </summary>
         /// <param name="repositoryName">The repository name that should belong to the <see cref="Repositories"/>.</param>
+        /// <param name="mustExist">False to return the url even if the repository doesn't exist.</param>
         /// <returns>The url for the remote repository (in the "Remotes/bare/" folder).</returns>
-        public Uri GetUriFor( string repositoryName )
+        public Uri GetUriFor( string repositoryName, bool mustExist = true )
         {
             var p = _barePath.AppendPart( repositoryName );
-            return Directory.Exists( p )
+            return !mustExist || Directory.Exists( p )
                     ? new Uri( p )
                     : new Uri( "file:///Missing '" + repositoryName + "' repository in '" + FullName + "' remotes" );
         }

@@ -147,4 +147,10 @@ public sealed class CKliEnv
             return _committer;
         }
     }
+
+    /// <summary>
+    /// Overridden to return the current directory.
+    /// </summary>
+    /// <returns>The <see cref="CurrentDirectory"/>.</returns>
+    public override string ToString() => _currentDirectory;
 }

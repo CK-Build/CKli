@@ -159,7 +159,7 @@ public static partial class CKliTestHelperExtensions
         return File.ReadAllLines( remoteIndexPath )
                     .Select( l => l.Split( '/' ) )
                     .GroupBy( names => names[0], names => names[1] )
-                    .Select( g => new RemotesFolder( _barePath.AppendPart( g.Key ) ) )
+                    .Select( g => new RemotesFolder( _barePath.AppendPart( g.Key ), null ) )
                     .ToDictionary( r => r.FullName );
 
         static void RestoreRemotesZipAndCreateBareRepositories( NormalizedPath remoteIndexPath, NormalizedPath zipPath, DateTime zipTime )
@@ -358,7 +358,7 @@ public static partial class CKliTestHelperExtensions
     }
 
     /// <summary>
-    /// Create or modify a "CKliTouchAndCommit.txt" file (by default) in the <paramref name="folder"/> and
+    /// Creates, deletes or updates a "CKliTouchAndCommit.txt" file (by default) in the <paramref name="folder"/> and
     /// creates a new commit on a specified branch or on the currently checked out branch.
     /// <para>
     /// The branch must exist: this method doesn't create a branch and this is intended (where should the branch start?).
@@ -370,23 +370,22 @@ public static partial class CKliTestHelperExtensions
     /// <param name="helper">This helper.</param>
     /// <param name="folder">The absolute folder (must be in a Git working folder).</param>
     /// <param name="branchName">The branch name to update (or null to touch the working folder and commit on the current repository head).</param>
-    /// <param name="commitMessage">Optional commit message. Defaults to "Touching '{<paramref name="folder"/>.LastPart}'.".</param>
-    /// <param name="fileContent">Optional file content. Defaults to the current content with a new line and the <see cref="Environment.TickCount64"/>.</param>
+    /// <param name="commitMessage">Optional commit message. Defaults to "Touching '&lt;relative file path&gt;'.".</param>
+    /// <param name="fileContent">
+    /// Content provider.
+    /// When returning null, the file is deleted.
+    /// Defaults to the current content with a new line and the <see cref="Environment.TickCount64"/>.
+    /// </param>
     /// <param name="fileName">File name to create or alter in the <paramref name="folder"/>.</param>
-    /// <param name="authorAndCommitWhen">Uses an explicit date for author and commit date (instead of <see cref="DateTimeOffset.Now"/>).</param>
+    /// <param name="committer">Defaults to signature "CKli.Testing", "none", <see cref="DateTimeOffset.Now"/>.</param>
     public static void TouchAndCommit( this IMonitorTestHelper helper,
                                        NormalizedPath folder,
                                        string? branchName,
                                        string? commitMessage = null,
-                                       string? fileContent = null,
+                                       Func<string?,string?>? fileContent = null,
                                        string fileName = "CKliTouchAndCommit.txt",
-                                       DateTimeOffset? authorAndCommitWhen = null )
+                                       Signature? committer = null )
     {
-        var committer = new Signature( "CKli.Testing", "none", authorAndCommitWhen ?? DateTimeOffset.Now );
-        if( string.IsNullOrEmpty( commitMessage ) )
-        {
-            commitMessage = $"Touching '{folder.LastPart}'.";
-        }
         NormalizedPath gitPath = Repository.Discover( folder );
         if( gitPath.IsEmptyPath )
         {
@@ -399,57 +398,130 @@ public static partial class CKliTestHelperExtensions
         gitPath = gitPath.RemoveLastPart();
         using( var git = new Repository( gitPath ) )
         {
-            if( branchName != null )
-            {
-                var b = git.Branches[branchName];
-                if( b == null )
-                {
-                    Throw.ArgumentException( $"Unable to find branch '{branchName}'." );
-                }
-                if( !b.IsCurrentRepositoryHead )
-                {
-                    TreeDefinition tDef = TreeDefinition.From( b.Tip.Tree );
-                    gitPath.TryGetRelativePathTo( folder, out var relativeGitPath ).ShouldBeTrue();
-                    if( !relativeGitPath.IsEmptyPath && tDef[relativeGitPath] == null )
-                    {
-                        Throw.ArgumentException( $"Unable to find '{relativeGitPath}' in branch '{branchName}'." );
-                    }
-                    var filePath = relativeGitPath.AppendPart( fileName );
-                    if( fileContent == null )
-                    {
-                        TreeEntryDefinition? fileDef = tDef[filePath];
-                        if( fileDef != null )
-                        {
-                            if( fileDef.TargetType != TreeEntryTargetType.Blob || fileDef.Mode != Mode.NonExecutableFile )
-                            {
-                                Throw.InvalidOperationException( $"Entry '{filePath}' in branch '{branchName}' must be a non executable Blob." );
-                            }
-                            var blob = git.Lookup<Blob>( fileDef.TargetId );
-                            fileContent = $"{blob.GetContentText()}{Environment.NewLine}{Environment.TickCount64}";
-                        }
-                        else
-                        {
-                            fileContent = Environment.TickCount64.ToString();
-                        }
-                    }
-                    ObjectId textId = git.ObjectDatabase.Write<Blob>( Encoding.UTF8.GetBytes( fileContent ) );
-                    tDef.Add( filePath, textId, Mode.NonExecutableFile );
-                    var newTree = git.ObjectDatabase.CreateTree( tDef );
-                    var newCommit = git.ObjectDatabase.CreateCommit( committer, committer, commitMessage, newTree, [b.Tip], prettifyMessage: true );
-                    git.Refs.UpdateTarget( b.Reference, newCommit.Id, null );
-                    return;
-                }
-            }
-            // Either the branchName is null (the user wants to work in the head) or the
-            // branch is the one currently checked out: use the working folder.
-            var sourceFilePath = folder.AppendPart( fileName );
-            fileContent ??= File.Exists( sourceFilePath )
-                                    ? File.ReadAllText( sourceFilePath ) + $"{Environment.NewLine}{Environment.TickCount64}"
-                                    : Environment.TickCount64.ToString();
-            File.WriteAllText( sourceFilePath, fileContent );
-            Commands.Stage( git, "*" );
-            git.Commit( commitMessage, committer, committer );
+            gitPath.TryGetRelativePathTo( folder, out var relativeGitPath ).ShouldBeTrue();
+            var filePath = relativeGitPath.AppendPart( fileName );
+
+            TouchAndCommit( helper, git, filePath, branchName, commitMessage, fileContent, committer );
         }
+    }
+
+    /// <summary>
+    /// Creates, deletes or updates a file in a <see cref="Repository"/>'s branch. Automatically uses the working folder if the
+    /// branch is checked out and creates the directories if needed.
+    /// <para>
+    /// The branch must exist: this method doesn't create a branch and this is intended (where should the branch start?).
+    /// </para>
+    /// <para>
+    /// By default, the commit uses the Author and Committer signature "CKli.Testing", "none", <see cref="DateTimeOffset.Now"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="helper">This helper.</param>
+    /// <param name="git">The Repository.</param>
+    /// <param name="filePath">The path to the file in the repository. Can be absolute (in the repository) or relative.</param>
+    /// <param name="branchName">The branch name to update (or null to touch the working folder and commit on the current repository head).</param>
+    /// <param name="commitMessage">Optional commit message. Defaults to "Touching '{<paramref name="filePath"/>}'.".</param>
+    /// <param name="fileContent">
+    /// Content provider.
+    /// When returning null, the file is deleted.
+    /// Defaults to the current content with a new line and the <see cref="Environment.TickCount64"/>.
+    /// </param>
+    /// <param name="committer">Defaults to signature "CKli.Testing", "none", <see cref="DateTimeOffset.Now"/>.</param>
+    public static void TouchAndCommit( this IMonitorTestHelper helper,
+                                       Repository git,
+                                       NormalizedPath filePath,
+                                       string? branchName = null,
+                                       string? commitMessage = null,
+                                       Func<string?, string?>? fileContent = null,
+                                       Signature? committer = null )
+    {
+        committer ??= new Signature( "CKli.Testing", "none", DateTimeOffset.Now );
+
+        NormalizedPath workingFolder = git.Info.WorkingDirectory;
+        Throw.CheckState( "The repository cannot be a bare one.", !workingFolder.IsEmptyPath );
+
+        // Normalize filePath to the relative path in the working folder.
+        NormalizedPath absoluteFilePath;
+        if( filePath.StartsWith( workingFolder ) )
+        {
+            absoluteFilePath = filePath;
+            filePath = filePath.RemoveFirstPart( workingFolder.Parts.Count );
+        }
+        else
+        {
+            if( filePath.IsRooted )
+            {
+                Throw.ArgumentException( nameof(filePath), $"Path '{filePath}' must be in '{workingFolder}'." );
+            }
+            absoluteFilePath = workingFolder.Combine( filePath );
+        }
+
+        if( string.IsNullOrEmpty( commitMessage ) )
+        {
+            commitMessage = $"Touching '{filePath}'.";
+        }
+
+        fileContent ??= s => s == null ? Environment.TickCount64.ToString() : $"{s}{Environment.NewLine}{Environment.TickCount64}";
+
+        if( branchName != null )
+        {
+            var b = git.Branches[branchName];
+            if( b == null )
+            {
+                Throw.ArgumentException( $"Unable to find branch '{branchName}'." );
+            }
+
+            if( !b.IsCurrentRepositoryHead )
+            {
+                TreeDefinition tDef = TreeDefinition.From( b.Tip.Tree );
+                string? content = null;
+                TreeEntryDefinition? fileDef = tDef[filePath];
+                if( fileDef != null )
+                {
+                    if( fileDef.TargetType != TreeEntryTargetType.Blob || fileDef.Mode != Mode.NonExecutableFile )
+                    {
+                        Throw.InvalidOperationException( $"Entry '{filePath}' in branch '{branchName}' must be a non executable Blob." );
+                    }
+                    content = git.Lookup<Blob>( fileDef.TargetId ).GetContentText();
+                }
+
+                var newContent = fileContent( content );
+
+                if( newContent != null )
+                {
+                    ObjectId textId = git.ObjectDatabase.Write<Blob>( Encoding.UTF8.GetBytes( newContent ) );
+                    tDef.Add( filePath, textId, Mode.NonExecutableFile );
+                }
+                else
+                {
+                    tDef.Remove( filePath );
+                }
+                var newTree = git.ObjectDatabase.CreateTree( tDef );
+                var newCommit = git.ObjectDatabase.CreateCommit( committer, committer, commitMessage, newTree, [b.Tip], prettifyMessage: true );
+                git.Refs.UpdateTarget( b.Reference, newCommit.Id, null );
+                return;
+            }
+        }
+        // Either the branchName is null (the user wants to work in the head) or the
+        // branch is the one currently checked out: use the working folder.
+
+        var fContent = File.Exists( absoluteFilePath )
+                           ? File.ReadAllText( absoluteFilePath )
+                           : null;
+        var newFContent = fileContent( fContent );
+        if( newFContent != null )
+        {
+            Directory.CreateDirectory( absoluteFilePath.RemoveLastPart() );
+            File.WriteAllText( absoluteFilePath, newFContent );
+        }
+        else
+        {
+            if( fContent != null )
+            {
+                FileHelper.DeleteFile( helper.Monitor, absoluteFilePath );
+            }
+        }
+        Commands.Stage( git, "*" );
+        git.Commit( commitMessage, committer, committer );
     }
 
     /// <summary>
