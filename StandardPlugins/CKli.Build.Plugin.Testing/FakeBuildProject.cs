@@ -1,7 +1,9 @@
 using CK.Core;
 using CKli.Core;
+using Microsoft.Extensions.FileProviders;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace CKli;
@@ -20,5 +22,22 @@ public sealed record FakeBuildProject( string ProjectName, ImmutableArray<Packag
                              references.Select( p => new XElement( XNames.PackageReference,
                                                             new XAttribute( XNames.Include, p.PackageId ),
                                                             new XAttribute( XNames.Version, p.Version ) ) ) ) );
+    }
+
+    /// <summary>
+    /// Reads a .csproj file to extract the &lt;PackageReference&gt;.
+    /// </summary>
+    /// <param name="f">The file info.</param>
+    /// <returns>The package references.</returns>
+    public static ImmutableArray<PackageInstance> ReadReferences( IFileInfo f )
+    {
+        using( var r = XmlReader.Create( f.CreateReadStream() ) )
+        {
+            return ((XElement)XNode.ReadFrom( r ))
+                        .Elements( XNames.ItemGroup )
+                        .Elements( XNames.PackageReference )
+                        .Select( r => new PackageInstance( (string)r.Attribute( XNames.Include )!, SVersion.Parse( (string)r.Attribute( XNames.Version )! ) ) )
+                        .ToImmutableArray();
+        }
     }
 }

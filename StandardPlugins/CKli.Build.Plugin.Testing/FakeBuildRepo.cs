@@ -1,6 +1,8 @@
 using CK.Core;
 using CK.Testing;
+using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
+using LibGit2Sharp;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
@@ -18,14 +20,26 @@ public sealed partial class FakeBuildRepo
     readonly string _defaultProjectName;
     CKliEnv? _repoRoot;
 
-    internal FakeBuildRepo( FakeBuildWorld world, IMonitorTestHelper helper, NormalizedPath path )
+    internal FakeBuildRepo( FakeBuildWorld world, IMonitorTestHelper helper, NormalizedPath path, SVersion? initialVersion )
     {
         Throw.DebugAssert( path.StartsWith( world.WorldRoot.CurrentDirectory ) );
         _world = world;
         _helper = helper;
         _path = path;
         _defaultProjectName = _path.LastPart.Replace( '-', '.' );
-        _displayPath = path.RemoveParts( 0, world.WorldRoot.CurrentDirectory.Parts.Count );
+        _displayPath = path.RemoveFirstPart( world.WorldRoot.CurrentDirectory.Parts.Count );
+        using( var e = CreateEditor() )
+        {
+            e.AddProject( _defaultProjectName );
+            if( initialVersion != null )
+            {
+                var content = new BuildContentInfo( consumed: [], produced: [_defaultProjectName], assetFileNames: [] );
+                e.GitRepository.Repository.Tags.Add( $"{initialVersion.ParsedPrefix}/v{initialVersion}",
+                                                     e.GitRepository.Repository.Head.Tip,
+                                                     e.GitRepository.Committer,
+                                                     content.ToString() );
+            }
+        }
     }
 
     /// <summary>
@@ -52,6 +66,11 @@ public sealed partial class FakeBuildRepo
     /// Gets the default project name based on the <see cref="RepositoryName"/>.
     /// </summary>
     public string DefaultProjectName => _defaultProjectName;
+
+    /// <summary>
+    /// Gets the .slnx file name.
+    /// </summary>
+    public string SolutionFileName => RepositoryName + ".slnx";
 
     /// <summary>
     /// Gets a context for this repository.

@@ -1,4 +1,4 @@
-using CK.Core;
+﻿using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
@@ -52,6 +52,18 @@ public class RepoBuilder : RepoInfo
         string testKey = commit.Tree.Sha;
         Throw.DebugAssert( _repositoryBuilder._shaTestRunCache != null );
         return _repositoryBuilder._shaTestRunCache.Contains( monitor, testKey );
+    }
+
+    /// <summary>
+    /// Records that tests have successfully run on the commit's content: <see cref="HasTestRun(IActivityMonitor, Commit)"/>
+    /// will return true for any commit with the same content.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="commit">The commit on which the tests have run.</param>
+    public void SetTestRun( IActivityMonitor monitor, Commit commit )
+    {
+        Throw.DebugAssert( _repositoryBuilder._shaTestRunCache != null );
+        _repositoryBuilder._shaTestRunCache.Add( monitor, commit.Tree.Sha );
     }
 
     /// <summary>
@@ -308,10 +320,7 @@ public class RepoBuilder : RepoInfo
         {
             return false;
         }
-        Throw.DebugAssert( _repositoryBuilder._shaTestRunCache != null );
-        var testCache = _repositoryBuilder._shaTestRunCache;
-        string testKey = Repo.GitRepository.Repository.Head.Tip.Tree.Sha;
-        testCache.Add( monitor, testKey );
+        SetTestRun( monitor, Repo.GitRepository.Repository.Head.Tip );
         return true;
     }
 

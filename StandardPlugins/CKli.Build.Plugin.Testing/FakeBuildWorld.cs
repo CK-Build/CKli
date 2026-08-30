@@ -43,21 +43,23 @@ public sealed class FakeBuildWorld
     public IReadOnlyList<FakeBuildRepo> Repositories => _repositories;
 
     /// <summary>
-    /// Create a new (fake) repository in the stack.
+    /// Create a new (fake) repository in the stack. The root "stable" branch is checked out.
     /// </summary>
     /// <param name="repositoryName">The repository name.</param>
+    /// <param name="initialVersion">Optional initial version tag to create on the root stable branch (that is checked out).</param>
     /// <param name="subFolder">Optional sub folder in the world.</param>
     /// <returns></returns>
-    public async Task<FakeBuildRepo> CreateRepoAsync( string repositoryName, NormalizedPath subFolder = default )
+    public async Task<FakeBuildRepo> CreateRepoAsync( string repositoryName, SVersion? initialVersion, NormalizedPath subFolder = default )
     {
         Throw.CheckArgument( repositoryName.Contains( '-' ) && !repositoryName.Contains( '.' ) );
         var repo = _repositories.FirstOrDefault( r => r.RepositoryName == repositoryName );
         if( repo == null )
         {
             var context = _worldRoot.ChangeDirectory( subFolder );
+            var display = _stack.Screen;
 
-            (await CKliCommands.ExecAsync( Monitor, context, "repo", "create", _stack.Remotes.GetUriFor( repositoryName ) ).ConfigureAwait( false )).ShouldBeTrue();
-            var display = (StringScreen)context.Screen;
+            var repoUrl = _stack.Remotes.GetUriFor( repositoryName, mustExist: false );
+            (await CKliCommands.ExecAsync( Monitor, context, "repo", "create", repoUrl ).ConfigureAwait( false )).ShouldBeTrue();
             // Must run ckli issue twice. TODO: find a way to do this only once...
             display.Clear();
             (await CKliCommands.ExecAsync( Monitor, context, "issue", "--fix" )).ShouldBeTrue();
@@ -73,13 +75,14 @@ public sealed class FakeBuildWorld
                 ❰✓❱
           
                 """ );
+            display.Clear();
             (await CKliCommands.ExecAsync( Monitor, context, "issue", "--fix" )).ShouldBeTrue();
             display.ToString().ShouldBe(
                     """
                 ❰✓❱
           
                 """ );
-            repo = new FakeBuildRepo( this, context.CurrentDirectory.AppendPart( repositoryName ) );
+            repo = new FakeBuildRepo( this, _helper, context.CurrentDirectory.AppendPart( repositoryName ), initialVersion );
             _repositories.Add( repo );
         }
         return repo;

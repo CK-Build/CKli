@@ -10,23 +10,38 @@ namespace CKli;
 /// </summary>
 public sealed class FakeBuildStack
 {
-    readonly IMonitorTestHelper _helper;
+    readonly FakeBuildTestEnv _testEnv;
     readonly CKliTestHelperExtensions.RemotesFolder _remotes;
     readonly bool _isPublic;
     readonly FakeBuildWorld _defaultWorld;
 
-    internal FakeBuildStack( IMonitorTestHelper helper, CKliTestHelperExtensions.RemotesFolder remotes, CKliEnv defaultWorldContext, bool privateStack )
+    internal FakeBuildStack( FakeBuildTestEnv testEnv,
+                             IMonitorTestHelper helper,
+                             CKliTestHelperExtensions.RemotesFolder remotes,
+                             CKliEnv defaultWorldContext,
+                             bool privateStack )
     {
-        _helper = helper;
+        _testEnv = testEnv;
         _remotes = remotes;
         _isPublic = !privateStack;
         _defaultWorld = new FakeBuildWorld( helper, this, defaultWorldContext );
     }
 
     /// <summary>
+    /// Gets the fake build test environment.
+    /// </summary>
+    public FakeBuildTestEnv TestEnv => _testEnv;
+
+    /// <summary>
     /// Gets the <see cref="StackRepository.StackRoot"/>.
     /// </summary>
     public NormalizedPath StackRoot => _defaultWorld.WorldRoot.CurrentDirectory;
+
+    /// <summary>
+    /// Gets the display screen as a concrete <see cref="StringScreen"/>.
+    /// This exposes the <see cref="StringScreen.Clear()"/>.
+    /// </summary>
+    public StringScreen Screen => (StringScreen)_defaultWorld.WorldRoot.Screen;
 
     /// <summary>
     /// Gets whether this stack is public.

@@ -50,28 +50,29 @@ public sealed partial class FakeBuildTestEnv : IDisposable
     /// Creates a new stack in <see cref="Path"/>/bare/<paramref name="name"/> folder and returns
     /// a <see cref="CKliTestHelperExtensions.RemotesFolder"/> that can be used to clone it.
     /// </summary>
-    /// <param name="name">The stack name. Must end with "-Stack".</param>
+    /// <param name="name">The stack name. Must not end with "-Stack".</param>
     /// <returns>The remotes folder.</returns>
-    public async Task<FakeBuildStack> CreateStackAsync( string stackName = "Test-Stack",
+    public async Task<FakeBuildStack> CreateStackAsync( string stackName = "Test",
                                                         Action<IActivityMonitor, NormalizedPath, XElement>? pluginConfigurationEditor = null,
                                                         bool allowDuplicateStack = false,
                                                         bool privateStack = false )
     {
-        Throw.CheckArgument( stackName.EndsWith( "-Stack" ) );
+        Throw.CheckArgument( !stackName.EndsWith( "-Stack" ) );
         // We want to use the real "ckli create <url>" command here.
         var rootContext = new CKliEnv( _path, screen: new StringScreen(), findCurrentStackPath: false );
-        var barePath = _path.AppendPart( "bare" ).AppendPart( stackName );
-        (await CKliCommands.ExecAsync( _helper.Monitor, rootContext, "create", new Uri( barePath ) ).ConfigureAwait( false )).ShouldBeTrue();
+
+        var barePath = _path.AppendPart( "bare" );
+        (await CKliCommands.ExecAsync( _helper.Monitor, rootContext, "create", new Uri( barePath.AppendPart( stackName + "-Stack" ) ), "--ignore-parent-stack" ).ConfigureAwait( false )).ShouldBeTrue();
         var clonedPath = _path.AppendPart( stackName );
         Throw.DebugAssert( "The 'ckli create' has cloned the stack (with only the .Public in it).", Directory.Exists( clonedPath ) );
         // We destroy the created clone: we need to clone it with the RemotesFolder.CloneAsync() that handles <Plugins> configurations
         // from the actual World plugins.
         FileHelper.DeleteFolder( _helper.Monitor, clonedPath );
 
-        var remotes = new CKliTestHelperExtensions.RemotesFolder( barePath );
+        var remotes = new CKliTestHelperExtensions.RemotesFolder( barePath, stackName );
         var defaultWorldContext = await remotes.CloneAsync( _path, allowDuplicateStack, pluginConfigurationEditor, privateStack ).ConfigureAwait( false );
 
-        return new FakeBuildStack( _helper, remotes, defaultWorldContext, privateStack );
+        return new FakeBuildStack( this, _helper, remotes, defaultWorldContext, privateStack );
     }
 
     /// <summary>
