@@ -15,8 +15,7 @@ namespace CKli.ShallowSolution.Plugin;
 /// </summary>
 public sealed class ShallowSolutionPlugin : PrimaryPluginBase
 {
-    // Indexed by Tree.Sha.
-    readonly Dictionary<string, TreeFolder> _gitContents;
+    readonly GitFileProviderCache _cache;
 
     /// <summary>
     /// Initializes a new ShallowSolutionPlugin.
@@ -25,7 +24,7 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
     public ShallowSolutionPlugin( PrimaryPluginContext primaryContext )
         : base( primaryContext )
     {
-        _gitContents = new Dictionary<string, TreeFolder>();
+        _cache = new GitFileProviderCache();
     }
 
     /// <summary>
@@ -42,28 +41,7 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
     /// False to always use the committed content and ignores the current file system.
     /// </param>
     /// <returns>The commit content.</returns>
-    public INormalizedFileProvider GetFiles( Commit commit, bool useWorkingFolder )
-    {
-        var repo = ((IBelongToARepository)commit).Repository;
-        return useWorkingFolder && commit.Sha == repo.Head.Tip.Sha
-            ? new CheckedOutFileProvider( repo.Info.WorkingDirectory )
-            : GetFiles( commit.Tree );
-    }
-
-    /// <summary>
-    /// Gets the content of a <see cref="Tree"/>.
-    /// </summary>
-    /// <param name="tree">The Tree.</param>
-    /// <returns>The Tree content.</returns>
-    public INormalizedFileProvider GetFiles( Tree tree )
-    {
-        if( !_gitContents.TryGetValue( tree.Sha, out var content ) )
-        {
-            content = new TreeFolder( tree );
-            _gitContents.Add( tree.Sha, content );
-        }
-        return content;
-    }
+    public INormalizedFileProvider GetFiles( Commit commit, bool useWorkingFolder ) => INormalizedFileProvider.GetFiles( commit, useWorkingFolder, _cache );
 
     /// <summary>
     /// Creates a <see cref="GitSolutionContent"/> from a root ".slnx" file that must be conventionally named

@@ -13,7 +13,7 @@ namespace CKli.ShallowSolution.Plugin;
 /// This only exposes the <see cref="Projects"/> and the <see cref="Consumed"/> packages.
 /// </para>
 /// </summary>
-public class GitSolutionContent
+public partial class GitSolutionContent
 {
     readonly HashSet<PackageInstance> _consumed;
     readonly List<Project> _projects;
@@ -83,57 +83,6 @@ public class GitSolutionContent
         return hasUpdates;
     }
 
-    /// <summary>
-    /// Minimal project file.
-    /// </summary>
-    public sealed class Project
-    {
-        readonly NormalizedPath _path;
-        readonly string _name;
-        readonly XElement _root;
-        bool _packableKnown;
-        bool? _isPackable;
-
-        internal Project( NormalizedPath path, XElement root )
-        {
-            _path = path;
-            _name = path.LastPart[0..^7];
-            _root = root;
-        }
-
-        /// <summary>
-        /// Gets the path to the ".csproj" file in the solution.
-        /// </summary>
-        public NormalizedPath Path => _path;
-
-        /// <summary>
-        /// Gets the project name.
-        /// </summary>
-        public string Name => _name;
-
-        /// <summary>
-        /// Gets whether this project is packable: its <see cref="Name"/> is the produced package name.
-        /// <para>
-        /// This is null when no &lt;IsPackable&gt; element can be found.
-        /// </para>
-        /// </summary>
-        public bool? IsPackable
-        {
-            get
-            {
-                if( !_packableKnown )
-                {
-                    _packableKnown = true;
-                    _isPackable = (bool?)_root.Elements( "PropertyGroup" )
-                                              .SelectMany( g => g.Elements( "IsPackable" ) )
-                                              .FirstOrDefault();
-                }
-                return _isPackable;
-            }
-        }
-
-    }
-
     private protected GitSolutionContent()
     {
         _consumed = new HashSet<PackageInstance>();
@@ -175,11 +124,11 @@ public class GitSolutionContent
         else
         {
             Throw.DebugAssert( path.LastPart.Equals( "Directory.Package.props", StringComparison.OrdinalIgnoreCase ) );
-            foreach( var e in project.Descendants( "PackageVersion" ) )
+            foreach( var e in project.Descendants( XNames.PackageVersion ) )
             {
                 var packageId = CommonSolution.GetIncludedName( monitor, path, e, CK.Core.LogLevel.Error );
                 if( packageId == null
-                    || !CommonSolution.ReadVersionAttribute( monitor, path, e, "Version", "Version", out var _, out var version ) )
+                    || !CommonSolution.ReadVersionAttribute( monitor, path, e, XNames.Version, "Version", out var _, out var version ) )
                 {
                     return false;
                 }
@@ -191,16 +140,16 @@ public class GitSolutionContent
 
         bool HandlePackageReferences( IActivityMonitor monitor, NormalizedPath path, XElement project )
         {
-            foreach( var e in project.Descendants( "PackageReference" ) )
+            foreach( var e in project.Descendants( XNames.PackageReference ) )
             {
                 var packageId = CommonSolution.GetIncludedName( monitor, path, e, CK.Core.LogLevel.Error );
                 if( packageId == null )
                 {
                     return false;
                 }
-                if( !CommonSolution.ReadVersionAttribute( monitor, path, e, "VersionOverride", null, out var _, out var version )
+                if( !CommonSolution.ReadVersionAttribute( monitor, path, e, XNames.VersionOverride, null, out var _, out var version )
                     || (version == null
-                        && !CommonSolution.ReadVersionAttribute( monitor, path, e, "Version", null, out var _, out version )) )
+                        && !CommonSolution.ReadVersionAttribute( monitor, path, e, XNames.Version, null, out var _, out version )) )
                 {
                     return false;
                 }

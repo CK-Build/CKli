@@ -29,9 +29,9 @@ static class CommonSolution
                                               Func<IActivityMonitor, NormalizedPath, XElement,bool> collector )
     {
         var dedupFolders = new HashSet<string>();
-        foreach( var xmlProject in solution.Descendants( "Project" ) )
+        foreach( var xmlProject in solution.Descendants( XNames.Project ) )
         {
-            NormalizedPath path = (string?)xmlProject.Attribute( "Path" );
+            NormalizedPath path = (string?)xmlProject.Attribute( XNames.Path );
             if( !path.IsEmptyPath )
             {
                 var fInfo = root.GetFileInfo( path );
@@ -123,7 +123,7 @@ static class CommonSolution
     /// <returns>The included name or null is not found.</returns>
     internal static string? GetIncludedName( IActivityMonitor monitor, string sourceFilePath, XElement e, LogLevel logLevel )
     {
-        var name = e.Attribute( "Include" )?.Value;
+        var name = e.Attribute( XNames.Include )?.Value;
         if( string.IsNullOrEmpty( name ) )
         {
             monitor.Log( logLevel, $"""
