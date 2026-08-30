@@ -337,7 +337,7 @@ public sealed partial class PluginMachinery
                               {ckliPluginsCore}
                               To use Version="{ckliVersion}".
                               """ );
-                ckliPluginsCore.SetAttributeValue( "Version", ckliVersion );
+                ckliPluginsCore.SetAttributeValue( XNames.Version, ckliVersion );
                 mustRecompile = true;
             }
             // Handles any standard plugins: their version is the same.
@@ -362,9 +362,9 @@ public sealed partial class PluginMachinery
             if( File.Exists( PluginTestsCSProjFilePath ) )
             {
                 var testsCSProj = XDocument.Load( PluginTestsCSProjFilePath, LoadOptions.PreserveWhitespace );
-                var ckliTesting = testsCSProj.Root?.Elements( "ItemGroup" )
-                                             .Elements( "PackageReference" )
-                                             .FirstOrDefault( e => e.Attribute( "Include" )?.Value == "CKli.Testing" );
+                var ckliTesting = testsCSProj.Root?.Elements( XNames.ItemGroup )
+                                             .Elements( XNames.PackageReference )
+                                             .FirstOrDefault( e => e.Attribute( XNames.Include )?.Value == "CKli.Testing" );
                 if( ckliTesting == null )
                 {
                     monitor.Warn( """
@@ -374,7 +374,7 @@ public sealed partial class PluginMachinery
                 }
                 else
                 {
-                    if( !SVersion.TryParse( ckliTesting.Attribute( "Version" )?.Value, out v ) )
+                    if( !SVersion.TryParse( ckliTesting.Attribute( XNames.Version )?.Value, out v ) )
                     {
                         monitor.Error( $"Invalid version in {ckliTesting} (in '{PluginTestsCSProjFilePath}'): {v.ErrorMessage}." );
                         return false;
@@ -386,7 +386,7 @@ public sealed partial class PluginMachinery
                           {ckliTesting}
                           To use Version="{ckliVersion}".
                           """ );
-                        ckliTesting.SetAttributeValue( "Version", ckliVersion );
+                        ckliTesting.SetAttributeValue( XNames.Version, ckliVersion );
                         testsCSProj.SafeSave( PluginTestsCSProjFilePath );
                         mustRecompile = true;
                     }
@@ -411,9 +411,9 @@ public sealed partial class PluginMachinery
 
         static bool ReadPackageVersion( IActivityMonitor monitor, XDocument d, string name, bool mustExist, NormalizedPath directoryPackageProps, out XElement? ckliPluginsCore, out SVersion? v )
         {
-            ckliPluginsCore = d.Root?.Elements( "ItemGroup" )
-                                         .Elements( "PackageVersion" )
-                                         .FirstOrDefault( e => e.Attribute( "Include" )?.Value == name );
+            ckliPluginsCore = d.Root?.Elements( XNames.ItemGroup )
+                                         .Elements( XNames.PackageVersion )
+                                         .FirstOrDefault( e => e.Attribute( XNames.Include )?.Value == name );
             if( ckliPluginsCore == null )
             {
                 v = null;
@@ -424,7 +424,7 @@ public sealed partial class PluginMachinery
                 }
                 return true;
             }
-            if( !SVersion.TryParse( ckliPluginsCore.Attribute( "Version" )?.Value, out v ) )
+            if( !SVersion.TryParse( ckliPluginsCore.Attribute( XNames.Version )?.Value, out v ) )
             {
                 monitor.Error( $"Invalid version in {ckliPluginsCore} (in '{directoryPackageProps}'): {v.ErrorMessage}." );
                 return false;
@@ -450,7 +450,7 @@ public sealed partial class PluginMachinery
                               {ckliStandard}
                               To use Version="{ckliVersion}".
                               """ );
-                ckliStandard.SetAttributeValue( "Version", ckliVersion );
+                ckliStandard.SetAttributeValue( XNames.Version, ckliVersion );
                 mustRecompile = true;
             }
             return true;

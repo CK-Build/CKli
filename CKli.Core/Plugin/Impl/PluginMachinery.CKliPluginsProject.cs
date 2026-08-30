@@ -26,7 +26,7 @@ sealed partial class PluginMachinery
             _machinery = machinery;
             _csProj = XDocument.Load( machinery.CKliPluginsCSProj, LoadOptions.PreserveWhitespace );
             Throw.CheckData( _csProj.Root != null );
-            _csFirstItemGroup = _csProj.Root.Elements( "ItemGroup" ).FirstOrDefault()!;
+            _csFirstItemGroup = _csProj.Root.Elements( XNames.ItemGroup ).FirstOrDefault()!;
             Throw.CheckData( _csFirstItemGroup != null );
             _ckliPluginsFileText = File.ReadAllText( machinery.CKliPluginsFile );
             _autoSectionEnd = _ckliPluginsFileText.IndexOf( "// </AutoSection>" );
@@ -35,7 +35,7 @@ sealed partial class PluginMachinery
             Throw.CheckData( _linePrefixLength >= 0 );
             _directoryPackages = XDocument.Load( machinery.DirectoryPackageProps, LoadOptions.PreserveWhitespace );
             Throw.CheckData( _directoryPackages.Root != null );
-            _dpFirstItemGroup = _directoryPackages.Root.Elements( "ItemGroup" ).FirstOrDefault()!;
+            _dpFirstItemGroup = _directoryPackages.Root.Elements( XNames.ItemGroup ).FirstOrDefault()!;
             Throw.CheckData( _dpFirstItemGroup != null );
         }
 
@@ -93,8 +93,8 @@ sealed partial class PluginMachinery
             }
             else
             {
-                _csFirstItemGroup.Add( new XElement( "ProjectReference",
-                                        new XAttribute( "Include", projectPath ) ) );
+                _csFirstItemGroup.Add( new XElement( XNames.ProjectReference,
+                                        new XAttribute( XNames.Include, projectPath ) ) );
             }
             EnsureRegisterCall( shortPluginName );
             return true;
@@ -119,23 +119,23 @@ sealed partial class PluginMachinery
             if( existsRef == null )
             {
                 added = true;
-                _csFirstItemGroup.Add( new XElement( "PackageReference",
-                                        new XAttribute( "Include", fullPluginName ) ) );
+                _csFirstItemGroup.Add( new XElement( XNames.PackageReference,
+                                        new XAttribute( XNames.Include, fullPluginName ) ) );
             }
             var targetVersion = version.ToString();
             XElement? existsVer = FindPackageVersion( fullPluginName );
             if( existsVer == null )
             {
-                existsVer = new XElement( "PackageVersion",
-                                        new XAttribute( "Include", fullPluginName ), new XAttribute( "Version", targetVersion ) );
+                existsVer = new XElement( XNames.PackageVersion,
+                                        new XAttribute( XNames.Include, fullPluginName ), new XAttribute( XNames.Version, targetVersion ) );
                 _dpFirstItemGroup.Add( existsVer );
             }
             else
             {
-                var vAttr = existsVer.Attribute( "Version" );
+                var vAttr = existsVer.Attribute( XNames.Version );
                 if( vAttr == null || vAttr.Value != targetVersion )
                 {
-                    existsVer.SetAttributeValue( "Version", targetVersion );
+                    existsVer.SetAttributeValue( XNames.Version, targetVersion );
                     versionChanged = true;
                 }
             }
@@ -153,24 +153,24 @@ sealed partial class PluginMachinery
 
         XElement? FindPackageReference( string fullPluginName )
         {
-            return _csProj.Root!.Elements( "ItemGroup" )
-                                         .Elements( "PackageReference" )
-                                         .FirstOrDefault( e => e.Attribute( "Include" )?.Value == fullPluginName );
+            return _csProj.Root!.Elements( XNames.ItemGroup )
+                                         .Elements( XNames.PackageReference )
+                                         .FirstOrDefault( e => e.Attribute( XNames.Include )?.Value == fullPluginName );
         }
 
         XElement? FindPackageVersion( string fullPluginName )
         {
-            return _directoryPackages.Root!.Elements( "ItemGroup" )
-                                                    .Elements( "PackageVersion" )
-                                                    .FirstOrDefault( e => e.Attribute( "Include" )?.Value == fullPluginName );
+            return _directoryPackages.Root!.Elements( XNames.ItemGroup )
+                                                    .Elements( XNames.PackageVersion )
+                                                    .FirstOrDefault( e => e.Attribute( XNames.Include )?.Value == fullPluginName );
         }
 
         XElement? FindProjectReference( string projectPath )
         {
             Throw.DebugAssert( projectPath.StartsWith( "..\\" ) && projectPath.EndsWith( ".csproj" ) );
-            return _csProj.Root!.Elements( "ItemGroup" )
+            return _csProj.Root!.Elements( XNames.ItemGroup )
                                          .Elements( "ProjectReference" )
-                                         .FirstOrDefault( e => e.Attribute( "Include" )?.Value == projectPath );
+                                         .FirstOrDefault( e => e.Attribute( XNames.Include )?.Value == projectPath );
         }
 
         internal bool Save( IActivityMonitor monitor ) 

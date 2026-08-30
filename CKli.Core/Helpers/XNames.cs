@@ -16,4 +16,10 @@ public static class XNames
     public static readonly XName Folder = XNamespace.None + "Folder";
     public static readonly XName Name = XNamespace.None + "Name";
     public static readonly XName Url = XNamespace.None + "Url";
+    public static readonly XName Version = XNamespace.None + "Version";
+    public static readonly XName PackageVersion = XNamespace.None + "PackageVersion";
+    public static readonly XName ItemGroup = XNamespace.None + "ItemGroup";
+    public static readonly XName PackageReference = XNamespace.None + "PackageReference";
+    public static readonly XName ProjectReference = XNamespace.None + "ProjectReference";
+    public static readonly XName Include = XNamespace.None + "Include";
 }
