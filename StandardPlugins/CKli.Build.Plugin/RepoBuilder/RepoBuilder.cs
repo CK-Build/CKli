@@ -1,4 +1,4 @@
-﻿using CK.Core;
+using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;

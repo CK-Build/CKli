@@ -1,4 +1,4 @@
-﻿using CK.Core;
+using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;
 using CKli.Build.Plugin;
