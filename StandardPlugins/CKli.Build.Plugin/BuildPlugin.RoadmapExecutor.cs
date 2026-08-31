@@ -282,27 +282,27 @@ public sealed partial class BuildPlugin
 
             // If no new commit has been created (canAmend is false), then we check whether the new version
             // requires an independent commit.
+            // Roadmap.BuildSolution used this very same predicate to decide the target version's CI number:
+            // it MUST answer the same here or the version tag will not land on the commit it claims.
             if( !canAmend
-                && build.Solution.VersionInfo.VersionTagInfo.TagCommitsBySha.TryGetValue( git.Repository.Head.Tip.Sha, out var already ) )
+                && build.Solution.VersionInfo.VersionTagInfo.RequiresNewCommit( git.Repository.Head.Tip,
+                                                                               build.TargetVersion,
+                                                                               out var error ) )
             {
-                var error = already.CanBearVersion( build.TargetVersion );
-                if( error != null )
+                monitor.Info( $"""
+                    Creating an empty commit to avoid error:
+                    {error}
+                    """ );
+                // We create the commit on the checked out branch (can be the regular or the "dev/") and
+                // refresh the buildBranch.
+                if( git.Commit( monitor,
+                                $"Producing 'v{build.TargetVersion}' from unchanged head.",
+                                CommitBehavior.CreateEmptyCommit ) == CommitResult.Error
+                    || !buildBranch.Refresh( monitor ) )
                 {
-                    monitor.Info( $"""
-                        Creating an empty commit to avoid error:
-                        {error}
-                        """ );
-                    // We create the commit on the checked out branch (can be the regular or the "dev/") and
-                    // refresh the buildBranch.
-                    if( git.Commit( monitor,
-                                    $"Producing 'v{build.TargetVersion}' from unchanged '{already.Version.ParsedText}'.",
-                                    CommitBehavior.CreateEmptyCommit ) == CommitResult.Error
-                        || !buildBranch.Refresh( monitor ) )
-                    {
-                        return null;
-                    }
-                    canAmend = true;
+                    return null;
                 }
+                canAmend = true;
             }
             // Since we work on the working folder, we must refresh the build branch.
             var commit = UpdateDependenciesAndCommit( monitor, build, _roadmap.PackageMapping, canAmend );

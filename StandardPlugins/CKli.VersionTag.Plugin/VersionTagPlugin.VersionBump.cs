@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using LibGit2Sharp;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -86,9 +87,58 @@ public sealed partial class VersionTagPlugin
         {
             monitor.Warn( $"Error occurred but the 'v{futureFake}+invalid' is nevertheless created on '{branch}'." );
         }
-        repo.GitRepository.Repository.Tags.Add( $"v{futureFake}+fake", branch.Tip, allowOverwrite: false );
+
+        // A commit produces at most one version: setting the "+fake" on a commit that already bears a
+        // version it is not based on would be a TagConflict.MultipleVersionsOnSameCommit (a released
+        // version's future fake belongs elsewhere, and a commit carrying a "+fake" cannot have produced an
+        // unrelated version). Since futureFake is necessarily greater than every published version, it can
+        // never be a IsStableRoughBaseOf what the tip already carries: an empty commit takes the fake.
+        // Note: RemoveFakeVersions above deleted git tags without updating this versionInfo (unlike
+        // DestroyLocalReleases, which goes through RemoveTagCommit), so a just-removed fake can still be
+        // reported here: cleanupFake filters it out to avoid a useless empty commit.
+        var target = branch.Tip;
+        if( versionInfo.TagCommitsBySha.TryGetValue( target.Sha, out var onTip )
+            && !cleanupFake.Any( f => f.Commit == onTip )
+            && !futureFake.IsStableRoughBaseOf( onTip.Version ) )
+        {
+            var newTarget = CreateEmptyCommit( monitor,
+                                               repo,
+                                               context.Committer,
+                                               branch,
+                                               $"Empty commit carrying the 'v{futureFake}+fake' version tag." );
+            if( newTarget == null ) return false;
+            monitor.Info( ScreenType.CKliScreenTag,
+                          $"Commit '{target.Sha.AsSpan( 0, 7 )}' already carries 'v{onTip.Version}': "
+                          + $"an empty commit has been created on '{branch}' to carry the new version tag." );
+            target = newTarget;
+        }
+        repo.GitRepository.Repository.Tags.Add( $"v{futureFake}+fake", target, allowOverwrite: false );
         monitor.Info( ScreenType.CKliScreenTag, $"Tag 'v{futureFake}+fake' created on '{branch}'." );
         return true;
+
+        // Creates an empty commit (same tree as the branch tip) on the branch and moves its ref, without
+        // requiring the branch to be checked out and without touching the working folder: GitRepository.Commit
+        // works on the checked out branch and stages "*", which would capture unrelated changes.
+        static Commit? CreateEmptyCommit( IActivityMonitor monitor,
+                                          Repo repo,
+                                          Signature committer,
+                                          Branch branch,
+                                          string message )
+        {
+            try
+            {
+                var git = repo.GitRepository.Repository;
+                var tip = branch.Tip;
+                var newCommit = git.ObjectDatabase.CreateCommit( committer, committer, message, tip.Tree, [tip], prettifyMessage: true );
+                git.Refs.UpdateTarget( branch.Reference, newCommit.Id, null );
+                return newCommit;
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"While creating an empty commit on '{repo.DisplayPath}' branch '{branch.FriendlyName}'.", ex );
+                return null;
+            }
+        }
 
         static bool RemoveFakeVersions( IActivityMonitor monitor,
                                         Repo repo,

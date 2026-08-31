@@ -131,7 +131,10 @@ public sealed partial class BuildResult
         Throw.CheckArgument( buildingVersionTag.CanonicalName.AsSpan( 19 ).EndsWith( buildingVersion.ToString(), StringComparison.Ordinal ) );
 
         // Defensive programming (allowOverwrite: true).
-        var vTag = $"local/{buildingVersion}";
+        // The "v" matters: version tags are "v{version}", "building/v{version}" and "local/v{version}"
+        // (see CommitBuildInfo.ApplyReleaseBuildTag), and VersionTagPlugin.DestroyLocalRelease looks the
+        // tag up by that exact name.
+        var vTag = $"local/v{buildingVersion}";
         var newTag = repo.GitRepository.Repository.Tags.Add( vTag,
                                                              buildingVersionTag.Target,
                                                              buildingVersionTag.Annotation.Tagger,

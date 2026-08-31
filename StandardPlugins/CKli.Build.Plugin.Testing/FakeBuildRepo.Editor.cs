@@ -93,7 +93,7 @@ public sealed partial class FakeBuildRepo
                     <Project Sdk="Microsoft.NET.Sdk">
                         <ItemGroup>
                         </ItemGroup>
-                    </Project >
+                    </Project>
                     """;
             } );
             _helper.TouchAndCommit( _git.Repository, _repo.SolutionFileName, branchName, $"Adding project '{fName}' (2/2).", textSlnx =>

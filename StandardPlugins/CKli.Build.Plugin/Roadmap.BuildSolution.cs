@@ -227,6 +227,34 @@ public sealed partial class Roadmap
             {
                 return false;
             }
+            // The build reason is not the only thing that makes the executor add a commit: it also adds one
+            // when the commit to build already bears a version that cannot produce the target one. That is
+            // independent of UpstreamBuild/DependencyUpdate, so the prediction above can miss it - and a
+            // missed commit means a CI number one too low (a "--ci.0" that is not on its base commit).
+            // RoadmapExecutor decides with this very same predicate, so the two cannot diverge.
+            if( !mustAddCommit
+                && _versionInfo.VersionTagInfo.RequiresNewCommit( _versionInfo.TagCommitTree.Tip,
+                                                                  targetVersion,
+                                                                  out var newCommitReason ) )
+            {
+                monitor.Trace( $"""
+                    A new commit will be created for '{_solution}': incrementing the CI number of '{targetVersion}'.
+                    {newCommitReason}
+                    """ );
+                mustAddCommit = true;
+                // ComputeTargetVersion only ever ratchets vChange up, so calling it again is idempotent
+                // apart from the CI number we want incremented.
+                targetVersion = _versionInfo.TagCommitTree.ComputeTargetVersion( monitor,
+                                                                                 ref vChange,
+                                                                                 _roadmap.Graph.BranchName,
+                                                                                 _roadmap._ciBuildMode != CIBuildMode.None,
+                                                                                 mustAddCommit,
+                                                                                 allowLocal: false );
+                if( targetVersion == null )
+                {
+                    return false;
+                }
+            }
             targetVersion = targetVersion.SetParsedPrefix( "building/" );
 
             // If the base version is a +fake, then IF this happens to be published we must ensure

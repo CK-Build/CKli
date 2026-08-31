@@ -48,8 +48,17 @@ public sealed class FakeBuildWorld
     /// <param name="repositoryName">The repository name.</param>
     /// <param name="initialVersion">Optional initial version tag to create on the root stable branch (that is checked out).</param>
     /// <param name="subFolder">Optional sub folder in the world.</param>
-    /// <returns></returns>
-    public async Task<FakeBuildRepo> CreateRepoAsync( string repositoryName, string? initialVersion, NormalizedPath subFolder = default )
+    /// <param name="references">
+    /// Optional repositories that the created repository's default project references. The reference is on
+    /// each one's default project (its produced package) at its <see cref="FakeBuildRepo.InitialVersion"/>,
+    /// and it is set up before the initial version tag: the created repository is up to date with regard to
+    /// its version, so nothing is to be built.
+    /// </param>
+    /// <returns>The new repository.</returns>
+    public async Task<FakeBuildRepo> CreateRepoAsync( string repositoryName,
+                                                      string? initialVersion,
+                                                      NormalizedPath subFolder = default,
+                                                      params IEnumerable<FakeBuildRepo> references )
     {
         Throw.CheckArgument( repositoryName.Contains( '-' ) && !repositoryName.Contains( '.' ) );
         var v = initialVersion == null ? null : SVersion.Parse( initialVersion );
@@ -69,7 +78,12 @@ public sealed class FakeBuildWorld
         // - If a initialVersion is provided:
         //    - It removes the v0.0.0+fake (application of the Missing initial version fix).
         //    - It sets the initialVersion tags.
-        repo = new FakeBuildRepo( this, _helper, context.CurrentDirectory.AppendPart( repositoryName ), v );
+        var refs = references as IReadOnlyList<FakeBuildRepo> ?? [.. references];
+        foreach( var r in refs )
+        {
+            Throw.CheckArgument( "References must belong to this World.", r.World == this );
+        }
+        repo = new FakeBuildRepo( this, _helper, context.CurrentDirectory.AppendPart( repositoryName ), v, refs );
         _repositories.Add( repo );
         return repo;
     }

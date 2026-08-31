@@ -520,14 +520,26 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
 #endif
 
         // Third pass: index the TagCommit by their commit's sha.
-        // Up to here the tags have only been checked "by version": a commit bearing more than one version
-        // is detected only now. The single accepted case is a "+fake" sitting on the same commit as a regular
-        // or "+deprecated" version tag: the fake is then attached to it (TagCommit.FakeVersion is a "by sha"
-        // relation, it says nothing about the versions). Anything else is a conflict.
+        // Up to here the tags have only been checked "by version". A commit produces at most ONE version,
+        // so two version tags on one commit is a TagConflict.MultipleVersionsOnSameCommit... except when one
+        // of them is a "+fake" that the other version is legitimately based on.
         //
-        // This runs before the HotZoneInfo is created (it relies on IsOrHasFakeVersion) and before the "ci.0"
-        // tags are processed: those only ever add an existing TagCommit instance under another version key,
-        // always on the same commit, so they cannot change this index.
+        // A "+fake" declares "consider this version released here". Another version tag on that same commit
+        // is then acceptable exactly when the build would have accepted it, i.e. when the fake is a
+        // IsStableRoughBaseOf the other version (same Major.Minor.Patch or one valid increment, prereleases
+        // included) - the very test TagCommit.CanBearVersion applies. Anything else is nonsense in both
+        // directions:
+        //  - if a released version exists, a "+fake" for an unrelated future version belongs on one of that
+        //    commit's PARENTS, not on it;
+        //  - if the "+fake" exists, that commit cannot have produced a version unrelated to it.
+        //
+        // Note that the equal-version case ('v4.3.2+fake' and the built 'local/v4.3.2') never reaches this
+        // pass at all: they share the v2c key, so the fake was shadowed and attached as TagCommit.FakeVersion
+        // by the "by version" pass above.
+        //
+        // This runs before the HotZoneInfo is created and before the "ci.0" tags are processed: those only
+        // ever add an existing TagCommit instance under another version key, always on the same commit, so
+        // they cannot change this index.
         var sha2c = new Dictionary<string, TagCommit>( v2c.Count );
         foreach( var tc in v2c.Values )
         {
@@ -540,33 +552,27 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             // under the ci.0 one): same instance, nothing to do.
             if( onSameCommit == tc ) continue;
 
-            // At most one "+fake" and one non-fake per commit. A "+fake" shadowed by a same version regular
-            // tag is not in v2c, so it cannot show up here (it was already attached by the pass above).
-            TagCommit? host = null;
+            // Exactly one of them must be the "+fake", and it must be a rough base of the other one.
+            // The fake keeps its own v2c entry (its version differs) so it stays reachable by version and
+            // can be the lastStable: there is nothing to attach here, only the produced version to index.
             TagCommit? fake = null;
+            TagCommit? produced = null;
             if( onSameCommit.IsFakeVersion != tc.IsFakeVersion )
             {
-                host = onSameCommit.IsFakeVersion ? tc : onSameCommit;
                 fake = onSameCommit.IsFakeVersion ? onSameCommit : tc;
+                produced = onSameCommit.IsFakeVersion ? tc : onSameCommit;
             }
-            if( host == null || host.FakeVersion != null )
+            // FirstTagCollect rejects a non stable "+fake", so IsStableRoughBaseOf cannot throw here.
+            if( fake != null && fake.Version.IsStableRoughBaseOf( produced!.Version ) )
             {
-                // Two regular versions, two "+fake", or a second "+fake" on the commit.
-                tagConflicts ??= new();
-                tagConflicts.Add( ((onSameCommit.Version, onSameCommit.Tag),
-                                   (tc.Version, tc.Tag),
-                                   TagConflict.MultipleVersionsOnSameCommit) );
+                sha2c[tc.Sha] = produced;
                 continue;
             }
-            Throw.DebugAssert( fake != null );
-            host.SetFake( fake );
-            sha2c[tc.Sha] = host;
-            // Same rule as the "by version" path above: the host can now be the lastStable because
-            // its commit carries a "+fake" (IsOrHasFakeVersion is now true).
-            if( host.Version.IsStable && (lastStable == null || lastStable.Version < host.Version) )
-            {
-                lastStable = host;
-            }
+            // Order the pair by version so the reported issue is stable across runs
+            // (v2c.Values enumeration order is not specified).
+            var (t1, t2) = onSameCommit.Version < tc.Version ? (onSameCommit, tc) : (tc, onSameCommit);
+            tagConflicts ??= new();
+            tagConflicts.Add( ((t1.Version, t1.Tag), (t2.Version, t2.Tag), TagConflict.MultipleVersionsOnSameCommit) );
         }
 
         // topHot can be +deprecated... The correct workflow should be to deprecate a version after having produced at least one next version.
@@ -781,14 +787,24 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 // a "local/" version cannot be a +fake, +deprecated nor +invalid: a "local/" is a regular version.
                 bool invalidParsedPrefix = false;
                 bool invalidBuildingOrLocalPrefix = false;
+                bool invalidNonStableFake = false;
                 if( v.VersionKind == CSVersionKind.None
                     || (invalidParsedPrefix = (!string.IsNullOrEmpty( v.ParsedPrefix ) && v.ParsedPrefix != "building/" && v.ParsedPrefix != "local/"))
-                    || (invalidBuildingOrLocalPrefix = (v.HasFakeMetadata || v.HasDeprecatedMetadata || v.HasInvalidMetadata) && v.IsBuildingOrLocal() ) )
+                    || (invalidBuildingOrLocalPrefix = (v.HasFakeMetadata || v.HasDeprecatedMetadata || v.HasInvalidMetadata) && v.IsBuildingOrLocal() )
+                    // A +fake declares a stable version to be considered released: it cannot be a prerelease.
+                    // This is relied upon downstream (SVersion.IsStableRoughBaseOf throws on a non stable
+                    // version), so it is filtered out here rather than defended against everywhere.
+                    || (invalidNonStableFake = (v.HasFakeMetadata && !v.IsStable)) )
                 {
                     if( invalidBuildingOrLocalPrefix )
                     {
                         nonConformantTags ??= [];
                         nonConformantTags.Add( $"Invalid 'building/' or local/' prefix: +fake, +deprecated or +invalid tags must not be local. ({tagName})" );
+                    }
+                    else if( invalidNonStableFake )
+                    {
+                        nonConformantTags ??= [];
+                        nonConformantTags.Add( $"A +fake tag must be a stable version, not a prerelease. ({tagName})" );
                     }
                     else if( invalidParsedPrefix )
                     {

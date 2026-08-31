@@ -198,13 +198,43 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// Gets the versioned tag commit indexed by their <see cref="TagCommit.Sha"/>: at most one
     /// <see cref="TagCommit"/> per commit.
     /// <para>
-    /// This index is built once by the <see cref="VersionTagPlugin"/>. When a commit carries both a "+fake"
-    /// and a regular or "+deprecated" version tag, the entry is the non-fake one and the "+fake" is exposed
-    /// by its <see cref="TagCommit.FakeVersion"/>. Any other commit bearing more than one version is a
-    /// <see cref="TagConflict.MultipleVersionsOnSameCommit"/> conflict: <see cref="HasIssue"/> is then true.
+    /// This index is built once by the <see cref="VersionTagPlugin"/>. A commit produces at most one
+    /// version, and that produced version is the entry. A commit may also carry a "+fake" that the produced
+    /// version is based on (<see cref="SVersion.IsStableRoughBaseOf(SVersion)"/>): the fake is not the entry
+    /// and stays reachable by its own version. Any other commit claimed by more than one version tag is
+    /// reported as <see cref="TagConflict.MultipleVersionsOnSameCommit"/> and <see cref="HasIssue"/> is
+    /// true (this index then keeps the first one seen and must not be trusted until the conflict is fixed).
     /// </para>
     /// </summary>
     public IReadOnlyDictionary<string, TagCommit> TagCommitsBySha => _sha2C;
+
+    /// <summary>
+    /// Gets whether producing <paramref name="targetVersion"/> on <paramref name="buildCommit"/> requires a new
+    /// commit to be created, because that commit already bears a version that cannot also produce this one
+    /// (see <see cref="TagCommit.CanBearVersion(SVersion)"/>).
+    /// <para>
+    /// This is the single source of truth for that decision and it MUST be used by both sides of the build:
+    /// the Build plugin's roadmap calls it to compute the target version (a new commit means one more commit
+    /// of depth, hence a greater <see cref="SVersion.CINumber"/>) and its executor calls it to actually create
+    /// the commit. If the two ever disagree - the roadmap predicting no new commit while the executor creates
+    /// one - the "--ci.N" number is one too low and the version tag no longer sits on the commit it claims,
+    /// which surfaces much later as a <see cref="TagConflict.CI0VersionOnOtherCommit"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="buildCommit">The commit that would be built.</param>
+    /// <param name="targetVersion">The version to produce.</param>
+    /// <param name="reason">The reason why a new commit is required. Null when it is not.</param>
+    /// <returns>True if a new commit must be created to carry <paramref name="targetVersion"/>.</returns>
+    public bool RequiresNewCommit( Commit buildCommit, SVersion targetVersion, out string? reason )
+    {
+        if( _sha2C.TryGetValue( buildCommit.Sha, out var already ) )
+        {
+            reason = already.CanBearVersion( targetVersion );
+            return reason != null;
+        }
+        reason = null;
+        return false;
+    }
 
     /// <summary>
     /// Gets all the <see cref="TagCommit"/>.
@@ -674,12 +704,17 @@ public sealed partial class VersionTagInfo : RepoInfo
 
         var newOne = new TagCommit( this, version, buildCommit, t, contentInfo, deprecatedInfo: null );
         _v2C.Add( version, newOne );
-        // The commit may already carry a "+fake" (this is how a version gap is allowed): the new TagCommit
-        // becomes the "by sha" entry and the fake is attached to it.
+        // The build commit may be the one that carries the "+fake". If the fake is for this very version, the
+        // new TagCommit takes over the "by sha" entry and the fake is attached to it (keeping the version
+        // available until it is published). If the fake is for another version, it keeps its own v2c entry:
+        // the build has already checked through CanBearVersion that this version is based on it.
         if( _sha2C.TryGetValue( newOne.Sha, out var fake ) )
         {
             Throw.DebugAssert( fake.IsFakeVersion );
-            newOne.SetFake( fake );
+            if( fake.Version == version && newOne.IsBuildingOrLocal )
+            {
+                newOne.SetFake( fake );
+            }
         }
         _sha2C[newOne.Sha] = newOne;
         if( version.IsStable && !_lastStables.IsDefault )
@@ -712,16 +747,8 @@ public sealed partial class VersionTagInfo : RepoInfo
             }
             else
             {
-                // The "+fake" tag on the commit is not removed: it becomes the "by sha" entry again.
-                var fake = tc.FakeVersion;
-                if( fake != null )
-                {
-                    _sha2C[tc.Sha] = fake;
-                }
-                else
-                {
-                    _sha2C.Remove( tc.Sha );
-                }
+                // A same-version "+fake" is on its own commit, so it never takes over this entry.
+                _sha2C.Remove( tc.Sha );
                 if( version.IsStable && !_lastStables.IsDefault )
                 {
                     var idx = _lastStables.BinarySearch( tc );
@@ -783,7 +810,9 @@ public sealed partial class VersionTagInfo : RepoInfo
                         collector( World.Issue.CreateManual( $"Found {conflict.Count()} commits bearing more than one version.",
                             screenType.Text( $"""
                                         {conflict.Select( c => $" - {ToString( c.T1 )} and {ToString( c.T2 )}" ).Concatenate( Environment.NewLine )}
-                                        A commit must release at most one version (a '+fake' tag on an already versioned commit is the only exception).
+                                        A commit produces at most one version. A '+fake' may share the commit of a version that
+                                        is based on it, but a '+fake' declaring an unrelated future version must be set on a
+                                        PARENT of the commit that carries the released version, never on it.
                                         This should be fixed manually.
                                         """ ),
                             Repo ) );
