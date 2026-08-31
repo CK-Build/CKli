@@ -219,8 +219,9 @@ public class StackRepositoryTests
             world.Layout.Count.ShouldBe( 1, "Only CKt-Core in the Layout" );
 
             (await world.AddRepositoryAsync( TestHelper.Monitor,
-                                      new GitRepositoryKey( context.SecretsStore, remotes.GetUriFor( "CKt-ActivityMonitor" ), stack.IsPublic ),
-                                      stack.DefaultWorldName.WorldRoot ).ConfigureAwait( false ))
+                                             context,
+                                             new GitRepositoryKey( context.SecretsStore, remotes.GetUriFor( "CKt-ActivityMonitor" ), stack.IsPublic ) )
+                         .ConfigureAwait( false ))
                     .ShouldBeTrue();
 
             world.Layout.Count.ShouldBe( 2, "The Layout has been updated." );
