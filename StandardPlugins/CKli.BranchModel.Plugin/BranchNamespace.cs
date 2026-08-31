@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -15,6 +16,8 @@ namespace CKli.BranchModel.Plugin;
 /// </summary>
 public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
 {
+    static readonly string[] _autoPrevRootBranchNames = ["stable", "main", "master", "root", "trunk", "mother", "primary", "develop"];
+
     const string _defaultRootName = "stable";
 
     readonly BranchName _root;
@@ -488,6 +491,22 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
             sb.AppendLine().Append( e.ToString() );
         }
         return sb.ToString();
+    }
+
+
+    internal string GetNoPreviousRootBranchFoundMessage()
+    {
+        return $"""
+            No '{_autoPrevRootBranchNames.Concatenate( "', '" )}' branch found.
+            The '{_root.Name}' should be created manually.
+            """;
+    }
+
+    internal Branch? GetPreviousRootBranch( IActivityMonitor monitor, GitRepository repository )
+    {
+        return _autoPrevRootBranchNames.Where( n => !n.Equals( Root.Name, StringComparison.OrdinalIgnoreCase ) )
+                                       .Select( n => repository.GetBranch( monitor, n, CK.Core.LogLevel.Info ) )
+                                       .FirstOrDefault( b => b != null );
     }
 
 }

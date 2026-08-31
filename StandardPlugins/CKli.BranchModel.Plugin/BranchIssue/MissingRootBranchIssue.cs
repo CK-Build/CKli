@@ -18,7 +18,7 @@ sealed class MissingRootBranchIssue : World.Issue
         _prevRoot = mainOrMaster;
     }
 
-    public static World.Issue Create( IActivityMonitor monitor,
+    public static World.Issue Create( BranchNamespace ns,
                                       HotBranch root,
                                       Branch? prevRoot,
                                       ScreenType screenType )
@@ -26,10 +26,7 @@ sealed class MissingRootBranchIssue : World.Issue
         var title = $"Missing root branch '{root.BranchName.Name}'.";
         if( prevRoot == null )
         {
-            return CreateManual( title, screenType.Text( $"""
-                    No 'master' nor 'main' branch found.
-                    The '{root.BranchName.Name}' should be created manually.
-                    """ ), root.Repo );
+            return CreateManual( title, screenType.Text( ns.GetNoPreviousRootBranchFoundMessage() ), root.Repo );
         }
         return new MissingRootBranchIssue( title,
                                            screenType.Text( $"Can be fixed by creating it from '{prevRoot.FriendlyName}'." ),

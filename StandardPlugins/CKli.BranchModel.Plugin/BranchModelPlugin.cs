@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CKli.BranchModel.Plugin;
@@ -31,7 +33,67 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
                                           configElement.Elements( XNames.Explo ) );
         _autoFixUselessBranch = (bool?)configElement.Attribute( XNames.AutoFixUselessBranch ) ?? true;
         World.Events.Issue += IssueRequested;
+        World.Events.RepoAdded.Sync += OnRepoAdded;
         _shallowSolution = shallowSolution;
+    }
+
+    void OnRepoAdded( IActivityMonitor monitor, RepoAddedEventArgs e )
+    {
+        // Reproduce MissingRootBranchIssue.
+        var git = e.GitRepository;
+        var root = git.GetBranch( monitor, _namespace.Root.Name );
+        if( root == null )
+        {
+            // Use "dev/stable" if it exists.
+            var prevRoot = git.GetBranch( monitor, _namespace.Root.DevName, missingLocalAndRemote: LogLevel.Trace )
+                            ?? _namespace.GetPreviousRootBranch( monitor, git );
+            if( prevRoot == null )
+            {
+                monitor.Warn( _namespace.GetNoPreviousRootBranchFoundMessage() );
+            }
+            else
+            {
+                monitor.Info( $"Creating root branch '{_namespace.Root.Name}' from branch '{prevRoot.FriendlyName}'." );
+                root = BranchLink.CreateAheadBranch( git, prevRoot.Tip, _namespace.Root.Name, withEmptyInitializationCommit: true );
+            }
+        }
+        if( root != null )
+        {
+            var devRoot = BranchLink.CreateAheadBranch( git, root.Tip, _namespace.Root.DevName, withEmptyInitializationCommit: false );
+            git.Checkout( monitor, devRoot );
+        }
+    }
+
+    void IssueRequested( IssueEventArgs e )
+    {
+        var monitor = e.Monitor;
+        bool hasSevereIssue = false;
+        bool forgetUselessBranches = PrimaryPluginContext.Command is CKliRepoAdd or CKliRepoCreate;
+        foreach( var r in e.Repos )
+        {
+            var info = Get( monitor, r );
+            info.CollectIssues( monitor, e.ScreenType, e.Add, forgetUselessBranches, out hasSevereIssue );
+        }
+        if( !hasSevereIssue )
+        {
+            if( ContentIssue != null )
+            {
+                using( monitor.OpenInfo( "Raising ContentIssue event." ) )
+                {
+                    foreach( var r in e.Repos )
+                    {
+                        var info = Get( monitor, r );
+                        var issueBuilder = new ContentIssueBuilder( info, RaiseContentIssue );
+                        if( !issueBuilder.CreateIssue( monitor, e.Context, e.Add ) )
+                        {
+                            monitor.CloseGroup( $"ContentIssue event handling failed." );
+                            // Stop on the first error.
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -48,34 +110,6 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
             e.Elements( XNames.Explo ).Remove();
             e.Add( ns.GetExplo() );
         } );
-    }
-
-    void IssueRequested( IssueEventArgs e )
-    {
-        var monitor = e.Monitor;
-        bool hasSevereIssue = false;
-        foreach( var r in e.Repos )
-        {
-            var info = Get( monitor, r );
-            info.CollectIssues( monitor, e.ScreenType, e.Add, out hasSevereIssue );
-        }
-        if( !hasSevereIssue && ContentIssue != null )
-        {
-            using( monitor.OpenInfo( "Raising ContentIssue event." ) )
-            {
-                foreach( var r in e.Repos )
-                {
-                    var info = Get( monitor, r );
-                    var issueBuilder = new ContentIssueBuilder( info, RaiseContentIssue );
-                    if( !issueBuilder.CreateIssue( monitor, e.Context, e.Add ) )
-                    {
-                        monitor.CloseGroup( $"ContentIssue event handling failed." );
-                        // Stop on the first error.
-                        break;
-                    }
-                }
-            }
-        }
     }
 
     bool RaiseContentIssue( IActivityMonitor monitor, ContentIssueEventArgs e )
@@ -129,8 +163,10 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     BranchModelInfo Create( IActivityMonitor monitor, Repo repo, BranchNamespace ns, bool autoFixUselessBranch )
     {
         bool isCKliIssueCommand = PrimaryPluginContext.Command is CKliIssue;
-        // We don't want to auto fix when executing "ckli issue".
-        autoFixUselessBranch &= !isCKliIssueCommand;
+        bool isCKliRepoAddOrCreate = PrimaryPluginContext.Command is CKliRepoCreate or CKliRepoAdd;
+        // We don't want to auto fix when executing "ckli issue" and we don't want to remove the "dev/stable"
+        // that have been created by the repo create or add.
+        autoFixUselessBranch &= !isCKliIssueCommand && !isCKliRepoAddOrCreate;
         var info = new BranchModelInfo( repo, ns, this );
         var git = repo.GitRepository.Repository;
 

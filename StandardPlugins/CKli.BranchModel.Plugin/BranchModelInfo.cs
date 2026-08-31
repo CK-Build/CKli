@@ -14,8 +14,6 @@ namespace CKli.BranchModel.Plugin;
 /// </summary>
 public sealed partial class BranchModelInfo : RepoInfo
 {
-    static readonly string[] _autoPrevRootBranchNames = ["stable", "main", "master", "root", "trunk", "mother", "primary", "develop"];
-
     readonly BranchNamespace _namespace;
     internal readonly BranchModelPlugin _plugin;
 
@@ -116,21 +114,19 @@ public sealed partial class BranchModelInfo : RepoInfo
     internal void CollectIssues( IActivityMonitor monitor,
                                  ScreenType screenType,
                                  Action<World.Issue> collector,
+                                 bool forgetUselessBranches,
                                  out bool hasSevereIssues )
     {
         // If the "stable" branch doesn't exist, no need to continue.
         if( Root.GitBranch == null )
         {
             // Use "dev/stable" if it exists.
-            Branch? prevRoot = Root.GitDevBranch
-                                    ?? _autoPrevRootBranchNames.Where( n => !n.Equals( _namespace.Root.Name, StringComparison.OrdinalIgnoreCase ) )
-                                                                   .Select( n => Repo.GitRepository.GetBranch( monitor, n, LogLevel.Info ) )
-                                                                   .FirstOrDefault( b => b != null );
-            collector( MissingRootBranchIssue.Create( monitor, Root, prevRoot, screenType ) );
+            Branch? prevRoot = Root.GitDevBranch ?? _namespace.GetPreviousRootBranch( monitor, Repo.GitRepository );
+            collector( MissingRootBranchIssue.Create( _namespace, Root, prevRoot, screenType ) );
             hasSevereIssues = true;
             return;
         }
-        var issues = new BranchIssueBuilder();
+        var issues = new BranchIssueBuilder( forgetUselessBranches );
         foreach( var b in _branches )
         {
             b.Collect( issues );

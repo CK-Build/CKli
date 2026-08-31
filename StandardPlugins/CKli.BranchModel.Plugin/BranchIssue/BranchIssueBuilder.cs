@@ -17,6 +17,12 @@ sealed partial class BranchIssueBuilder
     List<(Branch Ahead, Branch Base)>? _desynchronizedCheckout;
     List<(Branch Ahead, Branch Base)>? _unrelated;
     bool _hasSevereIssues;
+    readonly bool _forgetUselessBranches;
+
+    public BranchIssueBuilder( bool forgetUselessBranches )
+    {
+        _forgetUselessBranches = forgetUselessBranches;
+    }
 
     public void OnMissingBaseBranch( Branch branch, string baseBranchName )
     {
@@ -27,8 +33,11 @@ sealed partial class BranchIssueBuilder
 
     public void OnUselessBranch( Branch branch, Branch baseBranch )
     {
-        _removables ??= [];
-        _removables.Add( (branch, baseBranch) );
+        if( !_forgetUselessBranches )
+        {
+            _removables ??= [];
+            _removables.Add( (branch, baseBranch) );
+        }
     }
 
     public void OnDesynchronized( Branch ahead, Branch branch, int behindBy )
