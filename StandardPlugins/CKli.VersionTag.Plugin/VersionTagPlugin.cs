@@ -368,11 +368,14 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         // The version is the v2c key (this will throw: one version => one TagCommit), so:
                         // - Like the CI0Version, we have a "TagCommit? FakeVersion { get; }" on TagCommit.
                         // - The "local/" one holds the FakeVersion.
+                        Throw.DebugAssert( "A +fake is always published and stable.", newOne.Version.IsStable && !newOne.IsBuildingOrLocal );
+                        // Same version: the fake is attached whatever the commits are. The fake was set on a
+                        // commit and this version has been built there or on a descendant (the initial version
+                        // bootstrap does exactly this), and the link is what makes exists eligible as lastStable.
                         Throw.DebugAssert( exists.IsOrHasFakeVersion is false );
                         exists.SetFake( newOne );
                         Throw.DebugAssert( exists.IsOrHasFakeVersion is true );
                         // exists can now be the lastStable because IsOrHasFakeVersion is now true!
-                        Throw.DebugAssert( "A +fake is always published and stable.", newOne.Version.IsStable && !newOne.IsBuildingOrLocal );
                         if( lastStable == null || lastStable.Version < exists.Version )
                         {
                             lastStable = exists;
@@ -405,6 +408,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     //  - Otherwise we associate the existing +fake to the "local/" newOne.
                     if( newOne.IsBuildingOrLocal )
                     {
+                        // Same version: attached whatever the commits are (see SetFake).
                         newOne.SetFake( exists );
                     }
                     else if( _removeUselessFakeTag )
@@ -515,6 +519,56 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         validTags = null!;
 #endif
 
+        // Third pass: index the TagCommit by their commit's sha.
+        // Up to here the tags have only been checked "by version": a commit bearing more than one version
+        // is detected only now. The single accepted case is a "+fake" sitting on the same commit as a regular
+        // or "+deprecated" version tag: the fake is then attached to it (TagCommit.FakeVersion is a "by sha"
+        // relation, it says nothing about the versions). Anything else is a conflict.
+        //
+        // This runs before the HotZoneInfo is created (it relies on IsOrHasFakeVersion) and before the "ci.0"
+        // tags are processed: those only ever add an existing TagCommit instance under another version key,
+        // always on the same commit, so they cannot change this index.
+        var sha2c = new Dictionary<string, TagCommit>( v2c.Count );
+        foreach( var tc in v2c.Values )
+        {
+            if( !sha2c.TryGetValue( tc.Sha, out var onSameCommit ) )
+            {
+                sha2c.Add( tc.Sha, tc );
+                continue;
+            }
+            // A TagCommit that holds a "ci.0" version appears twice in v2c (under its own version and
+            // under the ci.0 one): same instance, nothing to do.
+            if( onSameCommit == tc ) continue;
+
+            // At most one "+fake" and one non-fake per commit. A "+fake" shadowed by a same version regular
+            // tag is not in v2c, so it cannot show up here (it was already attached by the pass above).
+            TagCommit? host = null;
+            TagCommit? fake = null;
+            if( onSameCommit.IsFakeVersion != tc.IsFakeVersion )
+            {
+                host = onSameCommit.IsFakeVersion ? tc : onSameCommit;
+                fake = onSameCommit.IsFakeVersion ? onSameCommit : tc;
+            }
+            if( host == null || host.FakeVersion != null )
+            {
+                // Two regular versions, two "+fake", or a second "+fake" on the commit.
+                tagConflicts ??= new();
+                tagConflicts.Add( ((onSameCommit.Version, onSameCommit.Tag),
+                                   (tc.Version, tc.Tag),
+                                   TagConflict.MultipleVersionsOnSameCommit) );
+                continue;
+            }
+            Throw.DebugAssert( fake != null );
+            host.SetFake( fake );
+            sha2c[tc.Sha] = host;
+            // Same rule as the "by version" path above: the host can now be the lastStable because
+            // its commit carries a "+fake" (IsOrHasFakeVersion is now true).
+            if( host.Version.IsStable && (lastStable == null || lastStable.Version < host.Version) )
+            {
+                lastStable = host;
+            }
+        }
+
         // topHot can be +deprecated... The correct workflow should be to deprecate a version after having produced at least one next version.
         // If this happens, we can:
         // - Restore the regular tag:
@@ -586,7 +640,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         // Associate the --ci.0 tag to its base.
                         if( tBase.CI0VersionTag != null )
                         {
-                            Throw.DebugAssert( tBase.CI0Version != null );
+                            Throw.DebugAssert( "non null tag => version is not null.", tBase.CI0Version != null );
                             // The 2 tags can only differ by their "local/" prefix.
                             // We keep the published, and add the "local/" to the removable tags.
                             Throw.DebugAssert( tBase.CI0Version.IsBuildingOrLocal() != v.IsBuildingOrLocal() );
@@ -635,6 +689,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
 
         info.Initialize( hotZone,
                          v2c,
+                         sha2c,
                          removableTags,
                          invalidTags,
                          tagConflicts,

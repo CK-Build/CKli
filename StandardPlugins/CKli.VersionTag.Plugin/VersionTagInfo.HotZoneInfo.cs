@@ -36,7 +36,8 @@ public sealed partial class VersionTagInfo
             {
                 if( lastStable.IsOrHasFakeVersion )
                 {
-                    Throw.DebugAssert( (lastStable.IsFakeVersion && !lastStable.IsBuildingOrLocal) || (lastStable.FakeVersion != null && lastStable.IsBuildingOrLocal) );
+                    // TagCommit.FakeVersion is a "by sha" relation: a published version tag can carry a
+                    // "+fake" on its commit, so nothing can be assumed on lastStable.IsBuildingOrLocal here.
                     var fake = lastStable.FakeVersion?.Version ?? lastStable.Version; 
                     if( !fake.IsStableRoughBaseOf( topHot.Version ) )
                     {

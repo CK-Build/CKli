@@ -49,42 +49,28 @@ public sealed class FakeBuildWorld
     /// <param name="initialVersion">Optional initial version tag to create on the root stable branch (that is checked out).</param>
     /// <param name="subFolder">Optional sub folder in the world.</param>
     /// <returns></returns>
-    public async Task<FakeBuildRepo> CreateRepoAsync( string repositoryName, SVersion? initialVersion, NormalizedPath subFolder = default )
+    public async Task<FakeBuildRepo> CreateRepoAsync( string repositoryName, string? initialVersion, NormalizedPath subFolder = default )
     {
         Throw.CheckArgument( repositoryName.Contains( '-' ) && !repositoryName.Contains( '.' ) );
+        var v = initialVersion == null ? null : SVersion.Parse( initialVersion );
         var repo = _repositories.FirstOrDefault( r => r.RepositoryName == repositoryName );
-        if( repo == null )
+        if( repo != null )
         {
-            var context = _worldRoot.ChangeDirectory( subFolder );
-            var display = _stack.Screen;
-
-            var repoUrl = _stack.Remotes.GetUriFor( repositoryName, mustExist: false );
-            (await CKliCommands.ExecAsync( Monitor, context, "repo", "create", repoUrl ).ConfigureAwait( false )).ShouldBeTrue();
-            // Must run ckli issue twice. TODO: find a way to do this only once...
-            display.Clear();
-            (await CKliCommands.ExecAsync( Monitor, context, "issue", "--fix" )).ShouldBeTrue();
-            display.ToString().ShouldBe(
-                    """
-                ❰✓❱
-          
-                """ );
-            display.Clear();
-            (await CKliCommands.ExecAsync( Monitor, context, "issue", "--fix" )).ShouldBeTrue();
-            display.ToString().ShouldBe(
-                    """
-                ❰✓❱
-          
-                """ );
-            display.Clear();
-            (await CKliCommands.ExecAsync( Monitor, context, "issue", "--fix" )).ShouldBeTrue();
-            display.ToString().ShouldBe(
-                    """
-                ❰✓❱
-          
-                """ );
-            repo = new FakeBuildRepo( this, _helper, context.CurrentDirectory.AppendPart( repositoryName ), initialVersion );
-            _repositories.Add( repo );
+            Throw.InvalidOperationException( $"Repo '{repositoryName}' already exists." );
         }
+        var context = _worldRoot.ChangeDirectory( subFolder );
+        var display = _stack.Screen;
+
+        var repoUrl = _stack.Remotes.GetUriFor( repositoryName, mustExist: false );
+        (await CKliCommands.ExecAsync( Monitor, context, "repo", "create", repoUrl ).ConfigureAwait( false )).ShouldBeTrue();
+        // Creating the Repo, a Editor is created:
+        // - It adds the SolutionFileName and the DefaultProjectName.csproj project.
+        // - It forwards stable onto dev/stable.
+        // - If a initialVersion is provided:
+        //    - It removes the v0.0.0+fake (application of the Missing initial version fix).
+        //    - It sets the initialVersion tags.
+        repo = new FakeBuildRepo( this, _helper, context.CurrentDirectory.AppendPart( repositoryName ), v );
+        _repositories.Add( repo );
         return repo;
     }
 

@@ -5,6 +5,7 @@ using CKli.Core;
 using LibGit2Sharp;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 
 namespace CKli;
 
@@ -30,9 +31,21 @@ public sealed partial class FakeBuildRepo
         _displayPath = path.RemoveFirstPart( world.WorldRoot.CurrentDirectory.Parts.Count );
         using( var e = CreateEditor() )
         {
-            e.AddProject( _defaultProjectName );
+            File.WriteAllText( path.AppendPart( SolutionFileName ), $"""
+                <Solution>
+                    <Project Path="{DefaultProjectName}.csproj" />
+                </Solution>
+                """ );
+            File.WriteAllText( path.AppendPart( DefaultProjectName + ".csproj" ), $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                    <ItemGroup>
+                    </ItemGroup>
+                </Project >
+                """ );
+            e.GitRepository.Commit( helper.Monitor, $"Created '{SolutionFileName}' and its default project." );
             if( initialVersion != null )
             {
+                e.GitRepository.Repository.Tags.Remove( "v0.0.0+fake" );
                 var content = new BuildContentInfo( consumed: [], produced: [_defaultProjectName], assetFileNames: [] );
                 e.GitRepository.Repository.Tags.Add( $"{initialVersion.ParsedPrefix}/v{initialVersion}",
                                                      e.GitRepository.Repository.Head.Tip,
@@ -75,7 +88,7 @@ public sealed partial class FakeBuildRepo
     /// <summary>
     /// Gets a context for this repository.
     /// </summary>
-    public CKliEnv? RepoRoot => _repoRoot ??= _world.WorldRoot.ChangeDirectory( _path );
+    public CKliEnv Root => _repoRoot ??= _world.WorldRoot.ChangeDirectory( _path );
 
     /// <summary>
     /// Creates a temporary editor for the repository.

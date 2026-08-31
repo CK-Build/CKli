@@ -56,6 +56,10 @@ public sealed partial class VersionTagPlugin
             monitor.Error( $"""Provided version must be greater than configured InfVersion="{versionInfo.InfVersion.ParsedText}".""" );
             return false;
         }
+        if( !versionInfo.CheckNoTagConflicts( monitor ) )
+        {
+            return false;
+        }
         //
         // Ignore +fake (even if they are published by design).
         // What matters are only non fake published version (regular or deprecated). 
@@ -83,6 +87,7 @@ public sealed partial class VersionTagPlugin
             monitor.Warn( $"Error occurred but the 'v{futureFake}+invalid' is nevertheless created on '{branch}'." );
         }
         repo.GitRepository.Repository.Tags.Add( $"v{futureFake}+fake", branch.Tip, allowOverwrite: false );
+        monitor.Info( ScreenType.CKliScreenTag, $"Tag 'v{futureFake}+fake' created on '{branch}'." );
         return true;
 
         static bool RemoveFakeVersions( IActivityMonitor monitor,

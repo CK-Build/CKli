@@ -16,17 +16,13 @@ public sealed class CommitBuildInfo
     readonly SVersion _version;
     readonly Commit _buildCommit;
     readonly string _toString;
-    readonly bool _rebuildingCommit;
-    readonly bool _rebuildingVersion;
     string? _informationalVersion;
 
-    internal CommitBuildInfo( VersionTagInfo tagInfo, SVersion version, Commit buildCommit, bool rebuildingCommit, bool rebuildingVersion )
+    internal CommitBuildInfo( VersionTagInfo tagInfo, SVersion version, Commit buildCommit )
     {
         _tagInfo = tagInfo;
         _version = version;
         _buildCommit = buildCommit;
-        _rebuildingCommit = rebuildingCommit;
-        _rebuildingVersion = rebuildingVersion;
         _toString = $"{tagInfo.Repo.DisplayPath}/v{version}";
     }
 
@@ -45,16 +41,6 @@ public sealed class CommitBuildInfo
     /// Gets the build commit.
     /// </summary>
     public Commit BuildCommit => _buildCommit;
-
-    /// <summary>
-    /// Gets whether we are rebuilding an existing commit.
-    /// </summary>
-    public bool RebuildingCommit => _rebuildingCommit;
-
-    /// <summary>
-    /// Gets whether we are rebuilding an existing version.
-    /// </summary>
-    public bool RebuildingVersion => _rebuildingVersion;
 
     /// <summary>
     /// Gets the informational version (see <see cref="InformationalVersion"/>) that must be embedded in the NuGet packages.

@@ -46,7 +46,17 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
 
     internal void SetFake( TagCommit fake )
     {
-        Throw.DebugAssert( fake.IsFakeVersion && fake.Version == _version && IsBuildingOrLocal && _fakeVersion == null );
+        // A "+fake" justifies this TagCommit through one of two relations:
+        //  - same commit: the fake is carried by THIS commit, whatever the two versions are. This is what
+        //    CKli tells the user to do to allow a version gap ("tag the commit (or one of its parents)").
+        //  - same version: the fake was set on another commit and this version has since been built there
+        //    or on a descendant. This is the initial-version bootstrap ('v0.0.0+fake' on "stable",
+        //    'building/v0.0.0' on the "dev/stable" tip) and it is what makes this TagCommit eligible as
+        //    the VersionTagInfo.LastStables head.
+        Throw.DebugAssert( fake.IsFakeVersion
+                           && (fake._sha == _sha || fake._version == _version)
+                           && !IsFakeVersion
+                           && _fakeVersion == null );
         _fakeVersion = fake;
     }
 
@@ -79,6 +89,9 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
 
     /// <summary>
     /// Gets whether <see cref="IsFakeVersion"/> is true or an associated <see cref="FakeVersion"/> exists.
+    /// <para>
+    /// In both cases, this <see cref="Commit"/> carries a "+fake" version tag.
+    /// </para>
     /// </summary>
     public bool IsOrHasFakeVersion => _version.HasFakeMetadata || _fakeVersion != null;
 
@@ -124,8 +137,26 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     public SVersion? CI0Version => _ci0Version;
 
     /// <summary>
-    /// Gets the +fake commit for this <see cref="Version"/> if it exists.
-    /// This is available only when <see cref="IsBuildingOrLocal"/> is true.
+    /// Gets the "+fake" TagCommit that justifies this one if it exists. Null when
+    /// <see cref="IsFakeVersion"/> is true (a fake doesn't carry a fake).
+    /// <para>
+    /// The fake is attached through either of two relations, and both matter:
+    /// <list type="bullet">
+    ///     <item>
+    ///     <b>Same commit</b> ("by sha"), whatever the two versions are: this is the exception CKli itself
+    ///     invites the user to declare in order to allow a version gap, by tagging an already versioned
+    ///     commit (or one of its parents) with a "+fake".
+    ///     </item>
+    ///     <item>
+    ///     <b>Same version</b>, on another commit: the "+fake" was set on a commit and the version has since
+    ///     been built there or on a descendant. This is the initial-version bootstrap ("v0.0.0+fake" on the
+    ///     "stable" branch, "building/v0.0.0" on the "dev/stable" tip) and it is what makes a "local/"
+    ///     TagCommit eligible as the head of <see cref="VersionTagInfo.LastStables"/>. Such a fake has no
+    ///     entry of its own in the "by version" index (its version key is taken by this TagCommit), so this
+    ///     property is the only way to reach it.
+    ///     </item>
+    /// </list>
+    /// </para>
     /// </summary>
     public TagCommit? FakeVersion => _fakeVersion;
 
@@ -147,17 +178,24 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     /// <returns>The error message or null.</returns>
     public string? CanBearVersion( SVersion version )
     {
-        // If this is a +fake version, then the new version must be "roughly based" on it.
-        if( IsFakeVersion )
+        // A "+fake" on this commit publicly documents an exception: the new version only has to be
+        // "roughly based" on it. This applies whether this TagCommit IS the fake or merely carries
+        // one on its commit (FakeVersion is a "by sha" relation).
+        var fake = IsFakeVersion ? this : _fakeVersion;
+        if( fake != null )
         {
-            if( Version.IsStableRoughBaseOf( version ) )
+            if( fake.Version.IsStableRoughBaseOf( version ) )
             {
                 return null;
             }
-            return $"""
+            if( IsFakeVersion )
+            {
+                return $"""
                     Invalid version 'v{version}' in '{Repo.DisplayPath}'.
                     This version is not compatible with the fake 'v{Version}'.
                     """;
+            }
+            // The fake doesn't allow this version: this commit's own version still has its say below.
         }
 
         // If this Version is +deprecated, we refuse to generate any version from it.
@@ -188,14 +226,15 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
         // new one, then it's fine: this previous version will be destroyed (ApplyReleaseBuildTag calls DestroyLocalReleases).
         bool rollingLocal = IsBuildingOrLocal && Version.BranchName == version.BranchName;
 
-        Throw.DebugAssert( "The IsFakeVersion case has been handled above.", !IsOrHasFakeVersion || FakeVersion != null );
-        Throw.DebugAssert( "(HasFakeVersion => IsLocal) <=> (!IsLocal => !HasFakeVersion)", FakeVersion == null || IsBuildingOrLocal );
+        Throw.DebugAssert( "The IsFakeVersion case has been handled above.", !IsFakeVersion );
         // The --ci.0 case implies that the versions have the same branch name (the rolling local build above generalizes it),
         // but here we save the case where this Version is published.
         bool validCI0 = !IsBuildingOrLocal
                         && ((version.CINumber == 0 && version.SetCINumber( -1, impactStablePatchNumber: true ) == Version)
                             || Version.CINumber == 0 && Version.SetCINumber( -1, impactStablePatchNumber: true ) == version);
 
+        // rollingLocal requires IsBuildingOrLocal and validCI0 requires !IsBuildingOrLocal: they are mutually
+        // exclusive. Only when NEITHER applies is the version refused (this was a "||" - hence always true - test).
         if( !rollingLocal && !validCI0 )
         {
             return $"""

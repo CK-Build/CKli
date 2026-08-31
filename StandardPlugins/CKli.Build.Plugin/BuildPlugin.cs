@@ -476,8 +476,6 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         // Should we run the tests?
         runTest ??= !repoBuilder.HasTestRun( monitor, buildCommit );
 
-        VersionTagInfo.RebuildMode rebuild = VersionTagInfo.RebuildMode.None;
-
         if( cancellation.IsCancellationRequested ) return null;
 
         // If we can avoid the build (because forceRebuild is false), we skip the build only if the tag has not been deleted:
@@ -502,16 +500,13 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                     }
                 }
             }
-            rebuild = VersionTagInfo.RebuildMode.AllowRebuildCommitAndCheckPrevious;
-        }
-        else
-        {
-            rebuild = VersionTagInfo.RebuildMode.AllowRebuildCommit | VersionTagInfo.RebuildMode.AllowRebuildVersion | VersionTagInfo.RebuildMode.CheckPreviousVersion;
         }
 
         if( cancellation.IsCancellationRequested ) return null;
 
-        var buildInfo = versionInfo.TryGetCommitBuildInfo( monitor, buildCommit, targetVersion, rebuild );
+        // forceRebuild is the only degree of freedom here: it allows the target version to already
+        // exist on another commit.
+        var buildInfo = versionInfo.TryGetCommitBuildInfo( monitor, buildCommit, targetVersion, allowRebuildVersion: forceRebuild );
         if( buildInfo == null )
         {
             return null;

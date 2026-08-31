@@ -14,6 +14,18 @@ namespace CKli;
 public sealed partial class FakeBuildRepo
 {
     /// <summary>
+    /// Helper that avoids the <see cref="CreateEditor()"/> for simple reference.
+    /// </summary>
+    /// <param name="rCore"></param>
+    /// <param name="v"></param>
+    /// <exception cref="NotImplementedException"></exception>
+    public void AddOrUpdateReference( FakeBuildRepo dependency, string version, string? branchName = null )
+    {
+        using var e = CreateEditor();
+        e.AddOrUpdateReference( DefaultProjectName, dependency.DefaultProjectName, SVersion.Parse( version ), branchName );
+    }
+
+    /// <summary>
     /// Disposable FakeBuildRepo editor.
     /// </summary>
     public sealed class Editor : IDisposable

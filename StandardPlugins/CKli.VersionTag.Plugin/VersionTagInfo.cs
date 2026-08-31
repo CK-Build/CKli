@@ -20,6 +20,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     readonly SVersion? _supVersion;
 
     [AllowNull] Dictionary<SVersion, TagCommit> _v2C;
+    [AllowNull] Dictionary<string, TagCommit> _sha2C;
     [AllowNull] IReadOnlyList<Tag> _removableTags;
     HotZoneInfo? _hotZone;
     //
@@ -33,7 +34,6 @@ public sealed partial class VersionTagInfo : RepoInfo
     List<(SVersion V, Tag T)>? _lightweightOrUnreadableRegularTags;
     bool _hasIssue;
     // Lazy initialization.
-    Dictionary<string, TagCommit>? _sha2C;
     ImmutableArray<TagCommit> _lastStables;
     ImmutableArray<TagCommit> _lastMajorMinorStables;
 
@@ -50,6 +50,7 @@ public sealed partial class VersionTagInfo : RepoInfo
 
     internal void Initialize( HotZoneInfo? hotZone,
                               Dictionary<SVersion, TagCommit> v2c,
+                              Dictionary<string, TagCommit> sha2c,
                               List<Tag>? removableTags,
                               Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags,
                               List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts,
@@ -58,6 +59,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     {
         _hotZone = hotZone;
         _v2C = v2c;
+        _sha2C = sha2c;
         _removableTags = removableTags ?? [];
         _invalidTags = invalidTags;
         _tagConflicts = tagConflicts;
@@ -193,23 +195,16 @@ public sealed partial class VersionTagInfo : RepoInfo
     public bool TryGetTagCommit( SVersion version, [NotNullWhen( true )] out TagCommit? tagCommit ) => (tagCommit = GetTagCommit( version )) != null;
 
     /// <summary>
-    /// Gets the versioned tag commit indexed by their <see cref="TagCommit.Sha"/>.
+    /// Gets the versioned tag commit indexed by their <see cref="TagCommit.Sha"/>: at most one
+    /// <see cref="TagCommit"/> per commit.
+    /// <para>
+    /// This index is built once by the <see cref="VersionTagPlugin"/>. When a commit carries both a "+fake"
+    /// and a regular or "+deprecated" version tag, the entry is the non-fake one and the "+fake" is exposed
+    /// by its <see cref="TagCommit.FakeVersion"/>. Any other commit bearing more than one version is a
+    /// <see cref="TagConflict.MultipleVersionsOnSameCommit"/> conflict: <see cref="HasIssue"/> is then true.
+    /// </para>
     /// </summary>
-    public IReadOnlyDictionary<string, TagCommit> TagCommitsBySha
-    {
-        get
-        {
-            if( _sha2C == null )
-            {
-                _sha2C = new Dictionary<string, TagCommit>( _v2C.Count );
-                foreach( var tc in _v2C.Values )
-                {
-                    _sha2C.Add( tc.Sha, tc );
-                }
-            }
-            return _sha2C;
-        }
-    }
+    public IReadOnlyDictionary<string, TagCommit> TagCommitsBySha => _sha2C;
 
     /// <summary>
     /// Gets all the <see cref="TagCommit"/>.
@@ -290,8 +285,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <returns>The first match or null.</returns>
     public TagCommit? FindFirst( IEnumerable<Commit> commits )
     {
-        // Build the index if not yet built.
-        var index = TagCommitsBySha;
+        var index = _sha2C;
         foreach( Commit c in commits )
         {
             if( index.TryGetValue( c.Sha, out var tc ) )
@@ -303,7 +297,9 @@ public sealed partial class VersionTagInfo : RepoInfo
     }
 
     /// <summary>
-    /// Destroys all "local/" releases for which <paramref name="filter"/> returns true.
+    /// Destroys all "local/" or "building/" releases for which <paramref name="filter"/> returns true.
+    /// Note that <see cref="RemovableTags"/> if any are considered but <see cref="HasTagConflicts"/> must be false
+    /// otherwise an <see cref="InvalidOperationException"/> is throw.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="filter">Optional filter.</param>
@@ -316,10 +312,25 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// </returns>
     public bool DestroyLocalReleases( IActivityMonitor monitor, Func<SVersion, bool>? filter, bool removeFromNuGetGlobalCache = true )
     {
+        Throw.CheckState( !HasTagConflicts );
         bool success = true;
-        var cleanupLocals = AllVersions.Select( tc => tc.Version )
-                                       .Where( v => v.IsBuildingOrLocal() && v.BuildMetaData.Length == 0 && (filter == null || filter( v )) )
-                                       .ToList();
+        var cleanupLocals = new List<SVersion>();
+        foreach( var t in _removableTags )
+        {
+            // It is necessarily a valid SVersion with a valid prefix (otherwise it would have been
+            // collected in invalidParsedPrefixTags, nonConformantTags or invalidTags).
+            var tagName = t.FriendlyName;
+            if( tagName.StartsWith( "local/", StringComparison.Ordinal ) || tagName.StartsWith( "building/", StringComparison.Ordinal ) )
+            {
+                var v = SVersion.Parse( tagName, allowPrefix: true );
+                if( filter == null || filter( v ) )
+                {
+                    cleanupLocals.Add( SVersion.Parse( tagName, allowPrefix: true ) );
+                }
+            }
+        }
+        cleanupLocals.AddRange( AllVersions.Select( tc => tc.Version )
+                                           .Where( v => v.IsBuildingOrLocal() && v.BuildMetaData.Length == 0 && (filter == null || filter( v )) ) );
         if( cleanupLocals.Count > 0 )
         {
             using( monitor.OpenInfo( $"""
@@ -337,14 +348,16 @@ public sealed partial class VersionTagInfo : RepoInfo
     }
 
     /// <summary>
-    /// Destroys a "local/" released version. The version tag is deleted, any artifacts are removed.
+    /// Destroys a "building/" or "local/" released version. The version tag is deleted, any artifacts are removed.
     /// <para>
-    /// This is idempotent (if the "local/" version tag doesn't exist, nothing is done).
+    /// This is idempotent (if the "building/" or "local/" version tag doesn't exist, nothing is done).
     /// </para>
+    /// The <paramref name="version"/> can appear in the <see cref="RemovableTags"/> but <see cref="HasTagConflicts"/> must
+    /// be false otherwise an <see cref="InvalidOperationException"/> is throw.
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="version">
-    /// The "local/" release to destroy.
+    /// The "building/" or "local/" release to destroy.
     /// <see cref="SVersion.IsCSVersion"/> must be true and <see cref="SVersion.BuildMetaData"/> must be empty.
     /// </param>
     /// <param name="removeFromNuGetGlobalCache">
@@ -357,46 +370,92 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// </returns>
     public bool DestroyLocalRelease( IActivityMonitor monitor, SVersion version, bool removeFromNuGetGlobalCache = true )
     {
-        var tagCommit = GetTagCommit( version );
+        Throw.CheckState( !HasTagConflicts );
+
+        // Usual case: the version maps to a TagCommit.
+        if( !TryGetFromTagCommit( monitor, _v2C, version, out var tag, out var v, out var tagCommit ) )
+        {
+            return false;
+        }
         if( tagCommit == null )
         {
-            monitor.Trace( $"Version tag 'building/v{version}' or 'local/v{version}' not found. Skipped DestroyLocalRelease." );
-            return true;
+            // Not found: there is no TagCommit for the version. It can be a removable tag: this is not an optimized
+            // path but we don't care.
+            (tag, v) = _removableTags.Select( t => (T: t, V: SVersion.Parse( t.FriendlyName, allowPrefix: true )) )
+                                     .FirstOrDefault( tv => tv.V == version );
+            if( tag == null )
+            {
+                monitor.Info( $"Version tag 'building/v{version}' or 'local/v{version}' not found. Skipped DestroyLocalRelease." );
+                return true;
+            }
         }
-        // Use the right (tag,version).
-        Tag tag;
-        SVersion v;
-        if( version == tagCommit.CI0Version )
-        {
-            Throw.DebugAssert( tagCommit.CI0VersionTag != null );
-            tag = tagCommit.CI0VersionTag;
-            v = tagCommit.CI0Version;
-        }
-        else
-        {
-            tag = tagCommit.Tag;
-            v = tagCommit.Version;
-        }
+        Throw.DebugAssert( "We have a Tag and its Version (and may be a TagCommit).", tag != null && v != null );
         if( !v.IsBuildingOrLocal() )
         {
-            monitor.Error( $"Existing versioned tag '{tag.FriendlyName}' is not 'building/' or 'local/'. Skipped DestroyLocalRelease." );
+            monitor.Warn( $"Existing versioned tag '{tag.FriendlyName}' is not 'building/' or 'local/'. Skipped DestroyLocalRelease." );
             return true;
         }
         if( v.HasFakeMetadata || v.HasDeprecatedMetadata )
         {
-            Throw.DebugAssert( tag == tagCommit.Tag );
             monitor.Error( $"DestroyLocalRelease failed: tag '{tag.FriendlyName}' must not be +fake or +deprecated." );
             return false;
         }
-        BuildContentInfo? tagContent = tagCommit.BuildContentInfo;
+        // Extracts the content.
+        BuildContentInfo? tagContent;
+        if( tagCommit != null )
+        {
+            tagContent = tagCommit.BuildContentInfo;
+            Throw.DebugAssert( """
+                If we are on the ci.0, then we have the BuildContentInfo of the ci.0.
+                If we are on the TagCommit, then it is not Fake (filtered above), so we have a content.
+                """, tagContent != null );
+        }
+        else
+        {
+            if( !BuildContentInfo.TryParse( tag.Annotation?.Message, out tagContent ) )
+            {
+                if( tag.Annotation == null )
+                {
+                    monitor.Error( $"Existing removable versioned tag '{tag.FriendlyName}' is a lightweight tag. Skipped DestroyLocalRelease." );
+                }
+                else
+                {
+                    monitor.Error( $"Existing removable versioned tag '{tag.FriendlyName}' has an invalid content. Skipped DestroyLocalRelease." );
+                }
+                return false;
+            }
+        }
 
-        Throw.DebugAssert( """
-            If we are on the ci.0, then we have the BuildContentInfo of the ci.0.
-            If we are on the TagCommit, then it is not Fake (filtered above), so we have a content.
-            """, tagCommit.BuildContentInfo != null );
+        if( tagCommit != null ) RemoveTagCommit( monitor, version );
+        return _versionTagPlugin.DoDestroyLocalRelease( monitor, Repo, tag, version, tagContent, removeFromNuGetGlobalCache );
 
-        RemoveTagCommit( monitor, version );
-        return _versionTagPlugin.DoDestroyLocalRelease( monitor, base.Repo, tag, version, tagCommit.BuildContentInfo, removeFromNuGetGlobalCache );
+        static bool TryGetFromTagCommit( IActivityMonitor monitor,
+                                         Dictionary<SVersion, TagCommit> v2C,
+                                         SVersion requestedVersion,
+                                         out Tag? tag,
+                                         out SVersion? v,
+                                         out TagCommit? tagCommit )
+        {
+            tag = null;
+            v = null;
+            if( !v2C.TryGetValue( requestedVersion, out tagCommit ) )
+            {
+                return true;
+            }
+            // Use the right (tag,version).
+            if( requestedVersion == tagCommit.CI0Version )
+            {
+                Throw.DebugAssert( tagCommit.CI0VersionTag != null );
+                tag = tagCommit.CI0VersionTag;
+                v = tagCommit.CI0Version;
+            }
+            else
+            {
+                tag = tagCommit.Tag;
+                v = tagCommit.Version;
+            }
+            return true;
+        }
     }
 
 
@@ -406,58 +465,52 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="buildCommit">The build commit selected by the build.</param>
     /// <param name="version">The target version. This is necessarily a "local/" prefixed version.</param>
-    /// <param name="rebuild">Configures the checks.</param>
+    /// <param name="allowRebuildVersion">
+    /// True to allow the target <paramref name="version"/> to already exist on another commit.
+    /// This is the "force rebuild" of the Build plugin.
+    /// </param>
     /// <returns>The commit build info on success, null on error.</returns>
-    public CommitBuildInfo? TryGetCommitBuildInfo( IActivityMonitor monitor, Commit buildCommit, SVersion version, RebuildMode rebuild )
+    public CommitBuildInfo? TryGetCommitBuildInfo( IActivityMonitor monitor, Commit buildCommit, SVersion version, bool allowRebuildVersion )
     {
-        Throw.CheckArgument( "Published version => rebuild commit", !version.IsBuildingOrLocal() || (rebuild & RebuildMode.AllowRebuildCommit)!=0 );
         // Preconditions for any commit.
-        if( !CanBuildAnyCommit( monitor, buildCommit, version, rebuild, out bool isRebuild ) )
+        if( !CanBuildAnyCommit( monitor, buildCommit, version, allowRebuildVersion ) )
         {
             return null;
         }
-        if( rebuild is RebuildMode.None || (rebuild & RebuildMode.CheckPreviousVersion) != 0 )
+        // Considering the existing versions, whatever the build process is, there are some invariants
+        // that must be respected.
+        // - There must be no gaps between major.minor.patch increments.
+        // - Whatever the version is (stable, pre or post release - the ones with the -- trick), the immediate
+        //   previous stable release must exist and appear in the commit parents.
+        //
+        // To handle exceptions, this is where the "+fake" build meta data is considered: we strictly enforce the rules
+        // but a "+fake" tag on any commit circumvents the rule and de facto publicly documents the exception.
+        //
+        // When there is no stable release at all in the ]InfVersion?,SupVersion?[ range: we allow the target
+        // version to be anywhere in the range.
+        if( _hotZone != null )
         {
-            // Considering the existing versions, whatever the build process is, there are some invariants
-            // that must be respected.
-            // - There must be no gaps between major.minor.patch increments.
-            // - Whatever the version is (stable, pre or post release - the ones with the -- trick), the immediate
-            //   previous stable release must exist and appear in the commit parents.
-            //
-            // To handle exceptions, this is where the "+fake" build meta data is considered: we strictly enforce the rules
-            // but a "+fake" tag on any commit circumvents the rule and de facto publicly documents the exception. 
-            //
-            // When there is no stable release at all in the ]InfVersion?,SupVersion?[ range: we allow the target
-            // version to be anywhere in the range.
-            if( _hotZone != null )
+            TagCommit? baseCommit = FindBaseCommitByVersion( monitor, buildCommit, version );
+            if( baseCommit == null )
             {
-                TagCommit? baseCommit = FindBaseCommitByVersion( monitor, buildCommit, version );
-                if( baseCommit == null )
-                {
-                    return null;
-                }
-                var div = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( baseCommit.Commit, buildCommit );
-                if( div.AheadBy is not 0 )
-                {
-                    monitor.Error( $"""
-                    Invalid Commit/Version topology in '{Repo.DisplayPath}'.
+                return null;
+            }
+            var div = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( baseCommit.Commit, buildCommit );
+            if( div.AheadBy is not 0 )
+            {
+                monitor.Error( $"""
+                Invalid Commit/Version topology in '{Repo.DisplayPath}'.
 
-                    To build the version 'v{version}', the commit '{buildCommit.Sha}' must be a parent of commit '{baseCommit.Sha}' with version 'v{baseCommit.Version}' built on {baseCommit.Commit.Committer.When}.
-                    """ );
-                    return null;
-                }
+                To build the version 'v{version}', the commit '{buildCommit.Sha}' must be a parent of commit '{baseCommit.Sha}' with version 'v{baseCommit.Version}' built on {baseCommit.Commit.Committer.When}.
+                """ );
+                return null;
             }
         }
-        return new CommitBuildInfo( this,
-                                    version,
-                                    buildCommit,
-                                    isRebuild && (rebuild & RebuildMode.AllowRebuildCommit) != 0,
-                                    isRebuild && (rebuild & RebuildMode.AllowRebuildVersion) != 0 );
+        return new CommitBuildInfo( this, version, buildCommit );
     }
 
-    bool CanBuildAnyCommit( IActivityMonitor monitor, Commit buildCommit, SVersion version, RebuildMode rebuild, out bool isRebuild )
+    bool CanBuildAnyCommit( IActivityMonitor monitor, Commit buildCommit, SVersion version, bool allowRebuildVersion )
     {
-        isRebuild = false;
         if( !CheckNoTagConflicts( monitor ) )
         {
             return false;
@@ -484,31 +537,22 @@ public sealed partial class VersionTagInfo : RepoInfo
                 return false;
             }
             // The version has already been produced. The buildCommit must be the same as the original version
-            // and allowRebuild must be true.
-            if( exists.Commit.Sha != buildCommit.Sha && (rebuild & RebuildMode.AllowRebuildVersion) == 0 )
+            // unless the caller explicitly allows the version to move to another commit.
+            if( exists.Commit.Sha != buildCommit.Sha && !allowRebuildVersion )
             {
                 monitor.Error( ActivityMonitor.Tags.ToBeInvestigated, $"""
                     Invalid build commit '{buildCommit.Sha}' for version 'v{version}' in '{Repo.DisplayPath}'.
                     This version has already been produced by commit '{exists.Sha}' on {exists.Commit.Committer.When}.
 
-                    This is an error of the Build process itself: AllowRebuildVersion must be explicitly set.
+                    This is an error of the Build process itself: allowRebuildVersion must be explicitly set.
                     """ );
                 return false;
             }
-            if( (rebuild & (RebuildMode.AllowRebuildVersion|RebuildMode.AllowRebuildCommit)) == 0 )
-            {
-                // This should have been handled by the builder before calling TryGetCommitBuildInfo: this is a security.
-                monitor.Error( $"""
-                    The version 'v{version}' in '{Repo.DisplayPath}' already exists on the commit '{exists.Sha}' but rebuilding it is not allowed.
-                    """ );
-                return false;
-            }
-            isRebuild = true;
             return true;
         }
         // This is a new version. The build process must have checked that the build commit is not already associated to
         // an incompatible version.
-        if( TagCommitsBySha.TryGetValue( buildCommit.Sha, out var already ) )
+        if( _sha2C.TryGetValue( buildCommit.Sha, out var already ) )
         {
             var msg = already.CanBearVersion( version );
             if( msg != null )
@@ -625,13 +669,19 @@ public sealed partial class VersionTagInfo : RepoInfo
         // the bad tag. 
         Throw.DebugAssert( "The 'ci.0' is on an existing TagCommit.", version.CINumber != 0 );
         Throw.DebugAssert( !_v2C.ContainsKey( version ) );
-        Throw.DebugAssert( _sha2C != null );
         Throw.DebugAssert( "This must have been checked by TryGetCommitBuildInfo.",
                            !_sha2C.TryGetValue( buildCommit.Sha, out var exist ) || exist.IsFakeVersion );
 
         var newOne = new TagCommit( this, version, buildCommit, t, contentInfo, deprecatedInfo: null );
         _v2C.Add( version, newOne );
-        _sha2C.Add( newOne.Sha, newOne );
+        // The commit may already carry a "+fake" (this is how a version gap is allowed): the new TagCommit
+        // becomes the "by sha" entry and the fake is attached to it.
+        if( _sha2C.TryGetValue( newOne.Sha, out var fake ) )
+        {
+            Throw.DebugAssert( fake.IsFakeVersion );
+            newOne.SetFake( fake );
+        }
+        _sha2C[newOne.Sha] = newOne;
         if( version.IsStable && !_lastStables.IsDefault )
         {
             var idx = _lastStables.BinarySearch( newOne );
@@ -662,7 +712,13 @@ public sealed partial class VersionTagInfo : RepoInfo
             }
             else
             {
-                if( _sha2C != null )
+                // The "+fake" tag on the commit is not removed: it becomes the "by sha" entry again.
+                var fake = tc.FakeVersion;
+                if( fake != null )
+                {
+                    _sha2C[tc.Sha] = fake;
+                }
+                else
                 {
                     _sha2C.Remove( tc.Sha );
                 }
@@ -719,6 +775,15 @@ public sealed partial class VersionTagInfo : RepoInfo
                         collector( World.Issue.CreateManual( $"Found {conflict.Count()} 'ci.0' version tag on unrelated commits.",
                             screenType.Text( $"""
                                         {conflict.Select( c => $" - {ToString( c.T1 )} is on {ToString( c.T2 )}" ).Concatenate( Environment.NewLine )}
+                                        This should be fixed manually.
+                                        """ ),
+                            Repo ) );
+                        break;
+                    case TagConflict.MultipleVersionsOnSameCommit:
+                        collector( World.Issue.CreateManual( $"Found {conflict.Count()} commits bearing more than one version.",
+                            screenType.Text( $"""
+                                        {conflict.Select( c => $" - {ToString( c.T1 )} and {ToString( c.T2 )}" ).Concatenate( Environment.NewLine )}
+                                        A commit must release at most one version (a '+fake' tag on an already versioned commit is the only exception).
                                         This should be fixed manually.
                                         """ ),
                             Repo ) );
