@@ -23,8 +23,11 @@ sealed class IndirectPublisher : BasePublisher
 {
     readonly BranchNamespace _branches;
 
-    public IndirectPublisher( PackageSender packageSender, ArtifactHandlerPlugin artifactHandler, BranchModelPlugin branchModel )
-        : base( packageSender, artifactHandler )
+    public IndirectPublisher( PackageSender packageSender,
+                              ArtifactHandlerPlugin artifactHandler,
+                              BranchModelPlugin branchModel,
+                              bool keepLocalReleaseAfterPublish )
+        : base( packageSender, artifactHandler, keepLocalReleaseAfterPublish )
     {
         _branches = branchModel.BranchNamespace;
     }

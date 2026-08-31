@@ -20,6 +20,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
     readonly ArtifactHandlerPlugin _artifactHandler;
     readonly BranchModelPlugin _branchModel;
     readonly VersionTagPlugin _versionTag;
+    readonly bool _keepLocalReleaseAfterPublish;
 
     /// <summary>
     /// Initializes a new publish plugin.
@@ -39,9 +40,24 @@ public sealed class PublishPlugin : PrimaryPluginBase
         _artifactHandler = artifactHandler;
         _branchModel = branchModel;
         _versionTag = versionTag;
+        // Publishing normally destroys the local release: its packages are now available from the feeds.
+        // A test harness (and a user who wants to keep playing with the produced artifacts) sets
+        // <Publish KeepLocalReleaseAfterPublish="true" /> to skip that housekeeping.
+        _keepLocalReleaseAfterPublish = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.KeepLocalReleaseAfterPublish ) ?? false;
         _build.OnRoadmapBuild.Async += OnRoadmapBuildAsync;
         _build.OnFixBuild.Async += OnFixBuildAsync;
     }
+
+    /// <summary>
+    /// Gets whether the local release (its packages in the "$Local" NuGet feed and its assets) is kept
+    /// after a successful publication instead of being destroyed.
+    /// <para>
+    /// This is the <c>&lt;Publish KeepLocalReleaseAfterPublish="true" /&gt;</c> configuration. It defaults to
+    /// false. Test harnesses set it so that the version a build produced remains available to subsequent
+    /// commands and assertions.
+    /// </para>
+    /// </summary>
+    public bool KeepLocalReleaseAfterPublish => _keepLocalReleaseAfterPublish;
 
     async Task OnFixBuildAsync( IActivityMonitor monitor, FixBuildEventArgs e, CancellationToken cancellation )
     {
@@ -54,6 +70,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                                      e.FixWorkflow,
                                      e.IsCIBuild,
                                      e.KeepBranchOnSuccessfulPublish,
+                                     _keepLocalReleaseAfterPublish,
                                      e.Results,
                                      cancellation ) )
             {
@@ -68,13 +85,14 @@ public sealed class PublishPlugin : PrimaryPluginBase
                                               FixWorkflow fixWorkflow,
                                               bool ciBuild,
                                               bool keepBranchOnSuccessfulPublish,
+                                              bool keepLocalReleaseAfterPublish,
                                               ImmutableArray<BuildResult> results,
                                               CancellationToken cancel )
         {
             var packageSender = PackageSender.Create( monitor, artifactHandler, branchModel, world.StackRepository.SecretsStore );
             if( packageSender == null ) return false;
 
-            var publisher = new FixPublisher( packageSender, artifactHandler );
+            var publisher = new FixPublisher( packageSender, artifactHandler, keepLocalReleaseAfterPublish );
 
             for( int i = 0; i < results.Length; i++ )
             {
@@ -142,8 +160,8 @@ public sealed class PublishPlugin : PrimaryPluginBase
                             e.SetFailed();
                             return;
                         }
-                        var roadmapPublisher = new RoadmapPublisher( packageSender, _artifactHandler, _branchModel );
-                        var indirectPublisher = new IndirectPublisher( packageSender, _artifactHandler, _branchModel );
+                        var roadmapPublisher = new RoadmapPublisher( packageSender, _artifactHandler, _branchModel, _keepLocalReleaseAfterPublish );
+                        var indirectPublisher = new IndirectPublisher( packageSender, _artifactHandler, _branchModel, _keepLocalReleaseAfterPublish );
                         if( !await publish.PublishAsync( e.Monitor, roadmapPublisher, indirectPublisher, cancellation ).ConfigureAwait( false ) )
                         {
                             e.SetFailed();

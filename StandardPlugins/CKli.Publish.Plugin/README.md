@@ -168,8 +168,9 @@ Each entry is a `PublishedPackageInfo : PackageInstance` carrying its `Reason`s
 release, in this order: resolve the `GitHostingProvider`, check `HasAllArtifacts`, push the produced
 packages through `PackageSender`, re-apply the `local/` tag as the final `v{version}` one, push the
 tag, create a draft release, push the branch (with any deferred ref-specs), upload the asset files,
-finalize the release, and finally `DestroyLocalRelease` to clean up `$Local`. Every failure after
-the tag is pushed compensates: the draft release is deleted and the pushed tag removed.
+finalize the release, and finally `DestroyLocalRelease` to clean up `$Local` — unless
+`KeepLocalReleaseAfterPublish` is configured (see [Configuration](#configuration)). Every failure
+after the tag is pushed compensates: the draft release is deleted and the pushed tag removed.
 
 The three concrete publishers differ only in which Git branch they push, and how:
 
@@ -250,8 +251,20 @@ Notable behavior:
 
 ## Configuration
 
-`CKli.Publish.Plugin` declares **no `<Plugins>` XML element of its own**. All configuration that
-governs where and how packages are pushed lives under `CKli.ArtifactHandler.Plugin`'s
+`CKli.Publish.Plugin` declares a single optional `<Plugins>` element of its own:
+
+```xml
+<Plugins>
+  <Publish KeepLocalReleaseAfterPublish="true" />
+</Plugins>
+```
+
+| Attribute | Default | Effect |
+|---|---|---|
+| `KeepLocalReleaseAfterPublish` | `false` | When true, `BasePublisher` skips the final `DestroyLocalRelease`, so the packages a build produced stay in the `$Local` NuGet feed after they have been published. Useful to keep experimenting with the produced artifacts, and for a test that needs a published version to remain locally available. It is **not** enabled by default for tests: `Tests/Plugins.Tests` is validated with the cleanup on (see the note below), so a test opts in through its own `pluginConfigurationEditor`. |
+
+Everything else that governs where and how packages are pushed lives under
+`CKli.ArtifactHandler.Plugin`'s
 `<ArtifactHandler><NuGet><Feed .../></NuGet></ArtifactHandler>` element (feed URL,
 `PushQualityFilter`, `PushCredentials` naming a secret resolved via `ISecretsStore`) — see that
 plugin's README for the exact shape. Git-hosting credentials (used to create releases) are
@@ -268,5 +281,10 @@ likewise resolved through `GitRepositoryKey` / `ISecretsStore`, documented in `C
 - `NuGetFeedClient.DeleteAsync` is fully implemented but never invoked by `PackageSender` or any
   publisher — there is currently no CKli-level command that deletes/unlists a published package
   version through this plugin.
-- `BasePublisher`'s `$Local` cleanup is skipped under a hard-coded test path
-  (`/.PublicStack/CK-Plugins/Tests/Plugins.Tests`), so it applies to one stack's harness only.
+- `BasePublisher`'s `$Local` cleanup used to be skipped by matching a hard-coded test path
+  (`/.PublicStack/CK-Plugins/Tests/Plugins.Tests`). That literal never matched any real folder — CKli's
+  own harness lives in `CKli-Plugins`, not `CK-Plugins` — so the cleanup always ran, including in tests,
+  and the "trick for the tests" its comment described never happened. It is now driven by the
+  `KeepLocalReleaseAfterPublish` configuration above, left off by default: `Tests/Plugins.Tests` has only
+  ever been green with the cleanup on, and enabling it makes `S2.intermediate_build_error_Async`'s
+  `ckli publish` fail. Whether that test or the intended behavior is wrong is still open.

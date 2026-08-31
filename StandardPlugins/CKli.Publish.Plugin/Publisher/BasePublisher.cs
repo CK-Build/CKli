@@ -24,11 +24,15 @@ abstract class BasePublisher
 {
     readonly PackageSender _packageSender;
     readonly ArtifactHandlerPlugin _artifactHandler;
+    readonly bool _keepLocalReleaseAfterPublish;
 
-    protected BasePublisher( PackageSender packageSender, ArtifactHandlerPlugin artifactHandler )
+    protected BasePublisher( PackageSender packageSender,
+                             ArtifactHandlerPlugin artifactHandler,
+                             bool keepLocalReleaseAfterPublish )
     {
         _packageSender = packageSender;
         _artifactHandler = artifactHandler;
+        _keepLocalReleaseAfterPublish = keepLocalReleaseAfterPublish;
     }
 
     /// <summary>
@@ -134,9 +138,10 @@ abstract class BasePublisher
             return false;
         }
 
-        // Housekeeping: trick here for the tests, we don't cleanup the $Local when testing so that
-        // the version a build has produced remains available.
-        if( !CKliRootEnv.DefaultCKliEnv.CurrentDirectory.Path.Contains( "/.PublicStack/CK-Plugins/Tests/Plugins.Tests" ) )
+        // Housekeeping: the local release is useless now that the packages are published, unless
+        // PublishPlugin.KeepLocalReleaseAfterPublish asks to keep it (test harnesses do, so that the
+        // version a build has produced remains available to the following commands).
+        if( !_keepLocalReleaseAfterPublish )
         {
             // If the cleanup fails, we still consider this release done.
             _artifactHandler.DestroyLocalRelease( monitor, repo, version, content, removeFromNuGetGlobalCache: false );

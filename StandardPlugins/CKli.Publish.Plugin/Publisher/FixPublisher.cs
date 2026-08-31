@@ -15,8 +15,10 @@ namespace CKli.Publish.Plugin;
 /// </summary>
 sealed class FixPublisher : BasePublisher
 {
-    public FixPublisher( PackageSender packageSender, ArtifactHandlerPlugin artifactHandler )
-        : base( packageSender, artifactHandler )
+    public FixPublisher( PackageSender packageSender,
+                         ArtifactHandlerPlugin artifactHandler,
+                         bool keepLocalReleaseAfterPublish )
+        : base( packageSender, artifactHandler, keepLocalReleaseAfterPublish )
     {
     }
 
