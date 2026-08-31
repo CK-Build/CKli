@@ -5,7 +5,10 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliRepoCreate : Command
+/// <summary>
+/// Creates a new remote and local repository.
+/// </summary>
+public sealed class CKliRepoCreate : Command
 {
     public CKliRepoCreate()
         : base( null,

@@ -70,7 +70,10 @@ public static partial class CKliTestHelperExtensions
 
         // We initialize the root environment (no need to wait): any participant can now use the instance name
         // if needed. 
-        CKliRootEnv.Initialize( $"{_defaultWorldName.FullName}-Test", screen: new StringScreen(), findCurrentStackPath: false );
+        CKliRootEnv.Initialize( $"{_defaultWorldName.FullName}-Test",
+                                screen: new StringScreen(),
+                                findCurrentStackPath: false,
+                                isTestRun: true );
 
         var ckliPluginsCompiledFile = sharedDataFolder.AppendPart( pluginFolderName ).AppendPart( "CKli.Plugins" ).AppendPart( "CKli.CompiledPlugins.cs" );
         if( !File.Exists( ckliPluginsCompiledFile ) )

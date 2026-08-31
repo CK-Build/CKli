@@ -552,12 +552,12 @@ public sealed partial class StackRepository : IDisposable
                                                            int maxDop = 0,
                                                            CancellationToken cancellation = default )
     {
-        bool isCKliTestRunning = CKliRootEnv.InstanceName == "CKli-Test";
+        bool isTestRun = CKliRootEnv.IsTestRun;
         Throw.CheckNotNullArgument( monitor );
         Throw.CheckNotNullArgument( context );
         // The nominal case is that we cannot clone a stack inside another stack. But when ignoreParentStack
-        // is specified or we are running the CKli.Core.Tests, we allow this.
-        if( !ignoreParentStack && !isCKliTestRunning && !context.CurrentStackPath.IsEmptyPath)
+        // is specified or we are running under a test harness, we allow this.
+        if( !ignoreParentStack && !isTestRun && !context.CurrentStackPath.IsEmptyPath)
         {
             monitor.Error( $"""
                 A stack exists above at '{context.CurrentStackPath}'.
@@ -607,10 +607,11 @@ public sealed partial class StackRepository : IDisposable
         // Secure Stack inside Stack scenario.
         if( !ignoreParentStack )
         {
-            // We cheat here: we allow cloning into the CKli-Stack itself if we are in the "CKli-Test" instance.
+            // Under a test harness, the cloned folder regularly lives inside the stack being tested:
+            // never relocate then. (This used to be restricted to a hard-coded "/CKli/.PublicStack" parent,
+            // which only ever matched CKli's own stack.)
             var parentStack = FindGitStackPath( parentPath );
-            if( !parentStack.IsEmptyPath
-                && !(isCKliTestRunning && parentStack.Path.EndsWith( "/CKli/.PublicStack", StringComparison.OrdinalIgnoreCase )) )
+            if( !parentStack.IsEmptyPath && !isTestRun )
             {
                 var stackAbove = parentStack.RemoveLastPart();
                 var safeRoot = stackAbove.RemoveLastPart().AppendPart( stackFolderName );

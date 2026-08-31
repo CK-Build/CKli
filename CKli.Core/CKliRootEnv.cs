@@ -14,8 +14,10 @@ namespace CKli.Core;
 /// It may be extended in the future to handle other basic locally configurable aspect but currently it has all what we need.
 /// This must be initialized before anything can be done with the <see cref="StackRepository"/>.
 /// <para>
-/// This is a static class. Tests use the <see cref="Initialize"/> instance name to isolate the
-/// test environment ("CKli-Test") from the regular run environment ("CKli").
+/// This is a static class. Tests use the <see cref="Initialize"/> instance name to isolate their
+/// <see cref="AppLocalDataPath"/> from the regular run environment ("CKli"), and set
+/// <see cref="IsTestRun"/> so that the few behaviors that must differ under a test harness can be
+/// detected reliably (never by sniffing paths or instance names).
 /// </para>
 /// <para>
 /// This captures the initial <see cref="Environment.CurrentDirectory"/> and initializes the <see cref="GrandOutput.Default"/> if it is
@@ -31,13 +33,16 @@ public static partial class CKliRootEnv
     static NormalizedPath _currentStackPath;
     static CKliEnv? _defaultCommandContext;
     static bool? _shouldDeletePureCKliLogFile;
+    static bool _isTestRun;
 
     /// <summary>
     /// Initializes the CKli environment.
     /// This ensures that the <see cref="GrandOutput.Default"/> is initialized.
     /// </summary>
     /// <param name="instanceName">
-    /// Used by tests (with "Test"). Can be used with other suffix if needed. This drives the <see cref="AppLocalDataPath"/>.
+    /// A suffix appended to "CKli-" to obtain the <see cref="AppLocalDataPath"/> folder name (null uses "CKli").
+    /// Test harnesses use this to isolate their local data; it carries no semantics, use
+    /// <paramref name="isTestRun"/> to state that this is a test run.
     /// </param>
     /// <param name="arguments">Optional arguments. when provided, this handles the <c>--screen</c> option.</param>
     /// <param name="screen">Optional <see cref="StringScreen"/> to use or <see cref="NoScreen"/>.</param>
@@ -45,12 +50,18 @@ public static partial class CKliRootEnv
     /// By default, <see cref="StackRepository.FindGitStackPath"/> is used from the current directory to initialize
     /// the <see cref="CurrentStackPath"/>. Setting this to false ignores the current stack path.
     /// </param>
+    /// <param name="isTestRun">
+    /// True when a test harness is driving CKli: see <see cref="IsTestRun"/>.
+    /// Only test harnesses set this. The CKli CLI never does.
+    /// </param>
     public static void Initialize( string? instanceName = null,
                                    CommandLineArguments? arguments = null,
                                    IScreen? screen = null,
-                                   bool findCurrentStackPath = true )
+                                   bool findCurrentStackPath = true,
+                                   bool isTestRun = false )
     {
         Throw.CheckState( "Initialize can be called only once.", _appLocalDataPath.IsEmptyPath );
+        _isTestRun = isTestRun;
         _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create ),
                                           instanceName == null ? "CKli" : $"CKli-{instanceName}" );
         // To handle logs, we first must determine if we are in a Stack. If this is the case, then the Logs/ folder
@@ -237,7 +248,32 @@ public static partial class CKliRootEnv
     public static void CheckInitialized() => Throw.CheckState( "CKliRootEnv.Initialize() must have been called before.", _screen != null );
 
     /// <summary>
-    /// Gets instance name ("CKli" or "CKli-Test" for instance).
+    /// Gets whether a test harness is driving CKli (set by <see cref="Initialize"/>).
+    /// <para>
+    /// A few behaviors must differ under a test harness: cloning a stack inside another stack is allowed
+    /// (a test's cloned folder regularly lives inside the stack being tested) and the relocation that
+    /// normally protects against it is disabled.
+    /// </para>
+    /// <para>
+    /// This must NEVER be inferred from the current directory, the <see cref="InstanceName"/> or the loaded
+    /// assemblies: only the harness knows, and it says so explicitly. This describes the <em>environment</em>,
+    /// not an intent: anything a real user could legitimately want must be a command option or a plugin
+    /// configuration instead.
+    /// </para>
+    /// </summary>
+    public static bool IsTestRun
+    {
+        get
+        {
+            CheckInitialized();
+            return _isTestRun;
+        }
+    }
+
+    /// <summary>
+    /// Gets instance name: the <see cref="AppLocalDataPath"/> folder name ("CKli" for a regular run,
+    /// "CKli-&lt;instanceName&gt;" otherwise). This is an isolation key and carries no semantics:
+    /// use <see cref="IsTestRun"/> to detect a test harness.
     /// </summary>
     public static string InstanceName
     {

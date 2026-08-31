@@ -46,13 +46,15 @@ sealed partial class World
     /// </list>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The CKli minimal context. The CurrentDirectory is the folder of the new repo.</param>
     /// <param name="gitKey">The repository key.</param>
-    /// <param name="folderPath">The absolute folder path inside <see cref="LocalWorldName.WorldRoot"/>.</param>
     /// <returns>True on success, false on error.</returns>
-    public async Task<bool> AddRepositoryAsync( IActivityMonitor monitor, GitRepositoryKey gitKey, NormalizedPath folderPath )
+    public async Task<bool> AddRepositoryAsync( IActivityMonitor monitor, CKliEnv context, GitRepositoryKey gitKey )
     {
         Throw.CheckState( CanChangeLayout );
         Throw.CheckArgument( !gitKey.IsStackRepository );
+
+        NormalizedPath folderPath = context.CurrentDirectory;
         using var _ = monitor.OpenInfo( $"Adding '{gitKey.RepositoryName}' ({gitKey.OriginUrl}) to world '{_name.FullName}'." );
         // Check the folder path.
         if( !folderPath.StartsWith( _name.WorldRoot, strict: false ) )
@@ -123,7 +125,7 @@ sealed partial class World
 
         XElement xRepo = _definitionFile.CreateDefaultRepositoryElement( monitor, gitKey.OriginUrl );
         // ...and we must ensure that it can be cloned.
-        using( var gitRepository = GitRepository.Clone( monitor, gitKey, _stackRepository.Context.Committer, _name.WorldRoot.Combine( folderPath ), folderPath ) )
+        using( var gitRepository = GitRepository.Clone( monitor, gitKey, _stackRepository.Context.Committer, folderPath, folderPath, _scopeAlive ) )
         {
             if( gitRepository == null ) return false;
             // The working folder is successfully cloned.
@@ -147,7 +149,16 @@ sealed partial class World
             _cachedRepositories.Clear();
             _ckliRepoIndex.Clear();
             FillCachedRepositories();
-            return true;
+            // Finalize: "ckli issue --fix" (with display of the issues).
+            // We need the repository for the event.
+            var newOne = GetDefinedRepo( monitor, gitKey.OriginUrl.ToString() );
+            if( newOne == null )
+            {
+                return false;
+            }
+            var issues = new List<Issue>();
+            return _events.SafeRaiseEvent( monitor, new IssueEventArgs( monitor, context, this, [newOne], issues ) )
+                   && await HandleIssuesAsync( monitor, context, issues, displayIssues: true, applyAutoFixes: true, _scopeAlive ).ConfigureAwait( false );
         }
         return false;
     }

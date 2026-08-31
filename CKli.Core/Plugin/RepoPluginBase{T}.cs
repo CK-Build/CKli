@@ -17,7 +17,10 @@ namespace CKli.Core;
 public abstract class RepoPluginBase<T> : RepoInfoPluginBase
     where T : RepoInfo
 {
-    readonly T?[] _infos;
+    // We wait for the first request. This is less an optimization than a
+    // simple way to handle the IssueEvent after having added or created a
+    // repository (World.AddRepositoryAsync).
+    T?[]? _infos;
     ImmutableArray<T> _all;
 
     /// <summary>
@@ -27,7 +30,6 @@ public abstract class RepoPluginBase<T> : RepoInfoPluginBase
     protected RepoPluginBase( World world )
         : base( world, typeof(T) )
     {
-        _infos = new T[world.Layout.Count];
     }
 
     /// <summary>
@@ -38,7 +40,7 @@ public abstract class RepoPluginBase<T> : RepoInfoPluginBase
     /// True if the info associated to the repository, false if the next
     /// call to <see cref="Get(IActivityMonitor, Repo)"/> will create it.
     /// </returns>
-    protected bool HasRepoInfoBeenCreated( Repo r ) => _infos[r.Index] != null;
+    protected bool HasRepoInfoBeenCreated( Repo r ) => _infos?[r.Index] != null;
 
     /// <summary>
     /// Gets the associated information of a given <see cref="Repo"/>.
@@ -48,6 +50,7 @@ public abstract class RepoPluginBase<T> : RepoInfoPluginBase
     /// <returns>The information.</returns>
     public T Get( IActivityMonitor monitor, Repo r )
     {
+        _infos ??= new T[World.Layout.Count];
         var info = _infos[r.Index];
         if( info == null )
         {

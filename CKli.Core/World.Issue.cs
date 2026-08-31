@@ -1,6 +1,9 @@
 using CK.Core;
+using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace CKli.Core;
 
@@ -96,6 +99,87 @@ public sealed partial class World
             if( _manualFix ) title = "✋ " + title; 
             return new Collapsable( screenType.Text( title ).AddBelow( _body ) );
         }
+    }
+
+
+    internal async Task<bool> HandleIssuesAsync( IActivityMonitor monitor,
+                                                 CKliEnv context,
+                                                 List<Issue> issues,
+                                                 bool displayIssues,
+                                                 bool applyAutoFixes,
+                                                 CancellationToken cancellation )
+    {
+        if( issues.Count == 0 )
+        {
+            monitor.Info( ScreenType.CKliScreenTag, "No issues found." );
+        }
+        else
+        {
+            int autoFixCount = issues.Count( i => !i.ManualFix );
+            int manualFixCount = issues.Count - autoFixCount;
+            if( manualFixCount > 0 )
+            {
+                monitor.Warn( $"Found {issues.Count} issues that require a manual fix." );
+            }
+            if( displayIssues )
+            {
+                foreach( var g in issues.GroupBy( i => i.Repo ).OrderBy( g => g.Key?.Index ?? -1 ) )
+                {
+                    var link = g.Key == null
+                                ? context.Screen.ScreenType.Text( _name.FullName )
+                                    .HyperLink( new Uri( _name.WorldRoot ) )
+                                : context.Screen.ScreenType.Text( g.Key.DisplayPath )
+                                    .HyperLink( new Uri( g.Key.WorkingFolder ) );
+                    var header = link.Box( marginRight: 1 ).AddRight( context.Screen.ScreenType.Text( $"({g.Count()})", TextEffect.Italic ) );
+                    var repo = header.AddBelow( g.Select( i => i.ToRenderable( context.Screen.ScreenType ) ) );
+                    context.Screen.Display( new Collapsable( repo ) );
+                }
+            }
+            if( applyAutoFixes )
+            {
+                // Applies always the same ordering.
+                var groupedIssues = issues.GroupBy( i => i.Repo ).OrderBy( g => g.Key?.Index ?? -1 );
+                if( autoFixCount > 0 )
+                {
+                    using( monitor.OpenInfo( manualFixCount > 0
+                                                ? $"Trying to fix {autoFixCount} issues ({manualFixCount} issues must be fixed manually)."
+                                                : $"Trying to fix {autoFixCount} issues." ) )
+                    {
+                        foreach( var g in groupedIssues.Where( g => g.Any() ) )
+                        {
+                            using( monitor.OpenInfo( $"Handling issues for '{g.Key?.DisplayPath ?? _name.FullName}'." ) )
+                            {
+                                foreach( var i in g )
+                                {
+                                    try
+                                    {
+                                        if( !i.ManualFix )
+                                        {
+                                            if( !await i.ExecuteAsync( monitor, context, this, cancellation ).ConfigureAwait( false ) )
+                                            {
+                                                monitor.CloseGroup( $"Fixing '{i.Title}' failed." );
+                                                return false;
+                                            }
+                                        }
+                                        monitor.Info( $"Fixed '{i.Title}'." );
+                                    }
+                                    catch( OperationCanceledException ex ) when( ex.CancellationToken == cancellation )
+                                    {
+                                        return false;
+                                    }
+                                    catch( Exception ex )
+                                    {
+                                        monitor.Error( $"While fixing '{i.Title}'.", ex );
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return true;
     }
 
 }

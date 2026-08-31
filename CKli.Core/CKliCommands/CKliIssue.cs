@@ -72,88 +72,15 @@ public sealed class CKliIssue : Command
             }
             IReadOnlyList<Repo>? repos = all
                                           ? world.GetAllDefinedRepo( monitor )
-                                          : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
-            if( repos == null ) return false;
-
-            if( repos.Count > 0
-                && !world.Events.SafeRaiseEvent( monitor, new IssueEventArgs( monitor, context, world, repos, issues ) ) )
+                                          : world.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
+            if( repos != null 
+                && world.Events.SafeRaiseEvent( monitor, new IssueEventArgs( monitor, context, world, repos, issues ) )
+                && await world.HandleIssuesAsync( monitor, context, issues, displayIssues: !fix, fix, scopeAlive ).ConfigureAwait( false ) )
             {
-                return false;
+                // On success, saves the World's DefinitionFile if it's dirty.
+                return stack.Close( monitor );
             }
-            if( issues.Count == 0 )
-            {
-                monitor.Info( ScreenType.CKliScreenTag, "No issues found." );
-            }
-            else
-            {
-                int autoFixCount = issues.Count( i => !i.ManualFix );
-                int manualFixCount = issues.Count - autoFixCount;
-                if( manualFixCount > 0 )
-                {
-                    monitor.Warn( $"Found {issues.Count} issues that require a manual fix." );
-                }
-                if( fix )
-                {
-                    // Applies always the same ordering.
-                    var groupedIssues = issues.GroupBy( i => i.Repo ).OrderBy( g => g.Key?.Index ?? -1 );
-                    if( autoFixCount > 0 )
-                    {
-                        using( monitor.OpenInfo( manualFixCount > 0
-                                                    ? $"Trying to fix {autoFixCount} issues ({manualFixCount} issues must be fixed manually)."
-                                                    : $"Trying to fix {autoFixCount} issues." ) )
-                        {
-                            foreach( var g in groupedIssues.Where( g => g.Any() ) )
-                            {
-                                using( monitor.OpenInfo( $"Handling issues for '{g.Key?.DisplayPath ?? world.Name.FullName}'." ) )
-                                {
-                                    foreach( var i in g )
-                                    {
-                                        try
-                                        {
-                                            if( !i.ManualFix )
-                                            {
-                                                if( !await i.ExecuteAsync( monitor, context, world, scopeAlive ).ConfigureAwait( false ) )
-                                                {
-                                                    monitor.CloseGroup( $"Fixing '{i.Title}' failed." );
-                                                    return false;
-                                                }
-                                            }
-                                            monitor.Info( $"Fixed '{i.Title}'." );
-                                        }
-                                        catch( OperationCanceledException ex ) when (ex.CancellationToken == scopeAlive)
-                                        {
-                                            return false;
-                                        }
-                                        catch( Exception ex )
-                                        {
-                                            monitor.Error( $"While fixing '{i.Title}'.", ex );
-                                            return false;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
-                        return stack.Close( monitor );
-                    }
-                }
-                else
-                {
-                    foreach( var g in issues.GroupBy( i => i.Repo ).OrderBy( g => g.Key?.Index ?? -1 ) )
-                    {
-                        var link = g.Key == null
-                                    ? context.Screen.ScreenType.Text( world.Name.FullName )
-                                        .HyperLink( new Uri( world.Name.WorldRoot ) )
-                                    : context.Screen.ScreenType.Text( g.Key.DisplayPath )
-                                        .HyperLink( new Uri( g.Key.WorkingFolder ) );
-                        var header = link.Box( marginRight: 1 ).AddRight( context.Screen.ScreenType.Text( $"({g.Count()})", TextEffect.Italic ) );
-                        var repo = header.AddBelow( g.Select( i => i.ToRenderable( context.Screen.ScreenType ) ) );
-                        context.Screen.Display( new Collapsable( repo ) );
-                    }
-                }
-            }
-            // Consider that the final result requires no error when saving a dirty World's DefinitionFile.
-            return stack.Close( monitor );
+            return false;
         }
         finally
         {
@@ -161,5 +88,4 @@ public sealed class CKliIssue : Command
             stack.Dispose();
         }
     }
-
 }

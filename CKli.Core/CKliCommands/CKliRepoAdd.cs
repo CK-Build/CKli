@@ -6,7 +6,10 @@ using System.Threading.Tasks;
 
 namespace CKli;
 
-sealed class CKliRepoAdd : Command
+/// <summary>
+/// Adds an existing remote to the world.
+/// </summary>
+public sealed class CKliRepoAdd : Command
 {
     public CKliRepoAdd()
         : base( null,
@@ -83,7 +86,7 @@ sealed class CKliRepoAdd : Command
                 }
             }
             // AddRepository handles the WorldDefinition file save and commit.
-            bool success = await world.AddRepositoryAsync( monitor, gitKey, context.CurrentDirectory ).ConfigureAwait( false );
+            bool success = await world.AddRepositoryAsync( monitor, context, gitKey ).ConfigureAwait( false );
             // On error, compensate by deleting the new repository (when create was true, the hostingProvider is not null).
             if( !success && hostingProvider != null )
             {
