@@ -199,9 +199,9 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <see cref="TagCommit"/> per commit.
     /// <para>
     /// This index is built once by the <see cref="VersionTagPlugin"/>. A commit produces at most one
-    /// version, and that produced version is the entry. A commit may also carry a "+fake" that the produced
-    /// version is based on (<see cref="SVersion.IsStableRoughBaseOf(SVersion)"/>): the fake is not the entry
-    /// and stays reachable by its own version. Any other commit claimed by more than one version tag is
+    /// version, and that produced version is the entry. A commit may also carry a "+fake" with the same
+    /// Major.Minor.Patch (<see cref="SVersion.SameStableAs(SVersion)"/>): the fake is not the entry and
+    /// stays reachable by its own version. Any other commit claimed by more than one version tag is
     /// reported as <see cref="TagConflict.MultipleVersionsOnSameCommit"/> and <see cref="HasIssue"/> is
     /// true (this index then keeps the first one seen and must not be trusted until the conflict is fixed).
     /// </para>
@@ -604,7 +604,7 @@ public sealed partial class VersionTagInfo : RepoInfo
             {
                 // New version is "Major.0.0".
                 baseCommit = LastStables.FirstOrDefault( tc => tc.Version.Major < version.Major
-                                                               || (tc.IsOrHasFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
+                                                               || (tc.IsOrHasFakeVersion && tc.Version.SameStableAs( version )) );
                 if( baseCommit == null )
                 {
                     monitor.Error( $"""
@@ -628,7 +628,7 @@ public sealed partial class VersionTagInfo : RepoInfo
             {
                 // New version is "Major.Minor.0".
                 baseCommit = LastStables.FirstOrDefault( tc => tc.Version.Major == version.Major && tc.Version.Minor < version.Minor
-                                                               || (tc.IsOrHasFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
+                                                               || (tc.IsOrHasFakeVersion && tc.Version.SameStableAs( version )) );
                 if( baseCommit == null )
                 {
                     monitor.Error( $"""
@@ -655,7 +655,7 @@ public sealed partial class VersionTagInfo : RepoInfo
             baseCommit = LastStables.FirstOrDefault( tc => tc.Version.Major == version.Major
                                                            && tc.Version.Minor == version.Minor
                                                            && tc.Version.Patch < version.Patch
-                                                           || (tc.IsOrHasFakeVersion && tc.Version.IsStableRoughBaseOf( version )) );
+                                                           || (tc.IsOrHasFakeVersion && tc.Version.SameStableAs( version )) );
             if( baseCommit == null )
             {
                 monitor.Error( $"""

@@ -141,10 +141,11 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     /// </para>
     /// <para>
     /// A "+fake" is never attached because of its commit. A commit may legitimately carry a "+fake" plus a
-    /// different version that is based on it (<see cref="SVersion.IsStableRoughBaseOf(SVersion)"/>) - the
-    /// fake then simply keeps its own version entry - but a "+fake" next to an UNRELATED version is nonsense
-    /// in both directions (a released version's future fake belongs on one of its parents, and a commit
-    /// carrying a "+fake" cannot have produced a version unrelated to it) and is reported as a
+    /// different version with the same Major.Minor.Patch (<see cref="SVersion.SameStableAs(SVersion)"/>) -
+    /// typically a prerelease or CI version of the very version the fake declares: the fake then simply
+    /// keeps its own version entry. A "+fake" next to any OTHER version is nonsense in both directions (a
+    /// released version's future fake belongs on one of its parents, and a commit carrying a "+fake" cannot
+    /// have produced another version) and is reported as a
     /// <see cref="TagConflict.MultipleVersionsOnSameCommit"/>.
     /// </para>
     /// </summary>
@@ -168,10 +169,11 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     /// <returns>The error message or null.</returns>
     public string? CanBearVersion( SVersion version )
     {
-        // If this is a +fake version, then the new version must be "roughly based" on it.
+        // If this is a +fake version, then the new version must have the same Major.Minor.Patch: the
+        // "+fake" declares ITS version to be produced here, not a subsequent one.
         if( IsFakeVersion )
         {
-            if( Version.IsStableRoughBaseOf( version ) )
+            if( Version.SameStableAs( version ) )
             {
                 return null;
             }

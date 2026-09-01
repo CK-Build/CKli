@@ -38,7 +38,11 @@ public sealed partial class VersionTagInfo
                 {
                     Throw.DebugAssert( (lastStable.IsFakeVersion && !lastStable.IsBuildingOrLocal) || (lastStable.FakeVersion != null && lastStable.IsBuildingOrLocal) );
                     var fake = lastStable.FakeVersion?.Version ?? lastStable.Version; 
-                    if( !fake.IsStableRoughBaseOf( topHot.Version ) )
+                    // A "+fake" is a STARTING version: it declares its own version to be produced here, so
+                    // only that version's prereleases and CI builds may appear above it. Its successors
+                    // cannot: they only become legitimate once the fake's version is published - and by
+                    // then the fake is gone (removableTags) and this branch no longer applies.
+                    if( !fake.SameStableAs( topHot.Version ) )
                     {
                         message = $"""
                               The greatest version tag '{topHot.Version.ParsedText}' is invalid because the current stable version is '{fake.ParsedText}'.
@@ -176,11 +180,11 @@ public sealed partial class VersionTagInfo
                 }
                 if( info.TagCommitsBySha.TryGetValue( c.Sha, out var tc ) )
                 {
-                    // Allow here the version to be "roughly based" on the lastStable when
+                    // Allow here the version to share the lastStable's Major.Minor.Patch when
                     // the lastStable is a +fake (this is not the case if the lastStable is
                     // a "local/" associated to a FakeVersion i.e. when IsOrHasFakeVersion is true).
                     if( lastStable.Version < tc.Version
-                        || (lastStable.IsFakeVersion && !lastStable.Version.IsStableRoughBaseOf( tc.Version )) )
+                        || (lastStable.IsFakeVersion && !lastStable.Version.SameStableAs( tc.Version )) )
                     {
                         return -1;
                     }
@@ -306,9 +310,10 @@ public sealed partial class VersionTagInfo
                 if( info.TagCommitsBySha.TryGetValue( c.Sha, out var tc ) )
                 {
                     // The tagged version must be greater than the last stable but we handle
-                    // the +fake case thanks to the relaxed IsStableRoughBaseOf condition.
+                    // the +fake case thanks to the relaxed SameStableAs condition (a prerelease or
+                    // CI build of the very version the fake declares is smaller than the fake).
                     if( tc.Version > lastStable.Version
-                        || (lastStable.IsFakeVersion && lastStable.Version.IsStableRoughBaseOf( tc.Version )) )
+                        || (lastStable.IsFakeVersion && lastStable.Version.SameStableAs( tc.Version )) )
                     {
                         collector.Add( (tc, level) );
                         return level + 1;

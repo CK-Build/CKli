@@ -525,10 +525,10 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         // of them is a "+fake" that the other version is legitimately based on.
         //
         // A "+fake" declares "consider this version released here". Another version tag on that same commit
-        // is then acceptable exactly when the build would have accepted it, i.e. when the fake is a
-        // IsStableRoughBaseOf the other version (same Major.Minor.Patch or one valid increment, prereleases
-        // included) - the very test TagCommit.CanBearVersion applies. Anything else is nonsense in both
-        // directions:
+        // is then acceptable exactly when the build would have accepted it, i.e. when the fake is
+        // SameStableAs the other version (same Major.Minor.Patch, so a prerelease or CI version of the very
+        // version the fake declares) - the very test TagCommit.CanBearVersion applies. Anything else is
+        // nonsense in both directions:
         //  - if a released version exists, a "+fake" for an unrelated future version belongs on one of that
         //    commit's PARENTS, not on it;
         //  - if the "+fake" exists, that commit cannot have produced a version unrelated to it.
@@ -552,7 +552,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             // under the ci.0 one): same instance, nothing to do.
             if( onSameCommit == tc ) continue;
 
-            // Exactly one of them must be the "+fake", and it must be a rough base of the other one.
+            // Exactly one of them must be the "+fake", and it must be SameStableAs the other one.
             // The fake keeps its own v2c entry (its version differs) so it stays reachable by version and
             // can be the lastStable: there is nothing to attach here, only the produced version to index.
             TagCommit? fake = null;
@@ -562,8 +562,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 fake = onSameCommit.IsFakeVersion ? onSameCommit : tc;
                 produced = onSameCommit.IsFakeVersion ? tc : onSameCommit;
             }
-            // FirstTagCollect rejects a non stable "+fake", so IsStableRoughBaseOf cannot throw here.
-            if( fake != null && fake.Version.IsStableRoughBaseOf( produced!.Version ) )
+            if( fake != null && fake.Version.SameStableAs( produced!.Version ) )
             {
                 sha2c[tc.Sha] = produced;
                 continue;
@@ -791,9 +790,10 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 if( v.VersionKind == CSVersionKind.None
                     || (invalidParsedPrefix = (!string.IsNullOrEmpty( v.ParsedPrefix ) && v.ParsedPrefix != "building/" && v.ParsedPrefix != "local/"))
                     || (invalidBuildingOrLocalPrefix = (v.HasFakeMetadata || v.HasDeprecatedMetadata || v.HasInvalidMetadata) && v.IsBuildingOrLocal() )
-                    // A +fake declares a stable version to be considered released: it cannot be a prerelease.
-                    // This is relied upon downstream (SVersion.IsStableRoughBaseOf throws on a non stable
-                    // version), so it is filtered out here rather than defended against everywhere.
+                    // A +fake declares a stable version to be produced here: it cannot be a prerelease.
+                    // The whole "+fake" handling relies on this (the fake is the base of the hot zone and
+                    // the version the build produces), so it is filtered out here once rather than
+                    // defended against at every use site.
                     || (invalidNonStableFake = (v.HasFakeMetadata && !v.IsStable)) )
                 {
                     if( invalidBuildingOrLocalPrefix )

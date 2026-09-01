@@ -89,17 +89,18 @@ public sealed partial class VersionTagPlugin
         }
 
         // A commit produces at most one version: setting the "+fake" on a commit that already bears a
-        // version it is not based on would be a TagConflict.MultipleVersionsOnSameCommit (a released
-        // version's future fake belongs elsewhere, and a commit carrying a "+fake" cannot have produced an
-        // unrelated version). Since futureFake is necessarily greater than every published version, it can
-        // never be a IsStableRoughBaseOf what the tip already carries: an empty commit takes the fake.
+        // version with another Major.Minor.Patch would be a TagConflict.MultipleVersionsOnSameCommit (a
+        // released version's future fake belongs elsewhere, and a commit carrying a "+fake" cannot have
+        // produced another version). Since futureFake is necessarily greater than every published version,
+        // the tip can only be SameStableAs it by carrying one of its prereleases: in every other case an
+        // empty commit takes the fake.
         // Note: RemoveFakeVersions above deleted git tags without updating this versionInfo (unlike
         // DestroyLocalReleases, which goes through RemoveTagCommit), so a just-removed fake can still be
         // reported here: cleanupFake filters it out to avoid a useless empty commit.
         var target = branch.Tip;
         if( versionInfo.TagCommitsBySha.TryGetValue( target.Sha, out var onTip )
             && !cleanupFake.Any( f => f.Commit == onTip )
-            && !futureFake.IsStableRoughBaseOf( onTip.Version ) )
+            && !futureFake.SameStableAs( onTip.Version ) )
         {
             var newTarget = CreateEmptyCommit( monitor,
                                                repo,
