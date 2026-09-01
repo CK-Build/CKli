@@ -416,10 +416,9 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         removableTags ??= new List<Tag>();
                         removableTags.Add( exists.Tag );
                     }
-                    // The lastStable becomes the "local/" with the associated FakeVersion.
-                    if( lastStable == exists ) lastStable = newOne;
-                    // The topHot prefers the actual "local/" to the "+fake".
-                    if( topHot == exists ) topHot = newOne;
+                    // The lastStable becomes the "local/" with the associated FakeVersion and the topHot
+                    // prefers the actual "local/" to the "+fake".
+                    ReplaceTagCommit( ref topHot, ref lastStable, exists, newOne );
                     continue;
                 }
                 // Now that "+fake" vs. ("regular" or "deprecated") have been handled, if the same version appears on different commits,
@@ -446,10 +445,9 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         removableTags ??= new List<Tag>();
                         removableTags.Add( exists.Tag );
                         v2c[newOne.Version] = newOne;
-                        // If topHot was the "local/" exists, it is now the published newOne.
-                        if( topHot == exists ) topHot = newOne;
-                        if( lastStable == exists ) lastStable = newOne;
-                   }
+                        // The published newOne takes over from the "local/" exists.
+                        ReplaceTagCommit( ref topHot, ref lastStable, exists, newOne );
+                    }
                     continue;
                 }
                 // Here, we can handle "valid" (expected) conflict between a deprecated and regular version.
@@ -481,8 +479,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     }
                     // topHot may become deprecated.
                     // If no better topHot pops, this is annoying (see below).
-                    if( topHot == exists ) topHot = newOne;
-                    if( lastStable == exists ) lastStable = newOne;
+                    ReplaceTagCommit( ref topHot, ref lastStable, exists, newOne );
                     continue;
                 }
                 // 2 regular tags: we must be able to chose a best one or this is
@@ -499,8 +496,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     var best = ResolveConflict( v2c, exists, newOne, ref removableTags );
                     if( best != null )
                     {
-                        if( topHot == exists && best == newOne ) topHot = newOne;
-                        if( lastStable == exists && best == newOne ) lastStable = newOne;
+                        if( best == newOne ) ReplaceTagCommit( ref topHot, ref lastStable, exists, newOne );
                         continue;
                     }
                 }
@@ -936,6 +932,20 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 return true;
             }
             return false;
+        }
+
+        // Called whenever newOne takes over the v2c entry that exists was holding.
+        // Transferring topHot/lastStable by identity is NOT enough: newOne may QUALIFY as lastStable where
+        // exists could not. A "local/" TagCommit is only eligible when it carries a FakeVersion (see
+        // TrackTagCommit), so when a published tag replaces a "local/" one of the same version, lastStable
+        // was left null and the repository reported "No initial version found" although its version was
+        // published - the exact state a publication interrupted after the version tag was created leaves
+        // behind ("v0.0.0+fake" + "local/v0.0.0" + "v0.0.0").
+        static void ReplaceTagCommit( ref TagCommit? topHot, ref TagCommit? lastStable, TagCommit exists, TagCommit newOne )
+        {
+            if( topHot == exists ) topHot = newOne;
+            if( lastStable == exists ) lastStable = newOne;
+            TrackTagCommit( ref topHot, ref lastStable, newOne );
         }
 
         static void TrackTagCommit( ref TagCommit? topHot, ref TagCommit? lastStable, TagCommit newOne )

@@ -158,8 +158,18 @@ abstract class BasePublisher
             Exception? ex = null;
             try
             {
+                // Exact inverse of the promotion above (Tags.Remove of the "local/" then ApplyTag of the
+                // version): the LOCAL version tag must be removed too, not only the remote one. Forgetting
+                // it leaves the repository with BOTH "v{version}" and "local/v{version}" on the same commit,
+                // a state that claims the version is published when it is not.
+                // Capture the annotation before removing the ref: the tag object is only reachable through
+                // it until the ref is recreated.
+                var sha = tag.Target.Sha;
+                var tagger = tag.Annotation.Tagger;
+                var message = tag.Annotation.Message;
                 success = r.DeleteRemoteTags( monitor, [tag.CanonicalName] );
-                r.Repository.ApplyTag( $"local/{tag.FriendlyName}", tag.Target.Sha, tag.Annotation.Tagger, tag.Annotation.Message );
+                r.Repository.Tags.Remove( tag.CanonicalName );
+                r.Repository.ApplyTag( $"local/{tag.FriendlyName}", sha, tagger, message );
             }
             catch( Exception e )
             {
@@ -170,7 +180,8 @@ abstract class BasePublisher
             {
                 monitor.Error( $"""
                     Error while compensating the previous error.
-                    The tag '{tag.CanonicalName}' must be deleted and must be recreated with a 'local/' prefix: 'local/{tag.FriendlyName}'.
+                    The tag '{tag.CanonicalName}' must be deleted (locally AND on the remote) and must be
+                    recreated locally with a 'local/' prefix: 'local/{tag.FriendlyName}'.
                     """, ex );
             }
         }
