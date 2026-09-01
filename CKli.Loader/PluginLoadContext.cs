@@ -12,8 +12,9 @@ namespace CKli.Loader;
 /// Implements the <see cref="World.PluginLoader"/> by loading the plugins "CKli.Plugins.dll" and all its
 /// installed plugins in a collectible <see cref="AssemblyLoadContext"/>.
 /// <para>
-/// Any assemblies that already are in the <see cref="AssemblyLoadContext.Default"/> are used: only the
-/// plugins assemblies (and their possibly shared assemblies) are in the plugins context. 
+/// The assemblies of the shared surface (see <see cref="GetSharedAssemblies"/>) are the host ones: the plugins
+/// assemblies and their own dependencies are loaded in this context. The .NET framework assemblies are not in
+/// the plugins run folder: they are resolved by the host context (see <see cref="Load(AssemblyName)"/>).
 /// </para>
 /// </summary>
 public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
@@ -25,58 +26,135 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
     static Dictionary<string, Assembly>? _assemblies;
 
     /// <summary>
-    /// Optional entry point... Depending on the host, the <see cref="AssemblyLoadContext.Default"/> may not be
-    /// the load context into which the application assemblies are loaded.
+    /// Loads the assemblies of the shared surface (see <see cref="GetSharedAssemblies"/>) and registers them:
+    /// <see cref="Load(AssemblyName)"/> uses them instead of the ones of the plugins run folder.
     /// <para>
-    /// Fortunately, <see cref="AssemblyLoadContext.All"/> exposes all the contexts so we can consider
-    /// another "Default" context when needed.
+    /// The host load context needs not be known: each shared assembly is obtained from one of its types, so it
+    /// comes from the context into which this CKli.Loader assembly has been loaded. This matters because the
+    /// <see cref="AssemblyLoadContext.Default"/> is not always the host context: NUnit3TestAdapter v6.0.0 for
+    /// instance loaded the test assemblies in a dedicated "TestAssemblyLoadContext" (this was not the case in
+    /// v5.2.1, nor anymore in v6.1.0).
     /// </para>
     /// <para>
-    /// For instance, NUnit3TestAdapter v6.0.0 loads the assemblies in a dedicated context (wasn't the case in v5.2.1).
-    /// ...and this is no more the case for v6.1.0. It seems that the introduction of this "TestAssemblyLoadContext" was
-    /// a mess.
-    /// (So this is no more used but this entry point is kept because it may be required again.)
-    /// </para>
-    /// <para>
-    /// This must obviously be called before the first call to <see cref="Load(IActivityMonitor, NormalizedPath, PluginCollectorContext, out bool, out WeakReference?)"/>.
-    /// If not called, only the <see cref="AssemblyLoadContext.Default"/> is considered.
+    /// Must be called only once, before the first call to <see cref="Load(IActivityMonitor, NormalizedPath, PluginCollectorContext, out bool, out WeakReference?)"/>
+    /// that calls it if it has not been called yet.
     /// </para>
     /// </summary>
-    /// <param name="supplementary">Optional supplementary context to consider.</param>
-    public static void Initialize( AssemblyLoadContext? supplementary = null )
+    public static void Initialize()
     {
         Throw.CheckState( "Must be called only once.", _assemblies == null );
 
-        //
-        // Preserves the assembly reference to CKli.Plugins.Core.
-        // Without this it is trimmed and the CKli.Plugins.Core is loaded in the plugins context.
-        //
-        // And the "funny" thing is that CKli.Testing must do the same. Without it, CKli.Testing
-        // references CKli.Loader and CKli.Core but not CKli.Plugins.Core and, again, when loaded
-        // from CKli.Testing (directly from the World host's run folder), CKli.Plugins.Core is loaded
-        // in the plugin context (and this triggers a MissingMethodException).
-        //
-        GC.KeepAlive( typeof( CKli.Plugins.PluginCollector ) );
-
-        _assemblies = new Dictionary<string, Assembly>( 100 );
-        // (No more used but this entry point is kept because it may be required again.)
-        if( supplementary != null )
-        {
-            foreach( var a in supplementary.Assemblies )
-            {
-                var n = a.GetName().Name;
-                if( n != null ) _assemblies.Add( n, a );
-            }
-        }
-        foreach( var a in Default.Assemblies )
+        var shared = GetSharedAssemblies();
+        _assemblies = new Dictionary<string, Assembly>( shared.Length );
+        foreach( var a in shared )
         {
             var n = a.GetName().Name;
             if( n != null ) _assemblies.TryAdd( n, a );
         }
+#if DEBUG
+        Throw.DebugAssert( "GetSharedAssemblies() is the CKli.Plugins.Core references closure.", CheckSharedAssemblies() );
+#endif
     }
 
     /// <summary>
-    /// Gets whether <see cref="Initialize(AssemblyLoadContext?)"/> has been called.
+    /// The shared surface: these assemblies MUST be the host ones, they must never be loaded in a plugins
+    /// context. This is the transitive closure of the assemblies referenced by CKli.Plugins.Core (the plugins
+    /// contract), without the .NET framework assemblies: those are not in the plugins run folder, so
+    /// <see cref="Load(AssemblyName)"/> lets the host context resolve them.
+    /// <para>
+    /// A type of each assembly is referenced here: this loads them (an assembly is loaded on first use only)
+    /// but this also secures the assembly references of this CKli.Loader assembly. Without the CKli.Plugins.Core
+    /// one for instance, the C# compiler doesn't emit the reference and CKli.Plugins.Core is loaded in the
+    /// plugins context (this is also why CKli.Testing must reference it).
+    /// </para>
+    /// <para>
+    /// This list is hard coded because assemblies are loaded lazily, on first use: considering the assemblies that
+    /// the host has already loaded would make the sharing depend on the execution. This is what happened with
+    /// CK.PerfectEvent: World.Events (the only user of PerfectEventSender) is created AFTER the plugins have been
+    /// loaded, so the plugins ended up with their own PerfectEvent&lt;&gt; types and the first plugin that
+    /// subscribed to World.Events.RepoAdded failed with "Method not found:
+    /// 'CK.PerfectEvent.PerfectEvent`1&lt;CKli.Core.RepoAddedEventArgs&gt; CKli.Core.WorldEvents.get_RepoAdded()'".
+    /// </para>
+    /// <para>
+    /// CheckSharedAssemblies() below asserts in DEBUG that this list is exactly the closure: any new dependency
+    /// of CKli.Core or CKli.Plugins.Core must appear here.
+    /// </para>
+    /// </summary>
+    static Assembly[] GetSharedAssemblies() =>
+    [
+        typeof( CKli.Plugins.PluginCollector ).Assembly,                                            // CKli.Plugins.Core
+        typeof( World ).Assembly,                                                                   // CKli.Core
+        typeof( CK.PerfectEvent.PerfectEventSender<> ).Assembly,                                    // CK.PerfectEvent
+        typeof( NormalizedPath ).Assembly,                                                          // CK.Core
+        typeof( ActivityMonitor ).Assembly,                                                         // CK.ActivityMonitor
+        typeof( ActivityMonitorSimpleSenderExtension ).Assembly,                                    // CK.ActivityMonitor.SimpleSender
+        typeof( SVersion ).Assembly,                                                                // CK.SVersion
+        typeof( CK.Monitoring.GrandOutput ).Assembly,                                               // CK.Monitoring
+        typeof( LibGit2Sharp.Repository ).Assembly,                                                 // LibGit2Sharp
+        typeof( CommunityToolkit.HighPerformance.ArrayExtensions ).Assembly,                         // CommunityToolkit.HighPerformance
+        typeof( Microsoft.IO.RecyclableMemoryStreamManager ).Assembly,                              // Microsoft.IO.RecyclableMemoryStream
+        typeof( Microsoft.Extensions.Configuration.ConfigurationBuilder ).Assembly,                  // Microsoft.Extensions.Configuration
+        typeof( Microsoft.Extensions.Configuration.IConfiguration ).Assembly,                        // ...Configuration.Abstractions
+        typeof( Microsoft.Extensions.Configuration.FileConfigurationSource ).Assembly,               // ...Configuration.FileExtensions
+        typeof( Microsoft.Extensions.Configuration.Json.JsonConfigurationSource ).Assembly,          // ...Configuration.Json
+        typeof( Microsoft.Extensions.Configuration.UserSecretsConfigurationExtensions ).Assembly,    // ...Configuration.UserSecrets
+        typeof( Microsoft.Extensions.DependencyInjection.ActivatorUtilities ).Assembly,              // ...DependencyInjection.Abstractions
+        typeof( Microsoft.Extensions.FileProviders.IFileProvider ).Assembly,                         // ...FileProviders.Abstractions
+        typeof( Microsoft.Extensions.FileProviders.PhysicalFileProvider ).Assembly,                  // ...FileProviders.Physical
+        typeof( Microsoft.Extensions.FileSystemGlobbing.FilePatternMatch ).Assembly,                 // ...FileSystemGlobbing
+        typeof( Microsoft.Extensions.Primitives.IChangeToken ).Assembly                              // ...Primitives
+    ];
+
+#if DEBUG
+    // Computes the transitive closure of the assemblies referenced by CKli.Plugins.Core and checks that
+    // GetSharedAssemblies() is this closure minus the .NET framework assemblies.
+    // This walk loads the whole closure (and its framework part is by far the biggest one): this is why it
+    // is done in DEBUG only. Throw.DebugAssert is [Conditional( "DEBUG" )]: in Release, the call itself
+    // (and this computation) is not even emitted.
+    static bool CheckSharedAssemblies()
+    {
+        var frameworkFolder = Path.GetDirectoryName( typeof( object ).Assembly.Location );
+        var closure = new HashSet<string>();
+        var visited = new HashSet<string>();
+        var pending = new Stack<Assembly>();
+        pending.Push( typeof( CKli.Plugins.PluginCollector ).Assembly );
+        while( pending.TryPop( out var a ) )
+        {
+            var name = a.GetName().Name;
+            if( name == null || !visited.Add( name ) ) continue;
+            if( Path.GetDirectoryName( a.Location ) != frameworkFolder ) closure.Add( name );
+            foreach( var r in a.GetReferencedAssemblies() )
+            {
+                if( r.Name == null || visited.Contains( r.Name ) ) continue;
+                try
+                {
+                    pending.Push( Assembly.Load( r ) );
+                }
+                catch( Exception ex )
+                {
+                    visited.Add( r.Name );
+                    ActivityMonitor.StaticLogger.Warn( $"Unable to load '{r}' referenced by '{name}'.", ex );
+                }
+            }
+        }
+        var declared = new HashSet<string>();
+        foreach( var a in GetSharedAssemblies() )
+        {
+            var n = a.GetName().Name;
+            if( n != null ) declared.Add( n );
+        }
+        if( closure.SetEquals( declared ) ) return true;
+        var missing = new HashSet<string>( closure );
+        missing.ExceptWith( declared );
+        var useless = new HashSet<string>( declared );
+        useless.ExceptWith( closure );
+        ActivityMonitor.StaticLogger.Error( $"Invalid GetSharedAssemblies(). Missing: {string.Join( ", ", missing )}. Useless: {string.Join( ", ", useless )}." );
+        return false;
+    }
+#endif
+
+    /// <summary>
+    /// Gets whether <see cref="Initialize()"/> has been called.
     /// </summary>
     public static bool IsInitialized => _assemblies != null;
 
@@ -150,24 +228,30 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
     {
         Throw.DebugAssert( _assemblies != null );
         Throw.CheckArgument( assemblyName.Name != null );
-        if( !_assemblies.TryGetValue( assemblyName.Name, out var a ) )
+        if( _assemblies.TryGetValue( assemblyName.Name, out var a ) )
         {
-            var p = $"{_runFolder}/{assemblyName.Name}.dll";
-            if( !File.Exists( p ) )
-            {
-                ActivityMonitor.StaticLogger.Info( $"""
-                    Unable to find '{assemblyName.Name}.dll' in '{_runFolder}'.
-                    Please check that 'CKli.Plugins.csproj' has <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>.
-                    Trying to load in the default context.
-                    """ );
-                a = Assembly.Load( assemblyName );
-            }
-            else
-            {
-                a = LoadFromAssemblyPath( p );
-            }
+            return a;
         }
-        return a;
+        var p = $"{_runFolder}/{assemblyName.Name}.dll";
+        if( File.Exists( p ) )
+        {
+            return LoadFromAssemblyPath( p );
+        }
+        // Not shared and not in the run folder: this is the regular case of the .NET framework assemblies
+        // (they are not copied in the run folder), the host context resolves them. If it cannot, then the
+        // run folder is incomplete.
+        try
+        {
+            return Assembly.Load( assemblyName );
+        }
+        catch( Exception ex )
+        {
+            ActivityMonitor.StaticLogger.Error( $"""
+                Unable to find '{assemblyName.Name}.dll' in '{_runFolder}' and the host context cannot load it.
+                Please check that 'CKli.Plugins.csproj' has <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>.
+                """, ex );
+            throw;
+        }
     }
 
     static readonly Type[] _getOrRegisterParameterTypes = [typeof( PluginCollectorContext )];

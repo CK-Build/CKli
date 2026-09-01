@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace CKli.Core;
@@ -179,6 +180,31 @@ public sealed partial class World
         // This is called from OnPluginChanged only when _pluginMachinery != null.
         // Otherwise this is called from Create and only when withPlugin is true and at least _directPluginFactory or _pluginMachinery exist.
         Throw.DebugAssert( "Never called when created without plugins.", _directPluginFactory != null || _pluginMachinery != null );
+        for( ; ; )
+        {
+            if( TryAcquirePlugins( monitor, out bool success ) ) return success;
+            // A plugin constructor threw. ReleasePlugins() unsubscribes the events of the plugins that have been
+            // instantiated and releases the plugin factory (initiating the unload of its AssemblyLoadContext).
+            // The machinery then recompiles and reloads the plugins when the generated CKli.CompiledPlugins.cs can
+            // be incriminated and ultimately switches to the NoPluginFactory whose empty PluginCollection cannot
+            // fail: this loop always ends.
+            ReleasePlugins();
+            if( _pluginMachinery == null || !_pluginMachinery.RecoverFromInstantiationError( monitor ) )
+            {
+                return false;
+            }
+        }
+    }
+
+    // Isolated and not inlined: on error, no reference to the plugins (nor to the IPluginFactory that is their
+    // unloadable AssemblyLoadContext) must survive in a live stack frame, otherwise the plugins cannot be unloaded
+    // and RecoverFromInstantiationError above cannot reload them.
+    // See https://learn.microsoft.com/en-us/dotnet/standard/assembly/unloadability.
+    // Returns false if - and only if - the instantiation threw: success is the plugins initialization result.
+    [MethodImpl( MethodImplOptions.NoInlining )]
+    bool TryAcquirePlugins( IActivityMonitor monitor, out bool success )
+    {
+        success = false;
         try
         {
             IPluginFactory? f = _directPluginFactory?.Invoke();
@@ -188,7 +214,8 @@ public sealed partial class World
                 f = _pluginMachinery.PluginFactory;
             }
             _plugins = f.Create( monitor, this );
-            return _plugins.CallPluginsInitialization( monitor );
+            success = _plugins.CallPluginsInitialization( monitor );
+            return true;
         }
         catch( Exception ex )
         {
@@ -200,9 +227,12 @@ public sealed partial class World
     internal void ReleasePlugins()
     {
         _events.ReleaseEvents();
+        // Not inside the test below: on a plugin instantiation error there is no PluginCollection but the plugins
+        // that have been instantiated may have registered themselves here. Such a reference would prevent the
+        // plugins from being unloaded.
+        _firstRepoInfoPlugin = null;
         if( _plugins != null )
         {
-            _firstRepoInfoPlugin = null;
             _plugins.Commands.Clear();
             _plugins.DisposeDisposablePlugins();
             _plugins = null;

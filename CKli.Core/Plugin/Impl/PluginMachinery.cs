@@ -38,6 +38,9 @@ public sealed partial class PluginMachinery
     NormalizedPath _ckliPluginsFile;
     NormalizedPath _ckliCompiledPluginsFile;
     NormalizedPath _pluginTestsCSProjFilePath;
+    // The last created PluginCollectorContext. It is immutable: it is reused to reload the plugins
+    // (see RecoverFromInstantiationError).
+    PluginCollectorContext? _pluginContext;
 
     // Fundamental singleton!
     // This MAY be transformed in a dictionary per World (key would be the RunFolder) to allow more than a
@@ -186,6 +189,35 @@ public sealed partial class PluginMachinery
         }
     }
 
+    // Called by World.AcquirePlugins when a plugin instantiation threw: the World has released its plugins and
+    // this released the plugin factory (its AssemblyLoadContext is unloading).
+    // The generated CKli.CompiledPlugins.cs is the usual suspect (a MissingMethodException typically): when it
+    // exists it is deleted, then the plugins are recompiled and reloaded so that the reflection based factory has
+    // a chance to work in this very run. Its deletion also bounds this recovery: once the file is gone, there is
+    // nothing left to fix this way.
+    // Any failure (plugins that cannot be unloaded, a failed compilation or load) falls back to the NoPluginFactory:
+    // the World must open, "ckli plugin compile" and "ckli plugin info" are the way out.
+    // False is returned only when we are already working without plugins.
+    internal bool RecoverFromInstantiationError( IActivityMonitor monitor )
+    {
+        // ReleasePluginFactory() nulls the released factory but keeps the NoPluginFactory as-is.
+        if( _pluginFactory != null && _pluginFactory == _onErrorPluginFactory ) return false;
+        if( _pluginContext != null && File.Exists( CKliCompiledPluginsFile ) )
+        {
+            using( monitor.OpenInfo( "Recovering from the plugin instantiation error." ) )
+            {
+                if( FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile )
+                    && RecompileAndLoad( monitor, _pluginContext ) )
+                {
+                    return true;
+                }
+            }
+        }
+        monitor.Warn( "Unable to instantiate plugins. Working without plugins." );
+        _pluginFactory = GetOnErrorPluginFactory();
+        return true;
+    }
+
     [MethodImpl( MethodImplOptions.NoInlining )]
     bool LoadPluginFactory( IActivityMonitor monitor, bool preCompile, out PluginCollectorContext? toRecompile )
     {
@@ -209,7 +241,7 @@ public sealed partial class PluginMachinery
             return false;
         }
         // Loads the plugins.
-        var pluginContext = new PluginCollectorContext( _definitionFile.World, pluginsConfiguration );
+        var pluginContext = _pluginContext = new PluginCollectorContext( _definitionFile.World, pluginsConfiguration );
         var pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext, out bool recoverableError, out _singleFactory );
         if( pluginFactory == null )
         {

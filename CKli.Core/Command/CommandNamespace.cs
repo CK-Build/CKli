@@ -86,8 +86,14 @@ public sealed class CommandNamespace
     {
         Command? cmd = null;
         path = null;
-        var sArgs = cmdLine.InitialArguments;
-        if( sArgs.Length == 0 ) return;
+        // The command must be located on the remaining arguments, not on the InitialArguments: the global
+        // "--path"/"-p", "i"/"interactive", "--ckli-debug" and "--ckli-screen" have been eaten and are no more
+        // here. Using the InitialArguments made any of them, when placed before the command (as documented for
+        // "--path"), hide the command: sArgs[0] was the option itself and no command path could match.
+        // SetFoundCommand( cmd, pathCount ) below also removes pathCount arguments from these very same
+        // remaining arguments: both must be indexed the same way.
+        var sArgs = cmdLine.RemainingArguments;
+        if( sArgs.Count == 0 ) return;
 
         int pathCount = 0;
         string nextPath = sArgs[0];
@@ -99,7 +105,7 @@ public sealed class CommandNamespace
             {
                 cmd = next;
             }
-            if( ++pathCount == sArgs.Length )
+            if( ++pathCount == sArgs.Count )
             {
                 break;
             }

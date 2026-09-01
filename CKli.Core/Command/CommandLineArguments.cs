@@ -113,7 +113,12 @@ public sealed class CommandLineArguments
             if( args.Length > 0 && (args[0] == "-p" || args[0] == "--path") )
             {
                 args = args.Slice( 1 );
-                return args.Length == 0 ? "" : args[0];
+                if( args.Length == 0 ) return "";
+                // The value must also be consumed: leaving it in the arguments made it the first
+                // remaining argument, hiding the command that follows.
+                var path = args[0];
+                args = args.Slice( 1 );
+                return path;
             }
             return null;
         }
@@ -183,6 +188,18 @@ public sealed class CommandLineArguments
     /// Gets the number of remaining arguments, options or flags.
     /// </summary>
     public int RemainingCount => _args.Count;
+
+    /// <summary>
+    /// Gets the remaining arguments, options or flags: the <see cref="InitialArguments"/> without the ones
+    /// that have been eaten (<see cref="HasHelp"/>, <see cref="HasVersionFlag"/>, <see cref="ExplicitPathOption"/>,
+    /// <see cref="HasInteractiveArgument"/>, <see cref="HasCKliDebugFlag"/> and <see cref="ScreenOption"/> first,
+    /// then the command path and the command's own arguments, options and flags).
+    /// <para>
+    /// This is what the command must be located on: <see cref="SetFoundCommand(Command, int)"/> removes the
+    /// command path from these arguments, not from the <see cref="InitialArguments"/>.
+    /// </para>
+    /// </summary>
+    internal IReadOnlyList<string> RemainingArguments => _args;
 
     /// <summary>
     /// Gets the found command.
