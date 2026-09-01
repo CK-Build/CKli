@@ -35,6 +35,32 @@ function Invoke-DotNet
     }
 }
 
+# Locates the Version attribute of a <PackageReference Include="$PackageId" .../>.
+# A targeted text match, NOT an XmlDocument: [xml]$x = ...; $x.Save() reformats the WHOLE file (blank
+# lines dropped, everything re-indented, trailing newline removed), which dirties every csproj this
+# script only means to touch the version of. It went unnoticed while CKli.Core was the single edited
+# file - its layout happened to match XmlDocument output - and showed up as soon as CK.Packaging.Model
+# and CKli.Publish.Plugin joined the rewrite.
+function Find-PackageVersionMatch
+{
+    param(
+        [string] $ProjectPath,
+        [string] $PackageId,
+        [string] $Content
+    )
+
+    $pattern = '(<PackageReference\s+Include="' + [regex]::Escape( $PackageId ) + '"\s+Version=")([^"]*)(")'
+
+    $m = [regex]::Match( $Content, $pattern )
+
+    if( -not $m.Success )
+    {
+        throw "PackageReference '$PackageId' not found in '$ProjectPath'."
+    }
+
+    return $m
+}
+
 function Set-PackageVersion
 {
     param(
@@ -43,23 +69,20 @@ function Set-PackageVersion
         [string] $Version
     )
 
-    [xml]$xml = Get-Content -LiteralPath $ProjectPath -Raw
+    $content = [System.IO.File]::ReadAllText( $ProjectPath )
 
-    $reference = $xml.Project.ItemGroup.PackageReference |
-        Where-Object Include -eq $PackageId |
-        Select-Object -First 1
+    $m = Find-PackageVersionMatch -ProjectPath $ProjectPath -PackageId $PackageId -Content $content
 
-    if( -not $reference )
+    $current = $m.Groups[2].Value
+
+    if( $current -ne $Version )
     {
-        throw "PackageReference '$PackageId' not found in '$ProjectPath'."
-    }
+        Write-Host "Updating $PackageId from '$current' to '$Version' in '$(Split-Path $ProjectPath -Leaf)'."
 
-    if( $reference.Version -ne $Version )
-    {
-        Write-Host "Updating $PackageId from '$($reference.Version)' to '$Version'."
+        $updated = $content.Remove( $m.Groups[2].Index, $current.Length ).Insert( $m.Groups[2].Index, $Version )
 
-        $reference.Version = $Version
-        $xml.Save($ProjectPath)
+        # UTF8Encoding($false) => no BOM. Newlines are untouched: the CRLF of the file is preserved.
+        [System.IO.File]::WriteAllText( $ProjectPath, $updated, (New-Object System.Text.UTF8Encoding $false) )
     }
 }
 
@@ -70,18 +93,11 @@ function Get-PackageVersion
         [string] $PackageId
     )
 
-    [xml]$xml = Get-Content -LiteralPath $ProjectPath -Raw
+    $content = [System.IO.File]::ReadAllText( $ProjectPath )
 
-    $reference = $xml.Project.ItemGroup.PackageReference |
-        Where-Object Include -eq $PackageId |
-        Select-Object -First 1
+    $m = Find-PackageVersionMatch -ProjectPath $ProjectPath -PackageId $PackageId -Content $content
 
-    if( -not $reference )
-    {
-        throw "PackageReference '$PackageId' not found in '$ProjectPath'."
-    }
-
-    return $reference.Version
+    return $m.Groups[2].Value
 }
 
 function Remove-GlobalNuGetPackage
@@ -112,6 +128,39 @@ function Remove-GlobalNuGetPackage
     }
 }
 
+function Publish-LocalPackage
+{
+    param(
+        [string] $SearchRoot,
+        [string] $PackageId,
+        [string] $Version,
+        [string] $LocalFeed
+    )
+
+    $package = Get-ChildItem `
+        -Path $SearchRoot `
+        -Recurse `
+        -File `
+        -Filter "$PackageId.$Version.nupkg" |
+        Select-Object -First 1
+
+    if( -not $package )
+    {
+        throw "Unable to find $PackageId.$Version.nupkg."
+    }
+
+    Write-Host "Publishing $($package.Name)"
+
+    Copy-Item `
+        $package.FullName `
+        (Join-Path $LocalFeed $package.Name) `
+        -Force
+
+    Remove-GlobalNuGetPackage `
+        -PackageId $PackageId `
+        -Version $Version
+}
+
 function New-LocalNuGetConfig
 {
     param(
@@ -136,9 +185,13 @@ function New-LocalNuGetConfig
 
 $scriptDir = $PSScriptRoot
 
-$ckSVersionSolution = Resolve-Path (Join-Path $scriptDir "../CK-SVersion/CK-SVersion.slnx")
-$ckliSolution       = Resolve-Path (Join-Path $scriptDir "CKli.slnx")
-$ckliCoreProject    = Resolve-Path (Join-Path $scriptDir "CKli.Core/CKli.Core.csproj")
+$ckSVersionSolution  = Resolve-Path (Join-Path $scriptDir "../CK-SVersion/CK-SVersion.slnx")
+$ckPackagingSolution = Resolve-Path (Join-Path $scriptDir "../CK-Packaging-Model/CK-Packaging-Model.slnx")
+$ckliSolution        = Resolve-Path (Join-Path $scriptDir "CKli.slnx")
+
+$ckliCoreProject     = Resolve-Path (Join-Path $scriptDir "CKli.Core/CKli.Core.csproj")
+$ckliPublishProject  = Resolve-Path (Join-Path $scriptDir "StandardPlugins/CKli.Publish.Plugin/CKli.Publish.Plugin.csproj")
+$ckPackagingProject  = Resolve-Path (Join-Path $scriptDir "../CK-Packaging-Model/CK.Packaging.Model/CK.Packaging.Model.csproj")
 
 $localFeed = Join-Path $scriptDir ".local-feed"
 $version = "0.0.0-0"
@@ -146,9 +199,27 @@ $version = "0.0.0-0"
 $baseNugetConfig = Resolve-Path (Join-Path $scriptDir "nuget.config")
 $localNugetConfig = Join-Path $localFeed "nuget-CKli-Local.config"
 
+# EVERY repository of the stack must be packed at $version and EVERY reference between them forced to it.
+# "0.0.0-0" is lower than any published version and NuGet resolves a package to the HIGHEST version
+# required anywhere in the graph, so a repository left out keeps pinning its published dependency and
+# that pin wins - silently compiling the whole stack against an older assembly. This is not a restore
+# error: it surfaces later as a missing type or member. CK-Packaging-Model was exactly this: it pins
+# CK.SVersion 0.2.2, which won over the locally packed 0.0.0-0 and made 'ckli plugin compile' fail with
+# "The type or namespace name 'PackageInstance' could not be found" (PackageInstance only exists from
+# CK.SVersion 0.2.3--ci.8 on).
+# => When a repository joins the stack, add it here: pack it, force its inbound references, and restore
+#    them in the finally block.
 $originalCKSVersion = Get-PackageVersion `
     -ProjectPath $ckliCoreProject `
     -PackageId "CK.SVersion"
+
+$originalPackagingCKSVersion = Get-PackageVersion `
+    -ProjectPath $ckPackagingProject `
+    -PackageId "CK.SVersion"
+
+$originalCKPackagingModel = Get-PackageVersion `
+    -ProjectPath $ckliPublishProject `
+    -PackageId "CK.Packaging.Model"
 
 try
 {
@@ -162,6 +233,14 @@ try
         New-Item -ItemType Directory -Path $localFeed | Out-Null
     }
 
+    Invoke-Step "Create local NuGet config" {
+
+        New-LocalNuGetConfig `
+            -SourceConfigPath $baseNugetConfig `
+            -DestinationPath $localNugetConfig `
+            -LocalFeedPath $localFeed
+    }
+
     Invoke-Step "Pack CK.SVersion" {
 
         Invoke-DotNet pack `
@@ -171,44 +250,54 @@ try
 
     Invoke-Step "Publish CK.SVersion to local feed" {
 
-        $package = Get-ChildItem `
-            -Path (Split-Path $ckSVersionSolution) `
-            -Recurse `
-            -File `
-            -Filter "CK.SVersion.$version.nupkg" |
-            Select-Object -First 1
-
-        if( -not $package )
-        {
-            throw "Unable to find CK.SVersion.$version.nupkg."
-        }
-
-        Write-Host "Publishing $($package.Name)"
-
-        Copy-Item `
-            $package.FullName `
-            (Join-Path $localFeed $package.Name) `
-            -Force
-
-        Remove-GlobalNuGetPackage `
+        Publish-LocalPackage `
+            -SearchRoot (Split-Path $ckSVersionSolution) `
             -PackageId "CK.SVersion" `
-            -Version $version*
-  }
+            -Version $version `
+            -LocalFeed $localFeed
+    }
 
-    Invoke-Step "Force CK.SVersion version" {
+    Invoke-Step "Force CK.SVersion version in CK.Packaging.Model" {
+
+        Set-PackageVersion `
+            -ProjectPath $ckPackagingProject `
+            -PackageId "CK.SVersion" `
+            -Version $version
+    }
+
+    Invoke-Step "Pack CK.Packaging.Model" {
+
+        # The restore must see the local feed: CK.SVersion 0.0.0-0 exists nowhere else. Once restored it
+        # is in the global cache and the pack's own implicit restore is happy with it.
+        Invoke-DotNet restore `
+            $ckPackagingSolution `
+            --configfile $localNugetConfig
+
+        Invoke-DotNet pack `
+            $ckPackagingSolution `
+            -c Debug
+    }
+
+    Invoke-Step "Publish CK.Packaging.Model to local feed" {
+
+        Publish-LocalPackage `
+            -SearchRoot (Split-Path $ckPackagingSolution) `
+            -PackageId "CK.Packaging.Model" `
+            -Version $version `
+            -LocalFeed $localFeed
+    }
+
+    Invoke-Step "Force CKli package versions" {
 
         Set-PackageVersion `
             -ProjectPath $ckliCoreProject `
             -PackageId "CK.SVersion" `
             -Version $version
-    }
 
-    Invoke-Step "Create local NuGet config" {
-
-        New-LocalNuGetConfig `
-            -SourceConfigPath $baseNugetConfig `
-            -DestinationPath $localNugetConfig `
-            -LocalFeedPath $localFeed
+        Set-PackageVersion `
+            -ProjectPath $ckliPublishProject `
+            -PackageId "CK.Packaging.Model" `
+            -Version $version
     }
 
     Invoke-Step "Restore CKli" {
@@ -299,12 +388,22 @@ try
 }
 finally
 {
-    Invoke-Step "Restore CKli.Core original package reference" {
+    Invoke-Step "Restore original package references" {
 
         Set-PackageVersion `
              -ProjectPath $ckliCoreProject `
              -PackageId "CK.SVersion" `
              -Version $originalCKSVersion
+
+        Set-PackageVersion `
+             -ProjectPath $ckliPublishProject `
+             -PackageId "CK.Packaging.Model" `
+             -Version $originalCKPackagingModel
+
+        Set-PackageVersion `
+             -ProjectPath $ckPackagingProject `
+             -PackageId "CK.SVersion" `
+             -Version $originalPackagingCKSVersion
     }
 
     if( Test-Path $localFeed )
