@@ -179,10 +179,9 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         using var response = await client.PostAsJsonAsync( $"repos/{repoPath}/releases", request, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            if( response.StatusCode == HttpStatusCode.NotFound )
-            {
-                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
-            }
+            // Log the body whatever the status: GitHub explains the refusal there and only there. Logging
+            // only the 404 hid a 422 "Invalid target_commitish parameter" behind a bare "publish failed".
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
             return null;
         }
         var releaseInfo = await response.Content.ReadFromJsonAsync<GitHubReleaseInfo>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );

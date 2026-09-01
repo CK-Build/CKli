@@ -1,6 +1,8 @@
 <Project>
 
   <PropertyGroup>
+    <!-- Let all the CKli components works in the invariant culture. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
     <!-- See https://github.com/dotnet/roslyn/blob/main/docs/compilers/CSharp/Warnversion%20Warning%20Waves.md -->
     <WarningLevel>9999</WarningLevel>
     <!-- Nullable Reference Type is not an option. -->
