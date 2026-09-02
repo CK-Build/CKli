@@ -19,6 +19,19 @@ sealed class FileSystemProvider : GitHostingProvider
 
     public override bool CanArchiveRepository => false;
 
+    /// <summary>
+    /// A bare repository has a HEAD but no notion of a "default branch" exposed to its clients:
+    /// <see cref="HasDefaultBranch"/> is false, this always throws.
+    /// </summary>
+    public override Task<bool> SetDefaultBranchAsync( IActivityMonitor monitor,
+                                                      NormalizedPath repoPath,
+                                                      string branchName,
+                                                      CancellationToken cancellation = default )
+    {
+        Throw.CheckState( HasDefaultBranch );
+        return Task.FromResult( false );
+    }
+
     protected internal override NormalizedPath GetRepositoryPathFromUrl( IActivityMonitor monitor, GitRepositoryKey key )
     {
         Throw.DebugAssert( key.OriginUrl.Scheme == Uri.UriSchemeFile );

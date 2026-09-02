@@ -26,6 +26,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
     public GiteaProvider( string baseUrl, IGitRepositoryAccessKey gitKey, string authority )
         : base( baseUrl, gitKey, new Uri( $"https://{authority}/api/v3/" ), alwaysUseAuthentication: false )
     {
+        HasDefaultBranch = true;
     }
 
     protected override void DefaultConfigure( HttpClient client )
@@ -106,6 +107,22 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
             return await LogFailedAsync<HostedRepositoryInfo>( monitor, response ).ConfigureAwait( false );
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
+    }
+
+    protected override async Task<bool> SetDefaultBranchAsync( IActivityMonitor monitor,
+                                                               HttpClient client,
+                                                               NormalizedPath repoPath,
+                                                               string branchName,
+                                                               CancellationToken cancellation )
+    {
+        var update = new GiteaUpdateDefaultBranchRequest { DefaultBranch = branchName };
+        using var response = await client.PatchAsJsonAsync( $"repos/{repoPath}", update, cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode )
+        {
+            // The branch must exist: Gitea answers a 422 when it doesn't.
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+        }
+        return true;
     }
 
     public override bool CanArchiveRepository => true;
@@ -347,6 +364,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
                     Description = giteaInfo.Description,
                     IsPrivate = giteaInfo.Private,
                     IsArchived = giteaInfo.Archived,
+                    DefaultBranch = giteaInfo.DefaultBranch,
                     CloneUrl = giteaInfo.CloneUrl,
                     WebUrl = giteaInfo.HtmlUrl,
                     CreatedAt = giteaInfo.CreatedAt,

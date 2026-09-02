@@ -57,6 +57,22 @@ public class FileSystemProviderTests
     }
 
     [Test]
+    public async Task there_is_no_default_branch_Async()
+    {
+        var p = GetFileHostingProvider();
+        p.HasDefaultBranch.ShouldBeFalse();
+
+        // An existing bare repository has a HEAD but the provider exposes no default branch.
+        var bareCKtStack = TestHelper.TestProjectFolder.Combine( "Remotes/bare/CKt/CKt-Stack" );
+        var info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, bareCKtStack, mustExist: true );
+        info.ShouldNotBeNull().DefaultBranch.ShouldBeNull();
+
+        // Calling SetDefaultBranchAsync is invalid, it is not a failure: the exception is
+        // synchronous (it is not the returned task that faults).
+        Should.Throw<InvalidOperationException>( () => p.SetDefaultBranchAsync( TestHelper.Monitor, bareCKtStack, "some-branch" ) );
+    }
+
+    [Test]
     public async Task info_on_non_existing_git_or_non_bare_repo_is_an_error_Async()
     {
         var p = GetFileHostingProvider();

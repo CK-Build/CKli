@@ -143,6 +143,44 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                           CancellationToken cancellation );
 
     /// <inheritdoc />
+    public sealed override async Task<bool> SetDefaultBranchAsync( IActivityMonitor monitor,
+                                                                   NormalizedPath repoPath,
+                                                                   string branchName,
+                                                                   CancellationToken cancellation = default )
+    {
+        Throw.CheckState( HasDefaultBranch );
+        Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
+        using var _ = monitor.OpenInfo( $"Setting default branch of repository '{repoPath}' on '{BaseUrl}' to '{branchName}'." );
+        if( !EnsureWriteAccess( monitor, ref repoPath, out var client, cancellation ) )
+        {
+            return false;
+        }
+        try
+        {
+            // No read before the write here (as opposed to ArchiveRepositoryAsync): hosts accept a write that
+            // sets the branch that is already the default one, and the repository representation they serve
+            // right after a write can be stale, which would make a "no change needed" shortcut unreliable.
+            return await SetDefaultBranchAsync( monitor, client, repoPath, branchName, cancellation ).ConfigureAwait( false );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( ex );
+            return false;
+        }
+        finally
+        {
+            client.Dispose();
+        }
+    }
+
+    /// <inheritdoc cref="GitHostingProvider.SetDefaultBranchAsync(IActivityMonitor, NormalizedPath, string, CancellationToken)"/>
+    protected abstract Task<bool> SetDefaultBranchAsync( IActivityMonitor monitor,
+                                                         HttpClient client,
+                                                         NormalizedPath repoPath,
+                                                         string branchName,
+                                                         CancellationToken cancellation );
+
+    /// <inheritdoc />
     public sealed override async Task<bool> ArchiveRepositoryAsync( IActivityMonitor monitor,
                                                                     NormalizedPath repoPath,
                                                                     bool archive,

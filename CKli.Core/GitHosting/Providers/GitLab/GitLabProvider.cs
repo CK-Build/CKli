@@ -22,6 +22,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
     GitLabProvider( string baseUrl, IGitRepositoryAccessKey gitKey, Uri baseApiUrl )
         : base( baseUrl, gitKey, baseApiUrl, alwaysUseAuthentication: true )
     {
+        HasDefaultBranch = true;
     }
 
     /// <summary>
@@ -160,6 +161,24 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         // Here, a 404 is an error like any other status.
         await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
         return null;
+    }
+
+    /// <inheritdoc />
+    protected override async Task<bool> SetDefaultBranchAsync( IActivityMonitor monitor,
+                                                               HttpClient client,
+                                                               NormalizedPath repoPath,
+                                                               string branchName,
+                                                               CancellationToken cancellation )
+    {
+        var projectPath = HttpUtility.UrlEncode( repoPath );
+        var update = new GitLabUpdateDefaultBranchRequest { DefaultBranch = branchName };
+        using var response = await client.PutAsJsonAsync( $"projects/{projectPath}", update, cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode )
+        {
+            // The branch must exist: GitLab answers a 400 "default_branch is invalid" when it doesn't.
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+        }
+        return true;
     }
 
     /// <summary>
@@ -420,6 +439,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
                     Description = gitLabProject.Description,
                     IsPrivate = gitLabProject.Visibility == "private",
                     IsArchived = gitLabProject.Archived,
+                    DefaultBranch = gitLabProject.DefaultBranch,
                     CloneUrl = gitLabProject.HttpUrlToRepo,
                     WebUrl = gitLabProject.WebUrl,
                     CreatedAt = gitLabProject.CreatedAt,

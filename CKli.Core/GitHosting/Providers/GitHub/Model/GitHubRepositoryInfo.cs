@@ -26,6 +26,9 @@ internal sealed class GitHubRepositoryInfo
     [JsonPropertyName( "archived" )]
     public bool Archived { get; set; }
 
+    [JsonPropertyName( "default_branch" )]
+    public string? DefaultBranch { get; set; }
+
     [JsonPropertyName( "clone_url" )]
     public string? CloneUrl { get; set; }
 

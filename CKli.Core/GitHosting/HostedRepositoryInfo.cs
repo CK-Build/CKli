@@ -38,6 +38,11 @@ public sealed record HostedRepositoryInfo
     public bool IsArchived { get; init; }
 
     /// <summary>
+    /// Gets the default branch name. Always null if <see cref="GitHostingProvider.HasDefaultBranch"/> is false.
+    /// </summary>
+    public string? DefaultBranch { get; init; }
+
+    /// <summary>
     /// Gets or sets the clone url.
     /// </summary>
     public string? CloneUrl { get; init; }

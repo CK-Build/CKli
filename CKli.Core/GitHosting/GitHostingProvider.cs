@@ -113,6 +113,30 @@ public abstract partial class GitHostingProvider
     public abstract bool CanArchiveRepository { get; }
 
     /// <summary>
+    /// Gets whether this provider supports the notion of "default branch".
+    /// When false, <see cref="HostedRepositoryInfo.DefaultBranch"/> is always null
+    /// and <see cref="SetDefaultBranchAsync"/> throws an <see cref="InvalidOperationException"/>.
+    /// </summary>
+    public bool HasDefaultBranch { get; init; }
+
+    /// <summary>
+    /// Sets the default branch of a repository. The branch must exist in the repository.
+    /// <para>
+    /// This must be idempotent: setting the branch that is already the default one is a no-op success.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The activity monitor.</param>
+    /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="branchName">The branch name that must become the default one.</param>
+    /// <param name="cancellation">Cancellation token.</param>
+    /// <returns>True on success, false on error.</returns>
+    /// <exception cref="InvalidOperationException">When <see cref="HasDefaultBranch"/> is false.</exception>
+    public abstract Task<bool> SetDefaultBranchAsync( IActivityMonitor monitor,
+                                                      NormalizedPath repoPath,
+                                                      string branchName,
+                                                      CancellationToken cancellation = default );
+
+    /// <summary>
     /// Archives a repository.
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>

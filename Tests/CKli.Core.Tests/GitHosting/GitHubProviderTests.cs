@@ -46,6 +46,8 @@ public class GitHubProviderTests
         info.RepoPath.ShouldBe( "CK-Build/CKli" );
         info.IsArchived.ShouldBeFalse();
         info.IsPrivate.ShouldBeFalse();
+        p.HasDefaultBranch.ShouldBeTrue();
+        info.DefaultBranch.ShouldBe( "stable" );
         info.WebUrl.ShouldBe( "https://github.com/CK-Build/CKli" );
         info.CloneUrl.ShouldBe( "https://github.com/CK-Build/CKli.git" );
         info.CreatedAt.ShouldBe( new DateTime( 2024, 10, 9, 8, 50, 17, DateTimeKind.Utc ) );

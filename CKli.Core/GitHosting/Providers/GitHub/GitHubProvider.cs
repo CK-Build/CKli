@@ -23,6 +23,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
     GitHubProvider( string baseUrl, IGitRepositoryAccessKey gitKey, Uri baseApiUrl )
         : base( baseUrl, gitKey, baseApiUrl, alwaysUseAuthentication: true )
     {
+        HasDefaultBranch = true;
     }
 
     /// <summary>
@@ -133,6 +134,23 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
             return await LogFailedAsync<HostedRepositoryInfo>( monitor, response ).ConfigureAwait( false );
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
+    }
+
+    protected override async Task<bool> SetDefaultBranchAsync( IActivityMonitor monitor,
+                                                               HttpClient client,
+                                                               NormalizedPath repoPath,
+                                                               string branchName,
+                                                               CancellationToken cancellation )
+    {
+        var update = new GitHubUpdateDefaultBranchRequest { Name = repoPath.LastPart, DefaultBranch = branchName };
+        using var response = await client.PatchAsJsonAsync( $"repos/{repoPath}", update, cancellation ).ConfigureAwait( false );
+        if( !response.IsSuccessStatusCode )
+        {
+            // The branch must exist: GitHub answers a 422 "Validation Failed" with an
+            // "invalid" code on "default_branch" when it doesn't.
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+        }
+        return true;
     }
 
     public override bool CanArchiveRepository => true;
@@ -509,6 +527,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                     Description = gitHubInfo.Description,
                     IsPrivate = gitHubInfo.Private,
                     IsArchived = gitHubInfo.Archived,
+                    DefaultBranch = gitHubInfo.DefaultBranch,
                     CloneUrl = gitHubInfo.CloneUrl,
                     WebUrl = gitHubInfo.HtmlUrl,
                     CreatedAt = gitHubInfo.CreatedAt,

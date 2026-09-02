@@ -5,6 +5,7 @@ using NUnit.Framework;
 using Shouldly;
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
@@ -51,6 +52,15 @@ public class CommonProviderTests
         p.ShouldNotBeNull();
         await GetUnexistingRepoInfoAsync( p, unexistingRepoName ).ConfigureAwait( false );
         await CreatingAndDeletingReposAsync( p, testRepoName, creds ).ConfigureAwait( false );
+        if( p.HasDefaultBranch )
+        {
+            await SettingDefaultBranchAsync( p, testRepoName, creds ).ConfigureAwait( false );
+        }
+        else
+        {
+            // The capability is not supported: the call is invalid, not a failure.
+            Should.Throw<InvalidOperationException>( () => p.SetDefaultBranchAsync( TestHelper.Monitor, testRepoName, DefaultBranchName ) );
+        }
         if( p.CanArchiveRepository )
         {
             await ArchivingReposAsync( p, testRepoName ).ConfigureAwait( false );
@@ -69,6 +79,7 @@ public class CommonProviderTests
         info.CloneUrl.ShouldBeNull();
         info.CreatedAt.ShouldBeNull();
         info.UpdatedAt.ShouldBeNull();
+        info.DefaultBranch.ShouldBeNull();
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
@@ -93,6 +104,7 @@ public class CommonProviderTests
 
         p.IsDefaultPublic.ShouldBeTrue();
         info.IsPrivate.ShouldBe( !p.IsDefaultPublic );
+        if( !p.HasDefaultBranch ) info.DefaultBranch.ShouldBeNull();
 
         await TestReleasesAsync( p, testRepoName, info, creds );
 
@@ -135,7 +147,7 @@ public class CommonProviderTests
 
             // CreateDraftReleaseAsync requires the tag to already be in the remote. A brand new repository
             // has no commit at all: GitHub answers a 422 "Invalid target_commitish parameter".
-            PushFirstCommitAndTag( info, creds, DefaultBranchName, "v1.0.0" );
+            PushFirstCommit( info, creds, [DefaultBranchName], "v1.0.0" );
 
             var releaseId = await p.CreateDraftReleaseAsync( TestHelper.Monitor, testRepoName, "v1.0.0" );
             releaseId.ShouldNotBeNull();
@@ -168,18 +180,19 @@ public class CommonProviderTests
     }
 
     /// <summary>
-    /// Clones the (empty) repository, commits a README, tags it and pushes the branch and the tag.
+    /// Clones the (empty) repository, commits a README, pushes it as each of the <paramref name="branchNames"/>
+    /// and, when <paramref name="versionedTag"/> is not null, tags the commit and pushes the tag.
     /// <para>
     /// <see cref="GitHostingProvider.CreateDraftReleaseAsync"/> requires the tag to be in the remote. GitHub
     /// moreover resolves the release against the repository default branch: the local branch (libgit2 names it
-    /// after its init.defaultBranch, "master") must be pushed as <paramref name="defaultBranchName"/>, the name
-    /// the repository has been created with, otherwise GitHub answers a 422 "Invalid target_commitish parameter".
+    /// after its init.defaultBranch, "master") must be pushed as the first of the <paramref name="branchNames"/>,
+    /// the name the repository has been created with, otherwise GitHub answers a 422 "Invalid target_commitish parameter".
     /// </para>
     /// </summary>
-    static void PushFirstCommitAndTag( HostedRepositoryInfo info,
-                                       UsernamePasswordCredentials creds,
-                                       string defaultBranchName,
-                                       string versionedTag )
+    static void PushFirstCommit( HostedRepositoryInfo info,
+                                 UsernamePasswordCredentials creds,
+                                 string[] branchNames,
+                                 string? versionedTag )
     {
         // "file://C:/path" is not a path libgit2 can resolve: the Uri normalizes it to "file:///C:/path".
         var cloneUrl = new Uri( info.CloneUrl.ShouldNotBeNull() ).ToString();
@@ -195,18 +208,75 @@ public class CommonProviderTests
                 Commands.Stage( repo, "*" );
                 var signature = new Signature( "CKli", "ckli@invalid.com", DateTimeOffset.Now );
                 var commit = repo.Commit( "Initialization.", signature, signature );
-                repo.Tags.Add( versionedTag, commit );
+                var refSpecs = branchNames.Select( b => $"refs/heads/{repo.Head.FriendlyName}:refs/heads/{b}" ).ToList();
+                if( versionedTag != null )
+                {
+                    repo.Tags.Add( versionedTag, commit );
+                    refSpecs.Add( $"refs/tags/{versionedTag}" );
+                }
                 var pushOptions = new PushOptions { CredentialsProvider = provideCreds };
-                repo.Network.Push( repo.Network.Remotes["origin"],
-                                   [$"refs/heads/{repo.Head.FriendlyName}:refs/heads/{defaultBranchName}",
-                                    $"refs/tags/{versionedTag}"],
-                                   pushOptions );
+                repo.Network.Push( repo.Network.Remotes["origin"], refSpecs, pushOptions );
             }
         }
         finally
         {
             FileHelper.DeleteFolder( TestHelper.Monitor, workFolder );
         }
+    }
+
+    static async Task SettingDefaultBranchAsync( GitHostingProvider p, string testRepoName, UsernamePasswordCredentials creds )
+    {
+        const string otherBranchName = "some-other-branch";
+
+        // Cleanup any previous run.
+        var info = await EnsureDeleteAsync( p, testRepoName ).ConfigureAwait( false );
+
+        info = await p.CreateRepositoryAsync( TestHelper.Monitor, testRepoName, defaultBranchName: DefaultBranchName ).ConfigureAwait( false );
+        info.ShouldNotBeNull();
+        info.Exists.ShouldBeTrue();
+
+        // A branch can only become the default one once it exists in the remote. Which of the 2 pushed
+        // branches the host elects as the default one is not specified: this is what is being set below.
+        PushFirstCommit( info, creds, [DefaultBranchName, otherBranchName], versionedTag: null );
+
+        (await p.SetDefaultBranchAsync( TestHelper.Monitor, testRepoName, otherBranchName )).ShouldBeTrue();
+        await ShouldEventuallyBeTheDefaultBranchAsync( p, testRepoName, otherBranchName ).ConfigureAwait( false );
+
+        // Idempotence: setting the branch that is already the default one succeeds and changes nothing.
+        (await p.SetDefaultBranchAsync( TestHelper.Monitor, testRepoName, otherBranchName )).ShouldBeTrue();
+        await ShouldEventuallyBeTheDefaultBranchAsync( p, testRepoName, otherBranchName ).ConfigureAwait( false );
+
+        // Back to the initial branch: the change works in both directions.
+        (await p.SetDefaultBranchAsync( TestHelper.Monitor, testRepoName, DefaultBranchName )).ShouldBeTrue();
+        await ShouldEventuallyBeTheDefaultBranchAsync( p, testRepoName, DefaultBranchName ).ConfigureAwait( false );
+
+        // A branch that doesn't exist is an error, not a silent success.
+        (await p.SetDefaultBranchAsync( TestHelper.Monitor, testRepoName, "no-way-this-branch-exists" )).ShouldBeFalse();
+        await ShouldEventuallyBeTheDefaultBranchAsync( p, testRepoName, DefaultBranchName ).ConfigureAwait( false );
+
+        await EnsureDeleteAsync( p, testRepoName ).ConfigureAwait( false );
+    }
+
+    /// <summary>
+    /// Waits for the repository information to expose <paramref name="branchName"/> as the default branch.
+    /// <para>
+    /// A read that immediately follows a write can be served a stale repository representation (GitHub answers
+    /// the previous default branch for a second or so): asserting on the first read makes the test flaky. The
+    /// provider itself never relies on such a read, only this check does.
+    /// </para>
+    /// </summary>
+    static async Task ShouldEventuallyBeTheDefaultBranchAsync( GitHostingProvider p, string testRepoName, string branchName )
+    {
+        string? read = null;
+        for( int i = 0; i < 10; ++i )
+        {
+            if( i > 0 ) await Task.Delay( 1000 ).ConfigureAwait( false );
+            var info = await p.GetRepositoryInfoAsync( TestHelper.Monitor, testRepoName, mustExist: true ).ConfigureAwait( false );
+            read = info.ShouldNotBeNull().DefaultBranch;
+            if( read == branchName ) return;
+            TestHelper.Monitor.Trace( $"Default branch of '{testRepoName}' is still '{read}', waiting for '{branchName}'." );
+        }
+        read.ShouldBe( branchName, "The default branch didn't become the expected one." );
     }
 
     static async Task ArchivingReposAsync( GitHostingProvider p, string testRepoName )
