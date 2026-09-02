@@ -14,7 +14,10 @@ sealed class RecordingSecretsStore : ISecretsStore
     {
         var keyArray = keys is string[] arr ? arr : new List<string>( keys ).ToArray();
         RequestedKeys.Add( keyArray );
-        // Return null to indicate no secret found.
-        return null; 
+        // No secret found. The error matters as much as the null: the real store explains how to register
+        // the secret and a silent mock turns a miswired store into a bare "false" (it once hid a
+        // GetWriteCredentials failure behind a PushBranch that logged nothing).
+        monitor.Error( $"RecordingSecretsStore has no secret for '{keyArray.Concatenate( "', '" )}'." );
+        return null;
     }
 }

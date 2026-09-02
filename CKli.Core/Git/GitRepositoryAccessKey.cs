@@ -9,8 +9,13 @@ namespace CKli.Core;
 
 /// <summary>
 /// Internal implementation of the primary <see cref="IGitRepositoryAccessKey"/>.
-/// These access keys are shared (indexed by PrefixPAT): <see cref="Get(ISecretsStore, Uri, bool)"/>
-/// finds or creates them. 
+/// These access keys are shared (indexed by the <see cref="ISecretsStore"/> and the PrefixPAT):
+/// <see cref="Get(ISecretsStore, Uri, bool)"/> finds or creates them.
+/// <para>
+/// The store is part of the key because an access key resolves and caches its credentials from the store
+/// it has been created with: sharing by PrefixPAT alone would silently bind every subsequent key of a
+/// prefix to the store of the first one.
+/// </para>
 /// <para>
 /// Externally, this can only be obtained through the <see cref="GitRepositoryKey.AccessKey"/> and to support
 /// externally resolved access keys, the static <see cref="GitRepositoryKey.CreateAccessKey"/> method can be used.
@@ -29,17 +34,17 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
     IGitRepositoryAccessKey? _revertedAccessKey;
     string? _toString;
 
-    static readonly Dictionary<string, GitRepositoryAccessKey> _accessKeys = [];
+    static readonly Dictionary<(ISecretsStore Store, string Prefix), GitRepositoryAccessKey> _accessKeys = [];
 
     internal static GitRepositoryAccessKey GetFileSystemAccessKey( ISecretsStore secretsStore )
     {
-        if( !_accessKeys.TryGetValue( GitRepositoryKey.FileSystemPrefixPAT, out var exists ) )
+        if( !_accessKeys.TryGetValue( (secretsStore, GitRepositoryKey.FileSystemPrefixPAT), out var exists ) )
         {
             exists = new GitRepositoryAccessKey( GitRepositoryKey.FileSystemPrefixPAT,
                                                  secretsStore,
                                                  isPublic: null,
                                                  key => new GitHosting.Providers.FileSystemProvider( key ) );
-            _accessKeys.Add( GitRepositoryKey.FileSystemPrefixPAT, exists );
+            _accessKeys.Add( (secretsStore, GitRepositoryKey.FileSystemPrefixPAT), exists );
         }
         return exists;
     }
@@ -84,7 +89,7 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
         if( authority.Equals( "github.com", StringComparison.Ordinal ) )
         {
             var prefix = ConcatFirstPathPart( "GITHUB_", url );
-            if( !_accessKeys.TryGetValue( prefix, out var exists ) )
+            if( !_accessKeys.TryGetValue( (secretsStore, prefix), out var exists ) )
             {
                 // We consider for https://github.com that IsDefaultPublic is determined by the
                 // first repository resolution. This "works" for us because a Stack is either public or private and
@@ -97,35 +102,35 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
                                                      secretsStore,
                                                      isPublic: firstIsPublic,
                                                      key => new GitHosting.Providers.GitHubProvider( key ) );
-                _accessKeys.Add( prefix, exists );
+                _accessKeys.Add( (secretsStore, prefix), exists );
             }
             return exists;
         }
         if( authority.Equals( "gitlab.com", StringComparison.Ordinal ) )
         {
             var prefix = ConcatFirstPathPart( "GITLAB_", url );
-            if( !_accessKeys.TryGetValue( prefix, out var exists ) )
+            if( !_accessKeys.TryGetValue( (secretsStore, prefix), out var exists ) )
             {
                 // Same as GitHub.
                 exists = new GitRepositoryAccessKey( prefix,
                                                      secretsStore,
                                                      isPublic: firstIsPublic,
                                                      key => new GitHosting.Providers.GitLabProvider( key ) );
-                _accessKeys.Add( prefix, exists );
+                _accessKeys.Add( (secretsStore, prefix), exists );
             }
             return exists;
         }
         if( authority.Equals( "dev.azure.com", StringComparison.Ordinal ) )
         {
             var prefix = ConcatFirstPathPart( "AZUREDEVOPS_", url );
-            if( !_accessKeys.TryGetValue( prefix, out var exists ) )
+            if( !_accessKeys.TryGetValue( (secretsStore, prefix), out var exists ) )
             {
                 // IsDefaultPublic is always false.
                 exists = new GitRepositoryAccessKey( prefix,
                                                      secretsStore,
                                                      isPublic: false,
                                                      hostingProviderFactory: null );
-                _accessKeys.Add( prefix, exists );
+                _accessKeys.Add( (secretsStore, prefix), exists );
             }
             return exists;
         }
@@ -133,14 +138,14 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
         if( authority.Equals( "bitbucket.org", StringComparison.Ordinal ) )
         {
             var prefix = ConcatFirstPathPart( "BITBUCKET_", url );
-            if( !_accessKeys.TryGetValue( prefix, out var exists ) )
+            if( !_accessKeys.TryGetValue( (secretsStore, prefix), out var exists ) )
             {
                 // IsDefaultPublic is always false.
                 exists = new GitRepositoryAccessKey( prefix,
                                                      secretsStore,
                                                      isPublic: false,
                                                      hostingProviderFactory: null );
-                _accessKeys.Add( prefix, exists );
+                _accessKeys.Add( (secretsStore, prefix), exists );
             }
             return exists;
         }
@@ -162,39 +167,39 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
         if( authority.Contains( "github", StringComparison.Ordinal ) )
         {
             var prefix = Secure( authority.ToUpperInvariant() );
-            if( !_accessKeys.TryGetValue( prefix, out var exists ) )
+            if( !_accessKeys.TryGetValue( (secretsStore, prefix), out var exists ) )
             {
                 exists = new GitRepositoryAccessKey( prefix,
                                                      secretsStore,
                                                      isPublic: firstIsPublic,
                                                      key => new GitHosting.Providers.GitHubProvider( baseUrl, key, authority ) );
-                _accessKeys.Add( prefix, exists );
+                _accessKeys.Add( (secretsStore, prefix), exists );
             }
             return exists;
         }
         if( authority.Contains( "gitlab", StringComparison.Ordinal ) )
         {
             var prefix = Secure( authority.ToUpperInvariant() );
-            if( !_accessKeys.TryGetValue( prefix, out var exists ) )
+            if( !_accessKeys.TryGetValue( (secretsStore, prefix), out var exists ) )
             {
                 exists = new GitRepositoryAccessKey( prefix,
                                                      secretsStore,
                                                      isPublic: firstIsPublic,
                                                      key => new GitHosting.Providers.GitLabProvider( baseUrl, key, authority ) );
-                _accessKeys.Add( prefix, exists );
+                _accessKeys.Add( (secretsStore, prefix), exists );
             }
             return exists;
         }
         if( authority.Contains( "gitea", StringComparison.Ordinal ) )
         {
             var prefix = Secure( authority.ToUpperInvariant() );
-            if( !_accessKeys.TryGetValue( prefix, out var exists ) )
+            if( !_accessKeys.TryGetValue( (secretsStore, prefix), out var exists ) )
             {
                 exists = new GitRepositoryAccessKey( prefix,
                                                      secretsStore,
                                                      isPublic: firstIsPublic,
                                                      key => new GitHosting.Providers.GiteaProvider( baseUrl, key, authority ) );
-                _accessKeys.Add( prefix, exists );
+                _accessKeys.Add( (secretsStore, prefix), exists );
             }
             return exists;
         }
@@ -206,13 +211,13 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
             {
                 Throw.CKException( $"Unable to derive a PAT prefix from url '{url}'." );
             }
-            if( !_accessKeys.TryGetValue( prefix, out var exists ) )
+            if( !_accessKeys.TryGetValue( (secretsStore, prefix), out var exists ) )
             {
                 exists = new GitRepositoryAccessKey( prefix,
                                                      secretsStore,
                                                      null,
                                                      hostingProviderFactory: null );
-                _accessKeys.Add( prefix, exists );
+                _accessKeys.Add( (secretsStore, prefix), exists );
             }
             return exists;
         }

@@ -14,9 +14,13 @@ namespace CKli.Core.Tests.GitHosting;
 public class FileSystemProviderTests
 {
 
-    public static GitHostingProvider GetFileHostingProvider()
+    /// <summary>
+    /// Gets the shared file system hosting provider. Access keys are indexed by store and prefix, so the
+    /// <paramref name="secretsStore"/> must be provided to obtain the same instance as another key.
+    /// </summary>
+    public static GitHostingProvider GetFileHostingProvider( ISecretsStore? secretsStore = null )
     {
-        var secretsStore = new RecordingSecretsStore();
+        secretsStore ??= new RecordingSecretsStore();
         var key = new GitRepositoryKey( secretsStore, new Uri( "C:/Some/path" ), isPublic: true );
         var p = key.AccessKey.HostingProvider;
         return p.ShouldNotBeNull();
@@ -27,7 +31,7 @@ public class FileSystemProviderTests
     {
         var secretsStore = new RecordingSecretsStore();
 
-        var p1 = GetFileHostingProvider();
+        var p1 = GetFileHostingProvider( secretsStore );
         p1.ProviderType.ShouldBe( "FileSystemProvider" );
 
         var gitKey2 = new GitRepositoryKey( secretsStore, new Uri( "//Some/path" ), isPublic: true );

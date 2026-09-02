@@ -9,18 +9,40 @@ using System.Linq;
 namespace CKli.Core;
 
 /// <summary>
-/// Implements <see cref="ISecretsStore"/> on dotnet user-secrets (with Id = "CKli").
+/// Implements <see cref="ISecretsStore"/> on dotnet user-secrets.
 /// <para>
-/// Note that the Id is <see cref="CKliRootEnv.InstanceName"/>.
+/// Note that the Id is <see cref="CKliRootEnv.InstanceName"/> by default.
 /// </para>
 /// </summary>
 public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
 {
     static string? _secretFilePath;
 
+    readonly string? _userSecretsId;
     // No Empty pattern. https://github.com/dotnet/runtime/issues/59303
     JsonDocument? _document;
     bool _documentLoaded;
+    DateTime _loadedWriteTimeUtc;
+    long _loadedLength;
+
+
+    /// <summary>
+    /// Default constructor use <see cref="CKliRootEnv.InstanceName"/> as the secrets identifier.
+    /// </summary>
+    public DotNetUserSecretsStore()
+        : this( null! )
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new secrets store with a secrets identifier.
+    /// This constructor should be used only for tests.
+    /// </summary>
+    /// <param name="userSecretsId">The secrets identifier to use.</param>
+    public DotNetUserSecretsStore( string userSecretsId )
+    {
+        _userSecretsId = userSecretsId;
+    }
 
     /// <inheritdoc />
     public string? TryGetRequiredSecret( IActivityMonitor monitor, IEnumerable<string> keys )
@@ -60,7 +82,7 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
                             This operation requires the secret '{failed[0]}'.
                             Please obtain this secret (typically a Personal Access Token) and register it on this machine:
 
-                            dotnet user-secrets set {failed[0]} <<your-secret>> --id {CKliRootEnv.InstanceName}
+                            dotnet user-secrets set {failed[0]} <<your-secret>> --id {_userSecretsId ?? CKliRootEnv.InstanceName}
                             {more}
                             """ );
         return null;
@@ -68,12 +90,24 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
 
     JsonDocument? TryLoadDocument( IActivityMonitor monitor )
     {
+        _secretFilePath ??= PathHelper.GetSecretsPathFromSecretsId( _userSecretsId ?? CKliRootEnv.InstanceName );
+        // A test harness registers and removes secrets while the process runs (a test that pushes must set
+        // the FILESYSTEM_GIT one and clear it afterwards): the cached document must then be dropped or the
+        // test would be reading a store from before its own setup.
+        // This is only done when testing: for a regular ckli command the store is read once and for all,
+        // its secrets must not change under the feet of a running operation.
+        if( _documentLoaded && CKliRootEnv.IsTestRun && HasFileChanged() )
+        {
+            _document?.Dispose();
+            _document = null;
+            _documentLoaded = false;
+        }
         if( !_documentLoaded )
         {
             _documentLoaded = true;
-            _secretFilePath ??= PathHelper.GetSecretsPathFromSecretsId( CKliRootEnv.InstanceName );
             try
             {
+                CaptureFileState();
                 if( File.Exists( _secretFilePath ) )
                 {
                     var bytes = File.ReadAllBytes( _secretFilePath );
@@ -93,6 +127,38 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
             }
         }
         return _document;
+    }
+
+    /// <summary>
+    /// Gets whether the secret file changed since <see cref="CaptureFileState"/> has been called.
+    /// A missing file is captured as a null write time and a -1 length: creating or deleting it is a change.
+    /// </summary>
+    bool HasFileChanged()
+    {
+        Throw.DebugAssert( _secretFilePath != null );
+        var f = new FileInfo( _secretFilePath );
+        return f.Exists
+                ? f.LastWriteTimeUtc != _loadedWriteTimeUtc || f.Length != _loadedLength
+                : _loadedLength != -1;
+    }
+
+    /// <summary>
+    /// Captures the state of the secret file that <see cref="HasFileChanged"/> compares against.
+    /// </summary>
+    void CaptureFileState()
+    {
+        Throw.DebugAssert( _secretFilePath != null );
+        var f = new FileInfo( _secretFilePath );
+        if( f.Exists )
+        {
+            _loadedWriteTimeUtc = f.LastWriteTimeUtc;
+            _loadedLength = f.Length;
+        }
+        else
+        {
+            _loadedWriteTimeUtc = default;
+            _loadedLength = -1;
+        }
     }
 
     /// <inheritdoc />

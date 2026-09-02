@@ -11,18 +11,15 @@ namespace CKli.Core.Tests;
 [TestFixture]
 public partial class GitRepositoryTests
 {
+    // Because we are pushing here, we need the Write PAT for the "FILESYSTEM". That is useless
+    // (credentials are not used on local file system) but it's good to not make an exception for this case.
     [SetUp]
-    public void Setup()
-    {
-        // Because we are pushing here, we need the Write PAT for the "FILESYSTEM"
-        // That is useless (credentials are not used on local file system) but it's
-        // good to not make an exception for this case.
-        ProcessRunner.RunProcess( TestHelper.Monitor,
-                                  "dotnet",
-                                  """user-secrets set FILESYSTEM_GIT "don't care" --id CKli-Test""",
-                                  Environment.CurrentDirectory )
-                     .ShouldBe( 0 );
-    }
+    public void Setup() => TestEnv.SetFileSystemWritePAT();
+
+    // TearDown is the finally: it runs even when the test fails. The secret must never be left in the
+    // store, a test that pushes is the one responsible for registering it.
+    [TearDown]
+    public void TearDown() => TestEnv.RemoveFileSystemWritePAT();
 
     [Test]
     public void GitStatus_detached_head_state()
