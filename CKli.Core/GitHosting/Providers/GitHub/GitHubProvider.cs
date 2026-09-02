@@ -79,11 +79,6 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         return repoPath;
     }
 
-    protected override bool IsSuccessfulResponse( HttpResponseMessage response )
-    {
-        return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
-    }
-
     protected override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                                  HttpClient client,
                                                                                  NormalizedPath repoPath,
@@ -99,7 +94,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         }
         if( !response.IsSuccessStatusCode )
         {
-            return null;
+            return await LogFailedAsync<HostedRepositoryInfo>( monitor, response ).ConfigureAwait( false );
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
     }
@@ -135,7 +130,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         }
         if( !response.IsSuccessStatusCode )
         {
-            return null;
+            return await LogFailedAsync<HostedRepositoryInfo>( monitor, response ).ConfigureAwait( false );
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
     }
@@ -149,8 +144,12 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                 CancellationToken cancellation )
     {
         var update = new GitHubUpdateArchiveRequest { Name = repoPath.LastPart, Archived = archive };
-        var response = await client.PatchAsJsonAsync( $"repos/{repoPath}", update, cancellation );
-        return response.IsSuccessStatusCode;
+        using var response = await client.PatchAsJsonAsync( $"repos/{repoPath}", update, cancellation );
+        if( !response.IsSuccessStatusCode )
+        {
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+        }
+        return true;
     }
 
     protected override async Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
@@ -158,8 +157,13 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                NormalizedPath repoPath,
                                                                CancellationToken cancellation = default )
     {
-        var response = await client.DeleteAsync( $"repos/{repoPath}", cancellation );
-        return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
+        using var response = await client.DeleteAsync( $"repos/{repoPath}", cancellation );
+        // Deleting a repository that doesn't exist is a no-op success.
+        if( !response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound )
+        {
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+        }
+        return true;
     }
 
     protected override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
@@ -183,10 +187,9 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         using var response = await client.PostAsJsonAsync( $"repos/{repoPath}/releases", request, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            // Log the body whatever the status: GitHub explains the refusal there and only there. Logging
-            // only the 404 hid a 422 "Invalid target_commitish parameter" behind a bare "publish failed".
-            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
-            return null;
+            // The body is where GitHub explains the refusal, and the only place: a bare "publish failed"
+            // once hid a 422 "Invalid target_commitish parameter".
+            return await LogFailedAsync<string>( monitor, response ).ConfigureAwait( false );
         }
         var releaseInfo = await response.Content.ReadFromJsonAsync<GitHubReleaseInfo>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
         if( releaseInfo == null )
@@ -219,11 +222,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         using var response = await client.PostAsync( uploadUrl, content, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            if( response.StatusCode == HttpStatusCode.NotFound )
-            {
-                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
-            }
-            return false;
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
         }
         return true;
     }
@@ -240,11 +239,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         using var response = await client.PatchAsJsonAsync( $"repos/{repoPath}/releases/{releaseId}", update, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            if( response.StatusCode == HttpStatusCode.NotFound )
-            {
-                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
-            }
-            return false;
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
         }
         return true;
     }
@@ -390,10 +385,10 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         var idToUse = pipeIdx >= 0 ? releaseId[..pipeIdx] : releaseId;
 
         using var response = await client.DeleteAsync( $"repos/{repoPath}/releases/{idToUse}", cancellation ).ConfigureAwait( false );
+        // Deleting a release that doesn't exist is a no-op success.
         if( !response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error );
-            return false;
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
         }
         return true;
     }
@@ -418,8 +413,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         var sha = await ReadTargetAsync( monitor, client, $"repos/{repoPath}/git/ref/tags/{Uri.EscapeDataString( versionedTag )}", cancellation ).ConfigureAwait( false );
         if( sha == null )
         {
-            // The response is logged by the hook, except a 404 that IsSuccessfulResponse considers successful:
-            // this message is then the only one.
+            // ReadTargetAsync has logged the response: this names the cause.
             monitor.Error( $"""
                 Unable to resolve tag '{versionedTag}' in '{BaseUrl}/{repoPath}'.
                 It must be pushed before its release can be created.
@@ -439,14 +433,15 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         }
         return sha.Value.Sha;
 
-        static async Task<(string Sha, string Type)?> ReadTargetAsync( IActivityMonitor monitor,
-                                                                       HttpClient client,
-                                                                       string url,
-                                                                       CancellationToken cancellation )
+        async Task<(string Sha, string Type)?> ReadTargetAsync( IActivityMonitor monitor,
+                                                                HttpClient client,
+                                                                string url,
+                                                                CancellationToken cancellation )
         {
             using var response = await client.GetAsync( url, cancellation ).ConfigureAwait( false );
             if( !response.IsSuccessStatusCode )
             {
+                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
                 return null;
             }
             var r = await response.Content.ReadFromJsonAsync<JsonElement>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
@@ -555,9 +550,9 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
     //        }
     //    }
     //
-    //    protected override Task<TimeSpan?> OnFailedResponseAsync( IActivityMonitor monitor, HttpRequestMessage request, HttpResponseMessage response )
+    //    protected override Task<TimeSpan?> GetRetryDelayAsync( IActivityMonitor monitor, HttpRequestMessage request, HttpResponseMessage response )
     //    {
-    //        return base.OnFailedResponseAsync( monitor, request, response );
+    //        return base.GetRetryDelayAsync( monitor, request, response );
     //    }
 
 }

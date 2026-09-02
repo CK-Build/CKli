@@ -52,11 +52,6 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         return repoPath;
     }
 
-    protected override bool IsSuccessfulResponse( HttpResponseMessage response )
-    {
-        return response.IsSuccessStatusCode || (response.StatusCode == HttpStatusCode.NotFound && response.RequestMessage?.Method == HttpMethod.Delete);
-    }
-
     protected override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                                  HttpClient client,
                                                                                  NormalizedPath repoPath,
@@ -72,7 +67,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         }
         if( !response.IsSuccessStatusCode )
         {
-            return null;
+            return await LogFailedAsync<HostedRepositoryInfo>( monitor, response ).ConfigureAwait( false );
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
     }
@@ -106,6 +101,10 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
             url = "user/repos";
             response = await client.PostAsJsonAsync( url, request, cancellation );
         }
+        if( !response.IsSuccessStatusCode )
+        {
+            return await LogFailedAsync<HostedRepositoryInfo>( monitor, response ).ConfigureAwait( false );
+        }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
     }
 
@@ -118,8 +117,12 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
                                                                 CancellationToken cancellation )
     {
         var update = new GiteaUpdateArchiveRequest { Archived = archive };
-        var response = await client.PatchAsJsonAsync( $"repos/{repoPath}", update, cancellation );
-        return response.IsSuccessStatusCode;
+        using var response = await client.PatchAsJsonAsync( $"repos/{repoPath}", update, cancellation );
+        if( !response.IsSuccessStatusCode )
+        {
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+        }
+        return true;
     }
 
     protected override async Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
@@ -127,8 +130,13 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
                                                                NormalizedPath repoPath,
                                                                CancellationToken cancellation = default )
     {
-        var response = await client.DeleteAsync( $"repos/{repoPath}", cancellation );
-        return response.IsSuccessStatusCode;
+        using var response = await client.DeleteAsync( $"repos/{repoPath}", cancellation );
+        // Deleting a repository that doesn't exist is a no-op success.
+        if( !response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound )
+        {
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+        }
+        return true;
     }
 
     protected override async Task<string?> CreateDraftReleaseAsync( IActivityMonitor monitor,
@@ -147,11 +155,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         using var response = await client.PostAsJsonAsync( $"repos/{repoPath}/releases", request, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            if( response.StatusCode == HttpStatusCode.NotFound )
-            {
-                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
-            }
-            return null;
+            return await LogFailedAsync<string>( monitor, response ).ConfigureAwait( false );
         }
         var releaseInfo = await response.Content.ReadFromJsonAsync<GiteaReleaseInfo>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
         if( releaseInfo == null )
@@ -237,11 +241,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         using var response = await client.PostAsync( uploadUrl, formContent, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            if( response.StatusCode == HttpStatusCode.NotFound )
-            {
-                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
-            }
-            return false;
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
         }
         return true;
     }
@@ -256,11 +256,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         using var response = await client.PatchAsJsonAsync( $"repos/{repoPath}/releases/{releaseIdentifier}", update, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            if( response.StatusCode == HttpStatusCode.NotFound )
-            {
-                await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
-            }
-            return false;
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
         }
         return true;
     }
@@ -317,10 +313,10 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
                                                             CancellationToken cancellation )
     {
         using var response = await client.DeleteAsync( $"repos/{repoPath}/releases/{releaseId}", cancellation ).ConfigureAwait( false );
+        // Deleting a release that doesn't exist is a no-op success.
         if( !response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error );
-            return false;
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
         }
         return true;
     }

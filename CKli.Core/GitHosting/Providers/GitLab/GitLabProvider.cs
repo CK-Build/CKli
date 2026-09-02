@@ -86,12 +86,6 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
     }
 
     /// <inheritdoc />
-    protected override bool IsSuccessfulResponse( HttpResponseMessage response )
-    {
-        return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
-    }
-
-    /// <inheritdoc />
     protected override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                                  HttpClient client,
                                                                                  NormalizedPath repoPath,
@@ -109,7 +103,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         }
         if( !response.IsSuccessStatusCode )
         {
-            return null;
+            return await LogFailedAsync<HostedRepositoryInfo>( monitor, response ).ConfigureAwait( false );
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
     }
@@ -146,7 +140,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
             {
                 monitor.Error( $"GitLab namespace or project '{folder}' doesn't exist. It must be created before '{repoPath.LastPart}' can be created inside." );
             }
-            return null;
+            return await LogFailedAsync<HostedRepositoryInfo>( monitor, response ).ConfigureAwait( false );
         }
         return await ReadHostedRepositoryInfoAsync( monitor, response, cancellation ).ConfigureAwait( false );
     }
@@ -163,11 +157,8 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
             var ns = await response.Content.ReadFromJsonAsync<GitLabNamespace>( cancellation );
             return ns?.Id;
         }
-        // Here, a 404 is an error.
-        if( response.StatusCode == HttpStatusCode.NotFound )
-        {
-            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
-        }
+        // Here, a 404 is an error like any other status.
+        await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
         return null;
     }
 
@@ -186,8 +177,12 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         var projectPath = HttpUtility.UrlEncode( repoPath );
         // GitLab has no "archived" flag to patch: archiving and unarchiving are two distinct endpoints.
         var action = archive ? "archive" : "unarchive";
-        var response = await client.PostAsync( $"projects/{projectPath}/{action}", null, cancellation );
-        return response.IsSuccessStatusCode;
+        using var response = await client.PostAsync( $"projects/{projectPath}/{action}", null, cancellation );
+        if( !response.IsSuccessStatusCode )
+        {
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+        }
+        return true;
     }
 
     /// <inheritdoc />
@@ -197,8 +192,13 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
                                                                CancellationToken cancellation = default )
     {
         var projectPath = HttpUtility.UrlEncode( repoPath );
-        var response = await client.DeleteAsync( $"projects/{projectPath}", cancellation );
-        return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
+        using var response = await client.DeleteAsync( $"projects/{projectPath}", cancellation );
+        // Deleting a project that doesn't exist is a no-op success.
+        if( !response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound )
+        {
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+        }
+        return true;
     }
 
     /// <inheritdoc />
@@ -218,8 +218,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         using var response = await client.PostAsJsonAsync( $"projects/{projectPath}/releases", request, cancellation ).ConfigureAwait( false );
         if( !response.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
-            return null;
+            return await LogFailedAsync<string>( monitor, response ).ConfigureAwait( false );
         }
         var releaseInfo = await response.Content.ReadFromJsonAsync<GitLabReleaseInfo>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
         if( releaseInfo == null || string.IsNullOrEmpty( releaseInfo.TagName ) )
@@ -308,8 +307,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         using var uploadResponse = await client.PutAsync( packagePath, fileContent, cancellation ).ConfigureAwait( false );
         if( !uploadResponse.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, uploadResponse, LogLevel.Error ).ConfigureAwait( false );
-            return false;
+            return await LogFailedAsync( monitor, uploadResponse ).ConfigureAwait( false );
         }
         // Step 2: create a release asset link pointing to the uploaded package.
         var downloadUrl = $"{BaseApiUrl}/{packagePath}";
@@ -318,8 +316,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         using var linkResponse = await client.PostAsJsonAsync( $"projects/{projectPath}/releases/{encodedTag}/assets/links", linkRequest, cancellation ).ConfigureAwait( false );
         if( !linkResponse.IsSuccessStatusCode )
         {
-            await LogResponseAsync( monitor, linkResponse, LogLevel.Error ).ConfigureAwait( false );
-            return false;
+            return await LogFailedAsync( monitor, linkResponse ).ConfigureAwait( false );
         }
         return true;
     }
@@ -389,10 +386,10 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         var projectPath = HttpUtility.UrlEncode( repoPath );
         var encodedTag = Uri.EscapeDataString( releaseId );
         using var response = await client.DeleteAsync( $"projects/{projectPath}/releases/{encodedTag}", cancellation ).ConfigureAwait( false );
+        // Deleting a release that doesn't exist is a no-op success.
         if( !response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound )
         {
-            await LogResponseAsync( monitor, response, LogLevel.Error );
-            return false;
+            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
         }
         return true;
     }

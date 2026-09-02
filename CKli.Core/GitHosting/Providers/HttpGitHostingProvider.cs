@@ -596,19 +596,17 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                                        CancellationToken cancellationToken )
     {
         OnStartRequest( monitor, request );
-        TimeSpan? delay;
         HttpResponseMessage response;
         retry:
         response = await sendAsync( request, cancellationToken ).ConfigureAwait( false );
-        if( IsSuccessfulResponse( response ) )
+        if( !response.IsSuccessStatusCode )
         {
-            return OnSuccessfulResponse( monitor, response );
-        }
-        delay = await OnFailedResponseAsync( monitor, request, response );
-        if( delay != null )
-        {
-            await Task.Delay( delay.Value, cancellationToken ).ConfigureAwait( false );
-            goto retry;
+            var delay = await GetRetryDelayAsync( monitor, request, response ).ConfigureAwait( false );
+            if( delay != null )
+            {
+                await Task.Delay( delay.Value, cancellationToken ).ConfigureAwait( false );
+                goto retry;
+            }
         }
         return response;
     }
@@ -626,49 +624,55 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     }
 
     /// <summary>
-    /// Gets whether this response must be considered successful.
-    /// Returns <see cref="HttpResponseMessage.IsSuccessStatusCode"/> by default.
-    /// </summary>
-    /// <param name="response">The response message.</param>
-    /// <returns>True if this is a successful response, false otherwise.</returns>
-    protected virtual bool IsSuccessfulResponse( HttpResponseMessage response )
-    {
-        return response.IsSuccessStatusCode;
-    }
-
-    /// <summary>
-    /// Called by default <see cref="OnSendHookAsync"/> when a successful response has been received
-    /// (according to <see cref="IsSuccessfulResponse(HttpResponseMessage)"/>).
-    /// Does nothing by default: returns the <paramref name="response"/> as-is and logs nothing.
+    /// Called by <see cref="OnSendHookAsync"/> for a response that is not a success status code, to know
+    /// whether the request must be sent again. Returns null by default: no retry.
     /// <para>
-    /// Per request state should have been registered in <see cref="HttpRequestMessage.Options"/>
-    /// by <see cref="OnStartRequest(IActivityMonitor, HttpRequestMessage)"/>.
-    /// </para>
-    /// </summary>
-    /// <param name="monitor">The monitor.</param>
-    /// <param name="response">The successful response.</param>
-    /// <returns>The response.</returns>
-    protected virtual HttpResponseMessage OnSuccessfulResponse( IActivityMonitor monitor, HttpResponseMessage response )
-    {
-        return response;
-    }
-
-    /// <summary>
-    /// Called by default <see cref="OnSendHookAsync"/> when a failed response has been received
-    /// (according to <see cref="IsSuccessfulResponse(HttpResponseMessage)"/>).
-    /// <para>
-    /// By default calls <see cref="LogResponseAsync"/> and doesn't retry (returns a null delay).
+    /// This is only about retrying and it logs nothing. What a status code means is known by the operation
+    /// that issued the request, and only it can tell a refusal from an expected answer: a 404 is an error
+    /// for a release creation and the plain answer of a "does this repository exist?". Concrete providers
+    /// test the <see cref="HttpResponseMessage.StatusCode"/> and report what they don't expect with
+    /// <see cref="LogFailedAsync(IActivityMonitor, HttpResponseMessage)"/>.
     /// </para>
     /// <para>
-    /// Per request state (lke a <see cref="HttpRetryState"/> instance) should have been registered
+    /// Per request state (like a <see cref="HttpRetryState"/> instance) should have been registered
     /// in <see cref="HttpRequestMessage.Options"/> by <see cref="OnStartRequest(IActivityMonitor, HttpRequestMessage)"/>.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="request">The sent request (should be the same as <see cref="HttpResponseMessage.RequestMessage"/>).</param>
     /// <param name="response">The unsuccessful response.</param>
-    /// <returns>The delay to wait before retrying, null to not retry an consider this response as the final one.</returns>
-    protected virtual async Task<TimeSpan?> OnFailedResponseAsync( IActivityMonitor monitor, HttpRequestMessage request, HttpResponseMessage response )
+    /// <returns>The delay to wait before retrying, null to consider this response as the final one.</returns>
+    protected virtual Task<TimeSpan?> GetRetryDelayAsync( IActivityMonitor monitor, HttpRequestMessage request, HttpResponseMessage response )
+    {
+        return Task.FromResult<TimeSpan?>( null );
+    }
+
+    /// <summary>
+    /// Logs an unexpected <paramref name="response"/> as an error and returns false.
+    /// <para>
+    /// Nothing else logs a failed response: every failing path must call this (or <see cref="LogResponseAsync"/>)
+    /// or the reason for the failure is lost. A status that is a normal answer rather than a failure must
+    /// obviously not be reported here.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="response">The unexpected response.</param>
+    /// <returns>Always false.</returns>
+    protected async Task<bool> LogFailedAsync( IActivityMonitor monitor, HttpResponseMessage response )
+    {
+        await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+        return false;
+    }
+
+    /// <summary>
+    /// Logs an unexpected <paramref name="response"/> as an error and returns null.
+    /// See <see cref="LogFailedAsync(IActivityMonitor, HttpResponseMessage)"/>.
+    /// </summary>
+    /// <typeparam name="T">Type of the result of the failing operation.</typeparam>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="response">The unexpected response.</param>
+    /// <returns>Always null.</returns>
+    protected async Task<T?> LogFailedAsync<T>( IActivityMonitor monitor, HttpResponseMessage response ) where T : class
     {
         await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
         return null;

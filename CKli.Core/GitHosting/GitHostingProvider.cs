@@ -264,12 +264,12 @@ public abstract partial class GitHostingProvider
     }
 
     /// <summary>
-    /// Deletes a repository.
+    /// Deletes a repository. This must be idempotent (deleting an unexisting repository is a no-op).
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
     /// <param name="cancellation">Cancellation token.</param>
-    /// <returns>True on success, false on error.</returns>
+    /// <returns>True on success (or if the repository didn't exist), false on error.</returns>
     public abstract Task<bool> DeleteRepositoryAsync( IActivityMonitor monitor,
                                                       NormalizedPath repoPath,
                                                       CancellationToken cancellation = default );
