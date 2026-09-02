@@ -148,7 +148,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                 bool archive,
                                                                 CancellationToken cancellation )
     {
-        var update = new GitHubUpdateArchiveRequest { Archived = archive };
+        var update = new GitHubUpdateArchiveRequest { Name = repoPath.LastPart, Archived = archive };
         var response = await client.PatchAsJsonAsync( $"repos/{repoPath}", update, cancellation );
         return response.IsSuccessStatusCode;
     }
@@ -168,9 +168,13 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                     string versionedTag,
                                                                     CancellationToken cancellation )
     {
+        // "target_commitish" only accepts a branch name or a commit sha (not a tag): the tag must be resolved.
+        var sha = await GetTagCommitShaAsync( monitor, client, repoPath, versionedTag, cancellation ).ConfigureAwait( false );
+        if( sha == null ) return null;
         var request = new GitHubCreateReleaseRequest
         {
             TagName = versionedTag,
+            TargetCommitish = sha,
             Name = versionedTag,
             Draft = true,
             Prerelease = versionedTag.Contains( '-' ),
@@ -190,12 +194,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
             monitor.Error( $"Empty response from '{response.RequestMessage?.RequestUri}'." );
             return null;
         }
-        // Strip the URI template suffix "{?name,label}" from the upload_url.
-        var uploadUrlBase = releaseInfo.UploadUrl;
-        var templateIdx = uploadUrlBase.IndexOf( '{' );
-        if( templateIdx > 0 ) uploadUrlBase = uploadUrlBase[..templateIdx];
-        // Encode release id and upload URL base together so AddReleaseAssetAsync can use both.
-        return $"{releaseInfo.Id}|{uploadUrlBase}";
+        return CreateReleaseIdentifier( releaseInfo.Id.ToString(), releaseInfo.UploadUrl );
     }
 
     protected override async Task<bool> AddReleaseAssetAsync( IActivityMonitor monitor,
@@ -283,16 +282,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                         string description = r.TryGetProperty( "body", out var bd ) && bd.ValueKind != JsonValueKind.Null
                                                 ? bd.GetString() ?? ""
                                                 : "";
-                        string releaseId;
-                        if( r.TryGetProperty( "id", out var idp ) )
-                        {
-                            // Prefer a string representation of the id.
-                            releaseId = idp.ValueKind == JsonValueKind.Number ? idp.GetInt64().ToString() : idp.ToString();
-                        }
-                        else
-                        {
-                            releaseId = tag;
-                        }
+                        var releaseId = ReadReleaseIdentifier( r, tag );
                         var assets = new List<string>();
                         if( r.TryGetProperty( "assets", out var ap ) && ap.ValueKind == JsonValueKind.Array )
                         {
@@ -366,15 +356,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
             string description = r.TryGetProperty( "body", out var bd ) && bd.ValueKind != JsonValueKind.Null
                                     ? bd.GetString() ?? ""
                                     : "";
-            string resolvedReleaseId;
-            if( r.TryGetProperty( "id", out var idp ) )
-            {
-                resolvedReleaseId = idp.ValueKind == JsonValueKind.Number ? idp.GetInt64().ToString() : idp.ToString();
-            }
-            else
-            {
-                resolvedReleaseId = tag;
-            }
+            var resolvedReleaseId = ReadReleaseIdentifier( r, tag );
             var assets = new List<string>();
             if( r.TryGetProperty( "assets", out var ap ) && ap.ValueKind == JsonValueKind.Array )
             {
@@ -414,6 +396,96 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
             return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// Resolves a versioned tag to its commit sha, following the tag object of an annotated tag.
+    /// <para>
+    /// This is required because <see cref="GitHubCreateReleaseRequest.TargetCommitish"/> accepts a branch name
+    /// or a commit sha, but not a tag.
+    /// </para>
+    /// <para>
+    /// Every read fails with a 409 "Git Repository is empty." while the repository has no branch, even though
+    /// the tag is pushed. Publication must have pushed the branch before creating the release.
+    /// </para>
+    /// </summary>
+    async Task<string?> GetTagCommitShaAsync( IActivityMonitor monitor,
+                                              HttpClient client,
+                                              NormalizedPath repoPath,
+                                              string versionedTag,
+                                              CancellationToken cancellation )
+    {
+        var sha = await ReadTargetAsync( monitor, client, $"repos/{repoPath}/git/ref/tags/{Uri.EscapeDataString( versionedTag )}", cancellation ).ConfigureAwait( false );
+        if( sha == null )
+        {
+            // The response is logged by the hook, except a 404 that IsSuccessfulResponse considers successful:
+            // this message is then the only one.
+            monitor.Error( $"""
+                Unable to resolve tag '{versionedTag}' in '{BaseUrl}/{repoPath}'.
+                It must be pushed before its release can be created.
+                """ );
+            return null;
+        }
+        // An annotated tag (this is what CKli creates) points to a tag object: peel it to reach the commit.
+        while( sha.Value.Type == "tag" )
+        {
+            var peeled = await ReadTargetAsync( monitor, client, $"repos/{repoPath}/git/tags/{sha.Value.Sha}", cancellation ).ConfigureAwait( false );
+            if( peeled == null )
+            {
+                monitor.Error( $"Unable to peel tag object '{sha.Value.Sha}' in '{BaseUrl}/{repoPath}'." );
+                return null;
+            }
+            sha = peeled;
+        }
+        return sha.Value.Sha;
+
+        static async Task<(string Sha, string Type)?> ReadTargetAsync( IActivityMonitor monitor,
+                                                                       HttpClient client,
+                                                                       string url,
+                                                                       CancellationToken cancellation )
+        {
+            using var response = await client.GetAsync( url, cancellation ).ConfigureAwait( false );
+            if( !response.IsSuccessStatusCode )
+            {
+                return null;
+            }
+            var r = await response.Content.ReadFromJsonAsync<JsonElement>( JsonSerializerOptions.Default, cancellation ).ConfigureAwait( false );
+            if( !r.TryGetProperty( "object", out var o )
+                || !o.TryGetProperty( "sha", out var sp ) || sp.ValueKind != JsonValueKind.String
+                || !o.TryGetProperty( "type", out var tp ) || tp.ValueKind != JsonValueKind.String )
+            {
+                monitor.Error( $"Invalid 'object' in the response from '{response.RequestMessage?.RequestUri}'." );
+                return null;
+            }
+            return (sp.GetString()!, tp.GetString()!);
+        }
+    }
+
+    /// <summary>
+    /// A release identifier is "&lt;id&gt;|&lt;uploadUrlBase&gt;": the url that uploads the assets is on another
+    /// authority than the API and only the server knows it. Every method that exposes a release identifier must
+    /// use this same form, otherwise an identifier read from GetReleaseListAsync or GetReleaseAsync cannot be
+    /// given back to AddReleaseAssetAsync.
+    /// </summary>
+    static string CreateReleaseIdentifier( string id, string uploadUrl )
+    {
+        // Strip the URI template suffix "{?name,label}" from the upload_url.
+        var templateIdx = uploadUrl.IndexOf( '{' );
+        if( templateIdx > 0 ) uploadUrl = uploadUrl[..templateIdx];
+        return $"{id}|{uploadUrl}";
+    }
+
+    /// <inheritdoc cref="CreateReleaseIdentifier(string, string)"/>
+    static string ReadReleaseIdentifier( JsonElement r, string tag )
+    {
+        // Prefer a string representation of the id, falling back to the tag.
+        var id = r.TryGetProperty( "id", out var idp )
+                    ? idp.ValueKind == JsonValueKind.Number ? idp.GetInt64().ToString() : idp.ToString()
+                    : tag;
+        var uploadUrl = r.TryGetProperty( "upload_url", out var up ) && up.ValueKind == JsonValueKind.String
+                            ? up.GetString() ?? ""
+                            : "";
+        return CreateReleaseIdentifier( id, uploadUrl );
     }
 
     static async Task<GitHubRepositoryInfo?> ReadGitHubRepositoryInfoAsync( IActivityMonitor monitor,

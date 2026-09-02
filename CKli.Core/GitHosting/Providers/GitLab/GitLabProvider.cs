@@ -184,7 +184,9 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
                                                                 CancellationToken cancellation )
     {
         var projectPath = HttpUtility.UrlEncode( repoPath );
-        var response = await client.PostAsync( $"projects/{projectPath}/archive", null, cancellation );
+        // GitLab has no "archived" flag to patch: archiving and unarchiving are two distinct endpoints.
+        var action = archive ? "archive" : "unarchive";
+        var response = await client.PostAsync( $"projects/{projectPath}/{action}", null, cancellation );
         return response.IsSuccessStatusCode;
     }
 

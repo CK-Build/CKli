@@ -156,6 +156,16 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         try
         {
+            // The current state must be read before acting: hosts reject a state change that is already
+            // done (GitHub answers a 422 with no error detail when patching an archived repository) and
+            // archiving must be idempotent.
+            var info = await GetRepositoryInfoAsync( monitor, client, repoPath, mustExist: true, cancellation ).ConfigureAwait( false );
+            if( info == null ) return false;
+            if( info.IsArchived == archive )
+            {
+                monitor.Info( $"Repository '{BaseUrl}/{repoPath}' is already {(archive ? "" : "un")}archived." );
+                return true;
+            }
             return await ArchiveRepositoryAsync( monitor, client, repoPath, archive, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )

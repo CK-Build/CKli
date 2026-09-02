@@ -1,4 +1,6 @@
 using CK.Core;
+using LibGit2Sharp;
+using LibGit2Sharp.Handlers;
 using NUnit.Framework;
 using Shouldly;
 using System;
@@ -12,6 +14,10 @@ namespace CKli.Core.Tests.GitHosting;
 [TestFixture]
 public class CommonProviderTests
 {
+    // The branch the test repositories are created with: GitHub ignores it on creation (its default branch
+    // is the account's one) but the first pushed branch must match it for releases to resolve.
+    const string DefaultBranchName = "main";
+
     [SetUp]
     public void Setup()
     {
@@ -25,11 +31,7 @@ public class CommonProviderTests
                      .ShouldBe( 0 );
     }
 
-    // Failing test on Archive with a StatusCode: 422, ReasonPhrase: 'Unprocessable Entity'
-    // and no errors details. Giving up.
-    // 
-    // [TestCase( "https://github.com/CK-Build/CKli", "GITHUB_CK_BUILD", "CK-Build/Test-Repo-Create", "CK-Build/No Way", true )]
-    //
+    [TestCase( "https://github.com/CK-Build/CKli", "GITHUB_CK_BUILD", "CK-Build/Test-Repo-Create", "CK-Build/No Way", true )]
     [TestCase( "//Some/path", "FILESYSTEM_GIT", "{TempPath}/CKli-Test/Test-Repo-Create", "A/path/That/Doesn't/Exist", true )]
     public async Task common_API_test_Async( string keyRepositoryUrl,
                                              string expectedPrefixPAT,
@@ -49,7 +51,7 @@ public class CommonProviderTests
         var p = gitKey.AccessKey.HostingProvider;
         p.ShouldNotBeNull();
         await GetUnexistingRepoInfoAsync( p, unexistingRepoName ).ConfigureAwait( false );
-        await CreatingAndDeletingReposAsync( p, testRepoName ).ConfigureAwait( false );
+        await CreatingAndDeletingReposAsync( p, testRepoName, creds ).ConfigureAwait( false );
         if( p.CanArchiveRepository )
         {
             await ArchivingReposAsync( p, testRepoName ).ConfigureAwait( false );
@@ -77,12 +79,12 @@ public class CommonProviderTests
         }
     }
 
-    static async Task CreatingAndDeletingReposAsync( GitHostingProvider p, string testRepoName )
+    static async Task CreatingAndDeletingReposAsync( GitHostingProvider p, string testRepoName, UsernamePasswordCredentials creds )
     {
         // Cleanup any previous run.
         var info = await DeleteTestRepoCreateAsync( p, testRepoName ).ConfigureAwait( false );
 
-        info = await p.CreateRepositoryAsync( TestHelper.Monitor, testRepoName ).ConfigureAwait( false );
+        info = await p.CreateRepositoryAsync( TestHelper.Monitor, testRepoName, defaultBranchName: DefaultBranchName ).ConfigureAwait( false );
         info.ShouldNotBeNull();
         info.Exists.ShouldBeTrue();
         info.RepoPath.ShouldBe( testRepoName );
@@ -93,7 +95,7 @@ public class CommonProviderTests
         p.IsDefaultPublic.ShouldBeTrue();
         info.IsPrivate.ShouldBe( !p.IsDefaultPublic );
 
-        await TestReleasesAsync( p, testRepoName );
+        await TestReleasesAsync( p, testRepoName, info, creds );
 
         await DeleteTestRepoCreateAsync( p, testRepoName ).ConfigureAwait( false );
 
@@ -124,10 +126,17 @@ public class CommonProviderTests
             return info;
         }
 
-        static async Task TestReleasesAsync( GitHostingProvider p, string testRepoName )
+        static async Task TestReleasesAsync( GitHostingProvider p,
+                                             string testRepoName,
+                                             HostedRepositoryInfo info,
+                                             UsernamePasswordCredentials creds )
         {
             var releases = await p.GetReleaseListAsync( TestHelper.Monitor, testRepoName, 1, 100 );
             releases.ShouldNotBeNull().ShouldBeEmpty();
+
+            // CreateDraftReleaseAsync requires the tag to already be in the remote. A brand new repository
+            // has no commit at all: GitHub answers a 422 "Invalid target_commitish parameter".
+            PushFirstCommitAndTag( info, creds, DefaultBranchName, "v1.0.0" );
 
             var releaseId = await p.CreateDraftReleaseAsync( TestHelper.Monitor, testRepoName, "v1.0.0" );
             releaseId.ShouldNotBeNull();
@@ -156,6 +165,48 @@ public class CommonProviderTests
                 i.Assets[0].ShouldBe( "TestFile.txt" );
                 i.ReleaseId.ShouldBe( expectedReleaseId );
             }
+        }
+    }
+
+    /// <summary>
+    /// Clones the (empty) repository, commits a README, tags it and pushes the branch and the tag.
+    /// <para>
+    /// <see cref="GitHostingProvider.CreateDraftReleaseAsync"/> requires the tag to be in the remote. GitHub
+    /// moreover resolves the release against the repository default branch: the local branch (libgit2 names it
+    /// after its init.defaultBranch, "master") must be pushed as <paramref name="defaultBranchName"/>, the name
+    /// the repository has been created with, otherwise GitHub answers a 422 "Invalid target_commitish parameter".
+    /// </para>
+    /// </summary>
+    static void PushFirstCommitAndTag( HostedRepositoryInfo info,
+                                       UsernamePasswordCredentials creds,
+                                       string defaultBranchName,
+                                       string versionedTag )
+    {
+        // "file://C:/path" is not a path libgit2 can resolve: the Uri normalizes it to "file:///C:/path".
+        var cloneUrl = new Uri( info.CloneUrl.ShouldNotBeNull() ).ToString();
+        CredentialsHandler provideCreds = ( _, _, _ ) => creds;
+        var workFolder = FileUtil.CreateUniqueTimedFolder( Path.GetTempPath(), "CKli-Test-Release", DateTime.UtcNow );
+        try
+        {
+            var cloneOptions = new CloneOptions();
+            cloneOptions.FetchOptions.CredentialsProvider = provideCreds;
+            using( var repo = new Repository( Repository.Clone( cloneUrl, workFolder, cloneOptions ) ) )
+            {
+                File.WriteAllText( Path.Combine( workFolder, "README.md" ), "Created by the CKli CommonProviderTests." );
+                Commands.Stage( repo, "*" );
+                var signature = new Signature( "CKli", "ckli@invalid.com", DateTimeOffset.Now );
+                var commit = repo.Commit( "Initialization.", signature, signature );
+                repo.Tags.Add( versionedTag, commit );
+                var pushOptions = new PushOptions { CredentialsProvider = provideCreds };
+                repo.Network.Push( repo.Network.Remotes["origin"],
+                                   [$"refs/heads/{repo.Head.FriendlyName}:refs/heads/{defaultBranchName}",
+                                    $"refs/tags/{versionedTag}"],
+                                   pushOptions );
+            }
+        }
+        finally
+        {
+            FileHelper.DeleteFolder( TestHelper.Monitor, workFolder );
         }
     }
 
