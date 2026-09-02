@@ -11,15 +11,17 @@ namespace CKli.Core.Tests;
 [TestFixture]
 public partial class GitRepositoryTests
 {
-    // Because we are pushing here, we need the Write PAT for the "FILESYSTEM". That is useless
+    // At least one test here pushes, so the write PAT for the "FILESYSTEM" is required. That is useless
     // (credentials are not used on local file system) but it's good to not make an exception for this case.
-    [SetUp]
-    public void Setup() => TestEnv.SetFileSystemWritePAT();
+    // Once per fixture: registering it is a "dotnet user-secrets" process writing a shared file, doing it
+    // around every test is churn on a file that has no transaction.
+    [OneTimeSetUp]
+    public void OneTimeSetup() => TestEnv.SetFileSystemWritePAT();
 
-    // TearDown is the finally: it runs even when the test fails. The secret must never be left in the
-    // store, a test that pushes is the one responsible for registering it.
-    [TearDown]
-    public void TearDown() => TestEnv.RemoveFileSystemWritePAT();
+    // OneTimeTearDown is the finally: it runs even when a test fails. The secret must never be left in the
+    // store, a fixture that pushes is the one responsible for registering it.
+    [OneTimeTearDown]
+    public void OneTimeTearDown() => TestEnv.RemoveFileSystemWritePAT();
 
     [Test]
     public void GitStatus_detached_head_state()
