@@ -31,7 +31,7 @@ public class CommonProviderTests
     [OneTimeTearDown]
     public void OneTimeTearDown() => TestEnv.RemoveFileSystemWritePAT();
 
-    [TestCase( "https://github.com/CK-Build/CKli", "GITHUB_CK_BUILD", "CK-Build/Test-Repo-Create", "CK-Build/No Way", true )]
+    [TestCase( "https://github.com/CK-Build/CKli", "GITHUB_CK_BUILD", "CK-Build/Test-Repo-Create", "CK-Build/No Way", true, Explicit = true )]
     [TestCase( "//Some/path", "FILESYSTEM_GIT", "{TempPath}/CKli-Test/Test-Repo-Create", "A/path/That/Doesn't/Exist", true )]
     public async Task common_API_test_Async( string keyRepositoryUrl,
                                              string expectedPrefixPAT,
