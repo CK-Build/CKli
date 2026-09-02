@@ -127,12 +127,16 @@ abstract class BasePublisher
         // Once the branch is pushed, if it is the root one then ensures that it is the remote
         // repository's default one. The SetDefaultBranchAsync is idempotent: better call it directly
         // than read the info then set (always one call).
+        //
+        // A failure doesn't fail the publication: the packages are already sent, the release is fine and
+        // only the remote repository's presentation is not the one we want. Hosts also require more than
+        // push rights to change it (GitHub requires administration rights on the repository): a token that
+        // can publish but not administer must not turn every publication into a failure.
         if( branchName == _rootBranchName
             && hostingProvider.HasDefaultBranch
             && !await hostingProvider.SetDefaultBranchAsync( monitor, hostedRepoPath, branchName, cancel ).ConfigureAwait( false ) )
         {
-            UnpublishTag( monitor, tag, r, isLocalVersion );
-            return false;
+            monitor.Warn( $"Unable to make '{branchName}' the default branch of '{hostedRepoPath}'. Publication continues." );
         }
 
         var releaseId = await hostingProvider.CreateDraftReleaseAsync( monitor, hostedRepoPath, tag.FriendlyName, cancel ).ConfigureAwait( false );
