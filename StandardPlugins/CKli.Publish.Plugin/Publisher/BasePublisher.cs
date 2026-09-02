@@ -90,9 +90,15 @@ abstract class BasePublisher
             }
         }
 
-        // Enter the atomic phase: version tag (+ optional extra tag) -> create draft release -> push
-        // branch (with the deferred ref specs). To create a release, hosting providers (like GitHub)
-        // require the tag to exist in the repository, so it's pushed first.
+        // Enter the atomic phase: version tag (+ optional extra tag) -> push branch (with the deferred
+        // ref specs) -> create draft release. To create a release, hosting providers (like GitHub) require
+        // the tag to exist in the repository, so it's pushed first.
+        //
+        // The branch is pushed before the release is created: on the very first publication of a new
+        // repository, the remote would otherwise hold nothing but tags, a state GitHub intermittently
+        // reports as "Git Repository is empty." and that makes every release call fail. Pushing the branch
+        // first doesn't publish anything more (the tag push already made the commit public), it only leaves
+        // the branch pushed when the release cannot be created.
         bool isLocalVersion = version.IsLocal();
         Throw.DebugAssert( "We may be on an already published version.", isLocalVersion || !version.IsBuilding() );
         if( isLocalVersion )
@@ -108,19 +114,20 @@ abstract class BasePublisher
             return false;
         }
 
-        var releaseId = await hostingProvider.CreateDraftReleaseAsync( monitor, hostedRepoPath, tag.FriendlyName, cancel ).ConfigureAwait( false );
-        if( releaseId == null )
+        r.DeferredPushRefSpecs.AddRange( branchPushRefSpecs );
+        if( !r.PushBranch( monitor, branch, autoCreateRemoteBranch: true ) )
         {
             // Compensate! Tries to remove the pushed version tag.
             UnpublishTag( monitor, tag, r, isLocalVersion );
             return false;
         }
 
-        r.DeferredPushRefSpecs.AddRange( branchPushRefSpecs );
-        if( !r.PushBranch( monitor, branch, autoCreateRemoteBranch: true ) )
+        var releaseId = await hostingProvider.CreateDraftReleaseAsync( monitor, hostedRepoPath, tag.FriendlyName, cancel ).ConfigureAwait( false );
+        if( releaseId == null )
         {
-            // Compensate! Tries to remove the pushed version tag and deletes the draft release.
-            await DeleteDraftAsync( monitor, tag, hostingProvider, hostedRepoPath, r, releaseId, isLocalVersion, cancel ).ConfigureAwait( false );
+            // Compensate! Tries to remove the pushed version tag. The pushed branch is kept: the commit is
+            // public since the tag has been pushed, unpushing the branch would gain nothing.
+            UnpublishTag( monitor, tag, r, isLocalVersion );
             return false;
         }
 
