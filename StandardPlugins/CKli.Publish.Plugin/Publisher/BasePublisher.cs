@@ -24,14 +24,17 @@ abstract class BasePublisher
 {
     readonly PackageSender _packageSender;
     readonly ArtifactHandlerPlugin _artifactHandler;
+    readonly string _rootBranchName;
     readonly bool _keepLocalReleaseAfterPublish;
 
     protected BasePublisher( PackageSender packageSender,
                              ArtifactHandlerPlugin artifactHandler,
+                             string rootBranchName,
                              bool keepLocalReleaseAfterPublish )
     {
         _packageSender = packageSender;
         _artifactHandler = artifactHandler;
+        _rootBranchName = rootBranchName;
         _keepLocalReleaseAfterPublish = keepLocalReleaseAfterPublish;
     }
 
@@ -118,6 +121,16 @@ abstract class BasePublisher
         if( !r.PushBranch( monitor, branch, autoCreateRemoteBranch: true ) )
         {
             // Compensate! Tries to remove the pushed version tag.
+            UnpublishTag( monitor, tag, r, isLocalVersion );
+            return false;
+        }
+        // Once the branch is pushed, if it is the root one then ensures that it is the remote
+        // repository's default one. The SetDefaultBranchAsync is idempotent: better call it directly
+        // than read the info then set (always one call).
+        if( branchName == _rootBranchName
+            && hostingProvider.HasDefaultBranch
+            && !await hostingProvider.SetDefaultBranchAsync( monitor, hostedRepoPath, branchName, cancel ).ConfigureAwait( false ) )
+        {
             UnpublishTag( monitor, tag, r, isLocalVersion );
             return false;
         }

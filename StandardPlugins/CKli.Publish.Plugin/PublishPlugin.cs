@@ -92,7 +92,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
             var packageSender = PackageSender.Create( monitor, artifactHandler, branchModel, world.StackRepository.SecretsStore );
             if( packageSender == null ) return false;
 
-            var publisher = new FixPublisher( packageSender, artifactHandler, keepLocalReleaseAfterPublish );
+            var publisher = new FixPublisher( packageSender, artifactHandler, branchModel.BranchNamespace.Root.Name, keepLocalReleaseAfterPublish );
 
             for( int i = 0; i < results.Length; i++ )
             {

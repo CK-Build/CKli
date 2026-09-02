@@ -27,7 +27,7 @@ sealed class IndirectPublisher : BasePublisher
                               ArtifactHandlerPlugin artifactHandler,
                               BranchModelPlugin branchModel,
                               bool keepLocalReleaseAfterPublish )
-        : base( packageSender, artifactHandler, keepLocalReleaseAfterPublish )
+        : base( packageSender, artifactHandler, branchModel.BranchNamespace.Root.Name, keepLocalReleaseAfterPublish )
     {
         _branches = branchModel.BranchNamespace;
     }
