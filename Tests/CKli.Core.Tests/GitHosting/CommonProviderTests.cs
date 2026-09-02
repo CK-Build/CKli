@@ -45,13 +45,12 @@ public class CommonProviderTests
         var gitKey = new GitRepositoryKey( store, new Uri( keyRepositoryUrl ), isPublic );
         gitKey.AccessKey.PrefixPAT.ShouldBe( expectedPrefixPAT );
 
-        Assume.That( gitKey.AccessKey.GetWriteCredentials( TestHelper.Monitor, out var creds ),
-                     "The user-secrets store must be configured." );
+        Assume.That( gitKey.AccessKey.GetWriteCredentials( TestHelper.Monitor, out var creds ), "The user-secrets store must be configured." );
 
         var p = gitKey.AccessKey.HostingProvider;
         p.ShouldNotBeNull();
         await GetUnexistingRepoInfoAsync( p, unexistingRepoName ).ConfigureAwait( false );
-        await CreatingAndDeletingReposAsync( p, testRepoName, creds ).ConfigureAwait( false );
+        await CreatingTestingDeletingAndCreatingReposAsync( p, testRepoName, creds ).ConfigureAwait( false );
         if( p.HasDefaultBranch )
         {
             await SettingDefaultBranchAsync( p, testRepoName, creds ).ConfigureAwait( false );
@@ -89,7 +88,17 @@ public class CommonProviderTests
         }
     }
 
-    static async Task CreatingAndDeletingReposAsync( GitHostingProvider p, string testRepoName, UsernamePasswordCredentials creds )
+    /// <summary>
+    /// Creates the test repository, exercises the releases on it, deletes it, then creates it again with the
+    /// opposite visibility to check that <see cref="GitHostingProvider.CreateRepositoryAsync"/> honors an
+    /// explicit <c>isPrivate</c> instead of <see cref="GitHostingProvider.IsDefaultPublic"/>.
+    /// <para>
+    /// That visibility flip is the last thing done here, so the repository EXISTS when this returns (and is
+    /// private, the providers under test being all public by default). The steps that run next must not assume
+    /// a clean slate: each of them starts with <see cref="EnsureDeleteAsync"/>.
+    /// </para>
+    /// </summary>
+    static async Task CreatingTestingDeletingAndCreatingReposAsync( GitHostingProvider p, string testRepoName, UsernamePasswordCredentials creds )
     {
         // Cleanup any previous run.
         var info = await DeleteTestRepoCreateAsync( p, testRepoName ).ConfigureAwait( false );
@@ -110,7 +119,8 @@ public class CommonProviderTests
 
         await DeleteTestRepoCreateAsync( p, testRepoName ).ConfigureAwait( false );
 
-        // Creating a private (or public) repository.
+        // Creating a private (or public) repository. This leaves the repository created: see this method's
+        // summary. Only a key that knows its visibility (a non null IsPublic) can flip it.
         if( p.GitKey.IsPublic is not null )
         {
             info = await p.CreateRepositoryAsync( TestHelper.Monitor, testRepoName, isPrivate: p.IsDefaultPublic ).ConfigureAwait( false );
