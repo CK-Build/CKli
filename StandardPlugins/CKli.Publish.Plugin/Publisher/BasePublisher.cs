@@ -45,7 +45,11 @@ abstract class BasePublisher
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="repo">The repository to publish.</param>
     /// <param name="branchName">The Git branch to push.</param>
-    /// <param name="branchPushRefSpecs">Additional ref specs to push along with <paramref name="branchName"/>.</param>
+    /// <param name="pushRefSpecs">Additional ref specs to push along with <paramref name="branchName"/>.</param>
+    /// <param name="branchToRemove">
+    /// An optional branch short name (without "refs/heads/") that must be removed from the
+    /// remote (after the <paramref name="branchName"/> has been pushed).
+    /// </param>
     /// <param name="version">The version to publish.</param>
     /// <param name="tag">The tag that carries the version.</param>
     /// <param name="extraTagToPush">An optional additional tag that must also be pushed to the remote.</param>
@@ -55,13 +59,16 @@ abstract class BasePublisher
     protected async Task<bool> PublishCoreAsync( IActivityMonitor monitor,
                                                  Repo repo,
                                                  string branchName,
-                                                 ImmutableArray<string> branchPushRefSpecs,
+                                                 ImmutableArray<string> pushRefSpecs,
+                                                 string? branchToRemove,
                                                  SVersion version,
                                                  Tag tag,
                                                  Tag? extraTagToPush,
                                                  BuildContentInfo content,
                                                  CancellationToken cancel )
     {
+        Throw.CheckArgument( branchToRemove == null || !branchToRemove.StartsWith( "refs/heads/", StringComparison.Ordinal ) );
+
         using var group = monitor.OpenInfo( $"Publishing '{repo.DisplayPath}' version '{version}'." );
 
         if( !repo.GitRepository.RepositoryKey.TryGetHostingInfo( monitor, out var hostingProvider, out var hostedRepoPath ) )
@@ -117,26 +124,70 @@ abstract class BasePublisher
             return false;
         }
 
-        r.DeferredPushRefSpecs.AddRange( branchPushRefSpecs );
+        r.DeferredPushRefSpecs.AddRange( pushRefSpecs );
         if( !r.PushBranch( monitor, branch, autoCreateRemoteBranch: true ) )
         {
             // Compensate! Tries to remove the pushed version tag.
             UnpublishTag( monitor, tag, r, isLocalVersion );
             return false;
         }
+        // 1 - Handle remote default branch (we want it to be the root "stable").
         // Once the branch is pushed, if it is the root one then ensures that it is the remote
-        // repository's default one. The SetDefaultBranchAsync is idempotent: better call it directly
-        // than read the info then set (always one call).
-        //
-        // A failure doesn't fail the publication: the packages are already sent, the release is fine and
-        // only the remote repository's presentation is not the one we want. Hosts also require more than
-        // push rights to change it (GitHub requires administration rights on the repository): a token that
-        // can publish but not administer must not turn every publication into a failure.
-        if( branchName == _rootBranchName
-            && hostingProvider.HasDefaultBranch
-            && !await hostingProvider.SetDefaultBranchAsync( monitor, hostedRepoPath, branchName, cancel ).ConfigureAwait( false ) )
+        // repository's default one. 
+        if( hostingProvider.HasDefaultBranch )
         {
-            monitor.Warn( $"Unable to make '{branchName}' the default branch of '{hostedRepoPath}'. Publication continues." );
+            string? defaultBranchName = null;
+            // Step 1 - SetDefaultBranchAsync
+            if( branchName == _rootBranchName )
+            {
+                // The SetDefaultBranchAsync is idempotent: better call it directly than read the info then set (always one call).
+                //
+                // A failure doesn't fail the publication: the packages are already sent, the release is fine and
+                // only the remote repository's presentation is not the one we want. Hosts also require more than
+                // push rights to change it (GitHub requires administration rights on the repository): a token that
+                // can publish but not administer must not turn every publication into a failure.
+                if( !await hostingProvider.SetDefaultBranchAsync( monitor, hostedRepoPath, branchName, cancel ).ConfigureAwait( false ) )
+                {
+                    monitor.Warn( $"Unable to make '{branchName}' the default branch of '{hostedRepoPath}'. Publication continues." );
+                }
+                else
+                {
+                    // The root "stable" is the default branch (or the provider has no default branch).
+                    defaultBranchName = branchName;
+                }
+            }
+            // Step 2 - If a branch must be removed, try to retrieve the remote Default branch and check
+            // whether the branch to remove can actually be removed.
+            if( branchToRemove != null )
+            {
+                if( defaultBranchName == null )
+                {
+                    var info = await hostingProvider.GetRepositoryInfoAsync( monitor, hostedRepoPath, mustExist: false, cancel ).ConfigureAwait( false );
+                    if( info != null )
+                    {
+                        defaultBranchName = info.DefaultBranch;
+                    }
+                }
+                if( defaultBranchName == null )
+                {
+                    monitor.Warn( $"Unable to retrieve the remote default branch name. Skipping branch '{branchToRemove}' deletion as it may be the default branch." );
+                    branchToRemove = null;
+                }
+                else if( defaultBranchName == branchToRemove )
+                {
+                    monitor.Warn( $"Skipping deletion of branch '{defaultBranchName}' because it is the remote default branch." );
+                    branchToRemove = null;
+                }
+            }
+        }
+        // 2 - Handle the branch to remove.
+        if( branchToRemove != null )
+        {
+            if( !r.GetRemote( monitor, "origin", true, out var remote, out var creds )
+                || !r.Push( monitor, remote, creds, [$":refs/heads/{branchToRemove}"] ) )
+            {
+                monitor.Trace( $"Leaving remote branch '{branchToRemove}' alive." );
+            }  
         }
 
         var releaseId = await hostingProvider.CreateDraftReleaseAsync( monitor, hostedRepoPath, tag.FriendlyName, cancel ).ConfigureAwait( false );

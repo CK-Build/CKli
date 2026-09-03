@@ -51,6 +51,7 @@ sealed class IndirectPublisher : BasePublisher
                                  release.Repo,
                                  gitBranchName,
                                  ImmutableArray<string>.Empty,
+                                 null,
                                  release.Version,
                                  release.TagCommit.Tag,
                                  null,

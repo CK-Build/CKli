@@ -1029,11 +1029,8 @@ public sealed partial class GitRepository : IDisposable
             //       monitor.CloseGroup( "Tracked branch is on the same commit. Push skipped." );
             //       return true;
             //   }
-            if( !GetRemote( monitor, remoteName, forWrite: true, out var remote, out var creds ) )
-            {
-                return false;
-            }
-            return Push( monitor, remote, creds, [$"{localBranch.CanonicalName}:{localBranch.CanonicalName}"] );
+            return GetRemote( monitor, remoteName, forWrite: true, out var remote, out var creds )
+                   && Push( monitor, remote, creds, [$"{localBranch.CanonicalName}:{localBranch.CanonicalName}"] );
         }
     }
 

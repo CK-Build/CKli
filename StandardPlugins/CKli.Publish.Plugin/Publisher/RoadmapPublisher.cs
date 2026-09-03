@@ -62,15 +62,6 @@ sealed class RoadmapPublisher : BasePublisher
             Throw.DebugAssert( "If this was a +fake, the MustBuild would have been true.", lastBuild.TagCommit.BuildContentInfo != null );
             content = lastBuild.TagCommit.BuildContentInfo;
         }
-        // If the BaseVersion is a +fake, it must be pushed so others can understand (and correctly work in CI builds).
-        // Only once the actual non-CI stable version is published can the +fake tag be deleted.
-        // => We push the tag except when we are building a non-CI stable version.
-        Tag? fakeTagVersionToPush = null;
-        if( !version.IsStable || version.IsCI )
-        {
-            var baseTagCommit = buildInfo.VersionInfo.HotZone.LastStable;
-            fakeTagVersionToPush = baseTagCommit.IsFakeVersion ? baseTagCommit.Tag : baseTagCommit.FakeVersion?.Tag;
-        }
         // We have everything we need.
         var branch = _branches.FindRequired( monitor, version );
         if( branch == null ) return Task.FromResult( false );
@@ -78,9 +69,37 @@ sealed class RoadmapPublisher : BasePublisher
         bool isCI = version.IsCI;
         string gitBranchName = isCI ? branch.DevName : branch.Name;
 
-        var pushRefSpecs = ComputeMainLinePushRefSpecs( monitor, solution.Repo, branch, isCI );
+        Tag? fakeTagVersionToPush = null;
 
-        return PublishCoreAsync( monitor, solution.Repo, gitBranchName, pushRefSpecs, version, tag, fakeTagVersionToPush, content, cancellation );
+        // If the BaseVersion is a +fake, it must be pushed so others can understand (and correctly work in CI builds).
+        // Only once the actual non-CI stable version is published can the +fake tag be deleted.
+        // => We push the tag except when we are building a non-CI stable version.
+        if( !version.IsStable || isCI )
+        {
+            var baseTagCommit = buildInfo.VersionInfo.HotZone.LastStable;
+            fakeTagVersionToPush = baseTagCommit.IsFakeVersion ? baseTagCommit.Tag : baseTagCommit.FakeVersion?.Tag;
+        }
+        // computes pushRefSpecs and branchToRemove.
+        ImmutableArray<string> pushRefSpecs = [];
+        string? branchToRemove = null;
+        var repo = solution.Repo.GitRepository;
+        if( isCI )
+        {
+            // We are publishing a CI: we ensure that the non-CI branch is also visible to the
+            // remote repository users.
+            var b = repo.GetBranch( monitor, branch.Name, missingLocalAndRemote: LogLevel.Warn );
+            if( b != null && !b.IsTracking )
+            {
+                monitor.Warn( $"Branch '{branch.Name}' has no tracked branch. Creating branch 'origin/{branch.Name}'." );
+                b = repo.Repository.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
+                pushRefSpecs = [$"{b.CanonicalName}:{b.CanonicalName}"];
+            }
+        }
+        else
+        {
+            branchToRemove = branch.DevName;
+        }
+        return PublishCoreAsync( monitor, solution.Repo, gitBranchName, pushRefSpecs, branchToRemove, version, tag, fakeTagVersionToPush, content, cancellation );
     }
 
     // Defensive fix for a brand new repository: on a CI build, the regular (non "dev/") branch may not

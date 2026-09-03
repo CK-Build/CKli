@@ -43,6 +43,6 @@ sealed class FixPublisher : BasePublisher
                                     BuildContentInfo content,
                                     CancellationToken cancel )
     {
-        return PublishCoreAsync( monitor, repo, branchName, ImmutableArray<string>.Empty, version, tag, null, content, cancel );
+        return PublishCoreAsync( monitor, repo, branchName, ImmutableArray<string>.Empty, null, version, tag, null, content, cancel );
     }
 }
