@@ -83,7 +83,8 @@ public sealed partial class FakeBuildRepo
         public void AddProject( string projectName, string? branchName = null )
         {
             var fName = projectName + ".csproj";
-            _helper.TouchAndCommit( _git.Repository, fName, branchName, $"Adding project '{fName}' (1/2).", content =>
+            var fPath = projectName + '/' + fName;
+            _helper.TouchAndCommit( _git.Repository, fPath, branchName, $"Adding project '{fName}' (1/2).", content =>
             {
                 if( content != null )
                 {
@@ -91,6 +92,7 @@ public sealed partial class FakeBuildRepo
                 }
                 return """
                     <Project Sdk="Microsoft.NET.Sdk">
+                        <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
                         <ItemGroup>
                         </ItemGroup>
                     </Project>
@@ -100,7 +102,7 @@ public sealed partial class FakeBuildRepo
             {
                 Throw.CheckState( textSlnx != null );
                 return textSlnx.Replace( "</Solution>", $"""
-                        <Project Path="{fName}"/>
+                        <Project Path="{fPath}"/>
                     </Solution>
                     """ );
 
@@ -117,7 +119,8 @@ public sealed partial class FakeBuildRepo
         public void AddOrUpdateReference( string projectName, string packageId, SVersion version, string? branchName = null )
         {
             var fName = projectName + ".csproj";
-            _helper.TouchAndCommit( _git.Repository, fName, branchName, $"Adding reference '{fName}' -> '{packageId}@{version}'.", content =>
+            var fPath = projectName + '/' + fName;
+            _helper.TouchAndCommit( _git.Repository, fPath, branchName, $"Adding reference '{fName}' -> '{packageId}@{version}'.", content =>
             {
                 if( content == null )
                 {
@@ -141,7 +144,8 @@ public sealed partial class FakeBuildRepo
         public void RemoveReference( string projectName, string packageId, string? branchName = null )
         {
             var fName = projectName + ".csproj";
-            _helper.TouchAndCommit( _git.Repository, fName, branchName, $"Removing reference '{fName}' -> '{packageId}'.", content =>
+            var fPath = projectName + '/' + fName;
+            _helper.TouchAndCommit( _git.Repository, fPath, branchName, $"Removing reference '{fName}' -> '{packageId}'.", content =>
             {
                 if( content == null )
                 {

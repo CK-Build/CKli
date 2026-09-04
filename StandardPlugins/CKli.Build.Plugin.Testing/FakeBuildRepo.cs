@@ -46,13 +46,16 @@ public sealed partial class FakeBuildRepo
         var refLines = string.Concat( consumed.Select( c => $"{Environment.NewLine}        <PackageReference Include=\"{c.PackageId}\" Version=\"{c.Version}\" />" ) );
         using( var e = CreateEditor() )
         {
+            var projectPath = path.AppendPart( DefaultProjectName );
+            Directory.CreateDirectory( projectPath );
             File.WriteAllText( path.AppendPart( SolutionFileName ), $"""
                 <Solution>
-                    <Project Path="{DefaultProjectName}.csproj" />
+                    <Project Path="{DefaultProjectName}/{DefaultProjectName}.csproj" />
                 </Solution>
                 """ );
-            File.WriteAllText( path.AppendPart( DefaultProjectName + ".csproj" ), $"""
+            File.WriteAllText( projectPath.AppendPart( $"{DefaultProjectName}.csproj" ), $"""
                 <Project Sdk="Microsoft.NET.Sdk">
+                    <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
                     <ItemGroup>{refLines}
                     </ItemGroup>
                 </Project>
