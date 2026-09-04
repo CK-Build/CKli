@@ -50,8 +50,12 @@ public sealed class NuGetFeed
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( name );
         Throw.CheckArgument( !url.IsEmptyPath );
-        Throw.CheckArgument( "The fake credentials must not be an API key.",
-                              publicReadCredentials == null || publicReadCredentials.UserNameKey != null );
+        Throw.CheckArgument( "The public read credentials must not be an API key (it must not be a secret): a UserName must be specified.",
+                              publicReadCredentials == null || !publicReadCredentials.IsAPIKey );
+        Throw.CheckArgument( "The credentials must be an API key (a secret): the SecretKey must be resolved by a SecretsStore (UserName is 'CKli').",
+                              credentials == null || credentials.IsAPIKey );
+        Throw.CheckArgument( "Both credentials and publicReadCredentials cannot be specified at the same time.",
+                              publicReadCredentials == null || publicReadCredentials == null );
         _name = name;
         _url = url;
         _credentials = credentials;
@@ -108,6 +112,10 @@ public sealed class NuGetFeed
     /// This is the case of <see href="https://docs.github.com/fr/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry#authenticating-with-a-personal-access-token">GitHub</see>.
     /// </para>
     /// <para>
+    /// The <see cref="NuGetFeedCredentials.IsAPIKey"/> is false: a <see cref="NuGetFeedCredentials.UserNameKey"/> and the <see cref="NuGetFeedCredentials.SecretKey"/>
+    /// must be specified.
+    /// </para>
+    /// <para>
     /// This PublicReadCredentials and <see cref="Credentials"/> are mutually exclusive.
     /// </para>
     /// </summary>
@@ -115,6 +123,7 @@ public sealed class NuGetFeed
 
     /// <summary>
     /// The required credentials to access a private feed or to push packages in a public one.
+    /// <see cref="NuGetFeedCredentials.IsAPIKey"/> is true.
     /// When not specified:
     /// <list type="bullet">
     ///     <item>CKli will never try to push any package to this feed.</item>
@@ -143,11 +152,10 @@ public sealed class NuGetFeed
     /// </summary>
     public CSVersionKindFilter? PushQualityFilter => _pushQualityFilter;
 
-
     /// <summary>
     /// Checks whether a kind of packages can be pushed to this feed:
     /// <list type="bullet">
-    ///    <item>The <see cref="Credentials"/> must exist and <see cref="NuGetFeedCredentials.IsAPIKey"/> must be true.</item>
+    ///    <item>The <see cref="Credentials"/> must exist.</item>
     ///    <item>The <see cref="PushQualityFilter"/> must be not null and <see cref="CSVersionKindFilter.Accepts(CSVersionKind, bool)"/> must be true.</item>
     /// </list>
     /// </summary>
@@ -155,7 +163,6 @@ public sealed class NuGetFeed
     /// <param name="isCI">Whether a CI version must be considered.</param>
     /// <returns>Whether <paramref name="kind"/> and <paramref name="isCI"/> are accepted or not.</returns>
     public bool CanPush( CSVersionKind kind, bool isCI ) => _credentials != null
-                                                            && _credentials.IsAPIKey
                                                             && _pushQualityFilter.HasValue
                                                             && _pushQualityFilter.Value.Accepts( kind, isCI );
 

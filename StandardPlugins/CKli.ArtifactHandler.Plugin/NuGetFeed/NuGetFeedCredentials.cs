@@ -7,7 +7,8 @@ namespace CKli.ArtifactHandler.Plugin;
 
 /// <summary>
 /// Captures credentials that can be used directly (<see cref="NuGetFeed.PublicReadCredentials"/>)
-/// or indirectly by resolving the name and secret through <see cref="ISecretsStore"/>.
+/// or indirectly by resolving the secret through <see cref="ISecretsStore"/> when <see cref="UserNameKey"/> is null
+/// (the <see cref="SecretKey"/> is an API key).
 /// </summary>
 public sealed class NuGetFeedCredentials
 {
@@ -27,7 +28,7 @@ public sealed class NuGetFeedCredentials
     }
 
     /// <summary>
-    /// Optional user name to lookup in the <see cref="ISecretsStore"/> (unless used directly).
+    /// User name that can be used directly with the <see cref="SecretKey"/>.
     /// Null when the secret to use is an API key.
     /// </summary>
     public string? UserNameKey => _userNameKey;

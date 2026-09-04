@@ -144,8 +144,12 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="root">The &lt;configuration&gt; root of the <c>nuget.config</c> file.</param>
     /// <param name="actions">Outputs the required updates if any. Null if the <paramref name="root"/> is up to date.</param>
+    /// <param name="withSecretCredentials">
+    /// When specified, consider the <see cref="NuGetFeed.Credentials"/>, resolves the secret and writes the NuGet credentials: this
+    /// must be a temporary uncommitted change.
+    /// </param>
     /// <returns>True on success, false otherwise.</returns>
-    public bool ApplyConfiguredNuGetFeeds( IActivityMonitor monitor, XElement root, out List<string>? actions )
+    public bool ApplyConfiguredNuGetFeeds( IActivityMonitor monitor, XElement root, out List<string>? actions, ISecretsStore? withSecretCredentials = null )
     {
         actions = null;
         if( !GetConfiguredNuGetFeeds( monitor, out var feeds ) )
@@ -154,7 +158,7 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
         }
         var addSources = root.Elements( NuGetHelper.XNames.PackageSources ).Elements( NuGetHelper.XNames.Add ).ToList();
         var mappings = root.Elements( NuGetHelper.XNames.PackageSourceMapping ).Elements( NuGetHelper.XNames.PackageSource ).ToList();
-        var creds = root.Element( NuGetHelper.XNames.PackageSourceCredentials );
+        var credentialsElement = root.Element( NuGetHelper.XNames.PackageSourceCredentials );
         foreach( var f in feeds )
         {
             bool mustEnsureSource = false;
@@ -182,26 +186,41 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
                     mustEnsureSource = true;
                 }
             }
+            // Handling credentials: whether its the PublicReadCredentials or the "true" Credentials is
+            // the same. The difference is that we must resolve the Credentials 
+            var creds = f.PublicReadCredentials;
+            if( creds == null && f.Credentials != null && withSecretCredentials != null )
+            {
+                var secret = withSecretCredentials.TryGetRequiredSecret( monitor, f.Credentials.SecretKey );
+                if( secret == null )
+                {
+                    return false;
+                }
+                creds = new NuGetFeedCredentials( secret, "CKli" );
+            }
             var credName = XNamespace.None + f.Name.Replace( " ", "_x0020_" );
-            if( f.PublicReadCredentials != null )
+            if( creds != null )
             {
                 bool mustAdd = false;
-                if( creds == null )
+                if( credentialsElement == null )
                 {
                     actions ??= [];
                     actions.Add( $"Missing required <packageSourceCredentials> element." );
-                    creds = new XElement( NuGetHelper.XNames.PackageSourceCredentials );
-                    root.Add( creds );
+                    credentialsElement = new XElement( NuGetHelper.XNames.PackageSourceCredentials );
+                    root.Add( credentialsElement );
                     actions.Add( $"Missing fake read credentials for '{f.Name}'." );
                     mustAdd = true;
                 }
                 else 
                 {
-                    var eCred = creds.Element( credName );
+                    var eCred = credentialsElement.Element( credName );
                     if( eCred == null )
                     {
-                        actions ??= [];
-                        actions.Add( $"Missing fake read credentials for '{f.Name}'." );
+                        if( f.PublicReadCredentials != null )
+                        {
+                            actions ??= [];
+                            actions.Add( $"Missing public read credentials for '{f.Name}'." );
+                        }
                         mustAdd = true;
                     }
                     else
@@ -213,17 +232,20 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
                             var key = (string?)e.Attribute( NuGetHelper.XNames.Key );
                             if( key == "Username" )
                             {
-                                hasUsername = (string?)e.Attribute( NuGetHelper.XNames.Value ) == (f.PublicReadCredentials.UserNameKey ?? "");
+                                hasUsername = (string?)e.Attribute( NuGetHelper.XNames.Value ) == (creds.UserNameKey ?? "");
                             }
                             else if( key == "ClearTextPassword" )
                             {
-                                hasPwd = (string?)e.Attribute( NuGetHelper.XNames.Value ) == f.PublicReadCredentials.SecretKey;
+                                hasPwd = (string?)e.Attribute( NuGetHelper.XNames.Value ) == creds.SecretKey;
                             }
                         }
                         if( !hasUsername || !hasPwd )
                         {
-                            actions ??= [];
-                            actions.Add( $"Fake read credentials for '{f.Name}' must be updated." );
+                            if( f.PublicReadCredentials != null )
+                            {
+                                actions ??= [];
+                                actions.Add( $"Fake read credentials for '{f.Name}' must be updated." );
+                            }
                             eCred.Elements( NuGetHelper.XNames.Add )
                                  .Where( a => (string?)a.Attribute( NuGetHelper.XNames.Key ) is "Username" or "ClearTextPassword" )
                                  .Remove();
@@ -233,14 +255,14 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
                 }
                 if( mustAdd )
                 {
-                    creds.Add( new XElement( credName,
-                                              f.PublicReadCredentials.ToNuGetUsernameElement(),
-                                              f.PublicReadCredentials.ToNuGetClearTextPasswordElement() ) );
+                    credentialsElement.Add( new XElement( credName,
+                                              creds.ToNuGetUsernameElement(),
+                                              creds.ToNuGetClearTextPasswordElement() ) );
                 }
             }
-            else if( creds != null )
+            else if( credentialsElement != null )
             {
-                var eCred = creds.Element( credName );
+                var eCred = credentialsElement.Element( credName );
                 if( eCred != null )
                 {
                     actions ??= [];

@@ -110,7 +110,7 @@ public class RepoBuilder : RepoInfo
             return null;
         }
 
-        if( !_artifactHandler.ApplyConfiguredNuGetFeeds( monitor, configRoot, out var actions ) )
+        if( !_artifactHandler.ApplyConfiguredNuGetFeeds( monitor, configRoot, out var actions, context.SecretsStore ) )
         {
             return null;
         }
