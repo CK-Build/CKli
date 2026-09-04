@@ -13,12 +13,8 @@ using System.Threading.Tasks;
 namespace CKli.Publish.Plugin;
 
 /// <summary>
-/// Handles the push of NuGet packages to <see cref="NuGetFeed"/>.
-/// <para>
-/// The feeds from <see cref="ArtifactHandlerPlugin.GetConfiguredNuGetFeeds(IActivityMonitor, out ImmutableArray{NuGetFeed})"/> are filtered
-/// to the ones that have a true <see cref="NuGetFeed.PushCredentials"/> and <see cref="NuGetFeedCredentials.IsAPIKey"/> and
-/// which <see cref="NuGetFeed.PushQualityFilter"/> accepts a <see cref="SVersion"/>.
-/// </para>
+/// Handles the push of NuGet packages to <see cref="NuGetFeed"/> defined
+/// by <see cref="ArtifactHandlerPlugin.GetConfiguredNuGetFeeds(IActivityMonitor, out ImmutableArray{NuGetFeed})"/>.
 /// </summary>
 sealed class PackageSender
 {
@@ -27,7 +23,9 @@ sealed class PackageSender
     readonly BranchNamespace _branches;
     readonly ISecretsStore _secretsStore;
     readonly Lock _lock;
+    // There can be one NuGet client per feed.
     readonly NuGetFeedClient[] _clients;
+    // There can be one Sender per existing branch and its CI.
     readonly Sender[] _senders;
 
     PackageSender( ImmutableArray<NuGetFeed> feeds, ArtifactHandlerPlugin artifactHandler, BranchModelPlugin branchModel, ISecretsStore secretsStore )
@@ -60,12 +58,12 @@ sealed class PackageSender
 
     NuGetFeedClient? EnsureClient( IActivityMonitor monitor, NuGetFeed feed )
     {
-        Throw.DebugAssert( _feeds.Contains( feed ) && feed.PushCredentials != null );
+        Throw.DebugAssert( _feeds.Contains( feed ) && feed.Credentials != null );
         int idx = _feeds.IndexOf( feed );
         ref var c = ref _clients[idx];
         if( c == null )
         {
-            var apiKey = _secretsStore.TryGetRequiredSecret( monitor, feed.PushCredentials.SecretKey );
+            var apiKey = _secretsStore.TryGetRequiredSecret( monitor, feed.Credentials.SecretKey );
             if( apiKey != null )
             {
                 c = new NuGetFeedClient( feed.Url, apiKey );
@@ -86,16 +84,14 @@ sealed class PackageSender
                 if( sender == null )
                 {
                     var clients = new List<NuGetFeedClient>();
-                    foreach( var f in _feeds.Where( f => f.PushCredentials != null
-                                                        && f.PushCredentials.IsAPIKey
-                                                        && f.PushQualityFilter.Accepts( branch.VersionKind, isCI ) ) )
+                    foreach( var f in _feeds.Where( f => f.CanPush( branch.VersionKind, isCI ) ) )
                     {
                         var client = EnsureClient( monitor, f );
                         if( client == null )
                         {
                             return null;
                         }
-                        var apiKey = _secretsStore.TryGetRequiredSecret( monitor, f.PushCredentials!.SecretKey );
+                        var apiKey = _secretsStore.TryGetRequiredSecret( monitor, f.Credentials!.SecretKey );
                         if( apiKey == null )
                         {
                             return null;
@@ -133,6 +129,10 @@ sealed class PackageSender
         return new PackageSender( feeds, artifactHandler, branchModel, secretsStore );
     }
 
+
+    /// <summary>
+    /// A Sender can send packages with the same <see cref="CSVersionKind"/> and CI flag to one or more NuGet client.
+    /// </summary>
     sealed class Sender
     {
         readonly ArtifactHandlerPlugin _artifactHandler;
@@ -161,55 +161,6 @@ sealed class PackageSender
                 }
                 return failed == 0;
             }
-        }
-
-        /// <summary>
-        /// Selects and configure NuGet clients to which packages must be sent and combine them in a <see cref="Sender"/>.
-        /// <para>
-        /// Filters the feeds provided by <see cref="ArtifactHandlerPlugin.GetConfiguredNuGetFeeds(IActivityMonitor, out ImmutableArray{NuGetFeed})"/>,
-        /// to the ones with a <see cref="NuGetFeed.PushCredentials"/> that has a true <see cref="NuGetFeedCredentials.IsAPIKey"/> and which <see cref="NuGetFeed.PushQualityFilter"/>
-        /// accepts the <paramref name="prereleaseName"/> and <paramref name="ciBuild"/> flag.
-        /// </para>
-        /// <para>
-        /// If no such feed exist, this is an error and null is returned.
-        /// </para>
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="versionKind">The <see cref="CSVersionKind"/> to publish.</param>
-        /// <param name="ciBuild">Whether the packages to publish are CI builds. See <see cref="SVersion.IsCI"/>.</param>
-        /// <param name="artifactHandler">The artifact handler plugin.</param>
-        /// <param name="secretsStore">The secret store.</param>
-        /// <returns>A package sender.</returns>
-        public static Sender? Create( IActivityMonitor monitor,
-                                             CSVersionKind versionKind,
-                                             bool ciBuild,
-                                             ArtifactHandlerPlugin artifactHandler,
-                                             ISecretsStore secretsStore )
-        {
-            if( !artifactHandler.GetConfiguredNuGetFeeds( monitor, out var feeds ) )
-            {
-                return null;
-            }
-            var clients = new List<NuGetFeedClient>();
-            foreach( var f in feeds.Where( f => f.PushCredentials != null
-                                                && f.PushCredentials.IsAPIKey
-                                                && f.PushQualityFilter.Accepts( versionKind, ciBuild ) ) )
-            {
-                var apiKey = secretsStore.TryGetRequiredSecret( monitor, f.PushCredentials!.SecretKey );
-                if( apiKey == null )
-                {
-                    return null;
-                }
-                clients.Add( new NuGetFeedClient( f.Url, apiKey ) );
-            }
-            if( clients.Count == 0 )
-            {
-                var name = $"'{versionKind.ToKindName()}' versions";
-                if( ciBuild ) name = "ci build of " + name;
-                monitor.Error( $"No configured NuGet feeds with PushCredentials accept {name}." );
-                return null;
-            }
-            return new Sender( artifactHandler, clients );
         }
 
     }

@@ -6,7 +6,7 @@ using System.Xml.Linq;
 namespace CKli.ArtifactHandler.Plugin;
 
 /// <summary>
-/// Captures credentials that can be used directly (<see cref="NuGetFeed.FakeReadCredentials"/>)
+/// Captures credentials that can be used directly (<see cref="NuGetFeed.PublicReadCredentials"/>)
 /// or indirectly by resolving the name and secret through <see cref="ISecretsStore"/>.
 /// </summary>
 public sealed class NuGetFeedCredentials

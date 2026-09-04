@@ -6,7 +6,6 @@ using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
-using Shouldly;
 using System;
 using System.Collections.Immutable;
 using System.IO;
@@ -16,7 +15,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace CKli;
 

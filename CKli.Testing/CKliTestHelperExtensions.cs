@@ -295,7 +295,9 @@ public static partial class CKliTestHelperExtensions
     /// <param name="methodTestName">The test name.</param>
     /// <param name="clearStackRegistryFile">True to clear the stack registry (<see cref="StackRepository.ClearRegistry"/>).</param>
     /// <returns>The <see cref="ClonedFolder"/> with the path to the cleaned folder.</returns>
-    public static ClonedFolder InitializeClonedFolder( this IMonitorTestHelper helper, [CallerMemberName] string? methodTestName = null, bool clearStackRegistryFile = true )
+    public static ClonedFolder InitializeClonedFolder( this IMonitorTestHelper helper,
+                                                       [CallerMemberName] string? methodTestName = null,
+                                                       bool clearStackRegistryFile = true )
     {
         NormalizedPath path = PrepareWorkingTestFolder( helper, methodTestName, clearStackRegistryFile );
         return new ClonedFolder( path );
@@ -308,7 +310,9 @@ public static partial class CKliTestHelperExtensions
     /// <param name="methodTestName">The test name.</param>
     /// <param name="clearStackRegistryFile">True to clear the stack registry (<see cref="StackRepository.ClearRegistry"/>).</param>
     /// <returns>The path to the cleaned folder.</returns>
-    public static NormalizedPath PrepareWorkingTestFolder( this IMonitorTestHelper helper, [CallerMemberName] string? methodTestName = null, bool clearStackRegistryFile = true )
+    public static NormalizedPath PrepareWorkingTestFolder( this IMonitorTestHelper helper,
+                                                           [CallerMemberName] string? methodTestName = null,
+                                                           bool clearStackRegistryFile = true )
     {
         var path = _clonedPath.AppendPart( methodTestName );
         if( Directory.Exists( path ) )

@@ -116,9 +116,9 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
                 {
                     var nugetOrg = new NuGetFeed( "NuGet",
                                                   "https://api.nuget.org/v3/index.json",
-                                                  pushCredentials: new NuGetFeedCredentials( "NUGET_ORG_PUSH_API_KEY", null ),
+                                                  credentials: new NuGetFeedCredentials( "NUGET_ORG_PUSH_API_KEY", null ),
                                                   pushQualityFilter: new CSVersionKindFilter( CSVersionKind.Papa, CSVersionKind.Stable, allowCI: false ),
-                                                  fakeReadCredentials: null );
+                                                  publicReadCredentials: null );
                     PrimaryPluginContext.Configuration.Edit( monitor, ( monitor, e ) =>
                     {
                         e.Ensure( XNames.NuGet ).Add( nugetOrg.ToXml() );
@@ -183,7 +183,7 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
                 }
             }
             var credName = XNamespace.None + f.Name.Replace( " ", "_x0020_" );
-            if( f.FakeReadCredentials != null )
+            if( f.PublicReadCredentials != null )
             {
                 bool mustAdd = false;
                 if( creds == null )
@@ -213,11 +213,11 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
                             var key = (string?)e.Attribute( NuGetHelper.XNames.Key );
                             if( key == "Username" )
                             {
-                                hasUsername = (string?)e.Attribute( NuGetHelper.XNames.Value ) == (f.FakeReadCredentials.UserNameKey ?? "");
+                                hasUsername = (string?)e.Attribute( NuGetHelper.XNames.Value ) == (f.PublicReadCredentials.UserNameKey ?? "");
                             }
                             else if( key == "ClearTextPassword" )
                             {
-                                hasPwd = (string?)e.Attribute( NuGetHelper.XNames.Value ) == f.FakeReadCredentials.SecretKey;
+                                hasPwd = (string?)e.Attribute( NuGetHelper.XNames.Value ) == f.PublicReadCredentials.SecretKey;
                             }
                         }
                         if( !hasUsername || !hasPwd )
@@ -234,8 +234,8 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
                 if( mustAdd )
                 {
                     creds.Add( new XElement( credName,
-                                              f.FakeReadCredentials.ToNuGetUsernameElement(),
-                                              f.FakeReadCredentials.ToNuGetClearTextPasswordElement() ) );
+                                              f.PublicReadCredentials.ToNuGetUsernameElement(),
+                                              f.PublicReadCredentials.ToNuGetClearTextPasswordElement() ) );
                 }
             }
             else if( creds != null )
@@ -287,13 +287,13 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
 
             static XElement? GetPackageSourceCredentials( ImmutableArray<NuGetFeed> feeds )
             {
-                if( feeds.Any( f => f.FakeReadCredentials != null ) )
+                if( feeds.Any( f => f.PublicReadCredentials != null ) )
                 {
                     return new XElement( NuGetHelper.XNames.PackageSourceCredentials,
-                                         feeds.Where( f => f.FakeReadCredentials != null )
+                                         feeds.Where( f => f.PublicReadCredentials != null )
                                               .Select( f => new XElement( f.Name.Replace( " ", "_x0020_" ),
-                                                                 f.FakeReadCredentials!.ToNuGetUsernameElement(),
-                                                                 f.FakeReadCredentials!.ToNuGetClearTextPasswordElement() ) ) );
+                                                                 f.PublicReadCredentials!.ToNuGetUsernameElement(),
+                                                                 f.PublicReadCredentials!.ToNuGetClearTextPasswordElement() ) ) );
                 }
                 return null;
             }
