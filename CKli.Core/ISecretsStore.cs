@@ -20,8 +20,9 @@ public interface ISecretsStore
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="keys">The keys of the secret to locate.</param>
+    /// <param name="level">The log level in case of failure.</param>
     /// <returns>The secret or null if the secret is not available.</returns>
-    string? TryGetRequiredSecret( IActivityMonitor monitor, IEnumerable<string> keys );
+    string? TryGetRequiredSecret( IActivityMonitor monitor, IEnumerable<string> keys, LogLevel level = LogLevel.Error );
 }
 
 /// <summary>
@@ -37,32 +38,21 @@ public static class SecretsStoreExtensions
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="strongestKey">The strongest key that would allow the operation and more.</param>
     /// <param name="regularKey">The regular key that would allow the operation.</param>
+    /// <param name="level">The log level in case of failure.</param>
     /// <returns>The secret or null if the secret is not available.</returns>
-    public static string? TryGetRequiredSecret( this ISecretsStore store, IActivityMonitor monitor, string strongestKey, string regularKey )
-        => store.TryGetRequiredSecret( monitor, [strongestKey,regularKey] );
+    public static string? TryGetRequiredSecret( this ISecretsStore store, IActivityMonitor monitor, string strongestKey, string regularKey, LogLevel level = LogLevel.Error )
+        => store.TryGetRequiredSecret( monitor, [strongestKey,regularKey], level );
 
     /// <summary>
-    /// Provides the secret if it exists or returns null and emits an error that explains
+    /// Provides the secret if it exists or returns null and emits a log that explains
     /// how to register the secret on the system.
     /// </summary>
     /// <param name="store">This store.</param>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="key">The key of the secret to locate.</param>
+    /// <param name="level">The log level in case of failure.</param>
     /// <returns>The secret or null if the secret is not available.</returns>
-    public static string? TryGetRequiredSecret( this ISecretsStore store, IActivityMonitor monitor, string key )
-        => store.TryGetRequiredSecret( monitor, [key] );
-
-    /// <summary>
-    /// Provides a secret if it exists or returns null and emits an error that explains
-    /// how to register the secret on the system.
-    /// </summary>
-    /// <param name="store">This store.</param>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="strongestKey">The strongest key of the secret to locate.</param>
-    /// <param name="otherKeys">Other keys.</param>
-    /// <returns>The secret or null if the secret is not available.</returns>
-    public static string? TryGetRequiredSecret( this ISecretsStore store, IActivityMonitor monitor, string strongestKey, params string[] otherKeys )
-        => store.TryGetRequiredSecret( monitor, [strongestKey, .. otherKeys] );
-
+    public static string? TryGetRequiredSecret( this ISecretsStore store, IActivityMonitor monitor, string key, LogLevel level = LogLevel.Error )
+        => store.TryGetRequiredSecret( monitor, [key], level );
 
 }

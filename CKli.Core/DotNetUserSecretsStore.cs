@@ -45,7 +45,7 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
     }
 
     /// <inheritdoc />
-    public string? TryGetRequiredSecret( IActivityMonitor monitor, IEnumerable<string> keys )
+    public string? TryGetRequiredSecret( IActivityMonitor monitor, IEnumerable<string> keys, LogLevel level = LogLevel.Error )
     {
         Throw.CheckNotNullArgument( keys );
         Throw.CheckArgument( keys.Any() && keys.All( k => !string.IsNullOrWhiteSpace( k ) ) );
@@ -78,7 +78,7 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
                             Register one of them as they enable more operations.
                             """;
 
-        monitor.Error( $"""
+        monitor.Log( level, $"""
                             This operation requires the secret '{failed[0]}'.
                             Please obtain this secret (typically a Personal Access Token) and register it on this machine:
 

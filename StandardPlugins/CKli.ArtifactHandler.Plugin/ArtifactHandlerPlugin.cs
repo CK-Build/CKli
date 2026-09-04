@@ -147,6 +147,11 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
     /// <param name="withSecretCredentials">
     /// When specified, consider the <see cref="NuGetFeed.Credentials"/>, resolves the secret and writes the NuGet credentials: this
     /// must be a temporary uncommitted change.
+    /// <para>
+    /// Note that <see cref="ISecretsStore.TryGetRequiredSecret(IActivityMonitor, IEnumerable{string}, LogLevel)"/> is called with <see cref="LogLevel.Warn"/>:
+    /// if some credentials (for one or more feeds) fails to be resolved, this is just a warning, not an error: the restore/build may not need the feed to
+    /// be used and if it is then the log will contain the message to the user.
+    /// </para>
     /// </param>
     /// <returns>True on success, false otherwise.</returns>
     public bool ApplyConfiguredNuGetFeeds( IActivityMonitor monitor, XElement root, out List<string>? actions, ISecretsStore? withSecretCredentials = null )
@@ -186,17 +191,19 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
                     mustEnsureSource = true;
                 }
             }
-            // Handling credentials: whether its the PublicReadCredentials or the "true" Credentials is
-            // the same. The difference is that we must resolve the Credentials 
+            // Handling credentials: whether its the PublicReadCredentials or the "true" Credentials this is
+            // almost the same.
+            // The difference is that we must resolve the Credentials against the secrets store first and the
+            // "actions" are muted.
             var creds = f.PublicReadCredentials;
             if( creds == null && f.Credentials != null && withSecretCredentials != null )
             {
-                var secret = withSecretCredentials.TryGetRequiredSecret( monitor, f.Credentials.SecretKey );
-                if( secret == null )
+                // Only warn if not found and continue.
+                var secret = withSecretCredentials.TryGetRequiredSecret( monitor, f.Credentials.SecretKey, LogLevel.Warn|LogLevel.IsFiltered );
+                if( secret != null )
                 {
-                    return false;
+                    creds = new NuGetFeedCredentials( secret, "CKli" );
                 }
-                creds = new NuGetFeedCredentials( secret, "CKli" );
             }
             var credName = XNamespace.None + f.Name.Replace( " ", "_x0020_" );
             if( creds != null )
@@ -204,11 +211,14 @@ public sealed class ArtifactHandlerPlugin : PrimaryRepoPlugin<RepoArtifactInfo>
                 bool mustAdd = false;
                 if( credentialsElement == null )
                 {
-                    actions ??= [];
-                    actions.Add( $"Missing required <packageSourceCredentials> element." );
+                    if( f.PublicReadCredentials != null )
+                    {
+                        actions ??= [];
+                        actions.Add( $"Missing required <packageSourceCredentials> element." );
+                        actions.Add( $"Missing public read credentials for '{f.Name}'." );
+                    }
                     credentialsElement = new XElement( NuGetHelper.XNames.PackageSourceCredentials );
                     root.Add( credentialsElement );
-                    actions.Add( $"Missing fake read credentials for '{f.Name}'." );
                     mustAdd = true;
                 }
                 else 
