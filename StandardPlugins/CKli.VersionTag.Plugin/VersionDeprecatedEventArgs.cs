@@ -50,6 +50,18 @@ public sealed class VersionDeprecatedEventArgs : WorldEventArgs
     public DeprecatedTagInfo DeprecatedInfo => _deprecatedInfo;
 
     /// <summary>
+    /// Gets whether the deprecation has expired: its packages must be unlisted or deleted from the feeds
+    /// and the version tags are gone.
+    /// <para>
+    /// This is the <see cref="Origin"/>'s <see cref="DeprecatedTagInfo.HasExpired"/> and it governs the
+    /// whole propagation: a consumer the deprecation reaches is tagged with the origin's expiration, and an
+    /// already deprecated consumer only ever keeps the earlier of the two. So an expired origin means every
+    /// one of the <see cref="Releases"/> has expired. "--immediate" expires the deprecation at once.
+    /// </para>
+    /// </summary>
+    public bool HasExpired => _deprecatedInfo.HasExpired;
+
+    /// <summary>
     /// Gets every release that is now deprecated: the <see cref="Origin"/> first, then the consumers the
     /// deprecation propagated to.
     /// <para>

@@ -123,6 +123,7 @@ synchronous at the cost of forcing every listener to be synchronous too.
 |---|---|
 | `Origin` | The `RepoReleaseInfo` the command named: the root of the deprecation, and the first of `Releases`. |
 | `DeprecatedInfo` | The root's `DeprecatedTagInfo`: its `Reason` and the `Expiration` at which the packages must leave the feeds. |
+| `HasExpired` | Whether that expiration has passed — the version tags are gone and the packages must leave the feeds. It governs the whole propagation: a reached consumer is tagged with the origin's expiration and an already deprecated one keeps only the earlier of the two, so an expired origin means every release here has expired. `--immediate` expires it at once. |
 | `Releases` | Every release that is now deprecated — the origin plus the consumers the propagation reached and could tag. |
 | `DeprecatedPackages` | Those releases flattened to `PackageInstance`s: each produced package identifier at the version its release published. |
 

@@ -60,12 +60,23 @@ public sealed class PublishPlugin : PrimaryPluginBase
     // event carries every deprecated release and not only the one the command named.
     void OnVersionDeprecated( IActivityMonitor monitor, VersionDeprecatedEventArgs e )
     {
+        // An expired deprecation has removed the version tags and its packages must leave the feeds: a
+        // profile that offers one of them describes something that no longer exists, so it is deleted.
+        // A deprecation still to come only marks them.
+        bool expired = e.HasExpired;
         var folder = PublishedFolder;
         foreach( var p in e.DeprecatedPackages )
         {
-            folder.OnDeprecatedPackage( p.PackageId, p.Version );
+            if( expired )
+            {
+                folder.OnExpiredPackage( p.PackageId, p.Version );
+            }
+            else
+            {
+                folder.OnDeprecatedPackage( p.PackageId, p.Version );
+            }
         }
-        // OnDeprecatedPackage read every file: an unreadable one has not been considered at all.
+        // Both read every file: an unreadable one has not been considered at all.
         foreach( var (version, error) in folder.LoadErrors )
         {
             monitor.Warn( $"Unable to read the profile 'v{version}': it may offer a deprecated package.", error );
@@ -76,7 +87,13 @@ public sealed class PublishPlugin : PrimaryPluginBase
             return;
         }
         int count = folder.Save();
-        monitor.Info( ScreenType.CKliScreenTag, $"{count} published profile(s) deprecated." );
+        var what = expired
+                    ? $"Removed {count} published profile(s) after the expiration of '{e.Origin}'."
+                    : $"Deprecated {count} published profile(s) after the deprecation of '{e.Origin}'.";
+        monitor.Info( ScreenType.CKliScreenTag, what );
+        // The generic "Automatic pre-push commit." of PushChanges would say nothing about this: the
+        // profiles that disappear from the Stack deserve a commit that names the reason.
+        World.StackRepository.GitRepository.Commit( monitor, what );
         World.StackRepository.PushChanges( monitor );
     }
 

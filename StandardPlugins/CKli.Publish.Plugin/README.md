@@ -109,23 +109,32 @@ deprecates every release that consumes it, transitively — and raises
 once every `+deprecated` tag is pushed. This handler mirrors the **whole** result onto the profiles,
 which is why the event carries every deprecated release and not only the one the command named:
 
-1. `PublishedFolder.OnDeprecatedPackage( packageId, version )` for each of `e.DeprecatedPackages`.
-   A profile deprecates when it offers exactly that package at that version, so a later profile that
-   offers the same package identifiers in newer versions is left alone.
+1. For each of `e.DeprecatedPackages`, and depending on `e.HasExpired`:
+
+   | `HasExpired` | What it means | What the profile gets |
+   |---|---|---|
+   | false | The deprecation is still to come (`--days <n>`). | `OnDeprecatedPackage` — the profile is **marked**. |
+   | true | The version tag is gone and the packages must leave the feeds (`--immediate`, or a date now past). | `OnExpiredPackage` — the profile is **deleted**. |
+
+   Either way a profile is touched only when it offers *exactly* that package at that version, so a
+   later profile that offers the same package identifiers in newer versions is left alone.
 2. Any file in `LoadErrors` is warned about: it could not be considered at all, so it may still offer
    a deprecated package.
 3. If nothing changed, it stops — that is the normal case for a Stack with no publication yet.
-   Otherwise `Save` writes the touched profiles and `World.StackRepository.PushChanges` commits and
-   pushes them.
+   Otherwise `Save` writes (or deletes) the touched files, the Stack is committed with a message that
+   names the reason, and `PushChanges` pushes it. The commit is explicit on purpose: `PushChanges`
+   alone would record profiles disappearing under "Automatic pre-push commit.".
 
 It takes the event's `Sync` slot: the work is file IO and git, so there is nothing to await. That is a
 choice this plugin makes for itself — `VersionDeprecated` is a `PerfectEvent`, so another listener can
 take the `Async` or `ParallelAsync` slot without affecting this one.
 
-Deprecation is monotonic (`PublishedProfile.Deprecate` is idempotent and there is no un-deprecate), so
-re-running `version deprecate --allow-update` changes nothing here. An expired deprecation removes the
-version tag but does **not** remove the profile: a profile that offers an expired version stays
-deprecated and is not deleted.
+Both outcomes are idempotent, which is what makes a failed handler safe to retry: `Deprecate` is a
+no-op on an already deprecated profile (and there is no un-deprecate), and an expired package finds no
+profile left to remove.
+
+**A deprecated profile is locked.** It records what was published and it will never gain a successor:
+when the fix workflow starts writing updated profiles, a deprecated one is not a candidate.
 
 ### `PublishRoadmap` — the gate and the publish loop
 
@@ -253,8 +262,9 @@ profile. `Tests/Plugins.Tests`' `PublishedFolderTests` covers the folder on its 
 does to it.
 
 Two entry points write to it: `OnRoadmapBuildAsync` adds a profile, and
-[`OnVersionDeprecated`](#onversiondeprecated--version-deprecate) deprecates the ones that offer a
-deprecated package.
+[`OnVersionDeprecated`](#onversiondeprecated--version-deprecate) marks the ones that offer a deprecated
+package — or removes them, once that deprecation has expired. `OnDeprecatedPackage` and
+`OnExpiredPackage` are the two package-oriented mutators that back those, and both read every file.
 
 ### The publishers — the actual publish loop
 
@@ -368,10 +378,15 @@ likewise resolved through `GitRepositoryKey` / `ISecretsStore`, documented in `C
 ## Known rough edges (from the code)
 
 - **A fix publication leaves no profile.** `OnFixBuildAsync` publishes its `FixWorkflow` targets
-  without computing a `PublishedProfile`, so nothing is added to the `PublishedFolder`: a
-  `fix/vMajor.Minor` release is invisible in the profile history. Only `OnRoadmapBuildAsync` records
-  one. This is deliberate for now — a fix workflow is a flat list of targets, not a dependency
-  roadmap, so what its profile should offer (and on which branch its version belongs) is undecided.
+  without touching the `PublishedFolder`, so a `fix/vMajor.Minor` release is invisible in the profile
+  history. Only `OnRoadmapBuildAsync` records one. The intended design is known: a fix updates every
+  profile that offers one of the fixed versions, substituting `TargetRepo.ToFixVersion` with what was
+  actually published, and the successor keeps its original's `Major.Minor` — "the same initial day" —
+  with the next free `Patch`. Two rules already hold: the substitution is per package (a `Repo` hosting
+  several solutions can carry several versions in one `Repository`), and a **deprecated profile is
+  locked** and gets no successor. What is still open is whether `fix publish --ci` should update the
+  profiles at all, since a CI fix build publishes a `--ci` version rather than
+  `TargetRepo.TargetVersion`.
 - The gate's failure paths have no integration test coverage: `Tests/Plugins.Tests` never reaches
   `PublishableStatus.IndirectPublishRequired`, so the `RequiredPublications` closure, its
   producers-first ordering, `IndirectPublisher`, and `BuildFinalProfile`'s conflict branch are all

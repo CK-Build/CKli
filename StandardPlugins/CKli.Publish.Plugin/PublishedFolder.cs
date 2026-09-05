@@ -325,6 +325,39 @@ public sealed class PublishedFolder
     }
 
     /// <summary>
+    /// Removes every profile that offers the provided package: the counterpart of
+    /// <see cref="OnDeprecatedPackage(string, SVersion)"/> for a deprecation that has expired. All the
+    /// files are read.
+    /// <para>
+    /// An expired deprecation removes the version tag and unlists the packages from the feeds: a profile
+    /// that offers one of them describes something that no longer exists, so it is deleted rather than
+    /// deprecated.
+    /// </para>
+    /// </summary>
+    /// <param name="packageId">The expired package identifier.</param>
+    /// <param name="version">The expired package version.</param>
+    /// <returns>True if at least one profile has been removed. False otherwise.</returns>
+    public bool OnExpiredPackage( string packageId, SVersion version )
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace( packageId );
+        ArgumentNullException.ThrowIfNull( version );
+        bool found = false;
+        LoadAll();
+        // Only Current is set to null here: this doesn't touch the _profiles dictionary, so iterating
+        // its values while removing is safe.
+        foreach( var info in _profiles.Values )
+        {
+            var p = info.Current;
+            if( p != null && p.Packages.TryGetValue( packageId, out var offered ) && offered.Version == version )
+            {
+                info.Current = null;
+                found = true;
+            }
+        }
+        return found;
+    }
+
+    /// <summary>
     /// Writes the added and updated profiles and deletes the files of the removed ones.
     /// </summary>
     /// <returns>The number of created, updated or deleted files.</returns>
