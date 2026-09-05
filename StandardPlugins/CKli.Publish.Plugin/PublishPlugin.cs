@@ -5,6 +5,7 @@ using CKli.Build.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.VersionTag.Plugin;
+using System;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,6 +22,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
     readonly BranchModelPlugin _branchModel;
     readonly VersionTagPlugin _versionTag;
     readonly bool _keepLocalReleaseAfterPublish;
+    PublishedFolder? _publishedFolder;
 
     /// <summary>
     /// Initializes a new publish plugin.
@@ -58,6 +60,11 @@ public sealed class PublishPlugin : PrimaryPluginBase
     /// </para>
     /// </summary>
     public bool KeepLocalReleaseAfterPublish => _keepLocalReleaseAfterPublish;
+
+    /// <summary>
+    /// Gets the "<see cref="StackRepository.StackWorkingFolder"/>/Published" folder.
+    /// </summary>
+    public PublishedFolder PublishedFolder => _publishedFolder ??= new PublishedFolder( World.StackRepository.StackWorkingFolder.AppendPart("Published"), createIfMissing: true );
 
     async Task OnFixBuildAsync( IActivityMonitor monitor, FixBuildEventArgs e, CancellationToken cancellation )
     {
@@ -162,12 +169,35 @@ public sealed class PublishPlugin : PrimaryPluginBase
                         }
                         var roadmapPublisher = new RoadmapPublisher( packageSender, _artifactHandler, _branchModel, _keepLocalReleaseAfterPublish );
                         var indirectPublisher = new IndirectPublisher( packageSender, _artifactHandler, _branchModel, _keepLocalReleaseAfterPublish );
-                        if( !await publish.PublishAsync( e.Monitor, roadmapPublisher, indirectPublisher, cancellation ).ConfigureAwait( false ) )
+                        // The profile is identified by a time based version that is free in the PublishedFolder: the
+                        // branch that is published (and whether this is a CI build) places its file.
+                        var publishedFolder = PublishedFolder;
+                        var branch = roadmap.Graph.BranchName;
+                        var profileVersion = publishedFolder.CreateNewProfileVersion( branch.VersionKind,
+                                                                                      branch.ExploratoryName,
+                                                                                      roadmap.IsCIBuild );
+                        if( !await publish.PublishAsync( e.Monitor,
+                                                         World,
+                                                         profileVersion,
+                                                         roadmapPublisher,
+                                                         indirectPublisher,
+                                                         cancellation ).ConfigureAwait( false ) )
                         {
                             e.SetFailed();
                         }
                         else
                         {
+                            // The publication is done: it cannot be undone because the profile file cannot be
+                            // written. Such an error is logged and the publication remains a success.
+                            try
+                            {
+                                publishedFolder.Add( publish.FinalProfile! );
+                                publishedFolder.Save();
+                            }
+                            catch( Exception ex )
+                            {
+                                monitor.Error( $"While saving the published profile '{profileVersion}'.", ex );
+                            }
                             World.StackRepository.PushChanges( monitor );
                         }
                     }

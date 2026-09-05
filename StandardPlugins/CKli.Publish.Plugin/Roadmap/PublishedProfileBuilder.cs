@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Packaging.Abstractions;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Build.Plugin;
 using CKli.Core;
@@ -12,7 +13,8 @@ namespace CKli.Publish.Plugin;
 
 /// <summary>
 /// Decides whether a <see cref="Roadmap"/> can be published and builds the <see cref="PublishedProfile"/> it leaves
-/// on the roadmap's branch.
+/// on the roadmap's branch. That profile is the published contract itself (<c>CK.Packaging.Abstractions</c>): the
+/// <see cref="PublishedFolder"/> stores it as a Json file that anything - a build server, a dashboard - can read.
 /// <para>
 /// The gate works at the solution level: every package a solution produces carries that solution's single version,
 /// and a package identifier is produced by exactly one solution (<see cref="HotGraph.ProducedPackages"/>), so the
@@ -198,34 +200,42 @@ sealed class PublishedProfileBuilder
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="roadmap">The built roadmap.</param>
+    /// <param name="world">The World that publishes: its stack url and name identify the profile.</param>
+    /// <param name="profileVersion">
+    /// The version of the profile, obtained from <see cref="PublishedFolder.CreateNewProfileVersion"/>: this is the
+    /// version of the publication itself, not of any of the packages it offers.
+    /// </param>
     /// <returns>The profile or null if it has any conflict (logged).</returns>
-    internal PublishedProfile? BuildFinalProfile( IActivityMonitor monitor, Roadmap roadmap )
+    internal PublishedProfile? BuildFinalProfile( IActivityMonitor monitor,
+                                                  Roadmap roadmap,
+                                                  World world,
+                                                  SVersion profileVersion )
     {
         using var g = monitor.OpenTrace( "Building the published profile." );
-        var builder = new PublishedProfile.Builder();
+        var offer = new Offer();
 
         // The offer: every package identifier each solution produces, in that solution's version.
         foreach( var s in roadmap.OrderedSolutions )
         {
             if( !TryGetFinalContent( s, out var version, out var content ) ) continue;
-            var reason = new PublishedPackageInfo.PublishedByRoadmap( s );
             foreach( var packageId in content.Produced )
             {
-                builder.Add( monitor, packageId, version, reason );
+                offer.Add( monitor, s.Repo, packageId, version, $"produced by '{s.Repo.DisplayPath}'" );
             }
         }
         // The requirements: every World package each solution consumes must be offered in the version it consumes.
+        // Such a package belongs to the repository that PRODUCES it, not to the one that consumes it.
         foreach( var s in roadmap.OrderedSolutions )
         {
             if( !TryGetFinalContent( s, out _, out var content ) ) continue;
-            var reason = new PublishedPackageInfo.RequiredBySolution( s );
             foreach( var c in content.Consumed )
             {
-                if( !roadmap.Graph.ProducedPackages.ContainsKey( c.PackageId ) ) continue;
-                builder.Add( monitor, c.PackageId, c.Version, reason );
+                if( !roadmap.Graph.ProducedPackages.TryGetValue( c.PackageId, out var producerSolution ) ) continue;
+                var producer = roadmap.OrderedSolutions[producerSolution.OrderedIndex];
+                offer.Add( monitor, producer.Repo, c.PackageId, c.Version, $"required by '{s.Repo.DisplayPath}'" );
             }
         }
-        return builder.Build( monitor );
+        return offer.Build( monitor, world, profileVersion );
 
         static bool TryGetFinalContent( Roadmap.BuildSolution s, out SVersion version, out BuildContentInfo content )
         {
@@ -362,5 +372,76 @@ sealed class PublishedProfileBuilder
         return r;
 
         static IRenderable Add( IRenderable? r, IRenderable line ) => r == null ? line : r.AddBelow( line );
+    }
+
+    /// <summary>
+    /// Accumulates the package identifiers a publication offers and the versions its packages require, detecting any
+    /// package identifier that would be offered in more than one version, then builds the <see cref="PublishedProfile"/>.
+    /// <para>
+    /// A package is always attributed to the <see cref="Repo"/> that produces it: this is what turns a flat
+    /// "package identifier to version" offer into the profile's <see cref="Repository"/> list.
+    /// </para>
+    /// </summary>
+    sealed class Offer
+    {
+        readonly Dictionary<string, Entry> _packages;
+        int _conflictCount;
+
+        // The Reason only exists for the conflict message: it says where the version comes from.
+        readonly record struct Entry( Repo Producer, SVersion Version, string Reason );
+
+        public Offer()
+        {
+            _packages = new Dictionary<string, Entry>( StringComparer.OrdinalIgnoreCase );
+        }
+
+        /// <summary>
+        /// Adds a version for a package identifier. The first one registered is the offered one; a different one is
+        /// a conflict: it is logged and <see cref="Build"/> will fail.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="producer">The repository that produces the package.</param>
+        /// <param name="packageId">The package identifier.</param>
+        /// <param name="version">The version to offer.</param>
+        /// <param name="reason">Where this version comes from. Appears in the conflict message.</param>
+        public void Add( IActivityMonitor monitor, Repo producer, string packageId, SVersion version, string reason )
+        {
+            if( _packages.TryGetValue( packageId, out var already ) )
+            {
+                if( already.Version != version )
+                {
+                    ++_conflictCount;
+                    monitor.Error( $"'{packageId}' is offered in '{already.Version}' ({already.Reason}) and in '{version}' ({reason})." );
+                }
+                return;
+            }
+            _packages.Add( packageId, new Entry( producer, version, reason ) );
+        }
+
+        /// <summary>
+        /// Gets the profile or null when any package identifier has been added in more than one version.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="world">The publishing World.</param>
+        /// <param name="profileVersion">The version of the profile.</param>
+        /// <returns>The profile or null.</returns>
+        public PublishedProfile? Build( IActivityMonitor monitor, World world, SVersion profileVersion )
+        {
+            if( _conflictCount > 0 )
+            {
+                monitor.Error( $"{_conflictCount} package version conflict(s): the publication would offer an incoherent profile." );
+                return null;
+            }
+            // Grouping by Repo cannot produce a duplicate url or identifier, and a package identifier appears in a
+            // single group since it is a key here: the PublishedProfile constructor's checks cannot fail.
+            var repositories = _packages.GroupBy( kv => kv.Value.Producer )
+                                        .Select( g => new Repository( new RepositoryKey( g.Key.OriginUrl, g.Key.CKliRepoId ),
+                                                                      g.Select( kv => new PackageInstance( kv.Key, kv.Value.Version ) )
+                                                                       .ToImmutableArray() ) )
+                                        .ToImmutableArray();
+            var profile = new PublishedProfile( world.StackRepository.OriginUrl, world.Name, profileVersion, repositories );
+            monitor.Trace( $"Published profile '{profile}' offers {_packages.Count} package(s) from {repositories.Length} repository(ies)." );
+            return profile;
+        }
     }
 }

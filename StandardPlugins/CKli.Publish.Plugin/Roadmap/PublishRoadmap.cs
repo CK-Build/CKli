@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Packaging.Abstractions;
 using CKli.Build.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
@@ -10,8 +11,8 @@ using System.Threading.Tasks;
 namespace CKli.Publish.Plugin;
 
 /// <summary>
-/// The associated <see cref="Roadmap"/> publication if the roadmap must be published: the <see cref="Profile"/> that
-/// this publication would leave on the roadmap's branch, whether it is publishable, and the publication itself.
+/// The associated <see cref="Roadmap"/> publication if the roadmap must be published: the <see cref="FinalProfile"/>
+/// that this publication would leave on the roadmap's branch, whether it is publishable, and the publication itself.
 /// </summary>
 sealed class PublishRoadmap
 {
@@ -37,6 +38,9 @@ sealed class PublishRoadmap
 
     /// <summary>
     /// Gets the profile this publication offers, available once <see cref="PublishAsync"/> has run.
+    /// <para>
+    /// On success this is the profile to add to the <see cref="PublishPlugin.PublishedFolder"/>.
+    /// </para>
     /// </summary>
     public PublishedProfile? FinalProfile => _finalProfile;
 
@@ -62,6 +66,8 @@ sealed class PublishRoadmap
     }
 
     internal async Task<bool> PublishAsync( IActivityMonitor monitor,
+                                            World world,
+                                            SVersion profileVersion,
                                             RoadmapPublisher publisher,
                                             IndirectPublisher indirectPublisher,
                                             CancellationToken cancellation )
@@ -69,7 +75,7 @@ sealed class PublishRoadmap
         Throw.DebugAssert( CanPublish );
         // The builds are done: the real content is now available, so the profile this publication offers can be
         // built. Nothing is pushed if it has any conflict.
-        _finalProfile = _gate.BuildFinalProfile( monitor, _roadmap );
+        _finalProfile = _gate.BuildFinalProfile( monitor, _roadmap, world, profileVersion );
         if( _finalProfile == null )
         {
             return false;

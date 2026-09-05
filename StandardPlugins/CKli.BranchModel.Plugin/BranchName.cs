@@ -84,6 +84,18 @@ public sealed class BranchName : IEquatable<BranchName>
     public CSVersionKind VersionKind => _versionKind;
 
     /// <summary>
+    /// Gets the exploratory name when <see cref="VersionKind"/> is <see cref="CSVersionKind.Exploratory"/>,
+    /// the empty span otherwise: this is the <see cref="Name"/> without its <see cref="WorldName.LTSName"/>
+    /// and "explo/" prefixes.
+    /// <para>
+    /// This is the <see cref="SVersion.ExploratoryName"/> of the versions of this branch.
+    /// </para>
+    /// </summary>
+    public ReadOnlySpan<char> ExploratoryName => _versionKind is CSVersionKind.Exploratory
+                                                    ? _name.AsSpan( _ltsPrefixLength + 6 )
+                                                    : default;
+
+    /// <summary>
     /// Gets whether this branch corresponds to the <paramref name="version"/>.
     /// </summary>
     /// <param name="version">The version.</param>
@@ -91,7 +103,7 @@ public sealed class BranchName : IEquatable<BranchName>
     public bool Match( SVersion version )
     {
         return version.VersionKind is CSVersionKind.Exploratory
-                ? _name.AsSpan( _ltsPrefixLength + 6 ).Equals( version.ExploratoryName, StringComparison.Ordinal )
+                ? ExploratoryName.Equals( version.ExploratoryName, StringComparison.Ordinal )
                 : version.VersionKind == _versionKind;
     }
 

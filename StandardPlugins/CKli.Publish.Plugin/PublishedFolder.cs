@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Packaging.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,16 +8,14 @@ using System.Text.Json;
 
 namespace CKli.Publish.Plugin;
 
-// CK.Packaging.Abstractions.PublishedProfile is spelled out here: this namespace declares its own
-// PublishedProfile (what a publication offers, built by PublishedProfileBuilder), which hides it.
-// A using alias cannot fix that - a namespace member conflicting with an alias is CS0576.
 /// <summary>
-/// Mutable set of <see cref="CK.Packaging.Abstractions.PublishedProfile"/> stored as Json files in a
-/// folder and identified by their <see cref="CK.Packaging.Abstractions.PublishedProfile.Version"/>.
+/// Mutable set of <see cref="PublishedProfile"/> stored as Json files in a folder and identified
+/// by their <see cref="PublishedProfile.Version"/>.
 /// <para>
-/// A profile is stored in a "v{Version}.json" file that is in the <see cref="RootPath"/> for stable
-/// versions (and their CI builds) and in a <see cref="SVersion.BranchName"/> subordinated folder for
-/// prereleases ("alpha" to "zulu") and exploratory versions ("explo/{name}").
+/// A profile is stored in a "v{Version}.json" file at its <see cref="PublishedProfile.GetProfilePath"/>:
+/// in the <see cref="RootPath"/> for stable versions (and their CI builds) and in a
+/// <see cref="SVersion.BranchName"/> subordinated folder for prereleases ("alpha" to "zulu") and
+/// exploratory versions ("explo/{name}").
 /// </para>
 /// <para>
 /// Files are lazily read and any modification is in-memory only until <see cref="Save"/> is called.
@@ -36,15 +35,15 @@ public sealed class PublishedFolder
         readonly string _jsonFilePath;
         // The profile that is currently in the file. Null when the file doesn't exist
         // or cannot be read (_loadError is then not null).
-        CK.Packaging.Abstractions.PublishedProfile? _saved;
+        PublishedProfile? _saved;
         // The exception when read if any (_saved is obviously null).
         Exception? _loadError;
         // Current profile (initially _saved).
-        CK.Packaging.Abstractions.PublishedProfile? _current;
+        PublishedProfile? _current;
 
         FileCacheInfo( SVersion version,
                        string jsonFilePath,
-                       CK.Packaging.Abstractions.PublishedProfile? saved,
+                       PublishedProfile? saved,
                        Exception? loadError )
         {
             _version = version;
@@ -60,7 +59,7 @@ public sealed class PublishedFolder
 
         public Exception? LoadError => _loadError;
 
-        public CK.Packaging.Abstractions.PublishedProfile? Current { get => _current; set => _current = value; }
+        public PublishedProfile? Current { get => _current; set => _current = value; }
 
         /// <summary>
         /// Gets whether the file must be written (or deleted when <see cref="Current"/> is null).
@@ -76,7 +75,7 @@ public sealed class PublishedFolder
         {
             try
             {
-                var profile = CK.Packaging.Abstractions.PublishedProfile.Parse( File.ReadAllBytes( jsonFilePath ) );
+                var profile = PublishedProfile.Parse( File.ReadAllBytes( jsonFilePath ) );
                 if( profile.Version != version )
                 {
                     throw new JsonException( $"File '{jsonFilePath}' contains the version '{profile.Version}'." );
@@ -109,8 +108,7 @@ public sealed class PublishedFolder
         {
             if( !createIfMissing )
             {
-                throw new ArgumentException( $"Published folder directory must exist: '{rootPath}'.",
-                                             nameof( rootPath ) );
+                throw new ArgumentException( $"Published folder directory must exist: '{rootPath}'.", nameof( rootPath ) );
             }
             Directory.CreateDirectory( rootPath );
         }
@@ -140,18 +138,70 @@ public sealed class PublishedFolder
     /// <returns>The full path of the Json file.</returns>
     public string GetProfileFilePath( SVersion version )
     {
-        ArgumentNullException.ThrowIfNull( version );
-        var branchName = version.BranchName;
-        if( branchName == null )
+        // RootPath ends with the directory separator: it is the prefix.
+        return PublishedProfile.GetProfilePath( version, _rootPath, ".json", Path.DirectorySeparatorChar );
+    }
+
+    /// <summary>
+    /// Creates a free, time based version for a new profile: the <see cref="SVersion.Major"/> is the year,
+    /// the <see cref="SVersion.Minor"/> is the day in the year and the <see cref="SVersion.Patch"/> starts at
+    /// 0 and is incremented until no profile of this folder uses the resulting version.
+    /// <para>
+    /// The <paramref name="branchKind"/>, <paramref name="exploratoryName"/> and <paramref name="isCIBuild"/>
+    /// describe the build this profile comes from: they place the version - and hence its file - on the branch
+    /// that produced it.
+    /// </para>
+    /// <para>
+    /// A version whose file exists but cannot be read (see <see cref="GetLoadError(SVersion)"/>) counts as used:
+    /// <see cref="Save"/> would replace that file.
+    /// </para>
+    /// </summary>
+    /// <param name="branchKind">
+    /// The kind of the built branch: <see cref="CSVersionKind.Stable"/>, <see cref="CSVersionKind.Exploratory"/>
+    /// or one of the <see cref="CSVersionKind.Alpha"/> to <see cref="CSVersionKind.Zulu"/> prereleases.
+    /// </param>
+    /// <param name="exploratoryName">
+    /// The exploratory name. Required when <paramref name="branchKind"/> is
+    /// <see cref="CSVersionKind.Exploratory"/>, ignored otherwise.
+    /// </param>
+    /// <param name="isCIBuild">True when the build is a CI build: the version is a CI one.</param>
+    /// <param name="utcNow">Optional time to use instead of <see cref="DateTime.UtcNow"/>.</param>
+    /// <returns>A Conformant SVersion that no profile of this folder uses.</returns>
+    public SVersion CreateNewProfileVersion( CSVersionKind branchKind,
+                                             ReadOnlySpan<char> exploratoryName = default,
+                                             bool isCIBuild = false,
+                                             DateTime? utcNow = null )
+    {
+        var now = utcNow ?? DateTime.UtcNow;
+        var v = SVersion.Create( now.Year, now.DayOfYear, 0, mustBeCSVersion: true );
+        if( branchKind is CSVersionKind.Exploratory )
         {
-            throw new ArgumentException( $"Version '{version}' must be a Conformant SVersion.", nameof( version ) );
+            if( exploratoryName.Length == 0 )
+            {
+                throw new ArgumentException( "An exploratory branch requires its name.", nameof( exploratoryName ) );
+            }
+            v = v.SetExploratoryName( new string( exploratoryName ) );
         }
-        // BranchName is the empty string for stable versions (and their CI builds) and can
-        // contain a '/' for exploratory versions ("explo/{name}").
-        return branchName.Length == 0
-                ? $"{_rootPath}v{version}.json"
-                : $"{_rootPath}{branchName.Replace( '/', Path.DirectorySeparatorChar )}"
-                  + $"{Path.DirectorySeparatorChar}v{version}.json";
+        else if( branchKind is >= CSVersionKind.Alpha and <= CSVersionKind.Zulu )
+        {
+            v = v.SetBranchName( branchKind );
+        }
+        else if( branchKind is not CSVersionKind.Stable )
+        {
+            throw new ArgumentException( $"Invalid branch kind '{branchKind}'.", nameof( branchKind ) );
+        }
+        if( isCIBuild )
+        {
+            // These numbers are minted, they don't follow a released version: unlike a regular CI build, the
+            // "--ci" form must not shift the Patch number that the conflict resolution below owns.
+            v = v.SetCINumber( 0, impactStablePatchNumber: false );
+        }
+        for(; ; )
+        {
+            var info = LoadInfo( v );
+            if( info.Current == null && info.LoadError == null ) return v;
+            v = v.SetVersionNumbers( v.Major, v.Minor, v.Patch + 1 );
+        }
     }
 
     /// <summary>
@@ -160,7 +210,7 @@ public sealed class PublishedFolder
     /// </summary>
     /// <param name="version">The version to find.</param>
     /// <returns>The profile or null.</returns>
-    public CK.Packaging.Abstractions.PublishedProfile? Find( SVersion version ) => LoadInfo( version ).Current;
+    public PublishedProfile? Find( SVersion version ) => LoadInfo( version ).Current;
 
     /// <summary>
     /// Gets the error that occurred while reading the file of a version. The file is read on demand.
@@ -171,10 +221,10 @@ public sealed class PublishedFolder
 
     /// <summary>
     /// Gets all the profiles, ordered by descending
-    /// <see cref="CK.Packaging.Abstractions.PublishedProfile.Version"/> (the latest first).
+    /// <see cref="PublishedProfile.Version"/> (the latest first).
     /// All the files are read.
     /// </summary>
-    public IEnumerable<CK.Packaging.Abstractions.PublishedProfile> Profiles
+    public IEnumerable<PublishedProfile> Profiles
     {
         get
         {
@@ -201,14 +251,14 @@ public sealed class PublishedFolder
 
     /// <summary>
     /// Adds a profile. Throw if a profile with the same
-    /// <see cref="CK.Packaging.Abstractions.PublishedProfile.Version"/> already exists.
+    /// <see cref="PublishedProfile.Version"/> already exists.
     /// <para>
     /// An existing file that cannot be read (see <see cref="GetLoadError(SVersion)"/>) doesn't prevent
     /// the add: <see cref="Save"/> replaces the invalid file.
     /// </para>
     /// </summary>
     /// <param name="profile">The profile to add.</param>
-    public void Add( CK.Packaging.Abstractions.PublishedProfile profile )
+    public void Add( PublishedProfile profile )
     {
         ArgumentNullException.ThrowIfNull( profile );
         var info = LoadInfo( profile.Version );

@@ -25,9 +25,10 @@ It sits downstream of, and depends on:
 |---|---|
 | `CKli.Build.Plugin` | Source of the `OnRoadmapBuild` / `OnFixBuild` events, `Roadmap`, `BuildResult`, `BuildContentInfo`, `FixWorkflow`. |
 | `CKli.ArtifactHandler.Plugin` | `GetConfiguredNuGetFeeds` (World's `<NuGet><Feed>` configuration), `GetAssetsFolder` (where produced asset files live locally), `DestroyLocalRelease` (post-publish cleanup of `$Local`). |
-| `CKli.BranchModel.Plugin` | `BranchNamespace` — maps a version's `CSVersionKind` to the `BranchName` (and its `Index`) that owns it, used to pick which configured feeds/senders apply. |
+| `CKli.BranchModel.Plugin` | `BranchNamespace` — maps a version's `CSVersionKind` to the `BranchName` (and its `Index`) that owns it, used to pick which configured feeds/senders apply. `BranchName.VersionKind` and `BranchName.ExploratoryName` also place a profile's version on the branch that produced it. |
 | `CKli.VersionTag.Plugin` | `EnsureDatabase` / release-info graph used to resolve indirect publication requirements (see caveat below). |
 | `CKli.HotZone.Plugin` | Indirectly, through `FixWorkflow` (owned by `HotZone`) which `CKli.Build.Plugin` passes along in `OnFixBuild`. |
+| `CK.Packaging.Abstractions` | The [`PublishedProfile`](https://github.com/CK-Build/CK-Packaging-Abstractions/blob/stable/CK.Packaging.Abstractions/README.md) contract: the immutable, serializable description of what a publication offers. It arrives transitively through `CKli.Core`. |
 
 Because the plugin only reacts to events, a World doesn't need to configure it explicitly to
 "enable" publishing — declaring it (or one of its NuGet package dependents) in the
@@ -69,9 +70,15 @@ blocking it):
 1. `PublishRoadmap.Create(monitor, roadmap, versionTag)` computes the **publication gate** (see
    below) and renders its verdict to the screen.
 2. Unless `roadmap.DryRun` is set: the gate must be open (`publish.CanPublish`), a `PackageSender`
-   is created from the World's configured NuGet feeds, and `PublishRoadmap.PublishAsync` runs the
-   actual publication with a `RoadmapPublisher` and an `IndirectPublisher`.
-3. On failure (closed gate, `packageSender == null`, or `PublishAsync` returning `false`),
+   is created from the World's configured NuGet feeds, a free profile version is minted from the
+   `PublishedFolder` (see [The profile version](#the-profile-version)), and
+   `PublishRoadmap.PublishAsync` runs the actual publication with a `RoadmapPublisher` and an
+   `IndirectPublisher`.
+3. On success, the `FinalProfile` is added to the `PublishedFolder` and `Save`d, then
+   `World.StackRepository.PushChanges` commits and pushes it along with everything else the Stack
+   accumulated. A failure to write the profile file is logged and does **not** fail the publication:
+   the publication itself cannot be undone.
+4. On failure (closed gate, `packageSender == null`, or `PublishAsync` returning `false`),
    `e.SetFailed()` is called, which fails the owning command.
 
 A `--dry-run` stops after step 1: it only reports. This mirrors how a `BuildingPending` roadmap is
@@ -99,7 +106,7 @@ On failure, `e.SetFailed()` is called.
 |---|---|
 | `Gate` (`PublishedProfileBuilder`) | Whether the profile this publication would leave on the roadmap's branch is coherent, and what must happen for it to be. |
 | `CanPublish` | `Status < PublishableStatus.BuildingPending` and `Gate.IsValid`. |
-| `FinalProfile` (`PublishedProfile?`) | The profile this publication offers. Available once `PublishAsync` has run. |
+| `FinalProfile` (`PublishedProfile?`) | The profile this publication offers. Available once `PublishAsync` has run, and on success this is what `PublishPlugin` stores in the `PublishedFolder`. |
 | `DirectBuildingAliens` / `DirectAlreadyPublished` | Solutions directly blocking (`BuildingPending`) or already done. |
 
 `PublishAsync` runs three steps, and pushes nothing until all of them are satisfied:
@@ -149,18 +156,71 @@ heals after the fact, and checking the profile before publishing makes it preven
 
 ### `PublishedProfile` — the published profile
 
-`BuildFinalProfile(monitor, roadmap)` builds the profile from the **real** content: `BuildResult`
-for built solutions, version tags for the others. The set of package identifiers a solution produces
-is only known once it has been built, so this is the only place a complete profile exists.
+`BuildFinalProfile(monitor, roadmap, world, profileVersion)` builds a
+[`CK.Packaging.Abstractions.PublishedProfile`](https://github.com/CK-Build/CK-Packaging-Abstractions/blob/stable/CK.Packaging.Abstractions/README.md) — the serializable **contract**
+itself, not a plugin-private type — from the **real** content: `BuildResult` for built solutions,
+version tags for the others. The set of package identifiers a solution produces is only known once
+it has been built, so this is the only place a complete profile exists.
 
-Building it is also the final check: a conflict means the publication would offer two versions of
-one package identifier — which `Roadmap.PackageMapping`, a function of the package identifier,
-cannot express (a single repository consuming the same package identifier in two versions through
-conditional package references across target frameworks, in particular). `PublishedProfile.Builder`
-returns null in that case, so a profile never exists in a conflicting state.
+| Part of the profile | Where it comes from |
+|---|---|
+| `StackUrl` | `World.StackRepository.OriginUrl`. |
+| `World` | `World.Name` (a `LocalWorldName`, hence a `WorldName`). |
+| `Version` | `PublishedFolder.CreateNewProfileVersion` — see [The profile version](#the-profile-version). |
+| `Repositories` | One `Repository` per `Repo`, keyed by `(Repo.OriginUrl, Repo.CKliRepoId)` and holding the `PackageInstance`s it **produces**. |
 
-Each entry is a `PublishedPackageInfo : PackageInstance` carrying its `Reason`s
-(`PublishedByRoadmap` / `RequiredBySolution`) and any `Conflicts`.
+A package always belongs to the repository that *produces* it: a version that appears only because
+another solution consumes it is recorded against its producer, never against its consumer. So a
+package identifier lands in exactly one `Repository`, which is what the profile's constructor
+requires.
+
+Building the profile is also the final check. The nested `Offer` accumulator registers every
+produced package identifier at its solution's version, then every World package identifier a
+solution consumes at the version it consumes; a second version for one identifier is a conflict.
+`Offer.Build` logs each one and returns null, so a profile never exists in a conflicting state and
+the publication pushes nothing. This is what `Roadmap.PackageMapping`, a function of the package
+identifier, cannot express — a single repository consuming the same package identifier in two
+versions through conditional package references across target frameworks, in particular.
+
+### The profile version
+
+A profile's version is the version of the **publication**, not of anything it offers: several
+repositories at several versions are published together, so no package version can name the set.
+`PublishedFolder.CreateNewProfileVersion(branchKind, exploratoryName, isCIBuild)` mints it from the
+day of the publication:
+
+- `Major` is the year and `Minor` is the day in the year — `2026.254` is the 11th of September 2026.
+- `Patch` starts at 0 and is incremented until the version is free in the folder. A file that exists
+  but cannot be read counts as used, since `Save` would replace it.
+- `branchKind`, `exploratoryName` and `isCIBuild` come from what is actually built
+  (`roadmap.Graph.BranchName.VersionKind`, `roadmap.Graph.BranchName.ExploratoryName` and
+  `roadmap.IsCIBuild`), so the version belongs to the branch that produced it — and that is what
+  places its file:
+
+| Branch built | CI | Profile version | File |
+|---|---|---|---|
+| root (`stable`) | no | `2026.254.0` | `Published/v2026.254.0.json` |
+| root (`stable`) | yes | `2026.254.0--ci.0` | `Published/v2026.254.0--ci.0.json` |
+| `alpha` | no | `2026.254.0-alpha` | `Published/alpha/v2026.254.0-alpha.json` |
+| `alpha` | yes | `2026.254.0-alpha.0.ci.0` | `Published/alpha/v2026.254.0-alpha.0.ci.0.json` |
+| `explo/spike` | no | `2026.254.0-0.spike` | `Published/explo/spike/v2026.254.0-0.spike.json` |
+
+The CI number is always 0: the `Patch` is what distinguishes two publications of the same day on the
+same branch, so a CI profile never collides with the non-CI one that sits beside it.
+
+### `PublishedFolder` — where the profiles live
+
+`PublishedFolder` (`PublishedFolder.cs`) is the mutable set of profiles stored as Json files under
+`<Stack>/Published`, exposed by `PublishPlugin.PublishedFolder` and created on demand. Files are read
+lazily and every modification (`Add`, `Remove`, `Deprecate`, `OnDeprecatedPackage`) stays in memory
+until `Save` writes the added and updated ones and deletes the files of the removed ones.
+`GetProfileFilePath` delegates to the abstraction's `PublishedProfile.GetProfilePath`, so a profile
+file is always at the canonical path for its version — `LoadAll` ignores any `*.json` that is not.
+
+Because the folder lives inside the Stack repository's working folder, the
+`World.StackRepository.PushChanges` that follows a successful publication commits and pushes the new
+profile. `Tests/Plugins.Tests`' `PublishedFolderTests` covers the folder on its own and
+`PublishedProfileTests` covers what a real publication leaves in it.
 
 ### The publishers — the actual publish loop
 
@@ -273,6 +333,11 @@ likewise resolved through `GitRepositoryKey` / `ISecretsStore`, documented in `C
 
 ## Known rough edges (from the code)
 
+- **A fix publication leaves no profile.** `OnFixBuildAsync` publishes its `FixWorkflow` targets
+  without computing a `PublishedProfile`, so nothing is added to the `PublishedFolder`: a
+  `fix/vMajor.Minor` release is invisible in the profile history. Only `OnRoadmapBuildAsync` records
+  one. This is deliberate for now — a fix workflow is a flat list of targets, not a dependency
+  roadmap, so what its profile should offer (and on which branch its version belongs) is undecided.
 - The gate's failure paths have no integration test coverage: `Tests/Plugins.Tests` never reaches
   `PublishableStatus.IndirectPublishRequired`, so the `RequiredPublications` closure, its
   producers-first ordering, `IndirectPublisher`, and `BuildFinalProfile`'s conflict branch are all
