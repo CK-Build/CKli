@@ -187,6 +187,14 @@ supports two entirely different consumers of the same collected data:
     reference instead of an index lookup;
   - one `sealed class Cmd_<path> : PluginCommand` per collected command (see below).
 
+> **Touching a command means regenerating this file — never hand-editing it.** The `_configSignature` guard
+> above only detects a changed `<Plugins>` *configuration*; it says nothing about the command *methods*. So a
+> `[CommandPath]` method whose flags, options, parameters or return type changed leaves a generated file that is
+> stale and still accepted. Worse, such a file usually still **compiles**: every flag is a `bool` and every
+> command parameter has a default, so a shifted `Flags[i]` index or a dropped trailing argument binds silently
+> to the wrong parameter. Delete `CKli.CompiledPlugins.cs` and run
+> [`ckli plugin compile`](../README.md#plugin-compile---mode-nonedebugrelease).
+
 ## `CommandCollector`: from `[CommandPath]` methods to `PluginCommand`
 
 `CommandCollector.Add(typeInfo, method, commandPath, attributes)` is called once per `[CommandPath("...")]`-decorated

@@ -310,6 +310,13 @@ single static initialization function that initializes the graph of objects (com
 In very specific scenario (developing, debugging), it is possible to set the option `--mode` to `None` (plugins
 are not compiled, reflection is always used) or `Debug` to compile the plugins in debug configuration.
 
+**Whenever a command changes — created, removed, or its flags, options, parameters or return type edited —
+delete the generated `CKli.CompiledPlugins.cs` and run this command.** That file is the exact transcription of
+the `[CommandPath]` methods and nothing keeps it in step on its own: the `_configSignature` it carries detects a
+changed `<Plugins>` *configuration*, not a changed command *signature*. It must never be hand-edited to catch
+up — see [`CKli.Plugins.Core`'s README](CKli.Plugins.Core/README.md#generatecode) for why a stale one can still
+compile and still be accepted.
+
 ### `plugin create <name> --allow-lts`
 Creates a new source based plugin project in the current World.
 
