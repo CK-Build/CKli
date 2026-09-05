@@ -26,7 +26,7 @@ It sits downstream of, and depends on:
 | `CKli.Build.Plugin` | Source of the `OnRoadmapBuild` / `OnFixBuild` events, `Roadmap`, `BuildResult`, `BuildContentInfo`, `FixWorkflow`. |
 | `CKli.ArtifactHandler.Plugin` | `GetConfiguredNuGetFeeds` (World's `<NuGet><Feed>` configuration), `GetAssetsFolder` (where produced asset files live locally), `DestroyLocalRelease` (post-publish cleanup of `$Local`). |
 | `CKli.BranchModel.Plugin` | `BranchNamespace` — maps a version's `CSVersionKind` to the `BranchName` (and its `Index`) that owns it, used to pick which configured feeds/senders apply. `BranchName.VersionKind` and `BranchName.ExploratoryName` also place a profile's version on the branch that produced it. |
-| `CKli.VersionTag.Plugin` | `EnsureDatabase` / release-info graph used to resolve indirect publication requirements (see caveat below). |
+| `CKli.VersionTag.Plugin` | `EnsureDatabase` / release-info graph used to resolve indirect publication requirements (see caveat below), and the source of the `VersionDeprecated` event. |
 | `CKli.HotZone.Plugin` | Indirectly, through `FixWorkflow` (owned by `HotZone`) which `CKli.Build.Plugin` passes along in `OnFixBuild`. |
 | `CK.Packaging.Abstractions` | The [`PublishedProfile`](https://github.com/CK-Build/CK-Packaging-Abstractions/blob/stable/CK.Packaging.Abstractions/README.md) contract: the immutable, serializable description of what a publication offers. It arrives transitively through `CKli.Core`. |
 
@@ -57,9 +57,10 @@ collaborator plugins above through constructor injection. In its constructor it 
 
 - `_build.OnRoadmapBuild.Async += OnRoadmapBuildAsync`
 - `_build.OnFixBuild.Async += OnFixBuildAsync`
+- `_versionTag.VersionDeprecated.Sync += OnVersionDeprecated`
 
 It defines no `[CommandPath]` methods and does not subscribe to `World.Events` — all of its work
-is triggered from these two build events.
+is triggered from these three events.
 
 #### `OnRoadmapBuildAsync` — regular `publish` / `*publish`
 
@@ -97,6 +98,34 @@ roadmap). On success, and only for a non-CI build:
 - `FixWorkflow.DeleteCurrent(monitor, world)` removes the persisted fix-workflow state file.
 
 On failure, `e.SetFailed()` is called.
+
+#### `OnVersionDeprecated` — `version deprecate`
+
+The deprecation of a version and the deprecation of a profile are the same fact seen from the two
+sides of the publication: a deprecated version is still *offered* by every profile that was published
+with it. `CKli.VersionTag.Plugin` owns the propagation across versions — deprecating a version
+deprecates every release that consumes it, transitively — and raises
+[`VersionDeprecated`](../CKli.VersionTag.Plugin/README.md#versiondeprecated--the-extension-point-this-plugin-offers)
+once every `+deprecated` tag is pushed. This handler mirrors the **whole** result onto the profiles,
+which is why the event carries every deprecated release and not only the one the command named:
+
+1. `PublishedFolder.OnDeprecatedPackage( packageId, version )` for each of `e.DeprecatedPackages`.
+   A profile deprecates when it offers exactly that package at that version, so a later profile that
+   offers the same package identifiers in newer versions is left alone.
+2. Any file in `LoadErrors` is warned about: it could not be considered at all, so it may still offer
+   a deprecated package.
+3. If nothing changed, it stops — that is the normal case for a Stack with no publication yet.
+   Otherwise `Save` writes the touched profiles and `World.StackRepository.PushChanges` commits and
+   pushes them.
+
+It takes the event's `Sync` slot: the work is file IO and git, so there is nothing to await. That is a
+choice this plugin makes for itself — `VersionDeprecated` is a `PerfectEvent`, so another listener can
+take the `Async` or `ParallelAsync` slot without affecting this one.
+
+Deprecation is monotonic (`PublishedProfile.Deprecate` is idempotent and there is no un-deprecate), so
+re-running `version deprecate --allow-update` changes nothing here. An expired deprecation removes the
+version tag but does **not** remove the profile: a profile that offers an expired version stays
+deprecated and is not deleted.
 
 ### `PublishRoadmap` — the gate and the publish loop
 
@@ -220,7 +249,12 @@ file is always at the canonical path for its version — `LoadAll` ignores any `
 Because the folder lives inside the Stack repository's working folder, the
 `World.StackRepository.PushChanges` that follows a successful publication commits and pushes the new
 profile. `Tests/Plugins.Tests`' `PublishedFolderTests` covers the folder on its own and
-`PublishedProfileTests` covers what a real publication leaves in it.
+`PublishedProfileTests` covers what a real publication leaves in it and what a `version deprecate`
+does to it.
+
+Two entry points write to it: `OnRoadmapBuildAsync` adds a profile, and
+[`OnVersionDeprecated`](#onversiondeprecated--version-deprecate) deprecates the ones that offer a
+deprecated package.
 
 ### The publishers — the actual publish loop
 

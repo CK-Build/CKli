@@ -230,7 +230,7 @@ sealed class Cmd_version＿deprecate : PluginCommand
                     (["--immediate",], "Apply the deprecation immediately. This flag excludes --days." ),
                     (["--allow-update",], "Allow the deprecated tag to already exist and updates it (must not already be expired)." ),
                 ],
-                "DeprecateVersion", MethodAsyncReturn.None ) {}
+                "DeprecateVersion", MethodAsyncReturn.Task ) {}
     protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine )
     {
         var a0 = cmdLine.EatArgument();
@@ -239,7 +239,7 @@ sealed class Cmd_version＿deprecate : PluginCommand
         var f0 = cmdLine.EatFlag( Flags[0].Names );
         var f1 = cmdLine.EatFlag( Flags[1].Names );
         if( !cmdLine.Close( monitor ) ) return ValueTask.FromResult( false );
-        return ValueTask.FromResult( ((CKli.VersionTag.Plugin.VersionTagPlugin)Instance).DeprecateVersion(
+        return new ValueTask<bool>( ((CKli.VersionTag.Plugin.VersionTagPlugin)Instance).DeprecateVersion(
                                            monitor, context, a0, o0, o1, f0, f1 ) );
     }
 }

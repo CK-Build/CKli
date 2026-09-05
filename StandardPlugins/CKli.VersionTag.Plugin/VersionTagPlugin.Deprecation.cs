@@ -1,14 +1,35 @@
 using CK.Core;
+using CK.PerfectEvent;
 using CKli.Core;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace CKli.VersionTag.Plugin;
 
 public sealed partial class VersionTagPlugin
 {
+    // The sender lives with the command that raises it.
+    readonly PerfectEventSender<VersionDeprecatedEventArgs> _versionDeprecated = new();
+
+    /// <summary>
+    /// Raised by "ckli version deprecate" once every "+deprecated" tag it implies has been created or
+    /// updated and pushed: the deprecation is public when this is raised.
+    /// <para>
+    /// Each listener chooses its own handler kind - <see cref="PerfectEvent{T}.Sync"/>,
+    /// <see cref="PerfectEvent{T}.Async"/> or <see cref="PerfectEvent{T}.ParallelAsync"/>. This is why
+    /// <see cref="DeprecateVersion"/> is asynchronous: raising a PerfectEvent is always awaited.
+    /// </para>
+    /// <para>
+    /// A handler that throws fails the command. Re-running the deprecation is harmless, so failing is the
+    /// honest outcome: the tags are pushed but whatever mirrors them is not up to date.
+    /// </para>
+    /// </summary>
+    public PerfectEvent<VersionDeprecatedEventArgs> VersionDeprecated => _versionDeprecated.PerfectEvent;
+
     /// <summary>
     /// Deprecates the specified version.
     /// </summary>
@@ -25,18 +46,18 @@ public sealed partial class VersionTagPlugin
         The tag annotation contains the actual "Expiration" date at which the packages must be unlisted or deleted from any feeds: this must be set thanks to the --immediate flag or --days option.
         """ )]
     [CommandPath( "version deprecate" )]
-    public bool DeprecateVersion( IActivityMonitor monitor,
-                                  CKliEnv context,
-                                  [Description("The version to deprecate.")]
-                                  string version,
-                                  [Description("""Appear in the tag annotation. Defaults to "(unspecified)".""")]
-                                  string? reason = null,
-                                  [Description("Specify the actual deprecation delay in days. This option excludes --immediate.")]
-                                  string? days = null,
-                                  [Description("Apply the deprecation immediately. This flag excludes --days.")]
-                                  bool immediate = false,
-                                  [Description("Allow the deprecated tag to already exist and updates it (must not already be expired).")]
-                                  bool allowUpdate = false )
+    public async Task<bool> DeprecateVersion( IActivityMonitor monitor,
+                                              CKliEnv context,
+                                              [Description("The version to deprecate.")]
+                                              string version,
+                                              [Description("""Appear in the tag annotation. Defaults to "(unspecified)".""")]
+                                              string? reason = null,
+                                              [Description("Specify the actual deprecation delay in days. This option excludes --immediate.")]
+                                              string? days = null,
+                                              [Description("Apply the deprecation immediately. This flag excludes --days.")]
+                                              bool immediate = false,
+                                              [Description("Allow the deprecated tag to already exist and updates it (must not already be expired).")]
+                                              bool allowUpdate = false )
     {
         // Before the actual deprecation that requires no version tag issue on any repository (because deprecation can touch multiple repositories),
         // we check that the version exists and is not a "local/" one.
@@ -107,7 +128,11 @@ public sealed partial class VersionTagPlugin
         }
         var releaseInfo = releaseDatabase.GetReleaseInfo( monitor, tagCommit, v.CINumber == 0 );
         var visited = new HashSet<RepoReleaseInfo>() { releaseInfo };
-        EnsureImpliedDeprecatedTag( monitor, releaseInfo, visited, path: [releaseInfo], tagInfo.DaysDelay, tagInfo.Expiration );
+        // "visited" is what the propagation reached: a release with no version tag left, or a "+fake" one,
+        // is added to it but is NOT deprecated (the propagation stops there with a warning). Only the
+        // releases that actually carry a "+deprecated" tag can be mirrored, hence this second collection.
+        var deprecated = new List<RepoReleaseInfo>() { releaseInfo };
+        EnsureImpliedDeprecatedTag( monitor, releaseInfo, visited, deprecated, path: [releaseInfo], tagInfo.DaysDelay, tagInfo.Expiration );
 
         bool success = true;
         using( monitor.OpenInfo( $"Pushing tags creation (and suppression if any) to remote origin repositories." ) )
@@ -116,6 +141,12 @@ public sealed partial class VersionTagPlugin
             {
                 success &= r.Repo.GitRepository.PushTags( monitor, [] );
             }
+        }
+        // The deprecation is now public: whatever mirrors it can be updated.
+        var e = new VersionDeprecatedEventArgs( monitor, context, World, releaseInfo, tagInfo, [.. deprecated] );
+        if( !await _versionDeprecated.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) )
+        {
+            success = false;
         }
         return success;
     }
@@ -258,6 +289,7 @@ public sealed partial class VersionTagPlugin
     void EnsureImpliedDeprecatedTag( IActivityMonitor monitor,
                                      RepoReleaseInfo origin,
                                      HashSet<RepoReleaseInfo> visited,
+                                     List<RepoReleaseInfo> deprecated,
                                      List<RepoReleaseInfo> path,
                                      int daysDelay,
                                      DateOnly expiration )
@@ -313,8 +345,9 @@ public sealed partial class VersionTagPlugin
                         }
                         tagInfo = CreateDeprecationTag( monitor, tagCommit, reason: sb.ToString(), daysDelay );
                     }
+                    deprecated.Add( impact );
                     path.Add( impact );
-                    EnsureImpliedDeprecatedTag( monitor, impact, visited, path, daysDelay, expiration );
+                    EnsureImpliedDeprecatedTag( monitor, impact, visited, deprecated, path, daysDelay, expiration );
                     path.RemoveAt( path.Count - 1 );
                 }
             }

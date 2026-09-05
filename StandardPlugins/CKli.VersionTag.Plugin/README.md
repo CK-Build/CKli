@@ -104,6 +104,38 @@ in **CKli.Core**, not in this plugin — VersionTag.Plugin only reasons about ta
 Only `World.Events.Issue` (`IssueRequested`): for every requested repo it calls `Get(monitor, repo)` (building/caching
 the `VersionTagInfo`) and lets it `CollectIssues` into the issue screen.
 
+### `VersionDeprecated` — the extension point this plugin offers
+
+```csharp
+public PerfectEvent<VersionDeprecatedEventArgs> VersionDeprecated => _versionDeprecated.PerfectEvent;
+```
+
+Raised at the very end of `version deprecate`, once every `+deprecated` tag it implies has been created or updated
+**and pushed**: the deprecation is public when a handler sees it.
+
+Each listener picks its own handler kind — `Sync`, `Async` or `ParallelAsync` — and that choice is the listener's
+alone. The only constraint a `PerfectEvent` puts on the *sender* is that raising it is awaited, which is why
+`DeprecateVersion` is a `Task<bool>` command (`MethodAsyncReturn.Task` in the generated dispatch). The plain
+synchronous `event Action<T>` of `World.Events.Issue` / `BranchModelPlugin.ContentIssue` would have kept the command
+synchronous at the cost of forcing every listener to be synchronous too.
+
+| Member of `VersionDeprecatedEventArgs` | Meaning |
+|---|---|
+| `Origin` | The `RepoReleaseInfo` the command named: the root of the deprecation, and the first of `Releases`. |
+| `DeprecatedInfo` | The root's `DeprecatedTagInfo`: its `Reason` and the `Expiration` at which the packages must leave the feeds. |
+| `Releases` | Every release that is now deprecated — the origin plus the consumers the propagation reached and could tag. |
+| `DeprecatedPackages` | Those releases flattened to `PackageInstance`s: each produced package identifier at the version its release published. |
+
+`Releases` is deliberately **not** the propagation's `visited` set. `EnsureImpliedDeprecatedTag` adds a release to
+`visited` even when it stops there — no version tag left, or a `+fake` one — and only warns; such a release carries no
+`+deprecated` tag and must not be mirrored as deprecated. The two collections are built side by side for that reason.
+
+A handler that throws fails the command: `SafeRaiseAsync` logs the exception and answers false. That is the honest
+outcome — the tags are pushed and cannot be taken back, but whatever mirrors them is stale, and re-running
+`version deprecate --allow-update` is harmless. Its current consumer is
+[`CKli.Publish.Plugin`](../CKli.Publish.Plugin/README.md), which takes the `Sync` slot and deprecates the published
+profiles that offer any of the `DeprecatedPackages`.
+
 ### Version tag vocabulary
 
 A version tag's `SVersion.ParsedPrefix` and build metadata drive how it's interpreted:
@@ -180,6 +212,8 @@ producing `RepoKey`, then lazily builds `RepoReleaseInfo` nodes with direct/tran
 walking `Consumed` package lists. `version deprecate` uses this graph (`GetDirectConsumers`) to walk outward from the
 deprecated version and create/refresh a `+deprecated` tag (with the earliest expiration) on every downstream
 consumer, pushing tag creations (and removals, once expired) to each repo's remote via `DeferredPushRefSpecs`.
+Once that is done it raises [`VersionDeprecated`](#versiondeprecated--the-extension-point-this-plugin-offers) with the
+releases it actually tagged, so the deprecation can be mirrored outside the tags.
 
 ## Notable design notes from the code
 

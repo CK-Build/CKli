@@ -48,6 +48,36 @@ public sealed class PublishPlugin : PrimaryPluginBase
         _keepLocalReleaseAfterPublish = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.KeepLocalReleaseAfterPublish ) ?? false;
         _build.OnRoadmapBuild.Async += OnRoadmapBuildAsync;
         _build.OnFixBuild.Async += OnFixBuildAsync;
+        // Sync: this handler is file IO and git, there is nothing to await. The event is a PerfectEvent,
+        // so this choice is ours alone - another listener can take the Async or ParallelAsync slot.
+        _versionTag.VersionDeprecated.Sync += OnVersionDeprecated;
+    }
+
+    // A deprecated version is still offered by every profile that was published with it: the deprecation
+    // of a version and the deprecation of a profile are the same fact seen from the two sides of the
+    // publication. VersionTagPlugin owns the propagation across versions (a deprecated version deprecates
+    // its consumers, transitively) and this mirrors the whole result onto the profiles - which is why the
+    // event carries every deprecated release and not only the one the command named.
+    void OnVersionDeprecated( IActivityMonitor monitor, VersionDeprecatedEventArgs e )
+    {
+        var folder = PublishedFolder;
+        foreach( var p in e.DeprecatedPackages )
+        {
+            folder.OnDeprecatedPackage( p.PackageId, p.Version );
+        }
+        // OnDeprecatedPackage read every file: an unreadable one has not been considered at all.
+        foreach( var (version, error) in folder.LoadErrors )
+        {
+            monitor.Warn( $"Unable to read the profile 'v{version}': it may offer a deprecated package.", error );
+        }
+        if( !folder.IsDirty )
+        {
+            monitor.Trace( "No published profile offers any of the deprecated packages." );
+            return;
+        }
+        int count = folder.Save();
+        monitor.Info( ScreenType.CKliScreenTag, $"{count} published profile(s) deprecated." );
+        World.StackRepository.PushChanges( monitor );
     }
 
     /// <summary>
