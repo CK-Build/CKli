@@ -39,8 +39,8 @@ function Invoke-DotNet
 # A targeted text match, NOT an XmlDocument: [xml]$x = ...; $x.Save() reformats the WHOLE file (blank
 # lines dropped, everything re-indented, trailing newline removed), which dirties every csproj this
 # script only means to touch the version of. It went unnoticed while CKli.Core was the single edited
-# file - its layout happened to match XmlDocument output - and showed up as soon as CK.Packaging.Model
-# and CKli.Publish.Plugin joined the rewrite.
+# file - its layout happened to match XmlDocument output - and showed up as soon as a second csproj
+# (CK.Packaging.Abstractions) joined the rewrite.
 function Find-PackageVersionMatch
 {
     param(
@@ -186,12 +186,11 @@ function New-LocalNuGetConfig
 $scriptDir = $PSScriptRoot
 
 $ckSVersionSolution  = Resolve-Path (Join-Path $scriptDir "../CK-SVersion/CK-SVersion.slnx")
-$ckPackagingSolution = Resolve-Path (Join-Path $scriptDir "../CK-Packaging-Model/CK-Packaging-Model.slnx")
+$ckPackagingSolution = Resolve-Path (Join-Path $scriptDir "../CK-Packaging-Abstractions/CK-Packaging-Abstractions.slnx")
 $ckliSolution        = Resolve-Path (Join-Path $scriptDir "CKli.slnx")
 
 $ckliCoreProject     = Resolve-Path (Join-Path $scriptDir "CKli.Core/CKli.Core.csproj")
-$ckliPublishProject  = Resolve-Path (Join-Path $scriptDir "StandardPlugins/CKli.Publish.Plugin/CKli.Publish.Plugin.csproj")
-$ckPackagingProject  = Resolve-Path (Join-Path $scriptDir "../CK-Packaging-Model/CK.Packaging.Model/CK.Packaging.Model.csproj")
+$ckPackagingProject  = Resolve-Path (Join-Path $scriptDir "../CK-Packaging-Abstractions/CK.Packaging.Abstractions/CK.Packaging.Abstractions.csproj")
 
 $localFeed = Join-Path $scriptDir ".local-feed"
 $version = "0.0.0-0"
@@ -203,7 +202,7 @@ $localNugetConfig = Join-Path $localFeed "nuget-CKli-Local.config"
 # "0.0.0-0" is lower than any published version and NuGet resolves a package to the HIGHEST version
 # required anywhere in the graph, so a repository left out keeps pinning its published dependency and
 # that pin wins - silently compiling the whole stack against an older assembly. This is not a restore
-# error: it surfaces later as a missing type or member. CK-Packaging-Model was exactly this: it pins
+# error: it surfaces later as a missing type or member. CK-Packaging-Abstractions was exactly this: it pins
 # CK.SVersion 0.2.2, which won over the locally packed 0.0.0-0 and made 'ckli plugin compile' fail with
 # "The type or namespace name 'PackageInstance' could not be found" (PackageInstance only exists from
 # CK.SVersion 0.2.3--ci.8 on).
@@ -217,9 +216,9 @@ $originalPackagingCKSVersion = Get-PackageVersion `
     -ProjectPath $ckPackagingProject `
     -PackageId "CK.SVersion"
 
-$originalCKPackagingModel = Get-PackageVersion `
-    -ProjectPath $ckliPublishProject `
-    -PackageId "CK.Packaging.Model"
+$originalCKPackagingAbstractions = Get-PackageVersion `
+    -ProjectPath $ckliCoreProject `
+    -PackageId "CK.Packaging.Abstractions"
 
 try
 {
@@ -257,7 +256,7 @@ try
             -LocalFeed $localFeed
     }
 
-    Invoke-Step "Force CK.SVersion version in CK.Packaging.Model" {
+    Invoke-Step "Force CK.SVersion version in CK.Packaging.Abstractions" {
 
         Set-PackageVersion `
             -ProjectPath $ckPackagingProject `
@@ -265,7 +264,7 @@ try
             -Version $version
     }
 
-    Invoke-Step "Pack CK.Packaging.Model" {
+    Invoke-Step "Pack CK.Packaging.Abstractions" {
 
         # The restore must see the local feed: CK.SVersion 0.0.0-0 exists nowhere else. Once restored it
         # is in the global cache and the pack's own implicit restore is happy with it.
@@ -278,11 +277,11 @@ try
             -c Debug
     }
 
-    Invoke-Step "Publish CK.Packaging.Model to local feed" {
+    Invoke-Step "Publish CK.Packaging.Abstractions to local feed" {
 
         Publish-LocalPackage `
             -SearchRoot (Split-Path $ckPackagingSolution) `
-            -PackageId "CK.Packaging.Model" `
+            -PackageId "CK.Packaging.Abstractions" `
             -Version $version `
             -LocalFeed $localFeed
     }
@@ -295,8 +294,8 @@ try
             -Version $version
 
         Set-PackageVersion `
-            -ProjectPath $ckliPublishProject `
-            -PackageId "CK.Packaging.Model" `
+            -ProjectPath $ckliCoreProject `
+            -PackageId "CK.Packaging.Abstractions" `
             -Version $version
     }
 
@@ -396,9 +395,9 @@ finally
              -Version $originalCKSVersion
 
         Set-PackageVersion `
-             -ProjectPath $ckliPublishProject `
-             -PackageId "CK.Packaging.Model" `
-             -Version $originalCKPackagingModel
+             -ProjectPath $ckliCoreProject `
+             -PackageId "CK.Packaging.Abstractions" `
+             -Version $originalCKPackagingAbstractions
 
         Set-PackageVersion `
              -ProjectPath $ckPackagingProject `

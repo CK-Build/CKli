@@ -89,6 +89,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
         typeof( ActivityMonitor ).Assembly,                                                         // CK.ActivityMonitor
         typeof( ActivityMonitorSimpleSenderExtension ).Assembly,                                    // CK.ActivityMonitor.SimpleSender
         typeof( SVersion ).Assembly,                                                                // CK.SVersion
+        typeof( CK.Packaging.Abstractions.PublishedProfile ).Assembly,                              // CK.Packaging.Abstractions
         typeof( CK.Monitoring.GrandOutput ).Assembly,                                               // CK.Monitoring
         typeof( LibGit2Sharp.Repository ).Assembly,                                                 // LibGit2Sharp
         typeof( CommunityToolkit.HighPerformance.ArrayExtensions ).Assembly,                         // CommunityToolkit.HighPerformance
