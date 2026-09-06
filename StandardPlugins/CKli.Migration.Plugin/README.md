@@ -136,6 +136,22 @@ handler. It:
   (`XmlHelper.SafeSave`, preserving whitespace) purely to normalize them
   (no XML declaration, no BOM) — failures here are swallowed.
 
+The three steps that touch the `.slnx` — `dotnet sln migrate`, `dotnet sln
+remove` and the `.slnx` edit — go through a private `Retry`: 5 attempts,
+100ms apart, the same shape `FileHelper` uses for its own deletions. Each of
+them writes the file the step before it just wrote, and on Windows a process
+that has exited can hold its handle a moment longer, so `dotnet sln remove`
+reports *"The process cannot access the file ... because it is being used by
+another process"* and a whole `ckli fix start` fails on a race that a second
+attempt wins. Retrying is safe because every step is idempotent: `sln migrate`
+regenerates the `.slnx`, `sln remove` answers *"could not be found"* (and `0`)
+once the project is gone, and the `.slnx` edit removes elements that may
+already be absent.
+
+A retried attempt logs a **warning**, never an error: `FixStartAsync` fails the
+workflow start on any error *logged* during the `OnFixStart` event, so only
+giving up after the last attempt logs one.
+
 ### Notable state / behavior
 
 - The plugin holds no mutable state of its own beyond the injected plugin

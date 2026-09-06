@@ -7,10 +7,12 @@ using CKli.HotZone.Plugin;
 using CKli.VersionTag.Plugin;
 
 using LibGit2Sharp;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Xml.Linq;
 using LogLevel = CK.Core.LogLevel;
 
@@ -263,6 +265,45 @@ public sealed class MigrationPlugin : PrimaryPluginBase
         return success;
     }
 
+    // Every step of the normalization touches the ".slnx" that the step before it just wrote, and on
+    // Windows the file handle of a process that has already exited can outlive it by a moment: "dotnet
+    // sln remove" then reports "The process cannot access the file ... because it is being used by
+    // another process", and a whole "ckli fix start" fails on a race that a second attempt would win.
+    //
+    // Retrying is safe because each step is idempotent: "sln migrate" regenerates the ".slnx", "sln
+    // remove" answers "could not be found" (and 0) once the project is gone, and the ".slnx" edit removes
+    // elements that are already absent. The shape - 5 tries, 100ms apart - is FileHelper's, which has
+    // always done this for its own deletions.
+    //
+    // The retries are warnings on purpose: FixStartAsync fails the workflow start on any error LOGGED
+    // during the event, so an attempt that is going to be retried must not log one. Only giving up does.
+    const int _retryCount = 5;
+    const int _retryDelayMs = 100;
+
+    static bool Retry( IActivityMonitor monitor, string what, Func<bool> action )
+    {
+        for( int tryCount = 1; ; ++tryCount )
+        {
+            string reason;
+            try
+            {
+                if( action() ) return true;
+                reason = "it failed";
+            }
+            catch( Exception ex )
+            {
+                reason = ex.Message;
+            }
+            if( tryCount > _retryCount )
+            {
+                monitor.Error( $"{what}: {reason}. Giving up after {tryCount} attempts." );
+                return false;
+            }
+            monitor.Warn( $"{what}: {reason}. Retrying ({tryCount}/{_retryCount})." );
+            Thread.Sleep( _retryDelayMs );
+        }
+    }
+
     static bool RemoveRepositoryInfoAndCodeCakeBuilderAndSlnx( IActivityMonitor monitor, IReadOnlyList<Repo> repos )
     {
         bool success = true;
@@ -284,9 +325,11 @@ public sealed class MigrationPlugin : PrimaryPluginBase
         success &= FileHelper.DeleteFile( monitor, appveyor );
 
         var slnPath = repo.WorkingFolder.AppendPart( repo.WorkingFolder.LastPart + ".sln" );
+        var slnxPath = slnPath + 'x';
         if( File.Exists( slnPath ) )
         {
-            if( ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", "sln migrate", repo.WorkingFolder ) == 0 )
+            if( Retry( monitor, $"'dotnet sln migrate' in '{repo.DisplayPath}'",
+                       () => ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", "sln migrate", repo.WorkingFolder ) == 0 ) )
             {
                 FileHelper.DeleteFile( monitor, slnPath );
             }
@@ -294,21 +337,25 @@ public sealed class MigrationPlugin : PrimaryPluginBase
             {
                 success = false;
             }
-            // Idempotent but to avoid useless call, do this only when a sln has been found. 
-            success &= ProcessRunner.RunProcess( monitor.ParallelLogger,
-                                                 "dotnet",
-                                                 "sln remove CodeCakeBuilder/CodeCakeBuilder.csproj",
-                                                 repo.WorkingFolder ) == 0;
+            // Idempotent but to avoid useless call, do this only when a sln has been found.
+            success &= Retry( monitor, $"'dotnet sln remove CodeCakeBuilder' in '{repo.DisplayPath}'",
+                              () => ProcessRunner.RunProcess( monitor.ParallelLogger,
+                                                              "dotnet",
+                                                              "sln remove CodeCakeBuilder/CodeCakeBuilder.csproj",
+                                                              repo.WorkingFolder ) == 0 );
         }
         var ccbPath = repo.WorkingFolder.AppendPart( "CodeCakeBuilder" );
         success &= FileHelper.DeleteFolder( monitor, ccbPath );
 
         // Remove legacy Common/SharedKey.snk if it exists.
-        var slnxPath = slnPath + 'x';
-        var d = XDocument.Load( slnxPath );
-        d.Root!.Descendants( "File" ).Where( e => e.Attribute( "Path" )?.Value == "RepositoryInfo.xml"
-                                                 || e.Attribute( "Path" )?.Value == "Common/SharedKey.snk" ).Remove();
-        XmlHelper.SafeSave( d, slnxPath );
+        success &= Retry( monitor, $"Updating '{slnxPath}'", () =>
+        {
+            var d = XDocument.Load( slnxPath );
+            d.Root!.Descendants( "File" ).Where( e => e.Attribute( "Path" )?.Value == "RepositoryInfo.xml"
+                                                     || e.Attribute( "Path" )?.Value == "Common/SharedKey.snk" ).Remove();
+            XmlHelper.SafeSave( d, slnxPath );
+            return true;
+        } );
 
         var nugetConfigPath = repo.WorkingFolder.AppendPart( "nuget.config" );
         if( File.Exists( nugetConfigPath ) )
