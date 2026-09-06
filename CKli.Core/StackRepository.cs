@@ -241,6 +241,37 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
+    /// Gets the branch to work on: <paramref name="stackBranchName"/> when the repository has it (locally or on
+    /// its "origin" remote), the repository's current branch otherwise.
+    /// <para>
+    /// A Stack repository has a single branch, "main" by convention: this is the branch that <see cref="CreateAsync"/>
+    /// creates. A Stack repository that predates this convention has a "master" one (or any other name) and creating
+    /// a purely local "main" for it - what <see cref="GitRepository.FullCheckout(IActivityMonitor, string, bool)"/>
+    /// and <see cref="GitRepository.EnsureBranch(IActivityMonitor, string, LogLevel, LibGit2Sharp.Commit?)"/> do when
+    /// the branch is nowhere to be found - gives a Stack that can never be pushed back: <see cref="PushChanges"/>
+    /// pushes the head and the head must track a remote branch.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="git">The stack repository.</param>
+    /// <param name="stackBranchName">The wanted branch name.</param>
+    /// <returns>The branch name to use.</returns>
+    static string GetStackBranchName( IActivityMonitor monitor, GitRepository git, string stackBranchName )
+    {
+        // GetBranch creates the local branch that tracks the "origin/{stackBranchName}" one when it exists:
+        // this is what the callers below need anyway.
+        if( git.GetBranch( monitor, stackBranchName, LogLevel.None ) != null )
+        {
+            return stackBranchName;
+        }
+        var actual = git.CurrentBranchName;
+        monitor.Warn( $"""
+            Stack repository '{git.DisplayPath}' has no '{stackBranchName}' branch: working on its current branch '{actual}'.
+            """ );
+        return actual;
+    }
+
+    /// <summary>
     /// Commits and push changes to the remote.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -378,7 +409,7 @@ public sealed partial class StackRepository : IDisposable
                 }
                 if( !error )
                 {
-                    var b = git.EnsureBranch( monitor, stackBranchName );
+                    var b = git.EnsureBranch( monitor, GetStackBranchName( monitor, git, stackBranchName ) );
                     if( git.Checkout( monitor, b )
                         && (skipPullStack || git.FetchMergeHead( monitor, LibGit2Sharp.MergeFileFavor.Theirs )) )
                     {
@@ -643,6 +674,9 @@ public sealed partial class StackRepository : IDisposable
                                        cancellation );
         if( git != null )
         {
+            // The clone checked out the remote's default branch: this is the one to work on when the
+            // remote has no "main" branch.
+            stackBranchName = GetStackBranchName( monitor, git, stackBranchName );
             // Before doing anything else, we read the definition file and extract the actual
             // world name with the right casing. If case differ, the git handle is disposed,
             // the folder name is fixed and a new git handle is acquired.

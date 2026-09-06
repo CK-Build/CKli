@@ -39,6 +39,11 @@ It is cloned once into a local folder at the root of the cloned stack folder:
 
 A local registry at `%LocalAppData%/CKli/StackRepositoryRegistry.v0.txt` tracks all known stacks on the machine.
 
+A Stack repository has a single branch: `main` by convention (this is the branch that `ckli create` creates on
+the remote). A Stack repository that predates this convention has a `master` branch (or any other name): CKli
+then works on the repository's current branch. It never creates a purely local `main` for it — such a Stack
+could never be pushed back since `PushChanges` pushes the head and the head must track a remote branch.
+
 A `StackRepository` instance is the entry point of the API. There are only 2 ways to obtain a `StackRepository`:
 - Calling `TryOpenFromPath`, `OpenFromPath`, `TryOpenWorldFromPath` or `OpenWorldFromPath` from any local path.
 - Calling `CloneAsync` from the remote Uri of the stack.
