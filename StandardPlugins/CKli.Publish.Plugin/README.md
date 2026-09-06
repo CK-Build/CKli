@@ -304,6 +304,41 @@ package — or removes them, once that deprecation has expired — and
 `OnDeprecatedPackage`, `OnExpiredPackage` and `OnFixedPackages` are the package-oriented mutators that
 back those, and all three read every file.
 
+#### `index.json` — the folder's own reflection
+
+`Save` refreshes `Published/index.json` whenever at least one profile file actually changed (that file is
+not counted in what it returns). It lists the profile **versions** in two sets, `Alive` and `Deprecated`,
+each grouped by branch and ordered from the latest to the oldest:
+
+```json
+{
+  "Alive": {
+    "(stable)": [
+      "2026.254.1",
+      "2026.254.0"
+    ],
+    "alpha": [
+      "2026.254.0-alpha"
+    ]
+  },
+  "Deprecated": {
+    "(stable)": []
+  }
+}
+```
+
+- The group name is the version's `SVersion.BranchName` — `alpha` to `zulu`, `explo/{name}` — except
+  for the stable versions (and their CI builds), whose branch name is the empty string: they are grouped
+  under `(stable)`. That is deliberately **not** the World's root branch name, which belongs to the
+  BranchModel and can differ (an LTS World has its own): the index names the versions it contains, not
+  the branches of any particular World. The parentheses also make the name unambiguous — an exploratory
+  branch is `explo/(stable)`, never `(stable)` — and sort it before every real branch.
+- A branch with no version in a set does not appear in that set. `(stable)` is the exception: it is always
+  there, empty list included.
+- **The index is a reflection, never a source.** `PublishedFolder` writes it and never reads it back:
+  `LoadAll` only accepts a file whose whole name is a version, and `index` is not one. Delete it and the
+  next `Save` that changes something puts it back; nothing else notices.
+
 ### The publishers — the actual publish loop
 
 `BasePublisher` (`Publisher/BasePublisher.cs`) holds the shared mechanics for one repository's

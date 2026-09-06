@@ -21,8 +21,13 @@ namespace CKli.Publish.Plugin;
 /// <para>
 /// Files are lazily read and any modification is in-memory only until <see cref="Save"/> is called.
 /// </para>
+/// <para>
+/// <see cref="Save"/> also refreshes the <see cref="IndexFileName"/> file at the <see cref="RootPath"/>:
+/// a projection of the profile files for whoever reads this folder from the outside. This folder never
+/// reads it back - it is a reflection, never a source.
+/// </para>
 /// </summary>
-public sealed class PublishedFolder
+public sealed partial class PublishedFolder
 {
     readonly string _rootPath;
     readonly Dictionary<SVersion, FileCacheInfo> _profiles;
@@ -474,9 +479,10 @@ public sealed class PublishedFolder
     }
 
     /// <summary>
-    /// Writes the added and updated profiles and deletes the files of the removed ones.
+    /// Writes the added and updated profiles, deletes the files of the removed ones and, when at least one
+    /// of them changed, refreshes the <see cref="IndexFileName"/> file (see <see cref="CreateIndexUtf8Bytes"/>).
     /// </summary>
-    /// <returns>The number of created, updated or deleted files.</returns>
+    /// <returns>The number of created, updated or deleted profile files. The index doesn't count.</returns>
     public int Save()
     {
         int count = 0;
@@ -497,6 +503,8 @@ public sealed class PublishedFolder
             info.OnSaved();
             ++count;
         }
+        // The index reflects the profile files: it is written last, and only when they moved.
+        if( count > 0 ) WriteIndex();
         return count;
     }
 
@@ -531,6 +539,8 @@ public sealed class PublishedFolder
             var fName = Path.GetFileNameWithoutExtension( f.AsSpan() );
             // The whole file name must be the version: SVersion.TryMatch handles the
             // optional leading 'v' and forwards the head on success.
+            // This is also what excludes the IndexFileName: "index" is not a version, so the index this
+            // folder writes can never be read back as one of its own profiles.
             if( !SVersion.TryMatch( ref fName, out var version, mustBeCSVersion: true ) || fName.Length != 0 )
             {
                 continue;
