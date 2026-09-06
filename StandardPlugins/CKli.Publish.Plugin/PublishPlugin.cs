@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Packaging.Abstractions;
 using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;
 using CKli.Build.Plugin;
@@ -6,7 +7,9 @@ using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.VersionTag.Plugin;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -129,6 +132,10 @@ public sealed class PublishPlugin : PrimaryPluginBase
             {
                 e.SetFailed();
             }
+            else
+            {
+                OnFixedProfiles( monitor, e.FixWorkflow, e.Results );
+            }
         }
 
         static async Task<bool> PublishAsync( IActivityMonitor monitor,
@@ -179,6 +186,60 @@ public sealed class PublishPlugin : PrimaryPluginBase
         }
     }
 
+
+    // A fix publishes versions that supersede the ones it fixes, and older profiles still offer those.
+    // Such a profile is not rewritten - it records what was actually published - so the fix adds a
+    // superseding profile beside each one, as if it had been built on the same day: same Major.Minor,
+    // next free Patch. A deprecated profile is locked and gets none.
+    void OnFixedProfiles( IActivityMonitor monitor, FixWorkflow fixWorkflow, ImmutableArray<BuildResult> results )
+    {
+        var folder = PublishedFolder;
+        ImmutableArray<PublishedProfile> created;
+        try
+        {
+            // The fix build forbids a fix from changing its produced package identifiers, so the packages
+            // to supersede are exactly the ones the fix produced, in the version being fixed.
+            //
+            // The key is the PackageInstance - identifier AND fixed version - rather than the identifier,
+            // because one workflow can target two Major.Minor lines of the SAME repository: S1's
+            // local_fix_Async carries "CKt-PerfectEvent fix/v0.2 -> v0.2.2" and "CKt-PerfectEvent
+            // fix/v0.3 -> v0.3.3" at once, so CKt.PerfectEvent is superseded from 0.2.1 and from 0.3.2 in
+            // the same pass. Two such targets cannot share a ToFixVersion, so Add's throw on a duplicate
+            // key stays an invariant check rather than a case to handle.
+            var fixedPackages = new Dictionary<PackageInstance, SVersion>();
+            for( int i = 0; i < results.Length; i++ )
+            {
+                var target = fixWorkflow.Targets[i];
+                foreach( var packageId in results[i].Content.Produced )
+                {
+                    fixedPackages.Add( new PackageInstance( packageId, target.ToFixVersion ), target.TargetVersion );
+                }
+            }
+            created = folder.OnFixedPackages( fixedPackages );
+            // OnFixedPackages read every file: an unreadable one has not been considered at all.
+            foreach( var (version, error) in folder.LoadErrors )
+            {
+                monitor.Warn( $"Unable to read the profile 'v{version}': it may offer a fixed package.", error );
+            }
+            if( created.Length == 0 )
+            {
+                monitor.Trace( "No published profile offers any of the fixed packages." );
+                return;
+            }
+            folder.Save();
+        }
+        catch( Exception ex )
+        {
+            // The publication is done and cannot be undone because the profiles could not be written.
+            monitor.Error( $"While superseding the published profiles of the fix '{fixWorkflow}'.", ex );
+            return;
+        }
+        var what = $"Added {created.Length} published profile(s) superseded by the fix of '{fixWorkflow}': "
+                   + $"'{created.Select( p => p.Version.ToString() ).Concatenate( "', '" )}'.";
+        monitor.Info( ScreenType.CKliScreenTag, what );
+        World.StackRepository.GitRepository.Commit( monitor, what );
+        World.StackRepository.PushChanges( monitor );
+    }
 
     async Task OnRoadmapBuildAsync( IActivityMonitor monitor, RoadmapBuildEventArgs e, CancellationToken cancellation )
     {

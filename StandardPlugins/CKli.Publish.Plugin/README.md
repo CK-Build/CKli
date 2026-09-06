@@ -99,6 +99,42 @@ roadmap). On success, and only for a non-CI build:
 
 On failure, `e.SetFailed()` is called.
 
+On success, `OnFixedProfiles` supersedes the published profiles the fix invalidates. A fix publishes
+versions that replace the ones it fixes, and older profiles still *offer* those:
+
+1. The fixed packages are `results[i].Content.Produced` at `TargetRepo.ToFixVersion`, superseded by
+   `TargetRepo.TargetVersion`. That set is exact because `BuildPlugin.Fix` **forbids** a fix from
+   changing its produced package identifiers — the fix's output is the same package set as the version
+   it fixes.
+2. `PublishedFolder.OnFixedPackages` adds, beside every profile that offers one of them, a profile with
+   the same offer and the fixed versions replaced.
+
+Three rules govern it, and they are what the method's shape is for:
+
+| Rule | Why |
+|---|---|
+| The superseded profile is **left untouched**. | A profile records what was actually published; a fix does not change the past. The successor sits beside it. |
+| The successor keeps its origin's `Major.Minor` and branch, with the next free `Patch` — "as if built the same day". | The publication it describes never happened on its own day; it belongs with the profile it corrects. `CreateSupersedingProfileVersion` does this. |
+| A **deprecated profile is locked** and gets no successor. | It is dead: deprecation is monotonic and there is no un-deprecate, so a successor would resurrect an offer nobody should pick up. |
+
+`fixedPackages` is keyed by `PackageInstance` — the package identifier **and** the version being fixed —
+rather than by identifier alone, because **one fix publication can target two Major.Minor lines of the
+same repository**. `S1`'s `local_fix_Async` does exactly that: a single workflow carries
+`CKt-PerfectEvent ⎇ fix/v0.2 → v0.2.2` *and* `CKt-PerfectEvent ⎇ fix/v0.3 → v0.3.3`, so `CKt.PerfectEvent`
+is superseded from `0.2.1` and from `0.3.2` in the same pass. Keyed by identifier those would collide;
+keyed by instance each profile picks up the entry matching the version it actually offers.
+
+Within one profile a `Repository` carries a single version across all its packages — a `Repo` has exactly
+one solution (`HotZonePlugin` adds one per repo) and a commit bears at most one version — and the fix's
+produced identifiers are exactly the fixed version's (`BuildPlugin.Fix` enforces that). So when a
+`Repository` is superseded, *all* of its packages move together; the per-package loop is how the
+instance-keyed map is consumed, not a way to move only some of them.
+
+It is idempotent. A retry of an interrupted fix publication finds that some profile already carries the
+resulting offer — `OnFixedPackages` compares offers, not versions — and adds nothing. As with the other
+`PublishedFolder` writers, the Stack is then committed with a message naming the reason and pushed, and
+a failure to write is logged rather than failing a publication that cannot be undone.
+
 #### `OnVersionDeprecated` — `version deprecate`
 
 The deprecation of a version and the deprecation of a profile are the same fact seen from the two
@@ -261,10 +297,12 @@ profile. `Tests/Plugins.Tests`' `PublishedFolderTests` covers the folder on its 
 `PublishedProfileTests` covers what a real publication leaves in it and what a `version deprecate`
 does to it.
 
-Two entry points write to it: `OnRoadmapBuildAsync` adds a profile, and
+Three entry points write to it: `OnRoadmapBuildAsync` adds a profile,
 [`OnVersionDeprecated`](#onversiondeprecated--version-deprecate) marks the ones that offer a deprecated
-package — or removes them, once that deprecation has expired. `OnDeprecatedPackage` and
-`OnExpiredPackage` are the two package-oriented mutators that back those, and both read every file.
+package — or removes them, once that deprecation has expired — and
+[`OnFixBuildAsync`](#onfixbuildasync--fix-build--fix-publish) supersedes the ones a fix invalidates.
+`OnDeprecatedPackage`, `OnExpiredPackage` and `OnFixedPackages` are the package-oriented mutators that
+back those, and all three read every file.
 
 ### The publishers — the actual publish loop
 
@@ -377,15 +415,6 @@ likewise resolved through `GitRepositoryKey` / `ISecretsStore`, documented in `C
 
 ## Known rough edges (from the code)
 
-- **A fix publication leaves no profile.** `OnFixBuildAsync` publishes its `FixWorkflow` targets
-  without touching the `PublishedFolder`, so a `fix/vMajor.Minor` release is invisible in the profile
-  history. Only `OnRoadmapBuildAsync` records one. The design is settled: a fix updates every profile
-  that offers one of the fixed versions, substituting `TargetRepo.ToFixVersion` with
-  `TargetRepo.TargetVersion`, and the successor keeps its original's `Major.Minor` — "the same initial
-  day" — with the next free `Patch`. Three rules hold: the substitution is **per package** (a `Repo`
-  hosting several solutions can carry several versions in one `Repository`); a **deprecated profile is
-  locked** and gets no successor; and there is no CI case to consider, since `fix build`/`fix publish`
-  no longer take `--ci`.
 - The gate's failure paths have no integration test coverage: `Tests/Plugins.Tests` never reaches
   `PublishableStatus.IndirectPublishRequired`, so the `RequiredPublications` closure, its
   producers-first ordering, `IndirectPublisher`, and `BuildFinalProfile`'s conflict branch are all

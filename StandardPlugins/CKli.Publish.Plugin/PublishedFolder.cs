@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Packaging.Abstractions;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -196,6 +197,30 @@ public sealed class PublishedFolder
             // "--ci" form must not shift the Patch number that the conflict resolution below owns.
             v = v.SetCINumber( 0, impactStablePatchNumber: false );
         }
+        return FindFreePatch( v );
+    }
+
+    /// <summary>
+    /// Creates the version of the profile that supersedes <paramref name="origin"/>: the same
+    /// <see cref="SVersion.Major"/>, <see cref="SVersion.Minor"/> and branch - as if it had been built the
+    /// same day - with the next free <see cref="SVersion.Patch"/>.
+    /// </summary>
+    /// <param name="origin">The version of the profile being superseded. Must be a Conformant SVersion.</param>
+    /// <returns>A Conformant SVersion that no profile of this folder uses.</returns>
+    public SVersion CreateSupersedingProfileVersion( SVersion origin )
+    {
+        ArgumentNullException.ThrowIfNull( origin );
+        if( origin.BranchName == null )
+        {
+            throw new ArgumentException( $"Version '{origin}' must be a Conformant SVersion.", nameof( origin ) );
+        }
+        return FindFreePatch( origin.SetVersionNumbers( origin.Major, origin.Minor, origin.Patch + 1 ) );
+    }
+
+    // Increments the Patch until the version is free. A file that exists but cannot be read counts as
+    // used: Save would replace it.
+    SVersion FindFreePatch( SVersion v )
+    {
         for(; ; )
         {
             var info = LoadInfo( v );
@@ -355,6 +380,97 @@ public sealed class PublishedFolder
             }
         }
         return found;
+    }
+
+    /// <summary>
+    /// Adds a superseding profile for every profile that offers one of the fixed packages: the same offer
+    /// with the fixed versions replaced, at a <see cref="CreateSupersedingProfileVersion"/> version. All the
+    /// files are read.
+    /// <para>
+    /// The superseded profiles are left untouched: a profile records what was published, and a fix does not
+    /// change the past. A <see cref="PublishedProfile.IsDeprecated"/> profile is <c>locked</c> and gets no
+    /// successor at all.
+    /// </para>
+    /// <para>
+    /// This is idempotent: an offer that some profile already carries is not created a second time, so
+    /// retrying an interrupted fix publication adds nothing.
+    /// </para>
+    /// </summary>
+    /// <param name="fixedPackages">
+    /// Maps each fixed <see cref="PackageInstance"/> - the package identifier in the version that was fixed -
+    /// to the version that now supersedes it.
+    /// </param>
+    /// <returns>The created profiles, in ascending version order. Empty when nothing was superseded.</returns>
+    public ImmutableArray<PublishedProfile> OnFixedPackages( IReadOnlyDictionary<PackageInstance, SVersion> fixedPackages )
+    {
+        ArgumentNullException.ThrowIfNull( fixedPackages );
+        if( fixedPackages.Count == 0 ) return ImmutableArray<PublishedProfile>.Empty;
+        LoadAll();
+        // Snapshotting is required twice over: Add mutates the dictionary being enumerated, and a profile
+        // created here already offers the fixed versions - it must not be superseded in its turn.
+        var origins = _profiles.Values.Where( i => i.Current != null && !i.Current.IsDeprecated )
+                                      .Select( i => i.Current! )
+                                      .OrderBy( p => p.Version )
+                                      .ToList();
+        var offers = _profiles.Values.Where( i => i.Current != null )
+                                     .Select( i => i.Current! )
+                                     .ToList();
+        var created = ImmutableArray.CreateBuilder<PublishedProfile>();
+        foreach( var origin in origins )
+        {
+            var updated = CreateSupersedingProfile( origin, fixedPackages );
+            if( updated == null || offers.Any( o => SameOffer( o, updated ) ) ) continue;
+            Add( updated );
+            offers.Add( updated );
+            created.Add( updated );
+        }
+        return created.DrainToImmutable();
+
+        // Two profiles carry the same offer when they offer the same versions of the same packages: the
+        // superseding profile differs from its origin by nothing else, so this is what makes a retry a no-op.
+        static bool SameOffer( PublishedProfile p1, PublishedProfile p2 )
+        {
+            if( p1.Packages.Count != p2.Packages.Count ) return false;
+            foreach( var (packageId, instance) in p1.Packages )
+            {
+                if( !p2.Packages.TryGetValue( packageId, out var other ) || other.Version != instance.Version )
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    // Returns null when the profile offers none of the fixed packages: only the repositories and the
+    // packages that actually change are rebuilt, the others are shared with the origin.
+    PublishedProfile? CreateSupersedingProfile( PublishedProfile origin, IReadOnlyDictionary<PackageInstance, SVersion> fixedPackages )
+    {
+        ImmutableArray<Repository>.Builder? repositories = null;
+        for( int i = 0; i < origin.Repositories.Length; ++i )
+        {
+            var r = origin.Repositories[i];
+            ImmutableArray<PackageInstance>.Builder? packages = null;
+            for( int j = 0; j < r.Packages.Length; ++j )
+            {
+                if( fixedPackages.TryGetValue( r.Packages[j], out var superseding ) )
+                {
+                    packages ??= r.Packages.ToBuilder();
+                    packages[j] = new PackageInstance( r.Packages[j].PackageId, superseding );
+                }
+            }
+            if( packages != null )
+            {
+                repositories ??= origin.Repositories.ToBuilder();
+                repositories[i] = new Repository( r.Key, packages.DrainToImmutable() );
+            }
+        }
+        return repositories == null
+                ? null
+                : new PublishedProfile( origin.StackUrl,
+                                        origin.World,
+                                        CreateSupersedingProfileVersion( origin.Version ),
+                                        repositories.DrainToImmutable() );
     }
 
     /// <summary>

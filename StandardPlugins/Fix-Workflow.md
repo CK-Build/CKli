@@ -114,6 +114,12 @@ default (the fix has fully landed, nothing more to track) and the persisted work
 closing the operation. `--keep-branch` opts out of the branch cleanup. An interrupted publication keeps
 whatever it already pushed, so that a retry can finish it.
 
+A fix also invalidates whatever the World already published: a profile that offers a fixed version now
+describes an offer nobody should pick up. The Publish plugin reacts by adding a **superseding profile**
+beside each one — the same offer with the fixed versions replaced, at the same `Major.Minor` with the
+next free `Patch` — leaving the original as the record of what was actually published. See
+[`CKli.Publish.Plugin`'s README](CKli.Publish.Plugin/README.md#onfixbuildasync--fix-build--fix-publish).
+
 ### Cancelling
 
 `fix cancel` destroys any local, unpublished build artifacts for every target and discards the
