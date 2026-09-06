@@ -85,7 +85,7 @@ Per-repo, under that repo's plugin configuration element:
 | `[CommandPath]` | Purpose |
 |---|---|
 | `version bump` | Sets a `+fake` version tag on the repo's root (or `dev/`) branch to retroactively start a new Major.Minor.Patch line above every currently known version, cleaning up now-superseded local builds and higher `+fake` tags first. |
-| `version deprecate` | Marks a published version as `+deprecated` (with an expiration date computed from `--immediate`/`--days`), and recursively propagates the deprecation to every repo/version in the Stack that (transitively) consumes it. |
+| `version deprecate` | Marks a published version as `+deprecated` (with an expiration date computed from `--immediate`/`--days`), and recursively propagates the deprecation to every repo/version in the Stack that (transitively) consumes it. Never the *alive* version of a repository (see below). |
 
 Both commands take `IActivityMonitor` and `CKliEnv` first, matching the plugin command convention. Selected
 parameters:
@@ -94,7 +94,12 @@ parameters:
   than every existing non-fake, non-local version and within `[InfVersion, SupVersion[`.
 - `version deprecate <version> [--reason <text>] [--days <n> | --immediate] [--allow-update]` — `--days`/`--immediate`
   are mutually exclusive when creating; `--allow-update` is required to edit an existing, non-expired `+deprecated`
-  tag.
+  tag. The version must not be the repository's **alive** version (`VersionTagInfo.AliveStable`: the top stable that
+  was actually published — `HotZone.LastStable`, or the published stable below it when that one is, or carries, a
+  `+fake`). Deprecating it would leave the repository with nothing usable at all: publish a replacement first, and the
+  previous version is then no longer alive. This guards the *creation* of a deprecation only — a deprecation is
+  irreversible, only its expiration can change, so `--allow-update` still works on an alive version that already
+  carries a `+deprecated` tag (a state only a manual tag edit can produce).
 
 Note: the day-to-day raw tag transport commands (`tag list`, `tag fetch`, `tag pull`, `tag push`, `tag delete`) live
 in **CKli.Core**, not in this plugin — VersionTag.Plugin only reasons about tags once they're present locally.
@@ -213,6 +218,11 @@ producing `RepoKey`, then lazily builds `RepoReleaseInfo` nodes with direct/tran
 walking `Consumed` package lists. `version deprecate` uses this graph (`GetDirectConsumers`) to walk outward from the
 deprecated version and create/refresh a `+deprecated` tag (with the earliest expiration) on every downstream
 consumer, pushing tag creations (and removals, once expired) to each repo's remote via `DeferredPushRefSpecs`.
+
+The propagation obeys the same alive-version rule as its root: a consumer whose **alive** version still consumes the
+deprecated one is left alone, with a warning, and the walk stops there and on that repository's own consumers — the
+same warn-and-stop treatment as a consumer whose version tag is missing or is a `+fake`. That repository must publish
+a replacement first; the deprecation can then be replayed.
 Once that is done it raises [`VersionDeprecated`](#versiondeprecated--the-extension-point-this-plugin-offers) with the
 releases it actually tagged, so the deprecation can be mirrored outside the tags.
 
