@@ -999,6 +999,13 @@ public sealed partial class GitRepository : IDisposable
         Throw.CheckArgument( !localBranch.Reference.IsRemoteTrackingBranch );
 
         var branchName = localBranch.FriendlyName;
+        if( IsLocalOnlyRefName( branchName ) )
+        {
+            // This is an explicit push request: it is an error. Doing it here also avoids creating the remote
+            // tracking association that autoCreateRemoteBranch sets up below.
+            monitor.Error( $"Branch '{DisplayPath}/{branchName}' cannot be pushed: 'local/' and 'building/' references must never appear on a remote." );
+            return false;
+        }
         using( monitor.OpenInfo( $"Pushing branch '{DisplayPath}/{branchName}'." ) )
         {
             string? remoteName = null;
@@ -1035,7 +1042,58 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
+    /// Gets whether a reference name is in the "local/" or "building/" namespace: such references are purely
+    /// local build artifacts that must never be pushed to a remote.
+    /// <para>
+    /// The name can be canonic (like "refs/tags/local/v1.0.0" or "refs/heads/building/xxx") or a friendly name
+    /// (like "local/v1.0.0"): a "refs/{category}/" prefix is skipped.
+    /// </para>
+    /// </summary>
+    /// <param name="refName">The reference name to test.</param>
+    /// <returns>True if this reference must never appear on a remote.</returns>
+    public static bool IsLocalOnlyRefName( ReadOnlySpan<char> refName )
+    {
+        if( refName.StartsWith( "refs/", StringComparison.Ordinal ) )
+        {
+            refName = refName.Slice( 5 );
+            int idxCategory = refName.IndexOf( '/' );
+            if( idxCategory >= 0 ) refName = refName.Slice( idxCategory + 1 );
+        }
+        return refName.StartsWith( "local/", StringComparison.Ordinal )
+               || refName.StartsWith( "building/", StringComparison.Ordinal );
+    }
+
+    /// <summary>
+    /// Gets whether a push ref spec must be refused because its destination is a <see cref="IsLocalOnlyRefName(ReadOnlySpan{char})"/>
+    /// reference or contains a wildcard (a wildcard cannot be proved to exclude such references).
+    /// <para>
+    /// Deletions (ref specs with an empty source like ":refs/tags/local/v1.0.0") are never refused: removing a
+    /// reference from a remote is always allowed.
+    /// </para>
+    /// </summary>
+    /// <param name="refSpec">The push ref spec to test.</param>
+    /// <returns>True if this ref spec must not be pushed.</returns>
+    public static bool IsRefusedPushRefSpec( ReadOnlySpan<char> refSpec )
+    {
+        // Skips the "force" marker and considers the destination: the right part of the ':' separator when it
+        // exists, the whole spec otherwise (Git then pushes to the same reference name).
+        if( refSpec.Length > 0 && refSpec[0] == '+' ) refSpec = refSpec.Slice( 1 );
+        int idxSeparator = refSpec.LastIndexOf( ':' );
+        if( idxSeparator >= 0 )
+        {
+            // An empty source is a deletion.
+            if( idxSeparator == 0 ) return false;
+            refSpec = refSpec.Slice( idxSeparator + 1 );
+        }
+        return refSpec.Contains( '*' ) || IsLocalOnlyRefName( refSpec );
+    }
+
+    /// <summary>
     /// Low level push method that must be used whenever possible as this handles the <see cref="DeferredPushRefSpecs"/>.
+    /// <para>
+    /// Ref specs for which <see cref="IsRefusedPushRefSpec(ReadOnlySpan{char})"/> is true are skipped (with a warning):
+    /// this is the single place that guaranties that no "local/" or "building/" reference can ever reach a remote.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="remote">The target remote.</param>
@@ -1045,6 +1103,24 @@ public sealed partial class GitRepository : IDisposable
     public bool Push( IActivityMonitor monitor, Remote remote, UsernamePasswordCredentials? creds, IEnumerable<string> pushRefSpecs )
     {
         _deferredPushRefSpecs.AddRange( pushRefSpecs );
+        // This is the single low level push: filtering here guaranties that no "local/" or "building/" reference
+        // can ever reach a remote. Such references are purely local build artifacts that the other side recomputes:
+        // pushing them is useless at best and harmful at worst (a pushed "local/" version tag breaks the fix branch
+        // adoption of 'ckli fix start').
+        // They are skipped instead of failing the push and are removed from the DeferredPushRefSpecs: a deferred
+        // spec that must not be pushed must neither break nor be retried by every subsequent push. Commands that
+        // explicitly name the reference to push (ckli tag push, ckli branch push) reject it before reaching this.
+        _deferredPushRefSpecs.RemoveWhere( spec =>
+        {
+            if( !IsRefusedPushRefSpec( spec ) ) return false;
+            monitor.Warn( $"Skipping push of '{spec}' in '{DisplayPath}': 'local/' and 'building/' references must never be pushed (nor wildcards that may match them)." );
+            return true;
+        } );
+        if( _deferredPushRefSpecs.Count == 0 )
+        {
+            monitor.Trace( $"Nothing to push in '{DisplayPath}'." );
+            return true;
+        }
         var commonLogMsg = $"'{DisplayPath}' references '{_deferredPushRefSpecs.Concatenate( "', '" )}'";
         using( monitor.OpenTrace( $"Pushing {commonLogMsg}." ) )
         {

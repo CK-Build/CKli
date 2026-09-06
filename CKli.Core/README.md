@@ -114,6 +114,25 @@ public interface ISecretsStore
 The default implementation (`DotNetUserSecretsStore`) uses the standard .NET user secrets mechanism. PAT key names follow the convention `{Prefix}_READ_PAT` / `{Prefix}_WRITE_PAT` (e.g. `GITHUB_CK-Build_READ_PAT`)
 but this is eventually under control of the `GitHostingProvider`.
 
+### Pushing: `local/` and `building/` references never reach a remote
+
+A version tag prefixed with `building/` (a build in progress) or `local/` (a build that succeeded but is not published
+yet) is a purely local artifact: another clone recomputes it, and a pushed `local/` tag actively harms the receiver (it
+breaks the `fix/` branch adoption of `ckli fix start`). The same holds for any reference in those namespaces, branches
+included. This is guaranteed, not merely respected by convention:
+
+- [`GitRepository.Push`](Git/GitRepository.cs) is the single low level push: `PushBranch`, `PushTags`, the
+  `DeferredPushRefSpecs` and the remote branch deletions all funnel into it. It skips — with a warning — every ref spec
+  for which `IsRefusedPushRefSpec` is true: one whose destination `IsLocalOnlyRefName` (`local/` or `building/`, canonic
+  or friendly name) or contains a wildcard (a wildcard cannot be proved to exclude such a reference).
+- Skipping rather than failing is deliberate: a refused ref spec sitting in `DeferredPushRefSpecs` must break no
+  subsequent push, and it is removed from the set so that it is not retried forever.
+- Deletions (`:refs/tags/local/v1.0.0`) are never refused: a reference that reached a remote before must stay removable.
+  `DeleteRemoteTags` is the only push that doesn't go through `Push` — it builds nothing but deletion ref specs.
+- The commands where the user names the reference reject it up front with an error rather than a silent skip:
+  `ckli tag push` and `ckli branch push`. `ckli push` names nothing (it pushes whatever tracks a remote branch), so it
+  warns and skips such a branch.
+
 ---
 
 # Git Hosting Providers

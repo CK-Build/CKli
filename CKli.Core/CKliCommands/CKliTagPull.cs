@@ -54,6 +54,20 @@ sealed class CKliTagPull : Command
                     """ );
             tagNames = tagNames.Except( invalidNames );
         }
+        if( !pull )
+        {
+            // GitRepository.Push skips these tags anyway. Here the user explicitly named the tags to push:
+            // refusing the command is better than pretending to push them.
+            var localNames = tagNames.Where( n => GitRepository.IsLocalOnlyRefName( n ) ).ToList();
+            if( localNames.Count > 0 )
+            {
+                monitor.Error( $"""
+                        Tags '{localNames.Concatenate( "', '" )}' cannot be pushed: 'local/' and 'building/' tags
+                        are purely local build artifacts, they must never appear on a remote.
+                        """ );
+                return false;
+            }
+        }
         if( !tagNames.Any() )
         {
             monitor.Error( $"Expecting at least one tag name to {(pull ? "pull" : "push")}." );

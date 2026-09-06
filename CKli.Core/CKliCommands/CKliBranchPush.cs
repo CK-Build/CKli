@@ -41,7 +41,12 @@ sealed class CKliBranchPush : Command
                                      bool all,
                                      CancellationToken scopeAlive )
     {
-
+        if( GitRepository.IsLocalOnlyRefName( branchName ) )
+        {
+            // GitRepository.PushBranch rejects it anyway: doing it here avoids opening the World for nothing.
+            monitor.Error( $"Branch '{branchName}' cannot be pushed: 'local/' and 'building/' references are purely local, they must never appear on a remote." );
+            return false;
+        }
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 context,
                                                 out var stack,

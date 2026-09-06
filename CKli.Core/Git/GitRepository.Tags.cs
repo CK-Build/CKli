@@ -82,6 +82,10 @@ public sealed partial class GitRepository
                 return false;
             }
             monitor.Trace( $"Deleting remote tags '{names}' from '{remote.Name}'." );
+            // This is the only push that doesn't go through Push (there is no DeferredPushRefSpecs to handle here):
+            // it builds nothing but deletion ref specs that IsRefusedPushRefSpec never refuses (removing a "local/"
+            // or "building/" reference from a remote is always allowed). Any other kind of spec added here must be
+            // filtered by IsRefusedPushRefSpec.
             _git.Network.Push( remote, tagNames.Select( t => t.StartsWith( "refs/tags/", StringComparison.Ordinal )
                                                                 ? $":{t}"
                                                                 : $":refs/tags/{t}" ), new PushOptions()

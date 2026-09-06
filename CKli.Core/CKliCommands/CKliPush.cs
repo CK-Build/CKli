@@ -90,6 +90,13 @@ sealed class CKliPush : Command
                                 if( tracked != null
                                     && tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.Ordinal ) )
                                 {
+                                    if( GitRepository.IsLocalOnlyRefName( b.FriendlyName ) )
+                                    {
+                                        // Not an error here: this pushes whatever tracks a remote branch, the user
+                                        // doesn't name them. GitRepository.PushBranch would fail on such a branch.
+                                        monitor.Warn( $"Skipping branch '{b.FriendlyName}' of '{repo.DisplayPath}': 'local/' and 'building/' references are never pushed." );
+                                        continue;
+                                    }
                                     success &= repo.GitRepository.PushBranch( monitor, b, autoCreateRemoteBranch: false );
                                     if( !success && !continueOnError ) break;
                                 }
