@@ -295,6 +295,28 @@ public class StackRepositoryTests
     }
 
     [Test]
+    public async Task Clone_with_diff_casing_reacquires_the_git_handle_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var remotes = TestEnv.OpenRemotes( "CKt" );
+
+        var stackUrl = remotes.StackUri.LocalPath.ToLowerInvariant();
+        Assume.That( Directory.Exists( stackUrl ), "This test can only run on case insensitive file system." );
+
+        // The Stack folder is first created as "ckt" and then renamed to "CKt". The git handle must be
+        // disposed for the folder to be moved: a new one is acquired on the new path.
+        using var stack = (await StackRepository.CloneAsync( TestHelper.Monitor,
+                                                             context,
+                                                             new Uri( stackUrl ),
+                                                             isPublic: true )).ShouldNotBeNull();
+        stack.StackRoot.LastPart.ShouldBe( "CKt" );
+        var git = stack.GitRepository;
+        git.DisplayPath.Path.ShouldBe( "CKt/.PublicStack", "Not the 'ckt' one of the disposed handle." );
+        git.CurrentBranchName.ShouldBe( "master" );
+        git.Repository.Head.Tip.ShouldNotBeNull();
+    }
+
+    [Test]
     public async Task Clone_with_diff_casing_Async()
     {
         var display = new StringScreen( useDebugRenderer: true );

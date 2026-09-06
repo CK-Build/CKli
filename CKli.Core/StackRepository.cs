@@ -679,7 +679,7 @@ public sealed partial class StackRepository : IDisposable
             stackBranchName = GetStackBranchName( monitor, git, stackBranchName );
             // Before doing anything else, we read the definition file and extract the actual
             // world name with the right casing. If case differ, the git handle is disposed,
-            // the folder name is fixed and a new git handle is acquired.
+            // the folder name is fixed and a new git handle is acquired on the new path.
             if( git.FullCheckout( monitor, stackBranchName, skipFetchMerge: true )
                 && GetActualStackName( monitor, git, stackNameFromUrl, out var actualStackName ) )
             {
@@ -706,6 +706,18 @@ public sealed partial class StackRepository : IDisposable
                         Throw.DebugAssert( "We kept the 'IsDuplicate uses ReferenceEquals' invariant.",
                             (ReferenceEquals( stackRoot.LastPart, stackFolderName ) && stackFolderName != stackNameFromUrl)
                             || (ReferenceEquals( stackRoot.LastPart, stackNameFromUrl ) && stackFolderName == stackNameFromUrl) );
+
+                        // The handle above has been disposed to be able to move the folder: everything below
+                        // (and the returned StackRepository) needs a valid one, bound to the new path and to
+                        // the new display path.
+                        var moved = GitRepository.Open( monitor,
+                                                        context.SecretsStore,
+                                                        context.Committer,
+                                                        gitPath,
+                                                        gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ),
+                                                        isPublic );
+                        if( moved == null ) return null;
+                        git = moved;
                     }
                 }
                 SetupNewLocalDirectory( gitPath );
