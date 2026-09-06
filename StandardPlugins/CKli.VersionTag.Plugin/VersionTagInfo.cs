@@ -163,6 +163,37 @@ public sealed partial class VersionTagInfo : RepoInfo
     }
 
     /// <summary>
+    /// Gets the "alive" version: the stable version that this repository currently offers to its consumers.
+    /// <para>
+    /// This is the <see cref="HotZoneInfo.LastStable"/> when it is a published version. When the LastStable
+    /// is (or carries) a "+fake", nothing has been published for it yet - a fake announces a version to be
+    /// produced - so the alive version is the published stable version below it.
+    /// </para>
+    /// <para>
+    /// This is null when this repository has never published a stable version.
+    /// </para>
+    /// </summary>
+    public TagCommit? AliveStable
+    {
+        get
+        {
+            var c = _hotZone?.LastStable;
+            if( c == null ) return null;
+            if( !c.IsOrHasFakeVersion ) return c;
+            // LastStables is ordered from the greatest to the oldest: the first published stable below the
+            // fake is the one the consumers use today.
+            foreach( var tc in LastStables )
+            {
+                if( tc.Version < c.Version && !tc.IsOrHasFakeVersion && !tc.IsBuildingOrLocal )
+                {
+                    return tc;
+                }
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Gets the hot zone information. Never null if <see cref="HasIssue"/> is false.
     /// <para>
     /// This is not null as soon as a <see cref="HotZoneInfo.LastStable"/> exists.

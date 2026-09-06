@@ -90,6 +90,22 @@ public sealed partial class VersionTagPlugin
                 """ );
             return false;
         }
+        // The alive version is the one the consumers use today. Deprecating it would leave this repository
+        // with nothing usable at all, so the replacement must be published first: once it is, this version
+        // is no longer the alive one and this deprecation is allowed.
+        //
+        // This only guards the CREATION of a deprecation. A deprecation is irreversible - only its "when"
+        // can be changed - so an alive version that already carries a "+deprecated" tag must remain
+        // updatable. Both this guard and the way "ckli build" rebuilds a deprecated version make that state
+        // unreachable, but if a manual tag edit produces it, the expiration must still be fixable.
+        if( !tagCommit.IsDeprecatedVersion && info.AliveStable == tagCommit )
+        {
+            monitor.Error( $"""
+                Version 'v{v}' is the current version of '{repo.DisplayPath}': it cannot be deprecated.
+                Publish a newer version first, then deprecate 'v{v}'.
+                """ );
+            return false;
+        }
 
         // Now, lets start by building the version database.
         var releaseDatabase = EnsureDatabase( monitor );
@@ -315,9 +331,20 @@ public sealed partial class VersionTagPlugin
                         {StoppingDeprecationMessage( monitor, impact )}
                         """ );
                 }
+                else if( !tagCommit.IsDeprecatedVersion && versionInfo.AliveStable == tagCommit )
+                {
+                    // Same rule as the root of the deprecation (see DeprecateVersion): the version this
+                    // repository currently offers to its own consumers cannot be taken away from it. The
+                    // deprecation stops here rather than silently killing it - the repository must publish
+                    // a replacement first, and the propagation can then be replayed.
+                    monitor.Warn( $"""
+                        Version 'v{impact.Version}' is the current version of '{impact.Repo.DisplayPath}': it cannot be deprecated.
+                        {StoppingDeprecationMessage( monitor, impact )}
+                        """ );
+                }
                 else
                 {
-                    // Tag exists and is not a fake one: it may already be deprecated.
+                    // Tag exists, is not a fake one and is not the alive version: it may already be deprecated.
                     var tagInfo = tagCommit.DeprecatedInfo;
                     if( tagInfo != null )
                     {
