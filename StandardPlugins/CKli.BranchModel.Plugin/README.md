@@ -104,7 +104,13 @@ rather than mutating in place. `BranchModelPlugin` persists the result back to t
   but has nothing ahead of its base (a "useless" `dev/`), silently delete it instead of reporting
   it as an issue.
 - **`<Explo Name="..." Parent="..." Link="...">`** — an exploratory branch. `Name` must be
-  `explo/<lowercase-id>` (the `explo/` prefix and the LTS prefix are inferred if omitted). `Parent`
+  `explo/<lowercase-id>` (the `explo/` prefix and the LTS prefix are inferred if omitted) and must
+  neither start with `ci-` nor end with `-ci` — that suffix qualifies a branch name to name its CI
+  builds apart from its regular versions (the Publish plugin's `Published/index.json` does exactly
+  that), so `explo/spike-ci` and the CI line of `explo/spike` would be one name. An exploratory name
+  is the only branch name that is free: `alpha` to `zulu` are fixed and by design none of them
+  collides. The rule is `BranchNamespace.IsReservedExploratoryName`, applied here, by `branch open`
+  and by `AddOrUpdateExplo`; `SVersion.SetExploratoryName` enforces it on the version side. `Parent`
   is required only on a *root* `<Explo>` (nested `<Explo>` elements inherit their XML parent).
   `Link` defaults to `CI`.
 

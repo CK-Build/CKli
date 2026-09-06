@@ -176,9 +176,14 @@ public sealed class BranchName : IEquatable<BranchName>
         if( h.TryMatch( "explo/", StringComparison.Ordinal ) )
         {
             csPrerelease = CSVersionKind.None;
-            if( !BranchNamespace.MatchBranchSegment( ref h, out _ ) || !h.SkipWhiteSpaces() || h.Length != 0 )
+            if( !BranchNamespace.MatchBranchSegment( ref h, out var exploName ) || !h.SkipWhiteSpaces() || h.Length != 0 )
             {
                 monitor.Error( $"Invalid '{branchName}'. Segment '{branchName.AsSpan( 6 )}' must be a lowercase ASCII identifier (which may contain dash '-' or underscore '_')" );
+                return false;
+            }
+            if( BranchNamespace.IsReservedExploratoryName( exploName ) )
+            {
+                monitor.Error( $"Invalid '{branchName}'. {BranchNamespace.ReservedExploratoryNameError}" );
                 return false;
             }
         }

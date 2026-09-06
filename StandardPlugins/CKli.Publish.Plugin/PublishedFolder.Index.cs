@@ -22,8 +22,8 @@ public sealed partial class PublishedFolder
     public const string IndexFileName = "index.json";
 
     /// <summary>
-    /// The index group name of the stable versions (and their CI builds), whose
-    /// <see cref="SVersion.BranchName"/> is the empty string: "(stable)".
+    /// The index group name of the stable versions, whose <see cref="SVersion.BranchName"/> is the empty
+    /// string: "(stable)".
     /// <para>
     /// This is deliberately NOT the World's root branch name - that one is the BranchModel's business and
     /// can be renamed (an LTS World has its own). The index names the versions it contains, not the
@@ -31,6 +31,23 @@ public sealed partial class PublishedFolder
     /// </para>
     /// </summary>
     public const string StableGroupName = "(stable)";
+
+    /// <summary>
+    /// The index group name of the CI builds of the stable versions: "(stable-ci)". They share the
+    /// <see cref="StableGroupName"/> empty <see cref="SVersion.BranchName"/> but never its list.
+    /// </summary>
+    public const string StableCIGroupName = "(stable-ci)";
+
+    /// <summary>
+    /// What qualifies a branch group name to hold its CI builds instead of its regular versions: "-ci".
+    /// <para>
+    /// This cannot collide with a branch: "alpha" to "zulu" are fixed and by design none of them ends
+    /// with it, and an exploratory name that would (or that starts with "ci-") is refused - by
+    /// SVersion.SetExploratoryName on the version side and by BranchNamespace.IsReservedExploratoryName
+    /// on the branch side.
+    /// </para>
+    /// </summary>
+    public const string CIGroupSuffix = "-ci";
 
     // Same options as PublishedProfile.ToUtf8Bytes: an explicit "\r\n" so that the file is the same on any
     // platform (JsonWriterOptions defaults to Environment.NewLine), and the relaxed encoder because this is
@@ -49,7 +66,8 @@ public sealed partial class PublishedFolder
 
     /// <summary>
     /// Gets the utf-8 Json index of this folder: the "Alive" and "Deprecated" profile versions, each one
-    /// grouped by branch and ordered from the latest to the oldest. All the files are read.
+    /// grouped by branch - a branch's CI builds in their own <see cref="CIGroupSuffix"/> group - and
+    /// ordered from the latest to the oldest. All the files are read.
     /// <para>
     /// This is what <see cref="Save"/> writes to <see cref="IndexFilePath"/>. The index is a projection of
     /// the profile files and nothing here ever reads it back: it exists for whoever looks at the folder
@@ -85,7 +103,11 @@ public sealed partial class PublishedFolder
                 // throws otherwise), so BranchName is never null here.
                 var branchName = p.Version.BranchName;
                 Throw.DebugAssert( branchName != null );
-                var name = branchName.Length == 0 ? StableGroupName : branchName;
+                // A CI build shares its branch's name - and its folder - but never its list. Ordinal order
+                // puts a group right before its own CI one: ')' and end-of-string both precede '-'.
+                var name = branchName.Length == 0
+                            ? (p.Version.IsCI ? StableCIGroupName : StableGroupName)
+                            : (p.Version.IsCI ? branchName + CIGroupSuffix : branchName);
                 if( !groups.TryGetValue( name, out var versions ) )
                 {
                     groups.Add( name, versions = new List<SVersion>() );
@@ -94,7 +116,8 @@ public sealed partial class PublishedFolder
             }
             w.WriteStartObject( setName );
             // A group exists only because a version landed in it, so a branch with no version is absent by
-            // construction. "(stable)" is the exception: it is seeded above and appears even when empty.
+            // construction - "(stable-ci)" included. "(stable)" is the only exception: it is seeded above
+            // and appears even when empty, so a consumer always has the root list to read.
             foreach( var (name, versions) in groups )
             {
                 w.WriteStartArray( name );

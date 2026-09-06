@@ -59,6 +59,10 @@ public sealed partial class BranchNamespace
         {
             Throw.ArgumentException( nameof( branchName ), $"Invalid branch name '{branchName}': segment '{segmentName}' must a lowercase identifier with optional '-' and '_' characters." );
         }
+        if( IsReservedExploratoryName( segmentName ) )
+        {
+            Throw.ArgumentException( nameof( branchName ), $"Invalid branch name '{branchName}'. {ReservedExploratoryNameError}" );
+        }
 
         if( _ltsName != null ) branchName = _ltsName + '/' + branchName;
         if( _byName.TryGetValue( branchName, out var exists )

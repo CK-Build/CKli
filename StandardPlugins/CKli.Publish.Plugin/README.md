@@ -308,7 +308,8 @@ back those, and all three read every file.
 
 `Save` refreshes `Published/index.json` whenever at least one profile file actually changed (that file is
 not counted in what it returns). It lists the profile **versions** in two sets, `Alive` and `Deprecated`,
-each grouped by branch and ordered from the latest to the oldest:
+each grouped by branch — a branch's CI builds in a group of their own — and ordered from the latest to
+the oldest:
 
 ```json
 {
@@ -316,6 +317,9 @@ each grouped by branch and ordered from the latest to the oldest:
     "(stable)": [
       "2026.254.1",
       "2026.254.0"
+    ],
+    "(stable-ci)": [
+      "2026.254.2--ci.0"
     ],
     "alpha": [
       "2026.254.0-alpha"
@@ -328,13 +332,20 @@ each grouped by branch and ordered from the latest to the oldest:
 ```
 
 - The group name is the version's `SVersion.BranchName` — `alpha` to `zulu`, `explo/{name}` — except
-  for the stable versions (and their CI builds), whose branch name is the empty string: they are grouped
-  under `(stable)`. That is deliberately **not** the World's root branch name, which belongs to the
-  BranchModel and can differ (an LTS World has its own): the index names the versions it contains, not
-  the branches of any particular World. The parentheses also make the name unambiguous — an exploratory
-  branch is `explo/(stable)`, never `(stable)` — and sort it before every real branch.
-- A branch with no version in a set does not appear in that set. `(stable)` is the exception: it is always
-  there, empty list included.
+  for the stable versions, whose branch name is the empty string: they are grouped under `(stable)`. That
+  is deliberately **not** the World's root branch name, which belongs to the BranchModel and can differ (an
+  LTS World has its own): the index names the versions it contains, not the branches of any particular
+  World. The parentheses also make the name unambiguous — an exploratory branch is `explo/(stable)`,
+  never `(stable)` — and sort it before every real branch.
+- **A branch's CI builds never share its list.** They carry the same `BranchName` and live in the same
+  folder, but the index appends `-ci` to the group name: `alpha-ci`, `explo/spike-ci`, and `(stable-ci)`
+  for the CI builds of the stable versions. That suffix cannot collide with a branch: `alpha` to `zulu`
+  are fixed and by design none of them ends with it, and an exploratory name that would — or that
+  starts with `ci-` — is refused, by `SVersion.SetExploratoryName` on the version side and by
+  `BranchNamespace.IsReservedExploratoryName` on the branch side (`branch open`, `AddOrUpdateExplo` and
+  the BranchModel configuration). Ordinal order puts each group immediately before its own CI one.
+- A branch with no version in a set does not appear in that set, its CI group included. `(stable)` is the
+  only exception: it is always there, empty list included, so a consumer always has the root list to read.
 - **The index is a reflection, never a source.** `PublishedFolder` writes it and never reads it back:
   `LoadAll` only accepts a file whose whole name is a version, and `index` is not one. Delete it and the
   next `Save` that changes something puts it back; nothing else notices.
