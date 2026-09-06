@@ -22,17 +22,14 @@ public sealed partial class BuildPlugin
     /// </summary>
     /// <param name="monitor"></param>
     /// <param name="context"></param>
-    /// <param name="ci"></param>
     /// <param name="skipTests"></param>
     /// <param name="forceTests"></param>
     /// <param name="rebuild"></param>
     /// <returns></returns>
-    [Description( "Builds the current Fix Workflow." )]
+    [Description( "Builds the current Fix Workflow. The produced versions are local ones: use 'ckli fix push' to share them." )]
     [CommandPath( "fix build" )]
     public Task<bool> FixBuildAsync( IActivityMonitor monitor,
                                      CKliEnv context,
-                                     [Description("Build CI versions instead of the target stable versions.")]
-                                     bool ci = false,
                                      [Description( "Don't run tests even if they have never locally run on a commit." )]
                                      bool skipTests = false,
                                      [Description( "Run tests even if they have already run successfully on a commit." )]
@@ -45,7 +42,7 @@ public sealed partial class BuildPlugin
         {
             return Task.FromResult( false );
         }
-        return DoBuildFixAsync( monitor, context, runTest, workflow, rebuild, ci, publish: false, keepBranch: true );
+        return DoBuildFixAsync( monitor, context, runTest, workflow, rebuild, publish: false, keepBranch: true );
     }
 
 
@@ -56,7 +53,6 @@ public sealed partial class BuildPlugin
     /// </summary>
     /// <param name="monitor"></param>
     /// <param name="context"></param>
-    /// <param name="ci"></param>
     /// <param name="keepBranch"></param>
     /// <param name="rebuild"></param>
     /// <returns></returns>
@@ -64,9 +60,7 @@ public sealed partial class BuildPlugin
     [CommandPath( "fix publish" )]
     public Task<bool> FixPublishAsync( IActivityMonitor monitor,
                                        CKliEnv context,
-                                       [Description( "Publishes CI versions instead of the target stable versions." )]
-                                       bool ci = false,
-                                       [Description( "On success, keeps the 'fix/' branches instead of deleting them. Applies only to non-CI builds." )]
+                                       [Description( "On success, keeps the 'fix/' branches instead of deleting them." )]
                                        bool keepBranch = false,
                                        [Description( "Force a rebuild." )]
                                        bool rebuild = false )
@@ -80,9 +74,8 @@ public sealed partial class BuildPlugin
                                 runTest: rebuild ? true : null,
                                 workflow,
                                 rebuild,
-                                ci,
                                 publish: true,
-                                keepBranch || ci );
+                                keepBranch );
     }
 
     async Task<bool> DoBuildFixAsync( IActivityMonitor monitor,
@@ -90,11 +83,9 @@ public sealed partial class BuildPlugin
                                       bool? runTest,
                                       FixWorkflow? workflow,
                                       bool rebuild,
-                                      bool isCIBuild,
                                       bool publish,
                                       bool keepBranch )
     {
-        Throw.DebugAssert( "!keepBranch => publishing non-CI builds", keepBranch || (publish && !isCIBuild) );
         if( workflow == null )
         {
             monitor.Error( $"No current Fix Workflow exist for world '{World.Name}'." );
@@ -114,7 +105,6 @@ public sealed partial class BuildPlugin
                                                    context,
                                                    runTest,
                                                    rebuild,
-                                                   isCIBuild,
                                                    bResults,
                                                    packageMapping,
                                                    target ).ConfigureAwait( false ) )
@@ -139,7 +129,7 @@ public sealed partial class BuildPlugin
         {
             using( monitor.OpenTrace( $"Raising FixBuild event." ) )
             {
-                var e = new FixBuildEventArgs( monitor, context, workflow, isCIBuild, results, publish, keepBranch );
+                var e = new FixBuildEventArgs( monitor, context, workflow, results, publish, keepBranch );
                 if( !await _onFixBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) )
                 {
                     return false;
@@ -195,7 +185,6 @@ public sealed partial class BuildPlugin
                                              CKliEnv context,
                                              bool? runTest,
                                              bool rebuild,
-                                             bool isCIBuild,
                                              ImmutableArray<BuildResult>.Builder bResults,
                                              FixPackageMapper packageMapping,
                                              FixWorkflow.TargetRepo target )
@@ -205,27 +194,21 @@ public sealed partial class BuildPlugin
         // We are ready to build or rebuild the target.
         // We have nothing to do when rebuilding: the previous "building/" or "local/" if it exists, will be
         // moved (the "rolling local build" feature).
-        // But when a "fix build --ci" has been done right before, a "--ci" version tag may
-        // exist on the same commit we are building. Because this is not allowed, we must
-        // handle this case.
-        //  - Aggressive: Cleaning any CI builds (or deprecate the published ones).
-        //                Because one cannot rebuild a deprecated (and this is a good feature),
-        //                the deprecation must be a "hard delete" (no +deprecated tag)...
-        //                That is NOT the spirit so far: published artefacts must be deprecated.
-        //                But deprecating a version from here would be weird (surprising remote impact).
-        //                
-        //  - Gentle: Adding an empty commit when needed (when a CI tag exists).
         //
-        //  - Gentle Synthesis: If a "building/" or "local/" CI build exists, we destroy the release (suppressing the tag
-        //                      and any artefacts).
-        //                      If a published CI build exists, create an empty commit to carry the release
-        //                      and let the user deprecate the version manually whenever he wants.
+        // A CI version tag may nevertheless be found on the commit we are building. The fix workflow cannot
+        // produce one any more (there is no "fix build --ci"), so it can only be a leftover from before that
+        // mode was removed. A commit bears at most one version, so it must be handled rather than tripped
+        // over:
+        //  - A "building/" or "local/" CI build is unpublished: we destroy the release (its tag and artefacts).
+        //  - A published CI build cannot be touched (published artefacts are deprecated, never deleted, and
+        //    deprecating from here would be a surprising remote effect): we add an empty commit to carry the
+        //    new release and leave the old version alone.
         //
         //  If the existing version is or has a +fake, this is an error (fake versions have nothing to do in
         //  a fix context).
         //
         var updates = new PackageMapper();
-        if( !CheckoutFixTargetBranch( monitor, target, versionInfo, out var toFix, out int commitDepth )
+        if( !CheckoutFixTargetBranch( monitor, target, versionInfo, out var toFix )
             || !_solutionPlugin.UpdatePackages( monitor, target.Repo, packageMapping, updates )
             || !CommitUpdatedPackages( monitor, updates, target, out bool hasNewCommit ) )
         {
@@ -234,13 +217,9 @@ public sealed partial class BuildPlugin
         Throw.DebugAssert( toFix.BuildContentInfo != null );
 
         var commitToBuild = target.Repo.GitRepository.Repository.Head.Tip;
-        if( hasNewCommit )
+        if( !hasNewCommit )
         {
-            commitDepth++;
-            // A commit has been created by CommitUpdatedPackages.
-        }
-        else
-        {
+            // No commit has been created by CommitUpdatedPackages.
             // No new commit: we must handle the potential tag clash.
             if( versionInfo.TagCommitsBySha.TryGetValue( commitToBuild.Sha, out var exists ) )
             {
@@ -255,27 +234,19 @@ public sealed partial class BuildPlugin
 
                 if( exists.IsBuildingOrLocal )
                 {
-                    // The "local/" version exists.
-                    // If it's a non-CI build, we must let the build be skipped.
-                    // If it's a CI build and we are ci build again, we must let the build be skipped.
-                    // => We must only handle a non-CI build on a previous CI build by destroying the
-                    //    "local/" build. 
-                    if( exists.Version.IsCI && !isCIBuild )
+                    // The version is unpublished. A non-CI one is this workflow's own previous build: we let
+                    // it be skipped or moved. A CI one is a leftover: destroy it, a commit bears one version.
+                    if( exists.Version.IsCI
+                        && !versionInfo.DestroyLocalRelease( monitor, exists.Version, removeFromNuGetGlobalCache: false ) )
                     {
-                        if( !versionInfo.DestroyLocalRelease( monitor, exists.Version, removeFromNuGetGlobalCache: false ) )
-                        {
-                            return false;
-                        }
+                        return false;
                     }
-
                 }
                 else
                 {
-                    // The commit has been published.
-                    // Only CI builds can be published in a fix workflow via 'ckli fix publish --ci'.
-                    // 'ckli fix publish' ends the workflow but if the publication fails, we must let
-                    // the build be skipped.
-                    // => We only handle a non-CI build on a previously published CI by creating an empty commit.
+                    // The commit has been published. A non-CI one is a 'ckli fix publish' whose publication
+                    // failed after the tag was applied: we let the build be skipped. A published CI one is a
+                    // leftover that must not be touched: carry the new release on an empty commit instead.
                     if( exists.Version.IsCI )
                     {
                         var git = target.Repo.GitRepository;
@@ -285,25 +256,26 @@ public sealed partial class BuildPlugin
                             return false;
                         }
                         commitToBuild = git.Repository.Head.Tip;
-                        commitDepth++;
                     }
                 }
             }
         }
-        var targetVersion = target.TargetVersion;
-        if( isCIBuild )
-        {
-            // The target version already has the incremented Patch number.
-            targetVersion = targetVersion.SetCINumber( commitDepth, impactStablePatchNumber: false );
-        }
-        targetVersion = targetVersion.SetParsedPrefix( "building/" );
+        var targetVersion = target.TargetVersion.SetParsedPrefix( "building/" );
+        // A previous "fix build" of this workflow may already have produced the target version. When it sits
+        // on another commit, this build must MOVE it onto the new one (the "rolling local build"), and
+        // CoreBuildAsync only allows that when forceRebuild is set - the very same flag that, when unset,
+        // lets a useless build be skipped. The two cases must therefore be told apart here: the roadmap can
+        // answer with a plain "!TargetVersion.IsCI" because it only calls CoreBuildAsync for the solutions it
+        // already decided to build, whereas every fix target goes through it.
+        bool moveVersion = versionInfo.TryGetTagCommit( target.TargetVersion, out var alreadyBuilt )
+                           && alreadyBuilt.Commit.Sha != commitToBuild.Sha;
         var result = await CoreBuildAsync( monitor,
                                            context,
                                            versionInfo,
-                                           target.Repo.GitRepository.Repository.Head.Tip,
+                                           commitToBuild,
                                            targetVersion,
                                            runTest,
-                                           forceRebuild: rebuild,
+                                           forceRebuild: rebuild || moveVersion,
                                            PrimaryPluginContext.Cancellation ).ConfigureAwait( false );
         if( result == null )
         {
@@ -356,10 +328,8 @@ public sealed partial class BuildPlugin
         static bool CheckoutFixTargetBranch( IActivityMonitor monitor,
                                              FixWorkflow.TargetRepo target,
                                              VersionTagInfo versionInfo,
-                                             [NotNullWhen( true )] out TagCommit? toFix,
-                                             out int commitDepth )
+                                             [NotNullWhen( true )] out TagCommit? toFix )
         {
-            commitDepth = 0;
             // We must be able to retrieve the TagCommit to fix.
             if( !versionInfo.TryGetTagCommit( target.ToFixVersion, out toFix ) )
             {
@@ -379,8 +349,9 @@ public sealed partial class BuildPlugin
             {
                 return false;
             }
-            commitDepth = gitRepository.ComputeCommitDepth( monitor, toFix.Commit, branch.Tip );
-            if( commitDepth < 0 )
+            // The depth itself is no longer used (it fed the CI number of the removed "fix build --ci"),
+            // but a negative answer is how an unrelated branch is detected.
+            if( gitRepository.ComputeCommitDepth( monitor, toFix.Commit, branch.Tip ) < 0 )
             {
                 monitor.Error( $"""
                     Unable to compute commit depth.

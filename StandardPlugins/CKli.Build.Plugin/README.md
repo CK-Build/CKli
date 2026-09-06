@@ -100,7 +100,7 @@ All build-family commands share a common set of options (declared once as `const
 | `publish` | `PublishAsync` | Same as `build`, and publishes the produced artifacts on success. |
 | `*build` | `StarBuildAsync` | "Upstream closure" build: also considers the *producers* of the current repositories (not just their consumers), propagating packages downstream, kept local. |
 | `*publish` | `StarPublishAsync` | Same as `*build`, and publishes on success. |
-| `fix build` | `FixBuildAsync` | Builds the current `FixWorkflow` (see below). |
+| `fix build` | `FixBuildAsync` | Builds the current `FixWorkflow` into the local feed (see below). There is no `--ci`: a fix has no CI line. |
 | `fix publish` | `FixPublishAsync` | Builds and publishes the current `FixWorkflow`; on success the workflow is finished. |
 | `maintenance rebuild old` | `RebuildOldAsync` | Walks each Repo's stable tags from the newest down, force-rebuilding until one succeeds; tags failing commits `+invalid` (unless `warnOnly`). |
 | `maintenance rebuild version` | `RebuildVersionAsync` | Force-rebuilds one specific version tag of the current repository (used to refresh a tag's recorded build content, e.g. to fix lightweight/unreadable tags). |
@@ -114,7 +114,7 @@ funnel into the same `DoCIAsync`/`DoNonCIAsync` â†’ `ComputeAndDisplayRoadmap` â
 | Event | Raised by | Payload | Purpose |
 |---|---|---|---|
 | `BuildPlugin.OnRoadmapBuild` | After a `Roadmap` build succeeds, or immediately for `--dry-run` | `RoadmapBuildEventArgs` (`Roadmap`, `ShouldPublish`, `BuildDate`) | Lets a listener (typically `CKli.Publish.Plugin`) act on the outcome; `Roadmap.SolutionBuildCount` can be 0 (nothing needed building). Handlers call `e.SetFailed()` to fail the command. |
-| `BuildPlugin.OnFixBuild` | After all targets of a `FixWorkflow` build succeed | `FixBuildEventArgs` (`FixWorkflow`, `Results`, `IsCIBuild`, `KeepBranchOnSuccessfulPublish`, `ShouldPublish`) | Same purpose for the `fix build`/`fix publish` pipeline. |
+| `BuildPlugin.OnFixBuild` | After all targets of a `FixWorkflow` build succeed | `FixBuildEventArgs` (`FixWorkflow`, `Results`, `KeepBranchOnSuccessfulPublish`, `ShouldPublish`) | Same purpose for the `fix build`/`fix publish` pipeline. |
 | `RepositoryBuilderPlugin.OnCoreBuild` | Right before `RepoBuilder` runs `dotnet build/test/pack` for one repository | `CoreBuildEventArgs` (`CommitBuildInfo`, `OutputPath`, `RunTest`, `Cancellation`, settable `ResultHook`) | Lets a handler short-circuit the actual build by setting `ResultHook` to a `BuildResult` - the mechanism used to fake builds in tests. |
 
 Both `RoadmapBuildEventArgs` and `FixBuildEventArgs` derive from `BuildBaseEventArgs`, which centralizes `ShouldPublish`,

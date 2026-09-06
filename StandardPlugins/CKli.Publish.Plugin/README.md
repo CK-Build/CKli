@@ -379,14 +379,13 @@ likewise resolved through `GitRepositoryKey` / `ISecretsStore`, documented in `C
 
 - **A fix publication leaves no profile.** `OnFixBuildAsync` publishes its `FixWorkflow` targets
   without touching the `PublishedFolder`, so a `fix/vMajor.Minor` release is invisible in the profile
-  history. Only `OnRoadmapBuildAsync` records one. The intended design is known: a fix updates every
-  profile that offers one of the fixed versions, substituting `TargetRepo.ToFixVersion` with what was
-  actually published, and the successor keeps its original's `Major.Minor` — "the same initial day" —
-  with the next free `Patch`. Two rules already hold: the substitution is per package (a `Repo` hosting
-  several solutions can carry several versions in one `Repository`), and a **deprecated profile is
-  locked** and gets no successor. What is still open is whether `fix publish --ci` should update the
-  profiles at all, since a CI fix build publishes a `--ci` version rather than
-  `TargetRepo.TargetVersion`.
+  history. Only `OnRoadmapBuildAsync` records one. The design is settled: a fix updates every profile
+  that offers one of the fixed versions, substituting `TargetRepo.ToFixVersion` with
+  `TargetRepo.TargetVersion`, and the successor keeps its original's `Major.Minor` — "the same initial
+  day" — with the next free `Patch`. Three rules hold: the substitution is **per package** (a `Repo`
+  hosting several solutions can carry several versions in one `Repository`); a **deprecated profile is
+  locked** and gets no successor; and there is no CI case to consider, since `fix build`/`fix publish`
+  no longer take `--ci`.
 - The gate's failure paths have no integration test coverage: `Tests/Plugins.Tests` never reaches
   `PublishableStatus.IndirectPublishRequired`, so the `RequiredPublications` closure, its
   producers-first ordering, `IndirectPublisher`, and `BuildFinalProfile`'s conflict branch are all

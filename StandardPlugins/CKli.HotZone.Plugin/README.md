@@ -77,6 +77,7 @@ and cancelled with three commands exposed by `HotZonePlugin`:
 |---|---|
 | `fix start <version> [--move-branch] [--with-empty-commit]` | Starts (or restarts) a Fix Workflow for the given `Major` or `Major.Minor` version of the current repo. |
 | `fix info` | Dumps the current Fix Workflow, if any. |
+| `fix push` | Pushes the targets' `fix/` branches to their remote (creating them if needed) so that another developer can join the fix. The `local/` version tags are deliberately not pushed — see [`Fix-Workflow.md`](../Fix-Workflow.md#sharing-a-fix-in-progress). |
 | `fix cancel` | Cancels the current Fix Workflow and destroys the local releases it may have created. |
 
 `fix start`:

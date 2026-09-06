@@ -20,10 +20,13 @@ to do the same thing.
   Major or Major.Minor version.
 - `fix info` — displays the current fix workflow, if any.
 - `fix cancel` — discards local, unpublished fix artifacts and abandons the current workflow.
-- `fix build [--ci] [--skip-tests] [--force-tests] [--rebuild]` — builds every target without
-  publishing.
-- `fix publish [--ci] [--keep-branch] [--rebuild]` — builds and publishes; on success, closes the
-  workflow.
+- `fix build [--skip-tests] [--force-tests] [--rebuild]` — builds every target without publishing.
+- `fix push` — pushes the targets' `fix/` branches so that another developer can join the fix.
+- `fix publish [--keep-branch] [--rebuild]` — builds and publishes; on success, closes the workflow.
+
+**There is no CI fix build.** `fix build` produces `local/` versions in the developer's own `$Local`
+feed and `fix publish` produces the real ones; nothing in between publishes an intermediate `--ci`
+version of a fix. Sharing work in progress is [`fix push`](#sharing-a-fix-in-progress)'s job instead.
 
 ## How it works
 
@@ -72,14 +75,44 @@ Targets build one at a time, in the order established at `fix start`, each on it
 The whole operation stops at the first failing target, leaving whatever already succeeded untouched
 until the workflow is retried or cancelled.
 
+### Rebuilding: a fix MOVES its version
+
+A fix's target version is a function of the version being fixed (its next Patch), so building the same
+fix twice must produce that same version again — on the new commit. `fix build` therefore *moves* the
+`local/` version rather than incrementing it, which is the "rolling local build". A target whose commit
+already bears the target version, with all its artifacts, is skipped instead.
+
+This is why the fix path decides `CoreBuildAsync`'s `forceRebuild` for itself
+(`BuildPlugin.Fix.cs`): that one flag both allows the target version to already exist on *another*
+commit and, when unset, allows a useless build to be skipped. The regular workflow answers it with a
+plain `!TargetVersion.IsCI` because it only calls `CoreBuildAsync` for the solutions it already decided
+to build; every fix target goes through it, so the two cases have to be told apart.
+
+### Sharing a fix in progress
+
+`fix push` pushes each target's `fix/` branch to its remote, creating it when needed. This is the only
+thing that shares a fix before it is published: a `fix/` branch tracks no remote branch yet, so a plain
+`ckli push` leaves it behind, and the branch names differ per repository (`fix/v1.0`, `fix/v0.1`, ...),
+so `ckli branch push` would have to be invoked once per name.
+
+The other developer then runs `fix start` on the same version. It fetches `fix/v{Major}.*` from the
+remote and **adopts** the pushed branch rather than restarting it: `CreateTarget` accepts a `fix/`
+branch whose tip differs from the commit to fix as long as that commit is in its history, and only
+demands `--move-branch` otherwise. A `fix build` then rebuilds the same versions into *his* `$Local`
+feed, and he can carry on.
+
+The `local/` version tags are deliberately **not** pushed. The fix versions are recomputed identically
+on the other side, so the tags carry nothing new — and pushing them would break the very `fix start`
+that adopts the branch: `FindFirst( bFix.Commits )` would answer the pushed `local/` tag instead of the
+version to fix, and demand a `--move-branch` whose move discards the fix.
+
 ### Publishing
 
 `fix build` only builds; `fix publish` builds and then publishes every target — pushing tags, packages,
-and hosted releases, and pushing the `fix/` branch itself. On a successful non-CI publish, the `fix/`
-branches are deleted by default (the fix has fully landed, nothing more to track) and the persisted
-workflow is discarded, closing the operation. `--keep-branch` opts out of the branch cleanup. A CI
-publish always keeps its branches — a fix's CI line is meant to be iterated on, not thrown away after
-one build.
+and hosted releases, and pushing the `fix/` branch itself. On success the `fix/` branches are deleted by
+default (the fix has fully landed, nothing more to track) and the persisted workflow is discarded,
+closing the operation. `--keep-branch` opts out of the branch cleanup. An interrupted publication keeps
+whatever it already pushed, so that a retry can finish it.
 
 ### Cancelling
 

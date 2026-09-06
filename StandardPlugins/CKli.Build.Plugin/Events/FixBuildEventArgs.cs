@@ -14,19 +14,16 @@ public sealed class FixBuildEventArgs : BuildBaseEventArgs
     readonly FixWorkflow _fix;
     readonly ImmutableArray<BuildResult> _results;
     readonly bool _keepBranchOnSuccessfulPublish;
-    readonly bool _isCIBuild;
 
     internal FixBuildEventArgs( IActivityMonitor monitor,
                                 CKliEnv context,
                                 FixWorkflow fix,
-                                bool isCIBuild,
                                 ImmutableArray<BuildResult> results,
                                 bool shouldPublish,
                                 bool keepBranchOnSuccessfulPublish )
         : base( monitor, context, fix.World, shouldPublish )
     {
         _fix = fix;
-        _isCIBuild = isCIBuild;
         _results = results;
         _keepBranchOnSuccessfulPublish = keepBranchOnSuccessfulPublish;
     }
@@ -40,11 +37,6 @@ public sealed class FixBuildEventArgs : BuildBaseEventArgs
     /// Gets the build results.
     /// </summary>
     public ImmutableArray<BuildResult> Results => _results;
-
-    /// <summary>
-    /// Gets whether the build is a CI build.
-    /// </summary>
-    public bool IsCIBuild => _isCIBuild;
 
     /// <summary>
     /// Gets whether the "fix/" branches must be kept once the fix is published.

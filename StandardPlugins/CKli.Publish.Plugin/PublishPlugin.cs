@@ -122,7 +122,6 @@ public sealed class PublishPlugin : PrimaryPluginBase
                                      _artifactHandler,
                                      _branchModel,
                                      e.FixWorkflow,
-                                     e.IsCIBuild,
                                      e.KeepBranchOnSuccessfulPublish,
                                      _keepLocalReleaseAfterPublish,
                                      e.Results,
@@ -137,7 +136,6 @@ public sealed class PublishPlugin : PrimaryPluginBase
                                               ArtifactHandlerPlugin artifactHandler,
                                               BranchModelPlugin branchModel,
                                               FixWorkflow fixWorkflow,
-                                              bool ciBuild,
                                               bool keepBranchOnSuccessfulPublish,
                                               bool keepLocalReleaseAfterPublish,
                                               ImmutableArray<BuildResult> results,
@@ -159,27 +157,24 @@ public sealed class PublishPlugin : PrimaryPluginBase
             }
             world.StackRepository.PushChanges( monitor );
 
-            if( !ciBuild )
+            // Instead of complicating FixPublisher with this capability that makes sense only for a
+            // successful fix publish, we implement this here as a post-operation: intermediate
+            // publications (halted on error) always keep the already pushed remote branches. Only the
+            // very last successful fix publish applies this default behavior.
+            if( !keepBranchOnSuccessfulPublish )
             {
-                // Instead of complicating FixPublisher with this capability that makes sense
-                // only for successful non-CI fix publish, we implement this here as a post-operation:
-                // intermediate publications (halted on error) always keep the already pushed remote
-                // branches. Only the very last successful fix publish applies this default behavior.
-                if( !keepBranchOnSuccessfulPublish )
+                // We ignore any errors here (they are only logged).
+                for( int i = 0; i < results.Length; i++ )
                 {
-                    // We ignore any errors here (they are only logged).
-                    for( int i = 0; i < results.Length; i++ )
+                    var r = results[i].Repo.GitRepository;
+                    var b = r.Repository.Branches[fixWorkflow.Targets[i].BranchName];
+                    if( b != null )
                     {
-                        var r = results[i].Repo.GitRepository;
-                        var b = r.Repository.Branches[fixWorkflow.Targets[i].BranchName];
-                        if( b != null )
-                        {
-                            r.DeleteBranch( monitor, b, DeleteGitBranchMode.WithTrackedAndRemoteBranch );
-                        }
+                        r.DeleteBranch( monitor, b, DeleteGitBranchMode.WithTrackedAndRemoteBranch );
                     }
                 }
-                FixWorkflow.DeleteCurrent( monitor, world );
             }
+            FixWorkflow.DeleteCurrent( monitor, world );
             return true;
         }
     }

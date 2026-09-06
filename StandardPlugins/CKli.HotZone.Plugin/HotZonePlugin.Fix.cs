@@ -516,6 +516,51 @@ public sealed partial class HotZonePlugin
     }
 
     /// <summary>
+    /// Pushes the current Fix Workflow's "fix/" branches to their remote.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The minimal CKli context.</param>
+    /// <returns>True on success, false on error.</returns>
+    [Description( """
+        Pushes the current Fix Workflow's 'fix/' branches to their remote (creating them if needed).
+        This is how a fix is shared before it is published: another developer pulls the branches, runs
+        'ckli fix start' on the same version to join the workflow and 'ckli fix build' to rebuild the
+        packages into his own local feed.
+        """ )]
+    [CommandPath( "fix push" )]
+    public bool FixPush( IActivityMonitor monitor, CKliEnv context )
+    {
+        if( !FixWorkflow.Load( monitor, World, out var workflow ) )
+        {
+            return false;
+        }
+        if( workflow == null )
+        {
+            monitor.Error( ScreenType.CKliScreenTag, "No current workflow exist." );
+            return false;
+        }
+        // Only the branches are pushed. The "local/" version tags are deliberately left behind: the fix
+        // versions are a function of the versions being fixed, so the other developer's "fix build"
+        // recomputes them, and a pushed "local/" tag would in fact BREAK his "fix start" - CreateTarget
+        // resolves the version to fix with FindFirst( bFix.Commits ), which would then answer that tag
+        // instead of the version to fix and demand --move-branch, whose move discards the fix.
+        bool success = true;
+        using( monitor.OpenInfo( $"Pushing the {workflow.Targets.Length} 'fix/' branch(es) of '{workflow}'." ) )
+        {
+            foreach( var target in workflow.Targets )
+            {
+                var git = target.Repo.GitRepository;
+                var branch = git.GetBranch( monitor, target.BranchName, LogLevel.Error );
+                if( branch == null || !git.PushBranch( monitor, branch, autoCreateRemoteBranch: true ) )
+                {
+                    success = false;
+                }
+            }
+        }
+        return success;
+    }
+
+    /// <summary>
     /// Cancels the current Fix Workflow.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
