@@ -181,7 +181,7 @@ public sealed class BranchName : IEquatable<BranchName>
                 monitor.Error( $"Invalid '{branchName}'. Segment '{branchName.AsSpan( 6 )}' must be a lowercase ASCII identifier (which may contain dash '-' or underscore '_')" );
                 return false;
             }
-            if( BranchNamespace.IsReservedExploratoryName( exploName ) )
+            if( SVersion.IsReservedExploratoryName( exploName ) )
             {
                 monitor.Error( $"Invalid '{branchName}'. {BranchNamespace.ReservedExploratoryNameError}" );
                 return false;

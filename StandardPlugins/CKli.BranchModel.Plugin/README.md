@@ -109,8 +109,9 @@ rather than mutating in place. `BranchModelPlugin` persists the result back to t
   builds apart from its regular versions (the Publish plugin's `Published/index.json` does exactly
   that), so `explo/spike-ci` and the CI line of `explo/spike` would be one name. An exploratory name
   is the only branch name that is free: `alpha` to `zulu` are fixed and by design none of them
-  collides. The rule is `BranchNamespace.IsReservedExploratoryName`, applied here, by `branch open`
-  and by `AddOrUpdateExplo`; `SVersion.SetExploratoryName` enforces it on the version side. `Parent`
+  collides. The rule is `SVersion.IsReservedExploratoryName` — `SetExploratoryName` and the version
+  parser apply it on the version side, and this plugin applies it at the three sites that accept an
+  exploratory name: here, `branch open` and `AddOrUpdateExplo`. `Parent`
   is required only on a *root* `<Explo>` (nested `<Explo>` elements inherit their XML parent).
   `Link` defaults to `CI`.
 

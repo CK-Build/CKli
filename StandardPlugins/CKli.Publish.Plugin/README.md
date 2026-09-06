@@ -341,8 +341,8 @@ the oldest:
   folder, but the index appends `-ci` to the group name: `alpha-ci`, `explo/spike-ci`, and `(stable-ci)`
   for the CI builds of the stable versions. That suffix cannot collide with a branch: `alpha` to `zulu`
   are fixed and by design none of them ends with it, and an exploratory name that would — or that
-  starts with `ci-` — is refused, by `SVersion.SetExploratoryName` on the version side and by
-  `BranchNamespace.IsReservedExploratoryName` on the branch side (`branch open`, `AddOrUpdateExplo` and
+  starts with `ci-` — is refused by `SVersion.IsReservedExploratoryName`, applied on the version side
+  (`SetExploratoryName` and the parser) and on the branch side (`branch open`, `AddOrUpdateExplo` and
   the BranchModel configuration). Ordinal order puts each group immediately before its own CI one.
 - A branch with no version in a set does not appear in that set, its CI group included. `(stable)` is the
   only exception: it is always there, empty list included, so a consumer always has the root list to read.

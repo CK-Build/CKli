@@ -202,7 +202,7 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                             {hName}
                             """ );
             }
-            if( IsReservedExploratoryName( bName ) )
+            if( SVersion.IsReservedExploratoryName( bName ) )
             {
                 throw new CKException( $"""
                             Invalid exploratory branch Name attribute in BranchModel configuration: '{hName}'.
@@ -265,12 +265,8 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
     private static partial Regex ValidBranchSegment();
 
     /// <summary>
-    /// The error tail shared by every site that refuses a <see cref="IsReservedExploratoryName"/>.
-    /// </summary>
-    internal const string ReservedExploratoryNameError = """An exploratory branch name must not start with "ci-" nor end with "-ci".""";
-
-    /// <summary>
-    /// Gets whether an exploratory name is reserved: it starts with "ci-" or ends with "-ci".
+    /// The error tail shared by every site that refuses a <see cref="SVersion.IsReservedExploratoryName"/>
+    /// exploratory name: one that starts with "ci-" or ends with "-ci".
     /// <para>
     /// A "-ci" suffix qualifies a branch name to distinguish its CI builds from its regular versions -
     /// this is what the Publish plugin's "Published/index.json" does - so an exploratory name must not be
@@ -278,17 +274,11 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
     /// the exploratory names need this: "alpha" to "zulu" are fixed and, by design, none of them collides.
     /// </para>
     /// <para>
-    /// SVersion.SetExploratoryName enforces the same rule on the version side. It is restated here rather
-    /// than called because CK.SVersion arrives as a package: the two must be kept in sync.
+    /// The rule itself belongs to <see cref="SVersion"/>, which applies it to the version side
+    /// (SetExploratoryName and the parser). Only the wording is ours.
     /// </para>
     /// </summary>
-    /// <param name="name">The exploratory name, without its "explo/" prefix.</param>
-    /// <returns>True if the name is reserved and must be refused.</returns>
-    internal static bool IsReservedExploratoryName( ReadOnlySpan<char> name )
-    {
-        return name.EndsWith( "-ci", StringComparison.Ordinal )
-               || name.StartsWith( "ci-", StringComparison.Ordinal );
-    }
+    internal const string ReservedExploratoryNameError = """An exploratory branch name must not start with "ci-" nor end with "-ci".""";
 
     /// <summary>
     /// Gets the "stable" root branch name.
