@@ -15,6 +15,7 @@ public sealed class WorldDefinitionFile
     static Func<IActivityMonitor,string,string>? _repositoryUrlHook;
     readonly XElement _root;
     readonly XElement _plugins;
+    readonly IReadOnlyList<XElement> _references;
     readonly LocalWorldName _world;
     List<World.RepoLayout>? _layout;
     Dictionary<XName, (XElement Config, bool IsDisabled)>? _pluginsConfiguration;
@@ -49,11 +50,12 @@ public sealed class WorldDefinitionFile
     /// </summary>
     public static LayoutRepoOrder RepoOrder { get; set; }
 
-    WorldDefinitionFile( LocalWorldName world, XElement root, XElement plugins )
+    WorldDefinitionFile( LocalWorldName world, XElement root, XElement plugins, IReadOnlyList<XElement> references )
     {
         Throw.DebugAssert( root.Document != null );
         _root = root;
         _plugins = plugins;
+        _references = references;
         _root.Document.Changed += OnDocumentChanged;
         _world = world;
     }
@@ -94,6 +96,22 @@ public sealed class WorldDefinitionFile
     /// </para>
     /// </summary>
     public XElement Plugins => _plugins;
+
+    /// <summary>
+    /// Gets the &lt;Reference Url="..." /&gt; elements of this world: the other Stacks that this world uses.
+    /// They can be direct children of the root or be grouped in an optional &lt;References&gt; element.
+    /// Must not be mutated otherwise a <see cref="InvalidOperationException"/> is raised.
+    /// <para>
+    /// A reference is honored by the "ckli clone" command only: it clones (or checks that it is already cloned)
+    /// the referenced Stack next to this one, recursively. The optional DefaultClone attribute (that defaults
+    /// to true) drives this and can be overridden by the --with-ref-clone and --without-ref-clone flags.
+    /// </para>
+    /// <para>
+    /// A referenced Stack is public unless it has a Private="true" attribute. A public Stack cannot reference a
+    /// private one: this is an error that prevents this world to be loaded.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<XElement> References => _references;
 
     /// <summary>
     /// Gets &lt;Plugins CompileMode="..." /&gt;.
@@ -474,7 +492,60 @@ public sealed class WorldDefinitionFile
                 if( a.Value != null ) a.Value = _repositoryUrlHook( monitor, a.Value );
             }
         }
-        return new WorldDefinitionFile( world, root, plugins );
+        return new WorldDefinitionFile( world, root, plugins, ReadReferences( monitor, world, root ) );
+    }
+
+    /// <summary>
+    /// Collects the &lt;Reference /&gt; elements (direct children of the root or children of the optional
+    /// &lt;References&gt; element) and validates their attributes: an invalid one throws and this prevents
+    /// the world to be loaded.
+    /// </summary>
+    static IReadOnlyList<XElement> ReadReferences( IActivityMonitor monitor, LocalWorldName world, XElement root )
+    {
+        List<XElement>? references = null;
+        foreach( var e in root.Elements() )
+        {
+            if( e.Name == XNames.Reference )
+            {
+                Add( world, e, ref references );
+            }
+            else if( e.Name == XNames.References )
+            {
+                foreach( var r in e.Elements() )
+                {
+                    if( r.Name != XNames.Reference )
+                    {
+                        monitor.Warn( $"""
+                            Unexpected element:
+                            {r}
+                            Only <Reference Url="..." /> is handled in <References>. Element is ignored.
+                            """ );
+                    }
+                    else
+                    {
+                        Add( world, r, ref references );
+                    }
+                }
+            }
+        }
+        return (IReadOnlyList<XElement>?)references ?? [];
+
+        static void Add( LocalWorldName world, XElement e, ref List<XElement>? references )
+        {
+            // Reads the 2 optional boolean attributes here: an invalid value throws (the world cannot be loaded)
+            // instead of failing later in the "ckli clone" command that consumes them.
+            _ = (bool?)e.Attribute( XNames.DefaultClone );
+            if( (bool?)e.Attribute( XNames.Private ) is true && world.Stack.IsPublic )
+            {
+                Throw.CKException( $"""
+                    Invalid element:
+                    {e}
+                    A public Stack cannot reference a private one.
+                    """ );
+            }
+            references ??= new List<XElement>();
+            references.Add( e );
+        }
     }
 
     static List<World.RepoLayout>? GetRepositoryLayout( IActivityMonitor monitor,
@@ -485,7 +556,7 @@ public sealed class WorldDefinitionFile
         bool hasError = false;
 
         NormalizedPath worldRoot = world.WorldRoot;
-        Process( monitor, root, world, worldRoot, list, ref hasError );
+        Process( monitor, root, world, worldRoot, list, isRoot: true, ref hasError );
         if( hasError ) return null;
         var uniqueCheck = new Dictionary<string,Uri>();
         var uniquePath = new HashSet<NormalizedPath>();
@@ -540,6 +611,7 @@ public sealed class WorldDefinitionFile
                              LocalWorldName world,
                              in NormalizedPath p,
                              List<World.RepoLayout> list,
+                             bool isRoot,
                              ref bool hasError )
         {
             foreach( var c in e.Elements() )
@@ -567,7 +639,7 @@ public sealed class WorldDefinitionFile
                     }
                     else
                     {
-                        Process( monitor, c, world, p.AppendPart( name ), list, ref hasError );
+                        Process( monitor, c, world, p.AppendPart( name ), list, isRoot: false, ref hasError );
                     }
                 }
                 else if( eN == XNames.Repository.LocalName )
@@ -641,12 +713,16 @@ public sealed class WorldDefinitionFile
                         }
                     }
                 }
-                else if( eN != XNames.Plugins.LocalName )
+                else if( eN != XNames.Plugins.LocalName
+                         // The references (see ReadReferences) are not part of the layout: they are
+                         // handled by the "ckli clone" command only.
+                         && !(isRoot && (eN == XNames.References.LocalName || eN == XNames.Reference.LocalName)) )
                 {
                     monitor.Warn( $"""
                         Unexpected element:
                         {c}
-                        Only <Plugins />, <Folder Name="..."> ... </Folder> and <Repository Url="..." /> are handled. Element is ignored.
+                        Only <Plugins />, <References />, <Reference Url="..." />, <Folder Name="..."> ... </Folder>
+                        and <Repository Url="..." /> are handled. Element is ignored.
                         """ );
                 }
             }

@@ -84,6 +84,48 @@ The file lists repositories, can organize them into folders and contains configu
 A Stack always has a **default World** (the current version). Long Term Support (LTS) Worlds can be derived from it (e.g. `CK-Build@net8`).
 World names follow the pattern `StackName[@ltsName]`.
 
+### `<Reference />`: the other Stacks a World uses
+
+A world definition can name the other Stacks it works with. The elements can be direct children of the root
+or be grouped in an optional `<References>` element:
+
+```xml
+<CK-Build>
+
+  <Reference Url="https://github.com/CK-Build/CK-Build-Samples-Stack" />
+
+  <References>
+    <Reference Url="https://github.com/Invenietis/CK-Database-Stack" DefaultClone="false" />
+    <Reference Url="https://github.com/Invenietis/Signature-Stack" Private="true" />
+  </References>
+
+</CK-Build>
+```
+
+| Attribute | Default | Meaning |
+|---|---|---|
+| `Url` | *required* | The remote url of the referenced Stack. |
+| `DefaultClone` | `true` | Whether `ckli clone` clones this reference. |
+| `Private` | `false` | Whether the referenced Stack is private (a `.PrivateStack/` folder). |
+
+**A public Stack cannot reference a private one**: this is an error that prevents the world to be loaded
+(the reference would be useless to anyone who can read the public Stack but not the private one).
+
+The references are exposed as raw `IReadOnlyList<XElement>` by `WorldDefinitionFile.References` (their
+attributes are validated when the file is loaded) and are honored by the `ckli clone` command **only**:
+`StackRepository.CloneAsync` clones one Stack and its default world repositories, nothing more.
+
+Once a Stack is cloned, `ckli clone` reads the references of its default world and, for each of them,
+clones the referenced Stack **next to** it (never inside it) or checks that it is already cloned somewhere
+on this machine, then recurses into that Stack's own references. A cycle between Stacks is handled: each
+url is cloned once. Two flags override the `DefaultClone` attributes:
+
+| | |
+|---|---|
+| `ckli clone <url>` | Clones the references whose `DefaultClone` is not `false`. |
+| `ckli clone <url> --with-ref-clone` | Clones every reference. |
+| `ckli clone <url> --without-ref-clone` | Clones no reference at all. |
+
 The `World` type is the primary type of the CKli API and the most complex one because it handles the plugins life cycle (loading, compiling, unloading).
 
 ## Repo, GitRepository & LibGit2Sharp's Repository

@@ -13,6 +13,10 @@ public static class XNames
     public static readonly XName Disabled = XNamespace.None + "Disabled";
     public static readonly XName CompileMode = XNamespace.None + "CompileMode";
     public static readonly XName Repository = XNamespace.None + "Repository";
+    public static readonly XName References = XNamespace.None + "References";
+    public static readonly XName Reference = XNamespace.None + "Reference";
+    public static readonly XName DefaultClone = XNamespace.None + "DefaultClone";
+    public static readonly XName Private = XNamespace.None + "Private";
     public static readonly XName Folder = XNamespace.None + "Folder";
     public static readonly XName Name = XNamespace.None + "Name";
     public static readonly XName Url = XNamespace.None + "Url";

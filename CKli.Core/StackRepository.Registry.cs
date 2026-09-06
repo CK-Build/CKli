@@ -31,6 +31,16 @@ public sealed partial class StackRepository
     /// <returns>The stacks url and working folders.</returns>
     public static Dictionary<NormalizedPath, Uri> ReadRegistry( IActivityMonitor monitor ) => Registry.Read( monitor );
 
+    /// <summary>
+    /// Gets the ".PublicStack" or ".PrivateStack" folder paths of the stacks that have been cloned
+    /// from <paramref name="stackUri"/> on this machine. The list is empty when this stack is not
+    /// cloned anywhere.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="stackUri">The stack remote url.</param>
+    /// <returns>The existing local stack folders (may be empty).</returns>
+    public static IReadOnlyList<NormalizedPath> FindExistingStacks( IActivityMonitor monitor, Uri stackUri ) => Registry.CheckExistingStack( monitor, stackUri );
+
 
     static class Registry
     {
