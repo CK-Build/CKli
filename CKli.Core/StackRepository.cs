@@ -275,11 +275,79 @@ public sealed partial class StackRepository : IDisposable
     /// Commits and push changes to the remote.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="force">
+    /// True to force the push. This is required when the head is not a descendant of the remote branch: this is
+    /// the case right after a <see cref="SetRemoteUrl(IActivityMonitor, Uri, bool)"/> to a brand new repository
+    /// since some hosting providers create it with an initial commit of their own (an unrelated history).
+    /// <para>
+    /// Caution: this discards whatever the remote branch holds.
+    /// </para>
+    /// </param>
     /// <returns>True on success, false on error.</returns>
-    public bool PushChanges( IActivityMonitor monitor )
+    public bool PushChanges( IActivityMonitor monitor, bool force = false )
     {
         CommitResult result = _git.Commit( monitor, "Automatic pre-push commit." );
-        return result != CommitResult.Error && _git.PushBranch( monitor, _git.Repository.Head, autoCreateRemoteBranch: false );
+        if( result == CommitResult.Error ) return false;
+        var head = _git.Repository.Head;
+        if( !force )
+        {
+            return _git.PushBranch( monitor, head, autoCreateRemoteBranch: false );
+        }
+        return _git.GetRemote( monitor, "origin", forWrite: true, out var remote, out var creds )
+               && _git.Push( monitor, remote, creds, [$"+{head.CanonicalName}:{head.CanonicalName}"] );
+    }
+
+    /// <summary>
+    /// The local git configuration key that holds the <see cref="MigrationSourceUrl"/>.
+    /// </summary>
+    public const string MigrationSourceConfigKey = "ckli.migratedFrom";
+
+    /// <summary>
+    /// Gets the url of the remote repository that this Stack has been migrated from and that has not reached its
+    /// final state (archived) yet. Null when no migration is pending.
+    /// <para>
+    /// <see cref="SetRemoteUrl(IActivityMonitor, Uri, bool)"/> sets it before changing the url so that the
+    /// "ckli remote stack migrate" command can finish its job even when it is interrupted, and that command
+    /// clears it once the previous repository is archived (or cannot be).
+    /// </para>
+    /// </summary>
+    public Uri? MigrationSourceUrl
+    {
+        get
+        {
+            var v = _git.Repository.Config.Get<string>( MigrationSourceConfigKey )?.Value;
+            return v != null && Uri.TryCreate( v, UriKind.Absolute, out var url ) ? url : null;
+        }
+    }
+
+    /// <summary>
+    /// Sets or clears (null <paramref name="url"/>) the <see cref="MigrationSourceUrl"/>.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="url">The url to remember or null to forget it.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool SetMigrationSourceUrl( IActivityMonitor monitor, Uri? url )
+    {
+        try
+        {
+            if( url == null )
+            {
+                if( _git.Repository.Config.Get<string>( MigrationSourceConfigKey ) != null )
+                {
+                    _git.Repository.Config.Unset( MigrationSourceConfigKey );
+                }
+            }
+            else
+            {
+                _git.Repository.Config.Set( MigrationSourceConfigKey, url.ToString() );
+            }
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While updating the '{MigrationSourceConfigKey}' configuration of '{_git.DisplayPath}'.", ex );
+            return false;
+        }
     }
 
     /// <summary>
@@ -288,21 +356,35 @@ public sealed partial class StackRepository : IDisposable
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="newUrl">The new remote URL. Must be a valid, normalized URL.</param>
-    /// <param name="push">True to push after changing the URL.</param>
+    /// <param name="push">
+    /// True to <see cref="PushChanges(IActivityMonitor, bool)"/> once the url has been changed.
+    /// <para>
+    /// Caution: the credentials are the ones of the <see cref="GitRepository.RepositoryKey"/>, that has been
+    /// resolved from the url this repository has been OPENED with. A migration that changes the host or the
+    /// repository owner must use false here and push from a Stack reopened on the new url (this is what the
+    /// "ckli remote stack migrate" command does).
+    /// </para>
+    /// </param>
     /// <returns>True on success, false on error.</returns>
     public bool SetRemoteUrl( IActivityMonitor monitor, Uri newUrl, bool push = true )
     {
         GitRepositoryKey.ThrowArgumentExceptionOnInvalidUrl( newUrl, nameof( newUrl ) );
 
         var oldUrl = _git.RepositoryKey.OriginUrl;
-        if( oldUrl == newUrl )
+        if( GitRepositoryKey.OrdinalIgnoreCaseUrlEqualityComparer.Equals( oldUrl, newUrl ) )
         {
             monitor.Info( $"Remote URL is already '{newUrl}'." );
-            return true;
+            return !push || PushChanges( monitor );
         }
 
         using( monitor.OpenInfo( $"Changing 'origin' remote url from '{oldUrl}' to '{newUrl}'." ) )
         {
+            // Remembers where we come from BEFORE changing anything: this is what enables the migration to
+            // archive the previous repository even if it is interrupted below (see MigrationSourceUrl).
+            if( !SetMigrationSourceUrl( monitor, oldUrl ) )
+            {
+                return false;
+            }
             // Update the git remote
             try
             {
@@ -312,6 +394,7 @@ public sealed partial class StackRepository : IDisposable
             catch( Exception ex )
             {
                 monitor.Error( $"Failed to update git remote 'origin'.", ex );
+                SetMigrationSourceUrl( monitor, null );
                 return false;
             }
 
@@ -328,15 +411,19 @@ public sealed partial class StackRepository : IDisposable
                 {
                     _git.Repository.Network.Remotes.Update( "origin", r => r.Url = oldUrl.AbsoluteUri );
                     monitor.Warn( "Reverted git remote to original url due to registry update failure." );
+                    // Reverted: there is no migration in progress anymore.
+                    SetMigrationSourceUrl( monitor, null );
                 }
                 catch
                 {
+                    // The remote is still the new url: the MigrationSourceUrl is kept so that a migration
+                    // can still archive the previous repository.
                     monitor.Error( "Failed to revert git remote after registry update failure. Manual fix required." );
                 }
                 return false;
             }
         }
-        return true;
+        return !push || PushChanges( monitor );
     }
 
     StackRepository( GitRepository git, in NormalizedPath stackRoot, CKliEnv context, string stackName )

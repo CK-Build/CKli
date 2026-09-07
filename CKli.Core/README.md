@@ -44,6 +44,15 @@ the remote). A Stack repository that predates this convention has a `master` bra
 then works on the repository's current branch. It never creates a purely local `main` for it — such a Stack
 could never be pushed back since `PushChanges` pushes the head and the head must track a remote branch.
 
+A Stack repository can be moved to another remote with `ckli remote stack migrate <newUrl>`: it creates the new
+remote repository if needed, changes the `origin` url (`StackRepository.SetRemoteUrl`), pushes the Stack content
+and archives the previous repository. The repository name must remain `{StackName}-Stack` — a migration cannot
+rename a Stack — and the repositories of the Worlds are not concerned: only the Stack repository moves. The
+operation is as idempotent as it can be: `SetRemoteUrl` records the previous url in the `ckli.migratedFrom` local
+git configuration (`StackRepository.MigrationSourceUrl`) and the command clears it only once the previous
+repository has reached its final state, so another run finishes an interrupted migration. When the hosting
+provider cannot archive (the file system one cannot), this is a warning: the previous repository is left as-is.
+
 A `StackRepository` instance is the entry point of the API. There are only 2 ways to obtain a `StackRepository`:
 - Calling `TryOpenFromPath`, `OpenFromPath`, `TryOpenWorldFromPath` or `OpenWorldFromPath` from any local path.
 - Calling `CloneAsync` from the remote Uri of the stack.

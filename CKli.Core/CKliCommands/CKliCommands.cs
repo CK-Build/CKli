@@ -34,6 +34,10 @@ public static class CKliCommands
         Add( cmds, new CKliLog() );
         Add( cmds, new CKliStatus() );
 
+        cmds.Add( "remote", null );
+        cmds.Add( "remote stack", null );
+        Add( cmds, new CKliRemoteStackMigrate() );
+
         cmds.Add( "repo", null );
         Add( cmds, new CKliRepoAdd() );
         Add( cmds, new CKliRepoCreate() );
