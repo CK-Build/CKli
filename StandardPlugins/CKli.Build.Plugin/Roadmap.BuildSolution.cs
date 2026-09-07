@@ -453,7 +453,7 @@ public sealed partial class Roadmap
         public BuildInfo BuildInfo => _buildInfo!;
 
         /// <summary>
-        /// Gets the version this solution will offer once this roadmap is done: the <see cref="Roadmap.BuildInfo.TargetVersion"/>,
+        /// Gets the version this solution will produce once this roadmap is done: the <see cref="Roadmap.BuildInfo.TargetVersion"/>,
         /// which is the "building/" version when this solution is built and the branch resolved
         /// <see cref="LastBuild"/> version otherwise (<see cref="HotGraph.SolutionVersionInfo.LastBuiltVersion.BranchName"/>
         /// is the closest branch to the roadmap's one from which the tag is available).

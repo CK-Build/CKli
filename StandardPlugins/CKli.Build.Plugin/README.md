@@ -150,7 +150,7 @@ For every `HotGraph.Solution` (ordered topologically, `OrderedSolutions`), a `Ro
 When `MustBuildReason.None`, the build is skipped and the `BuildSolution.BuildInfo.TargetVersion` is simply the last
 built version (so downstream solutions still see a consistent version). Otherwise `BuildInfo.TargetVersion` is computed
 via `TagCommitTree.ComputeTargetVersion` and stamped with a `"building/"` prefix pending a successful build. Either way
-it is the version the solution will offer once the roadmap is done, exposed as `BuildSolution.TargetVersion`; since
+it is the version the solution will produce once the roadmap is done, exposed as `BuildSolution.TargetVersion`; since
 `SVersion` equality ignores the `"building/"` prefix, it compares directly with the versions recorded by consumers.
 
 Every solution of an initialized roadmap has a `BuildInfo`: `Initialize` sets one on each of them (the field is only

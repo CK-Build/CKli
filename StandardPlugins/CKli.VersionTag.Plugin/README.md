@@ -140,7 +140,7 @@ A handler that throws fails the command: `SafeRaiseAsync` logs the exception and
 outcome — the tags are pushed and cannot be taken back, but whatever mirrors them is stale, and re-running
 `version deprecate --allow-update` is harmless. Its current consumer is
 [`CKli.Publish.Plugin`](../CKli.Publish.Plugin/README.md), which takes the `Sync` slot and deprecates the published
-profiles that offer any of the `DeprecatedPackages`.
+profiles that carry any of the `DeprecatedPackages`.
 
 ### Version tag vocabulary
 

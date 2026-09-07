@@ -37,7 +37,7 @@ sealed class PublishRoadmap
     public PublishedProfileBuilder Gate => _gate;
 
     /// <summary>
-    /// Gets the profile this publication offers, available once <see cref="PublishAsync"/> has run.
+    /// Gets the profile this publication carries, available once <see cref="PublishAsync"/> has run.
     /// <para>
     /// On success this is the profile to add to the <see cref="PublishPlugin.PublishedFolder"/>.
     /// </para>
@@ -73,14 +73,14 @@ sealed class PublishRoadmap
                                             CancellationToken cancellation )
     {
         Throw.DebugAssert( CanPublish );
-        // The builds are done: the real content is now available, so the profile this publication offers can be
+        // The builds are done: the real content is now available, so the profile this publication carries can be
         // built. Nothing is pushed if it has any conflict.
         _finalProfile = _gate.BuildFinalProfile( monitor, _roadmap, world, profileVersion );
         if( _finalProfile == null )
         {
             return false;
         }
-        // Everything the profile offers must be on a feed: the "local/" releases from other branches that this
+        // Everything the profile carries must be on a feed: the "local/" releases from other branches that this
         // publication depends on come first, producers before consumers.
         if( !_gate.RequiredPublications.IsEmpty )
         {
@@ -123,7 +123,7 @@ sealed class PublishRoadmap
     {
         // The gate is computed before any build and is therefore the same in --dry-run: it decides whether the
         // profile this publication would leave on the roadmap's branch is coherent and whether every release it
-        // offers can actually reach a feed.
+        // carries can actually reach a feed.
         var gate = PublishedProfileBuilder.Create( monitor, roadmap, versionTag );
         return gate == null ? null : new PublishRoadmap( roadmap, gate );
     }

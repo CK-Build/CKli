@@ -355,12 +355,12 @@ public sealed partial class PublishedFolder
     }
 
     /// <summary>
-    /// Removes every profile that offers the provided package: the counterpart of
+    /// Removes every profile that carries the provided package: the counterpart of
     /// <see cref="OnDeprecatedPackage(string, SVersion)"/> for a deprecation that has expired. All the
     /// files are read.
     /// <para>
     /// An expired deprecation removes the version tag and unlists the packages from the feeds: a profile
-    /// that offers one of them describes something that no longer exists, so it is deleted rather than
+    /// that carries one of them describes something that no longer exists, so it is deleted rather than
     /// deprecated.
     /// </para>
     /// </summary>
@@ -378,7 +378,7 @@ public sealed partial class PublishedFolder
         foreach( var info in _profiles.Values )
         {
             var p = info.Current;
-            if( p != null && p.Packages.TryGetValue( packageId, out var offered ) && offered.Version == version )
+            if( p != null && p.ProducedPackages.TryGetValue( packageId, out var produced ) && produced.Version == version )
             {
                 info.Current = null;
                 found = true;
@@ -388,17 +388,17 @@ public sealed partial class PublishedFolder
     }
 
     /// <summary>
-    /// Adds a superseding profile for every profile that offers one of the fixed packages: the same offer
-    /// with the fixed versions replaced, at a <see cref="CreateSupersedingProfileVersion"/> version. All the
-    /// files are read.
+    /// Adds a superseding profile for every profile that carries one of the fixed packages: the same
+    /// produced packages with the fixed versions replaced, at a <see cref="CreateSupersedingProfileVersion"/>
+    /// version. All the files are read.
     /// <para>
     /// The superseded profiles are left untouched: a profile records what was published, and a fix does not
     /// change the past. A <see cref="PublishedProfile.IsDeprecated"/> profile is <c>locked</c> and gets no
     /// successor at all.
     /// </para>
     /// <para>
-    /// This is idempotent: an offer that some profile already carries is not created a second time, so
-    /// retrying an interrupted fix publication adds nothing.
+    /// This is idempotent: produced packages that some profile already carries are not created a second
+    /// time, so retrying an interrupted fix publication adds nothing.
     /// </para>
     /// </summary>
     /// <param name="fixedPackages">
@@ -412,33 +412,34 @@ public sealed partial class PublishedFolder
         if( fixedPackages.Count == 0 ) return ImmutableArray<PublishedProfile>.Empty;
         LoadAll();
         // Snapshotting is required twice over: Add mutates the dictionary being enumerated, and a profile
-        // created here already offers the fixed versions - it must not be superseded in its turn.
+        // created here already carries the fixed versions - it must not be superseded in its turn.
         var origins = _profiles.Values.Where( i => i.Current != null && !i.Current.IsDeprecated )
                                       .Select( i => i.Current! )
                                       .OrderBy( p => p.Version )
                                       .ToList();
-        var offers = _profiles.Values.Where( i => i.Current != null )
-                                     .Select( i => i.Current! )
-                                     .ToList();
+        var known = _profiles.Values.Where( i => i.Current != null )
+                                    .Select( i => i.Current! )
+                                    .ToList();
         var created = ImmutableArray.CreateBuilder<PublishedProfile>();
         foreach( var origin in origins )
         {
             var updated = CreateSupersedingProfile( origin, fixedPackages );
-            if( updated == null || offers.Any( o => SameOffer( o, updated ) ) ) continue;
+            if( updated == null || known.Any( o => SameProducedPackages( o, updated ) ) ) continue;
             Add( updated );
-            offers.Add( updated );
+            known.Add( updated );
             created.Add( updated );
         }
         return created.DrainToImmutable();
 
-        // Two profiles carry the same offer when they offer the same versions of the same packages: the
-        // superseding profile differs from its origin by nothing else, so this is what makes a retry a no-op.
-        static bool SameOffer( PublishedProfile p1, PublishedProfile p2 )
+        // Two profiles carry the same produced packages when they carry the same versions of the same
+        // package identifiers: the superseding profile differs from its origin by nothing else, so this is
+        // what makes a retry a no-op.
+        static bool SameProducedPackages( PublishedProfile p1, PublishedProfile p2 )
         {
-            if( p1.Packages.Count != p2.Packages.Count ) return false;
-            foreach( var (packageId, instance) in p1.Packages )
+            if( p1.ProducedPackages.Count != p2.ProducedPackages.Count ) return false;
+            foreach( var (packageId, instance) in p1.ProducedPackages )
             {
-                if( !p2.Packages.TryGetValue( packageId, out var other ) || other.Version != instance.Version )
+                if( !p2.ProducedPackages.TryGetValue( packageId, out var other ) || other.Version != instance.Version )
                 {
                     return false;
                 }
@@ -447,7 +448,7 @@ public sealed partial class PublishedFolder
         }
     }
 
-    // Returns null when the profile offers none of the fixed packages: only the repositories and the
+    // Returns null when the profile carries none of the fixed packages: only the repositories and the
     // packages that actually change are rebuilt, the others are shared with the origin.
     PublishedProfile? CreateSupersedingProfile( PublishedProfile origin, IReadOnlyDictionary<PackageInstance, SVersion> fixedPackages )
     {

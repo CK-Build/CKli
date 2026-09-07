@@ -186,7 +186,7 @@ the mechanisms above — it does not implement the guarantee itself.
 
 At publication time, `CKli.Publish.Plugin`'s **publication gate** checks the version-level
 strengthening of this invariant: not merely that a package depends on a comparable, cooler-or-equal
-branch, but that it depends on exactly the version the branch's profile offers. That check runs
+branch, but that it depends on exactly the version the branch's profile carries. That check runs
 before anything is pushed, which makes it preventive where the mechanisms above are self-healing.
 It is per branch, and only the branch being published is gated: a publication on a cooler branch
 necessarily invalidates the profiles of the hotter ones — they still reference the version it

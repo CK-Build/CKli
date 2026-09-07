@@ -14,7 +14,7 @@ namespace CKli.VersionTag.Plugin;
 /// A deprecation propagates. Deprecating a version deprecates every release that consumes it, transitively,
 /// so a listener that mirrors the deprecation elsewhere must consider the whole <see cref="Releases"/> set
 /// and not only the <see cref="Origin"/>. This is what <c>CKli.Publish.Plugin</c> does: it deprecates every
-/// published profile that offers one of the <see cref="DeprecatedPackages"/>.
+/// published profile that carries one of the <see cref="DeprecatedPackages"/>.
 /// </para>
 /// </summary>
 public sealed class VersionDeprecatedEventArgs : WorldEventArgs

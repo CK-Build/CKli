@@ -56,7 +56,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
         _versionTag.VersionDeprecated.Sync += OnVersionDeprecated;
     }
 
-    // A deprecated version is still offered by every profile that was published with it: the deprecation
+    // A deprecated version is still carried by every profile that was published with it: the deprecation
     // of a version and the deprecation of a profile are the same fact seen from the two sides of the
     // publication. VersionTagPlugin owns the propagation across versions (a deprecated version deprecates
     // its consumers, transitively) and this mirrors the whole result onto the profiles - which is why the
@@ -64,7 +64,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
     void OnVersionDeprecated( IActivityMonitor monitor, VersionDeprecatedEventArgs e )
     {
         // An expired deprecation has removed the version tags and its packages must leave the feeds: a
-        // profile that offers one of them describes something that no longer exists, so it is deleted.
+        // profile that carries one of them describes something that no longer exists, so it is deleted.
         // A deprecation still to come only marks them.
         bool expired = e.HasExpired;
         var folder = PublishedFolder;
@@ -82,11 +82,11 @@ public sealed class PublishPlugin : PrimaryPluginBase
         // Both read every file: an unreadable one has not been considered at all.
         foreach( var (version, error) in folder.LoadErrors )
         {
-            monitor.Warn( $"Unable to read the profile 'v{version}': it may offer a deprecated package.", error );
+            monitor.Warn( $"Unable to read the profile 'v{version}': it may carry a deprecated package.", error );
         }
         if( !folder.IsDirty )
         {
-            monitor.Trace( "No published profile offers any of the deprecated packages." );
+            monitor.Trace( "No published profile carries any of the deprecated packages." );
             return;
         }
         int count = folder.Save();
@@ -187,7 +187,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
     }
 
 
-    // A fix publishes versions that supersede the ones it fixes, and older profiles still offer those.
+    // A fix publishes versions that supersede the ones it fixes, and older profiles still carry those.
     // Such a profile is not rewritten - it records what was actually published - so the fix adds a
     // superseding profile beside each one, as if it had been built on the same day: same Major.Minor,
     // next free Patch. A deprecated profile is locked and gets none.
@@ -219,11 +219,11 @@ public sealed class PublishPlugin : PrimaryPluginBase
             // OnFixedPackages read every file: an unreadable one has not been considered at all.
             foreach( var (version, error) in folder.LoadErrors )
             {
-                monitor.Warn( $"Unable to read the profile 'v{version}': it may offer a fixed package.", error );
+                monitor.Warn( $"Unable to read the profile 'v{version}': it may carry a fixed package.", error );
             }
             if( created.Length == 0 )
             {
-                monitor.Trace( "No published profile offers any of the fixed packages." );
+                monitor.Trace( "No published profile carries any of the fixed packages." );
                 return;
             }
             folder.Save();

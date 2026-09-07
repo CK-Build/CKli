@@ -18,7 +18,7 @@ namespace CKli.Publish.Plugin;
 /// <para>
 /// The gate works at the solution level: every package a solution produces carries that solution's single version,
 /// and a package identifier is produced by exactly one solution (<see cref="HotGraph.ProducedPackages"/>), so the
-/// version a package will be offered in is a function of its producing solution. Package identifiers are only the
+/// version a package will carry is a function of its producing solution. Package identifiers are only the
 /// join key: the version a consumer was built against is read from its recorded
 /// <see cref="BuildContentInfo.Consumed"/> and mapped back to the solution that produces it.
 /// </para>
@@ -50,16 +50,16 @@ sealed class PublishedProfileBuilder
     readonly ImmutableArray<RepoReleaseInfo> _alreadyPublishedAliens;
 
     /// <summary>
-    /// A requirement of a solution that disagrees with the version its producer will offer.
+    /// A requirement of a solution that disagrees with the version its producer will produce.
     /// </summary>
     /// <param name="Consumer">The solution whose recorded requirement disagrees.</param>
     /// <param name="Producer">The solution that produces the required package.</param>
     /// <param name="Required">The package instance the <paramref name="Consumer"/> was built against.</param>
-    /// <param name="Offered">The version the <paramref name="Producer"/> will offer.</param>
+    /// <param name="Produced">The version the <paramref name="Producer"/> will produce.</param>
     public readonly record struct Discrepancy( Roadmap.BuildSolution Consumer,
                                                Roadmap.BuildSolution Producer,
                                                PackageInstance Required,
-                                               SVersion Offered );
+                                               SVersion Produced );
 
     PublishedProfileBuilder( ImmutableArray<Discrepancy> discrepancies,
                              ImmutableArray<Roadmap.BuildSolution> solutionsToBuild,
@@ -83,7 +83,7 @@ sealed class PublishedProfileBuilder
     public bool IsValid => _discrepancies.Length == 0 && _buildingAliens.Length == 0 && _missingArtifacts.Length == 0;
 
     /// <summary>
-    /// Gets the requirements that disagree with the versions their producers will offer.
+    /// Gets the requirements that disagree with the versions their producers will produce.
     /// </summary>
     public ImmutableArray<Discrepancy> Discrepancies => _discrepancies;
 
@@ -135,8 +135,8 @@ sealed class PublishedProfileBuilder
     {
         using var g = monitor.OpenTrace( "Computing the publication gate." );
 
-        // Only the solutions that are NOT built can disagree with what will be offered: a built solution has its
-        // World references rewritten from the Roadmap.PackageMapping, which is that very offer. The recorded
+        // Only the solutions that are NOT built can disagree with what will be produced: a built solution has its
+        // World references rewritten from the Roadmap.PackageMapping, which is those very versions. The recorded
         // requirements of a solution that is not built are frozen.
         var discrepancies = new List<Discrepancy>();
         foreach( var s in roadmap.OrderedSolutions )
@@ -149,11 +149,11 @@ sealed class PublishedProfileBuilder
                 // Packages not produced by this World are out of scope.
                 if( !roadmap.Graph.ProducedPackages.TryGetValue( c.PackageId, out var producerSolution ) ) continue;
                 var producer = roadmap.OrderedSolutions[producerSolution.OrderedIndex];
-                var offered = producer.TargetVersion;
-                if( offered != null && c.Version != offered )
+                var produced = producer.TargetVersion;
+                if( produced != null && c.Version != produced )
                 {
-                    monitor.Warn( $"'{s.Repo.DisplayPath}/v{s.LastBuild.Version}' requires '{c}' but '{producer.Repo.DisplayPath}' offers '{offered}'." );
-                    discrepancies.Add( new Discrepancy( s, producer, c, offered ) );
+                    monitor.Warn( $"'{s.Repo.DisplayPath}/v{s.LastBuild.Version}' requires '{c}' but '{producer.Repo.DisplayPath}' produces '{produced}'." );
+                    discrepancies.Add( new Discrepancy( s, producer, c, produced ) );
                 }
             }
         }
@@ -162,7 +162,7 @@ sealed class PublishedProfileBuilder
                                             .OrderBy( s => s.Solution.OrderedIndex )
                                             .ToImmutableArray();
 
-        // Everything the profile offers must be on a feed. A "local/" version is built but unpublished: when it
+        // Everything the profile carries must be on a feed. A "local/" version is built but unpublished: when it
         // belongs to another branch, it and the closure of its producers and consumers must be published first.
         var requiredPublications = ImmutableArray<RepoReleaseInfo>.Empty;
         var buildingAliens = ImmutableArray<RepoReleaseInfo>.Empty;
@@ -188,11 +188,11 @@ sealed class PublishedProfileBuilder
     }
 
     /// <summary>
-    /// Builds the profile that this publication offers on the roadmap's branch, from the real content of the builds
+    /// Builds the profile that this publication carries on the roadmap's branch, from the real content of the builds
     /// and of the version tags. The set of package identifiers a solution produces is only known once it has been
     /// built, so this is the only place a complete profile exists.
     /// <para>
-    /// Building it is also the final check: a conflict here means the publication would offer two versions of one
+    /// Building it is also the final check: a conflict here means the publication would carry two versions of one
     /// package identifier. This is what <see cref="Roadmap.PackageMapping"/> cannot express, a single repository
     /// consuming the same package identifier in two versions (conditional package references across target
     /// frameworks) in particular.
@@ -203,7 +203,7 @@ sealed class PublishedProfileBuilder
     /// <param name="world">The World that publishes: its stack url and name identify the profile.</param>
     /// <param name="profileVersion">
     /// The version of the profile, obtained from <see cref="PublishedFolder.CreateNewProfileVersion"/>: this is the
-    /// version of the publication itself, not of any of the packages it offers.
+    /// version of the publication itself, not of any of the packages it carries.
     /// </param>
     /// <returns>The profile or null if it has any conflict (logged).</returns>
     internal PublishedProfile? BuildFinalProfile( IActivityMonitor monitor,
@@ -212,18 +212,18 @@ sealed class PublishedProfileBuilder
                                                   SVersion profileVersion )
     {
         using var g = monitor.OpenTrace( "Building the published profile." );
-        var offer = new Offer();
+        var produced = new ProducedPackages();
 
-        // The offer: every package identifier each solution produces, in that solution's version.
+        // The produced packages: every package identifier each solution produces, in that solution's version.
         foreach( var s in roadmap.OrderedSolutions )
         {
             if( !TryGetFinalContent( s, out var version, out var content ) ) continue;
             foreach( var packageId in content.Produced )
             {
-                offer.Add( monitor, s.Repo, packageId, version, $"produced by '{s.Repo.DisplayPath}'" );
+                produced.Add( monitor, s.Repo, packageId, version, $"produced by '{s.Repo.DisplayPath}'" );
             }
         }
-        // The requirements: every World package each solution consumes must be offered in the version it consumes.
+        // The requirements: every World package each solution consumes must be carried in the version it consumes.
         // Such a package belongs to the repository that PRODUCES it, not to the one that consumes it.
         foreach( var s in roadmap.OrderedSolutions )
         {
@@ -232,10 +232,10 @@ sealed class PublishedProfileBuilder
             {
                 if( !roadmap.Graph.ProducedPackages.TryGetValue( c.PackageId, out var producerSolution ) ) continue;
                 var producer = roadmap.OrderedSolutions[producerSolution.OrderedIndex];
-                offer.Add( monitor, producer.Repo, c.PackageId, c.Version, $"required by '{s.Repo.DisplayPath}'" );
+                produced.Add( monitor, producer.Repo, c.PackageId, c.Version, $"required by '{s.Repo.DisplayPath}'" );
             }
         }
-        return offer.Build( monitor, world, profileVersion );
+        return produced.Build( monitor, world, profileVersion );
 
         static bool TryGetFinalContent( Roadmap.BuildSolution s, out SVersion version, out BuildContentInfo content )
         {
@@ -352,7 +352,7 @@ sealed class PublishedProfileBuilder
                                  foreColor: ConsoleColor.Red ) );
         foreach( var d in _discrepancies )
         {
-            r = Add( r, screen.Text( $"  {d.Consumer.Repo.DisplayPath} requires '{d.Required}' but '{d.Producer.Repo.DisplayPath}' offers '{d.Offered}'." ) );
+            r = Add( r, screen.Text( $"  {d.Consumer.Repo.DisplayPath} requires '{d.Required}' but '{d.Producer.Repo.DisplayPath}' produces '{d.Produced}'." ) );
         }
         if( !_solutionsToBuild.IsEmpty )
         {
@@ -375,14 +375,14 @@ sealed class PublishedProfileBuilder
     }
 
     /// <summary>
-    /// Accumulates the package identifiers a publication offers and the versions its packages require, detecting any
-    /// package identifier that would be offered in more than one version, then builds the <see cref="PublishedProfile"/>.
+    /// Accumulates the package identifiers a publication carries and the versions its packages require, detecting any
+    /// package identifier that would be carried in more than one version, then builds the <see cref="PublishedProfile"/>.
     /// <para>
     /// A package is always attributed to the <see cref="Repo"/> that produces it: this is what turns a flat
-    /// "package identifier to version" offer into the profile's <see cref="Repository"/> list.
+    /// "package identifier to version" map into the profile's <see cref="Repository"/> list.
     /// </para>
     /// </summary>
-    sealed class Offer
+    sealed class ProducedPackages
     {
         readonly Dictionary<string, Entry> _packages;
         int _conflictCount;
@@ -390,19 +390,19 @@ sealed class PublishedProfileBuilder
         // The Reason only exists for the conflict message: it says where the version comes from.
         readonly record struct Entry( Repo Producer, SVersion Version, string Reason );
 
-        public Offer()
+        public ProducedPackages()
         {
             _packages = new Dictionary<string, Entry>( StringComparer.OrdinalIgnoreCase );
         }
 
         /// <summary>
-        /// Adds a version for a package identifier. The first one registered is the offered one; a different one is
+        /// Adds a version for a package identifier. The first one registered is the produced one; a different one is
         /// a conflict: it is logged and <see cref="Build"/> will fail.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="producer">The repository that produces the package.</param>
         /// <param name="packageId">The package identifier.</param>
-        /// <param name="version">The version to offer.</param>
+        /// <param name="version">The version it is produced in.</param>
         /// <param name="reason">Where this version comes from. Appears in the conflict message.</param>
         public void Add( IActivityMonitor monitor, Repo producer, string packageId, SVersion version, string reason )
         {
@@ -411,7 +411,7 @@ sealed class PublishedProfileBuilder
                 if( already.Version != version )
                 {
                     ++_conflictCount;
-                    monitor.Error( $"'{packageId}' is offered in '{already.Version}' ({already.Reason}) and in '{version}' ({reason})." );
+                    monitor.Error( $"'{packageId}' is produced in '{already.Version}' ({already.Reason}) and in '{version}' ({reason})." );
                 }
                 return;
             }
@@ -429,7 +429,7 @@ sealed class PublishedProfileBuilder
         {
             if( _conflictCount > 0 )
             {
-                monitor.Error( $"{_conflictCount} package version conflict(s): the publication would offer an incoherent profile." );
+                monitor.Error( $"{_conflictCount} package version conflict(s): the publication would carry an incoherent profile." );
                 return null;
             }
             // Grouping by Repo cannot produce a duplicate url or identifier, and a package identifier appears in a
@@ -440,7 +440,7 @@ sealed class PublishedProfileBuilder
                                                                        .ToImmutableArray() ) )
                                         .ToImmutableArray();
             var profile = new PublishedProfile( world.StackRepository.OriginUrl, world.Name, profileVersion, repositories );
-            monitor.Trace( $"Published profile '{profile}' offers {_packages.Count} package(s) from {repositories.Length} repository(ies)." );
+            monitor.Trace( $"Published profile '{profile}' carries {_packages.Count} produced package(s) from {repositories.Length} repository(ies)." );
             return profile;
         }
     }
