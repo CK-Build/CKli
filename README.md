@@ -100,7 +100,7 @@ the current version is a pre release.
 This command transparently updates the CKli version used by the `CKli.Plugins` solution. If a `Tests/Plugins.Tests` project
 exists in the `CKi`, the version of the `CKli.Testing` package reference is also updated.
 
-### `clone <url> --private --allow-duplicate --ignore-parent-stack`
+### `clone <url> --private --allow-duplicate --ignore-parent-stack --with-ref-clone --without-ref-clone`
 Clones a Stack and all its current World repositories in the current directory.
 
 `--private` drives the name of the Stack repository folder: it is `.PrivateStack/`
@@ -112,6 +112,18 @@ and is available on the local system. In such case, the Stack's folder name will
 
 `--ignore-parent-stack` allows the cloned Stack to be inside an existing one.
 
+Once the Stack is cloned, the `<Reference Url="..." />` elements of its default World definition are handled:
+a reference names another Stack that this World uses and it is cloned **next to** this one (never inside it),
+recursively. A referenced Stack that is already cloned on this system is left as-is and a cycle between
+Stacks is handled: each Stack is cloned once.
+
+A reference is a public Stack unless it carries `Private="true"` (and a public Stack cannot reference a
+private one: this is an error). A reference with `DefaultClone="false"` is skipped by default.
+
+`--with-ref-clone` clones every reference, including the `DefaultClone="false"` ones.
+
+`--without-ref-clone` clones no reference at all.
+
 ### `create <url> --private`
 Creates a new Stack by creating the remote repository (the url must belong to a Git hosting provider
 that CKli can handle), checks out the new stack in the current directory, initializes default files in
@@ -120,6 +132,23 @@ the stack folder and pushes it.
 The `<url>` must end with the `-Stack` suffix.
 
 `--private` uses `.PrivateStack/` folder instead of `.PublicStack/`.
+
+### `remote stack migrate <newUrl>`
+Moves the Stack repository to a new remote: creates the new remote repository if it doesn't exist yet,
+changes the `origin` url, pushes the Stack content and, on success, archives the previous repository.
+
+The `<newUrl>` must end with the `-Stack` suffix and the Stack name must not change: a migration cannot
+rename a Stack (the Stack folder name and the World definition file names are the Stack name).
+
+Only the Stack repository moves: the repositories of the Worlds keep their own remotes.
+
+The command is as idempotent as it can be. It first detects whether the url has already moved to `<newUrl>`
+and it remembers the previous url (in the `ckli.migratedFrom` local git configuration) until that previous
+repository has reached its final state. A run interrupted between the url change and the archive is
+therefore finished by the next one, and a run on an already migrated Stack changes nothing.
+
+When the hosting provider cannot archive a repository (the file system one cannot), a warning is emitted and
+the previous repository is left as-is: it should then be archived or deleted manually.
 
 ### `log --folder`
 Opens the last log file. When `--folder` (or `-f`) is specified, the folder is opened instead
@@ -156,12 +185,20 @@ The branch is fetched and must be successfully merged before the push can succee
 By default, the current directory selects the Repos unless `--all` is specified.
 When applied to multiple Repos, a warning is emitted if the branch doesn't exist in a Repo.
 
+A branch in the `local/` or `building/` namespace cannot be pushed (see `ckli push`).
+
 ### `push --stack-only --all --continue-on-error`
 Pushes the Stack repository and all Repo's local branches that track a remote branch.
 A pull is done before: it must be successful for the actual push to be done.
 
 Tags are not pushed: tags are pushed when artifacts are published and this is the job
 of dedicated plugins.
+
+References in the `local/` and `building/` namespaces are never pushed, whatever the command: they are the
+version tags of a build that is in progress or not published yet, purely local artifacts that any other
+clone recomputes (and a pushed `local/` version tag breaks the fix branch adoption of `ckli fix start`).
+Such a branch is skipped with a warning here; `ckli branch push` and `ckli tag push` reject it with an error.
+Deleting such a reference from a remote remains possible.
 
 When `--stack-only` is specified, only the Stack repository is pushed. Repos are ignored.
 
@@ -268,6 +305,8 @@ Pushes the specified tags from the current Repo to its remote "origin".
 Modifications of remote tags are lost (the local version replaces them).
 
 Tag names must contain only ASCII characters with lowercase letters (to avoid case sensitivity issues).
+
+Tags in the `local/` and `building/` namespaces cannot be pushed (see `ckli push`).
 
 Must be run from within a Repo directory.
 
