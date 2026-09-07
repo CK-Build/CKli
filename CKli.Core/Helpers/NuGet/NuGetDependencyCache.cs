@@ -13,6 +13,11 @@ namespace CKli.Core;
 /// the dependencies by reading the Xml nuspec files.
 /// The version ranges are read by <see cref="SVersionBound.NugetTryParse(ReadOnlySpan{char})"/> and only the <see cref="SVersionBound.Base"/>
 /// version is considered.
+/// <para>
+/// The dependencies are NOT filtered by target framework: every group of a nuspec is read and each
+/// <see cref="NuGetPackageInstance.Dependency"/> carries the framework it comes from. Resolving a graph for a
+/// given framework is the caller's business.
+/// </para>
 /// </summary>
 public sealed class NuGetDependencyCache
 {
@@ -20,6 +25,10 @@ public sealed class NuGetDependencyCache
     readonly HashSet<NuGetPackageInstance>.AlternateLookup<(string, SVersion)> _altLookup;
     readonly List<MissingLink> _missingLinks;
     readonly HashSet<PackageInstance> _missingDeps;
+    // A package is added to _cache only once its dependencies have been read, so a cycle would recurse
+    // forever: this tracks the reads that are in progress (the package identifier is lower invariant).
+    readonly HashSet<(string PackageId, SVersion Version)> _reading;
+    readonly string? _cachePath;
 
     static readonly XmlReaderSettings _readerSettings = new XmlReaderSettings
     {
@@ -55,12 +64,18 @@ public sealed class NuGetDependencyCache
     /// <summary>
     /// Initializes a new empty cache.
     /// </summary>
-    public NuGetDependencyCache()
+    /// <param name="cachePath">
+    /// Optional folder to read the nuspec files from instead of the <see cref="NuGetHelper.Cache.GetGlobalCachePath(IActivityMonitor)"/>.
+    /// The expected layout is the global cache's one: "&lt;cachePath&gt;/&lt;package id lower invariant&gt;/&lt;version&gt;/&lt;package id lower invariant&gt;.nuspec".
+    /// </param>
+    public NuGetDependencyCache( string? cachePath = null )
     {
         _cache = new HashSet<NuGetPackageInstance>( Comp.Instance );
         _altLookup = _cache.GetAlternateLookup<(string, SVersion)>();
         _missingLinks = new List<MissingLink>();
         _missingDeps = new HashSet<PackageInstance>();
+        _reading = new HashSet<(string, SVersion)>();
+        _cachePath = cachePath;
     }
 
     /// <summary>
@@ -69,9 +84,17 @@ public sealed class NuGetDependencyCache
     public IReadOnlyList<MissingLink> MissingLinks => _missingLinks;
 
     /// <summary>
-    /// Gets the packages that cannot be found in the <see cref="NuGetHelper.Cache"/>.
+    /// Gets the packages that cannot be found in the <see cref="GetCachePath(IActivityMonitor)"/> folder.
     /// </summary>
     public IReadOnlySet<PackageInstance> Missing => _missingDeps;
+
+    /// <summary>
+    /// Gets the folder the nuspec files are read from: the <c>cachePath</c> of the constructor when one has
+    /// been provided, the <see cref="NuGetHelper.Cache.GetGlobalCachePath(IActivityMonitor)"/> otherwise.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>The folder path.</returns>
+    public string GetCachePath( IActivityMonitor monitor ) => _cachePath ?? NuGetHelper.Cache.GetGlobalCachePath( monitor );
 
     /// <summary>
     /// Gets a <see cref="NuGetPackageInstance"/> or returns false and logs an error.
@@ -89,7 +112,7 @@ public sealed class NuGetDependencyCache
         if( Get( monitor, packageId, version, out package ) )
         {
             if( package != null ) return true;
-            monitor.Error( $"Unable to find '{packageId}@{version}' in NuGet global cache (path: {NuGetHelper.Cache.GetGlobalCachePath( monitor )})." );
+            monitor.Error( $"Unable to find '{packageId}@{version}' in NuGet global cache (path: {GetCachePath( monitor )})." );
         }
         return false;
     }
@@ -106,31 +129,43 @@ public sealed class NuGetDependencyCache
     {
         if( !_altLookup.TryGetValue( (packageId, version), out package ) )
         {
-            packageId = packageId.ToLowerInvariant();
-            var path = Path.Combine( NuGetHelper.Cache.GetGlobalCachePath( monitor), packageId, version.ToString(), packageId ) + ".nuspec";
-            if( File.Exists( path ) )
+            var id = packageId.ToLowerInvariant();
+            if( !_reading.Add( (id, version) ) )
             {
-                var dependencies = ImmutableArray.CreateBuilder<NuGetPackageInstance>();
-                List<(string TargetFramework, NuGetPackageInstance Missing)>? missingDeps = null;
-                string? actualPackageId;
-                using( var f = File.OpenRead( path ) )
-                using( var r = XmlReader.Create( f, _readerSettings ) )
+                monitor.Error( $"Dependency cycle detected on '{packageId}@{version}' while reading the nuspec files." );
+                return false;
+            }
+            try
+            {
+                var path = Path.Combine( GetCachePath( monitor ), id, version.ToString(), id ) + ".nuspec";
+                if( File.Exists( path ) )
                 {
-                    actualPackageId = ReadNuspec( monitor, path, r, dependencies, ref missingDeps );
-                    if( actualPackageId == null ) 
+                    var dependencies = ImmutableArray.CreateBuilder<NuGetPackageInstance.Dependency>();
+                    List<(string TargetFramework, NuGetPackageInstance Missing)>? missingDeps = null;
+                    string? actualPackageId;
+                    using( var f = File.OpenRead( path ) )
+                    using( var r = XmlReader.Create( f, _readerSettings ) )
                     {
-                        return false;
+                        actualPackageId = ReadNuspec( monitor, path, r, dependencies, ref missingDeps );
+                        if( actualPackageId == null )
+                        {
+                            return false;
+                        }
                     }
-                }
-                package = new NuGetPackageInstance( actualPackageId, version, dependencies.DrainToImmutable() );
-                if( missingDeps != null )
-                {
-                    foreach( var dep in missingDeps )
+                    package = new NuGetPackageInstance( actualPackageId, version, dependencies.DrainToImmutable() );
+                    if( missingDeps != null )
                     {
-                        _missingLinks.Add( new MissingLink( package, dep.TargetFramework, dep.Missing ) );
+                        foreach( var dep in missingDeps )
+                        {
+                            _missingLinks.Add( new MissingLink( package, dep.TargetFramework, dep.Missing ) );
+                        }
                     }
+                    _cache.Add( package );
                 }
-                _cache.Add( package );
+            }
+            finally
+            {
+                _reading.Remove( (id, version) );
             }
         }
         return true;
@@ -138,7 +173,7 @@ public sealed class NuGetDependencyCache
         string? ReadNuspec( IActivityMonitor monitor,
                             string path,
                             XmlReader r,
-                            ImmutableArray<NuGetPackageInstance>.Builder dependencies,
+                            ImmutableArray<NuGetPackageInstance.Dependency>.Builder dependencies,
                             ref List<(string TargetFramework, NuGetPackageInstance Missing)>? missingDeps )
         {
             if( r.MoveToContent() != XmlNodeType.Element
@@ -146,79 +181,96 @@ public sealed class NuGetDependencyCache
                 || !r.Read()
                 || r.NodeType != XmlNodeType.Text )
             {
-                return Error(monitor, "Unable to find <id> element", path, r );
+                return Error( monitor, "Unable to find <id> element", path, r );
             }
             var actualPackageId = r.Value;
             r.Read();
             Throw.DebugAssert( "We are on the </id>.", r.NodeType == XmlNodeType.EndElement );
             // Not having dependencies is not an error (Microsoft.NETCore.Platforms packages have no dependencies at all).
-            if( r.ReadToNextSibling( "dependencies" ) )
+            if( !r.ReadToNextSibling( "dependencies" ) )
             {
-                while( r.Read() && r.LocalName == "group" )
+                return actualPackageId;
+            }
+            // The nuspec schema allows the <dependency> elements to be listed flat or grouped by target framework,
+            // and a <group> can perfectly be empty - self closed in particular, which is very common (System.Text.Json
+            // has one). Reading the subtree and dispatching on the element name handles every form, and any mix of
+            // them, instead of relying on the reader landing exactly where a nested loop expects it: a self closed
+            // <group/> used to make the reader skip the following <dependency> AND leave the outer loop, silently
+            // dropping every remaining dependency of the file.
+            using( var sub = r.ReadSubtree() )
+            {
+                if( !sub.Read() )
                 {
-                    if( !r.MoveToAttribute( "targetFramework" ) )
+                    return actualPackageId;
+                }
+                Throw.DebugAssert( "The subtree starts on the <dependencies> element.",
+                                   sub.NodeType == XmlNodeType.Element && sub.LocalName == "dependencies" );
+                // The depth is captured rather than assumed: only its relative value matters here.
+                int rootDepth = sub.Depth;
+                // A malformed nuspec can list the same dependency twice in one group. Two groups requiring the
+                // same instance are 2 legitimate edges: the target framework is part of the key.
+                var seen = new HashSet<(string TargetFramework, string PackageId, SVersion Version)>();
+                var groupFramework = "";
+                while( sub.Read() )
+                {
+                    if( sub.NodeType != XmlNodeType.Element ) continue;
+                    if( sub.LocalName == "group" )
                     {
-                        return Error( monitor, "Unable to read \"targetFramework\" attribute in <group .../>", path, r );
+                        // A <group> without a "targetFramework" attribute applies to any framework: the empty
+                        // string stands for it, exactly like a flat <dependency>.
+                        groupFramework = sub.GetAttribute( "targetFramework" ) ?? "";
+                        continue;
                     }
-                    string targetFramework = r.Value;
-                    while( r.Read() && r.LocalName == "dependency" )
+                    if( sub.LocalName != "dependency" ) continue;
+                    // A <dependency> directly under <dependencies> is a flat one: no group, hence no framework.
+                    var targetFramework = sub.Depth == rootDepth + 1 ? "" : groupFramework;
+                    if( !ReadIdAndVersion( sub, out var id, out var v ) )
                     {
-                        if( !ReadIdAndVersion( r, out var id, out var v ) )
-                        {
-                            return Error( monitor, "Unable to read \"id\" and/or \"version\" attributes in <dependency .../>", path, r );
-                        }
-                        if( !Get( monitor, id, v, out var dep ) )
-                        {
-                            return null;
-                        }
-                        bool isMissing = false;
-                        if( dep == null )
-                        {
-                            dep = new NuGetPackageInstance( id, v, [] );
-                            isMissing = true;
-                            _missingDeps.Add( dep );
-                        }
-                        else if( _missingDeps.Contains( dep ) )
-                        {
-                            isMissing = true;
-                        }
-                        if( isMissing )
-                        {
-                            missingDeps ??= new List<(string TargetFramework, NuGetPackageInstance Missing)>();
-                            missingDeps.Add( (targetFramework, dep) );
-                        }
-                        dependencies.Add( dep );
+                        return Error( monitor, "Unable to read \"id\" and/or \"version\" attributes in <dependency .../>", path, sub );
                     }
+                    if( !seen.Add( (targetFramework, id, v) ) ) continue;
+                    if( !Get( monitor, id, v, out var dep ) )
+                    {
+                        return null;
+                    }
+                    bool isMissing = false;
+                    if( dep == null )
+                    {
+                        dep = new NuGetPackageInstance( id, v, [] );
+                        isMissing = true;
+                        _missingDeps.Add( dep );
+                    }
+                    else if( _missingDeps.Contains( dep ) )
+                    {
+                        isMissing = true;
+                    }
+                    if( isMissing )
+                    {
+                        missingDeps ??= new List<(string TargetFramework, NuGetPackageInstance Missing)>();
+                        missingDeps.Add( (targetFramework, dep) );
+                    }
+                    dependencies.Add( new NuGetPackageInstance.Dependency( targetFramework, dep ) );
                 }
             }
             return actualPackageId;
 
+            // GetAttribute is used rather than MoveToFirstAttribute/MoveToNextAttribute: it leaves the reader on
+            // the element, so the enclosing loop's next Read() and the Depth test above stay predictable.
             static bool ReadIdAndVersion( XmlReader r, [NotNullWhen( true )] out string? id, [NotNullWhen( true )] out SVersion? v )
             {
-                id = null;
                 v = null;
-                if( r.MoveToFirstAttribute() )
+                id = r.GetAttribute( "id" );
+                if( string.IsNullOrWhiteSpace( id ) )
                 {
-                    do
-                    {
-                        if( r.LocalName == "id" )
-                        {
-                            id = r.Value;
-                            if( v != null ) return true;
-                        }
-                        else if( r.LocalName == "version" )
-                        {
-                            var result = SVersionBound.NugetTryParse( r.Value );
-                            if( result.IsValid )
-                            {
-                                v = result.Result.Base;
-                                if( id != null ) return true;
-                            }
-                        }
-                    }
-                    while( r.MoveToNextAttribute() );
+                    id = null;
+                    return false;
                 }
-                return false;
+                var version = r.GetAttribute( "version" );
+                if( version == null ) return false;
+                var result = SVersionBound.NugetTryParse( version );
+                if( !result.IsValid ) return false;
+                v = result.Result.Base;
+                return true;
             }
 
             static string? Error( IActivityMonitor monitor, string message, string path, XmlReader r )
