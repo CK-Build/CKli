@@ -270,30 +270,9 @@ public class NuGetHelperTests
         return p.Dependencies.Select( d => $"{d.TargetFramework}:{d.Package}" ).ToArray();
     }
 
-    // Creates a cache over a folder holding one nuspec per package, in the NuGet global cache's layout:
-    // "<package id lower invariant>/<version>/<package id lower invariant>.nuspec".
     static NuGetDependencyCache CreateCache( string testName,
                                              params (string PackageId, string Version, string Dependencies)[] packages )
     {
-        var root = Path.Combine( Path.GetTempPath(), "CKliNuGetDependencyCacheTests", testName );
-        TestHelper.CleanupFolder( root, ensureFolderAvailable: true );
-        foreach( var (packageId, version, dependencies) in packages )
-        {
-            var id = packageId.ToLowerInvariant();
-            var folder = Path.Combine( root, id, version );
-            Directory.CreateDirectory( folder );
-            File.WriteAllText( Path.Combine( folder, id + ".nuspec" ),
-                               $"""
-                                <?xml version="1.0" encoding="utf-8"?>
-                                <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
-                                  <metadata>
-                                    <id>{packageId}</id>
-                                    <version>{version}</version>
-                                {dependencies}
-                                  </metadata>
-                                </package>
-                                """ );
-        }
-        return new NuGetDependencyCache( root );
+        return FakeNuGetCache.Create( testName, packages );
     }
 }
