@@ -195,7 +195,8 @@ sealed class PublishedProfileBuilder
     /// Building it is also the final check: a conflict here means the publication would carry two versions of one
     /// package identifier. This is what <see cref="Roadmap.PackageMapping"/> cannot express, a single repository
     /// consuming the same package identifier in two versions (conditional package references across target
-    /// frameworks) in particular.
+    /// frameworks) in particular. The same check applies to the profile's
+    /// <see cref="PublishedProfile.DirectDependencies"/>: see <see cref="DirectDependencies"/>.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -235,7 +236,22 @@ sealed class PublishedProfileBuilder
                 produced.Add( monitor, producer.Repo, c.PackageId, c.Version, $"required by '{s.Repo.DisplayPath}'" );
             }
         }
-        return produced.Build( monitor, world, profileVersion );
+        // The direct dependencies: everything the repositories consume that this profile does not produce.
+        // The filter is the produced set built above, NOT roadmap.Graph.ProducedPackages: the graph only sees
+        // a project as packable once something in the stack references it, so it under approximates what a
+        // solution produces, and a stale reference in a frozen BuildContentInfo.Consumed would then make a
+        // produced identifier look external - which the PublishedProfile constructor rejects.
+        var direct = new DirectDependencies();
+        foreach( var s in roadmap.OrderedSolutions )
+        {
+            if( !TryGetFinalContent( s, out _, out var content ) ) continue;
+            foreach( var c in content.Consumed )
+            {
+                if( produced.Contains( c.PackageId ) ) continue;
+                direct.Add( monitor, s.Repo, c );
+            }
+        }
+        return produced.Build( monitor, world, profileVersion, direct.Build( monitor ) );
 
         static bool TryGetFinalContent( Roadmap.BuildSolution s, out SVersion version, out BuildContentInfo content )
         {
@@ -419,17 +435,34 @@ sealed class PublishedProfileBuilder
         }
 
         /// <summary>
-        /// Gets the profile or null when any package identifier has been added in more than one version.
+        /// Gets whether a package identifier is produced by this publication.
+        /// </summary>
+        /// <param name="packageId">The package identifier.</param>
+        /// <returns>True if the identifier is produced, false otherwise.</returns>
+        public bool Contains( string packageId ) => _packages.ContainsKey( packageId );
+
+        /// <summary>
+        /// Gets the profile or null when any package identifier has been added in more than one version or when
+        /// the <paramref name="directDependencies"/> are incoherent.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="world">The publishing World.</param>
         /// <param name="profileVersion">The version of the profile.</param>
+        /// <param name="directDependencies">
+        /// The profile's direct dependencies or null if they are incoherent (the conflicts have been logged).
+        /// </param>
         /// <returns>The profile or null.</returns>
-        public PublishedProfile? Build( IActivityMonitor monitor, World world, SVersion profileVersion )
+        public PublishedProfile? Build( IActivityMonitor monitor,
+                                        World world,
+                                        SVersion profileVersion,
+                                        ImmutableArray<PackageInstance>? directDependencies )
         {
             if( _conflictCount > 0 )
             {
                 monitor.Error( $"{_conflictCount} package version conflict(s): the publication would carry an incoherent profile." );
+            }
+            if( _conflictCount > 0 || directDependencies == null )
+            {
                 return null;
             }
             // Grouping by Repo cannot produce a duplicate url or identifier, and a package identifier appears in a
@@ -439,9 +472,88 @@ sealed class PublishedProfileBuilder
                                                                       g.Select( kv => new PackageInstance( kv.Key, kv.Value.Version ) )
                                                                        .ToImmutableArray() ) )
                                         .ToImmutableArray();
-            var profile = new PublishedProfile( world.StackRepository.OriginUrl, world.Name, profileVersion, repositories );
-            monitor.Trace( $"Published profile '{profile}' carries {_packages.Count} produced package(s) from {repositories.Length} repository(ies)." );
+            var profile = new PublishedProfile( world.StackRepository.OriginUrl,
+                                                world.Name,
+                                                profileVersion,
+                                                repositories,
+                                                directDependencies.Value );
+            monitor.Trace( $"Published profile '{profile}' carries {_packages.Count} produced package(s) from "
+                           + $"{repositories.Length} repository(ies) and {directDependencies.Value.Length} direct dependency(ies)." );
             return profile;
+        }
+    }
+
+    /// <summary>
+    /// Accumulates the packages the publication's repositories consume and that it does not produce - the profile's
+    /// <see cref="PublishedProfile.DirectDependencies"/> - detecting any identifier that would be carried in more
+    /// than one version.
+    /// <para>
+    /// The set is expected to be coherent: the 'D' discrepancies mapping aligns every clashing external reference
+    /// onto the greatest one (<see cref="Roadmap.PackageMapping"/>) and a solution that disagrees is forced to build
+    /// (<see cref="MustBuildReason.DependencyUpdate"/>). So this is an assertion with a message rather than a gate,
+    /// and the message names the colliding repositories: that guarantee runs through the shallow read of the project
+    /// files while this set comes from the MSBuild evaluated <see cref="BuildContentInfo.Consumed"/>, and the two can
+    /// diverge - a repository that this publication did not rebuild keeps a frozen Consumed, a genuine NuGet version
+    /// range resolves to something other than the project's text, and conditional package references across target
+    /// frameworks legitimately give one identifier two versions inside a single repository.
+    /// </para>
+    /// <para>
+    /// That last case is only a conflict because the model is target framework blind: the day
+    /// <see cref="BuildContentInfo.Consumed"/> becomes framework qualified, it stops being one.
+    /// </para>
+    /// </summary>
+    sealed class DirectDependencies
+    {
+        readonly Dictionary<string, Entry> _packages;
+        int _conflictCount;
+
+        // The Consumer only exists for the conflict message: it says which repository requires the version.
+        readonly record struct Entry( Repo Consumer, PackageInstance Package );
+
+        public DirectDependencies()
+        {
+            _packages = new Dictionary<string, Entry>( StringComparer.OrdinalIgnoreCase );
+        }
+
+        /// <summary>
+        /// Adds a package consumed by a repository. The first version registered is the carried one; a different
+        /// one is a conflict: it is logged and <see cref="Build"/> will fail.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="consumer">The repository that consumes the package.</param>
+        /// <param name="package">The package instance it consumes.</param>
+        public void Add( IActivityMonitor monitor, Repo consumer, PackageInstance package )
+        {
+            if( _packages.TryGetValue( package.PackageId, out var already ) )
+            {
+                if( already.Package.Version != package.Version )
+                {
+                    ++_conflictCount;
+                    monitor.Error( $"External package '{package.PackageId}' is consumed by "
+                                   + $"'{already.Consumer.DisplayPath}' in '{already.Package.Version}' and by "
+                                   + $"'{consumer.DisplayPath}' in '{package.Version}'. The publication cannot "
+                                   + "state which version it carries." );
+                }
+                return;
+            }
+            _packages.Add( package.PackageId, new Entry( consumer, package ) );
+        }
+
+        /// <summary>
+        /// Gets the direct dependencies or null when any package identifier has been consumed in more than one
+        /// version. Sorting is the <see cref="PublishedProfile"/>'s business.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>The direct dependencies or null.</returns>
+        public ImmutableArray<PackageInstance>? Build( IActivityMonitor monitor )
+        {
+            if( _conflictCount > 0 )
+            {
+                monitor.Error( $"{_conflictCount} external package version conflict(s): the publication cannot "
+                               + "state the versions it is built against." );
+                return null;
+            }
+            return [.. _packages.Values.Select( e => e.Package )];
         }
     }
 }
