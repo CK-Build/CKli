@@ -12,6 +12,12 @@ namespace CKli.Core;
 /// </summary>
 public sealed class WorldDefinitionFile
 {
+    /// <summary>
+    /// Describes <see cref="WorldName.IsValidLTSName(ReadOnlySpan{char})"/> for the user.
+    /// </summary>
+    internal const string InvalidLTSNameMessage = "Must be at least 3 characters that starts with '@', "
+                                                  + "only ASCII lowercase characters, digits, - (hyphen), _ (underscore) and '.' (dot).";
+
     static Func<IActivityMonitor,string,string>? _repositoryUrlHook;
     readonly XElement _root;
     readonly XElement _plugins;
@@ -535,6 +541,17 @@ public sealed class WorldDefinitionFile
             // Reads the 2 optional boolean attributes here: an invalid value throws (the world cannot be loaded)
             // instead of failing later in the "ckli clone" command that consumes them.
             _ = (bool?)e.Attribute( XNames.DefaultClone );
+            // Same for the optional LTSName: it has no default value (when absent, the referenced Stack's
+            // default world is the one that is used) but an invalid one must not reach any consumer.
+            var ltsName = e.Attribute( XNames.LTSName )?.Value;
+            if( ltsName != null && !WorldName.IsValidLTSName( ltsName ) )
+            {
+                Throw.CKException( $"""
+                    Invalid element:
+                    {e}
+                    Invalid LTSName="{ltsName}". {InvalidLTSNameMessage}
+                    """ );
+            }
             if( (bool?)e.Attribute( XNames.Private ) is true && world.Stack.IsPublic )
             {
                 Throw.CKException( $"""

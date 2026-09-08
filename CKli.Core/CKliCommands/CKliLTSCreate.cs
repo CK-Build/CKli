@@ -13,12 +13,9 @@ sealed class CKliLTSCreate : Command
         : base( null,
                 "lts create",
                 "Creates a new Long-Term-Support World from the current default World.",
-                [("ltsName", "The LTS name. Must start with the '@' character and be followed by at least .")],
+                [("ltsName", $"The LTS name. {WorldDefinitionFile.InvalidLTSNameMessage}")],
                 [],
-                [
-                    (["--private"], "Specify a private Stack. By default, a Stack is public."),
-                    (["--ignore-parent-stack"], "Allows the new Stack to be inside an existing one.")
-       ] )
+                [] )
     {
     }
 
@@ -34,8 +31,12 @@ sealed class CKliLTSCreate : Command
         {
             monitor.Error( $"""
                 Invalid LTS name '{ltsName}'.
-                Must be at least 3 characters that starts with '@', only ASCII lowercase characters, digits, - (hyphen), _ (underscore) and '.' (dot).
+                {WorldDefinitionFile.InvalidLTSNameMessage}
                 """ );
+            return ValueTask.FromResult( false );
+        }
+        if( !cmdLine.Close( monitor ) )
+        {
             return ValueTask.FromResult( false );
         }
         return new ValueTask<bool>( CreateLTSFromCurrentWorldAsync( monitor, this, context, ltsName, scopeAlive ) );

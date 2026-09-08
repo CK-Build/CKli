@@ -33,21 +33,43 @@ sealed class CKliClone : Command
         None
     }
 
+    /// <summary>
+    /// Carries the state across the reference recursion.
+    /// </summary>
+    sealed class CloneState
+    {
+        /// <summary>
+        /// The (url,LTSName) worlds that have been handled: a reference cycle (or a Stack referenced
+        /// twice for the same world) is handled once. This is what bounds the recursion.
+        /// </summary>
+        public readonly HashSet<(Uri Url, string? LTSName)> HandledWorlds = new();
+
+        /// <summary>
+        /// The <see cref="StackRepository.StackRoot"/> of the Stacks that THIS command has cloned. A Stack
+        /// that was found already cloned elsewhere on this machine is not here: it is left as-is.
+        /// </summary>
+        public readonly Dictionary<Uri, NormalizedPath> ClonedStacks = new();
+    }
+
     internal CKliClone()
         : base( null,
                 "clone",
                 """
-                Clones a Stack and all its current World repositories in the current directory.
-                The <Reference /> of the cloned default world are then cloned next to it (recursively):
-                see --with-ref-clone and --without-ref-clone.
+                Clones a Stack and the repositories of one of its Worlds in the current directory: its default
+                World unless --lts-name is specified.
+                The <Reference /> of the cloned world are then cloned next to it (recursively):
+                see --with-ref-clone and --without-ref-clone. A reference that carries a LTSName selects
+                the Long Term Support world of the referenced Stack whose repositories are cloned.
                 """,
                 [("stackUrl", "The url stack repository to clone from. The repository name must end with '-Stack'.")],
-                [],
+                [
+                    (["--max-dop"], "Limits the parallelism when cloning the repositories.", false),
+                    (["--lts-name"], "Clones the repositories of this Long Term Support World instead of the default one (\"@net8\").", false),
+                ],
                 [
                     (["--private"], "Indicates a private repository. A Personal Access Token (or any other secret) is required."),
                     (["--allow-duplicate"], "Allows a Stack that already exists locally to be cloned."),
                     (["--ignore-parent-stack"], "Allows the cloned Stack to be inside an existing one."),
-                    (["--max-dop"], "Limits the parallelism when cloning the repositories."),
                     (["--with-ref-clone"], "Clones every <Reference />, even the ones with DefaultClone=\"false\"."),
                     (["--without-ref-clone"], "Doesn't clone any <Reference />."),
                 ] )
@@ -86,6 +108,15 @@ sealed class CKliClone : Command
         {
             return false;
         }
+        var ltsName = cmdLine.EatSingleOption( "--lts-name" );
+        if( ltsName != null && !WorldName.IsValidLTSName( ltsName ) )
+        {
+            monitor.Error( $"""
+                Invalid --lts-name '{ltsName}'.
+                {WorldDefinitionFile.InvalidLTSNameMessage}
+                """ );
+            return false;
+        }
         if( !cmdLine.Close( monitor ) )
         {
             return false;
@@ -95,75 +126,117 @@ sealed class CKliClone : Command
                         : withoutRefClone
                             ? ReferenceMode.None
                             : ReferenceMode.Default;
+        var state = new CloneState();
+        state.HandledWorlds.Add( (uri, ltsName) );
         return await CloneAsync( monitor,
                                  context,
+                                 this,
                                  uri,
                                  !isPrivate,
                                  allowDuplicate,
                                  ignoreParentStack,
                                  maxDop,
                                  refMode,
-                                 new HashSet<Uri>(),
+                                 ltsName,
+                                 existingStackRoot: default,
+                                 state,
                                  scopeAlive )
                      .ConfigureAwait( false );
     }
 
     /// <summary>
-    /// Clones the stack and then the <Reference /> of its default world, recursively.
-    /// The <paramref name="handled"/> set carries the urls across the recursion: a reference cycle
-    /// (or a stack referenced twice) is handled once.
+    /// Clones the stack (or adds a world to it when <paramref name="existingStackRoot"/> is not empty) and
+    /// then handles the <Reference /> of the world that has been cloned, recursively.
     /// </summary>
     static async ValueTask<bool> CloneAsync( IActivityMonitor monitor,
                                              CKliEnv context,
+                                             Command command,
                                              Uri url,
                                              bool isPublic,
                                              bool allowDuplicate,
                                              bool ignoreParentStack,
                                              int maxDop,
                                              ReferenceMode refMode,
-                                             HashSet<Uri> handled,
+                                             string? ltsName,
+                                             NormalizedPath existingStackRoot,
+                                             CloneState state,
                                              CancellationToken scopeAlive )
     {
-        handled.Add( url );
-        List<(Uri Url, bool IsPublic)>? references = null;
-        using( var stack = await StackRepository.CloneAsync( monitor,
-                                                             context,
-                                                             url,
-                                                             isPublic,
-                                                             allowDuplicate,
-                                                             ignoreParentStack,
-                                                             "main",
-                                                             maxDop,
-                                                             scopeAlive )
-                                                .ConfigureAwait( false ) )
+        List<(Uri Url, bool IsPublic, string? LTSName)>? references = null;
+        List<(Uri Url, NormalizedPath StackRoot, string? LTSName)>? extraWorlds = null;
+        StackRepository? stack = null;
+        try
         {
-            if( stack == null ) return false;
+            if( existingStackRoot.IsEmptyPath )
+            {
+                stack = await StackRepository.CloneAsync( monitor,
+                                                          context,
+                                                          url,
+                                                          isPublic,
+                                                          allowDuplicate,
+                                                          ignoreParentStack,
+                                                          "main",
+                                                          maxDop,
+                                                          ltsName,
+                                                          scopeAlive )
+                                             .ConfigureAwait( false );
+                if( stack == null ) return false;
+                state.ClonedStacks[url] = stack.StackRoot;
+            }
+            else
+            {
+                // This command has already cloned this Stack for another of its worlds: a Stack is cloned
+                // once, so the referenced world is added to the existing clone.
+                if( !StackRepository.OpenFromPath( monitor,
+                                                   context.ChangeDirectory( existingStackRoot ),
+                                                   out stack,
+                                                   skipPullStack: true )
+                    || !CKliLTSClone.AddWorld( monitor, command, stack, ltsName, scopeAlive ) )
+                {
+                    return false;
+                }
+            }
             // The references are cloned next to this Stack, not in it: the Stack is released before cloning them.
+            // They are the ones of the world that has just been cloned, not necessarily the default one.
             if( refMode != ReferenceMode.None
-                && !ReadReferences( monitor, stack, refMode, handled, out references ) )
+                && !ReadReferences( monitor, stack, ltsName, refMode, state, out references, out extraWorlds ) )
             {
                 return false;
             }
         }
+        finally
+        {
+            stack?.Dispose();
+        }
         if( references != null )
         {
-            foreach( var (refUrl, refIsPublic) in references )
+            foreach( var (refUrl, refIsPublic, refLTSName) in references )
             {
                 if( scopeAlive.IsCancellationRequested ) return false;
-                using( monitor.OpenInfo( $"Cloning referenced {(refIsPublic ? "public" : "private")} Stack '{refUrl}'." ) )
+                using( monitor.OpenInfo( $"Cloning {WorldDisplay( refLTSName )} of the referenced {(refIsPublic ? "public" : "private")} Stack '{refUrl}'." ) )
                 {
                     // allowDuplicate is not propagated: an already cloned reference is skipped by ReadReferences,
                     // reaching this means that the stack is not cloned anywhere.
-                    if( !await CloneAsync( monitor,
-                                           context,
-                                           refUrl,
-                                           refIsPublic,
-                                           allowDuplicate: false,
-                                           ignoreParentStack,
-                                           maxDop,
-                                           refMode,
-                                           handled,
-                                           scopeAlive )
+                    if( !await CloneAsync( monitor, context, command, refUrl, refIsPublic,
+                                           allowDuplicate: false, ignoreParentStack, maxDop, refMode,
+                                           refLTSName, existingStackRoot: default, state, scopeAlive )
+                                .ConfigureAwait( false ) )
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        if( extraWorlds != null )
+        {
+            foreach( var (refUrl, refRoot, refLTSName) in extraWorlds )
+            {
+                if( scopeAlive.IsCancellationRequested ) return false;
+                using( monitor.OpenInfo( $"Adding {WorldDisplay( refLTSName )} to the referenced Stack '{refUrl}' already cloned in '{refRoot}'." ) )
+                {
+                    if( !await CloneAsync( monitor, context, command, refUrl, isPublic,
+                                           allowDuplicate: false, ignoreParentStack, maxDop, refMode,
+                                           refLTSName, refRoot, state, scopeAlive )
                                 .ConfigureAwait( false ) )
                     {
                         return false;
@@ -174,18 +247,26 @@ sealed class CKliClone : Command
         return true;
     }
 
+    static string WorldDisplay( string? ltsName ) => ltsName == null ? "the default world" : $"world '{ltsName}'";
+
     /// <summary>
-    /// Reads the <Reference /> of the default world of a freshly cloned stack and keeps the ones that must
-    /// be cloned: the already handled ones and the ones that are already cloned on this machine are skipped.
+    /// Reads the <Reference /> of the world that has just been cloned from a freshly cloned stack and keeps
+    /// the ones that must be cloned: the already handled ones and the ones that are already cloned on this
+    /// machine are skipped.
     /// </summary>
     static bool ReadReferences( IActivityMonitor monitor,
                                 StackRepository stack,
+                                string? ltsName,
                                 ReferenceMode refMode,
-                                HashSet<Uri> handled,
-                                out List<(Uri Url, bool IsPublic)>? references )
+                                CloneState state,
+                                out List<(Uri Url, bool IsPublic, string? LTSName)>? references,
+                                out List<(Uri Url, NormalizedPath StackRoot, string? LTSName)>? extraWorlds )
     {
         references = null;
-        var world = stack.DefaultWorldName;
+        extraWorlds = null;
+        // The world has necessarily been found: StackRepository.CloneAsync cloned its repositories.
+        var world = stack.FindWorldName( monitor, ltsName );
+        Throw.DebugAssert( world != null );
         var definitionFile = world.LoadDefinitionFile( monitor );
         if( definitionFile == null ) return false;
         bool success = true;
@@ -202,7 +283,7 @@ sealed class CKliClone : Command
                 success = false;
                 continue;
             }
-            // The boolean attributes have been validated by WorldDefinitionFile.ReadReferences.
+            // The boolean and LTSName attributes have been validated by WorldDefinitionFile.ReadReferences.
             if( refMode == ReferenceMode.Default && (bool?)e.Attribute( XNames.DefaultClone ) is false )
             {
                 monitor.Info( $"""
@@ -212,22 +293,37 @@ sealed class CKliClone : Command
                         """ );
                 continue;
             }
-            if( !handled.Add( url ) )
+            // LTSName selects the world of the referenced Stack to clone: absent means its default world.
+            var refLTSName = e.Attribute( XNames.LTSName )?.Value;
+            if( !state.HandledWorlds.Add( (url, refLTSName) ) )
             {
-                monitor.Trace( $"Reference '{url}' has already been handled." );
+                monitor.Trace( $"Reference to {WorldDisplay( refLTSName )} of '{url}' has already been handled." );
+                continue;
+            }
+            if( state.ClonedStacks.TryGetValue( url, out var clonedRoot ) )
+            {
+                // This command has cloned this Stack for another of its worlds. A Stack is cloned once,
+                // so the referenced world is added to that clone instead.
+                extraWorlds ??= new List<(Uri, NormalizedPath, string?)>();
+                extraWorlds.Add( (url, clonedRoot, refLTSName) );
                 continue;
             }
             var already = StackRepository.FindExistingStacks( monitor, url );
             if( already.Count > 0 )
             {
+                // The Stack lives somewhere else on this machine: it is left as-is. Its world may not be
+                // cloned there, but reaching into a folder that this command doesn't own is not its business.
                 monitor.Info( $"""
                         Referenced Stack '{url}' is already cloned here:
                         {already.Select( p => p.Path ).Concatenate( Environment.NewLine )}
+                        {(refLTSName != null
+                            ? $"""To obtain {WorldDisplay( refLTSName )} there: ckli --path "{already[0].RemoveLastPart()}" lts clone {refLTSName}"""
+                            : "")}
                         """ );
                 continue;
             }
-            references ??= new List<(Uri, bool)>();
-            references.Add( (url, !((bool?)e.Attribute( XNames.Private ) is true)) );
+            references ??= new List<(Uri, bool, string?)>();
+            references.Add( (url, !((bool?)e.Attribute( XNames.Private ) is true), refLTSName) );
         }
         return success;
     }

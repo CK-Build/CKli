@@ -31,6 +31,10 @@ public static class CKliCommands
         Add( cmds, new CKliLayoutFix() );
         Add( cmds, new CKliLayoutXif() );
 
+        cmds.Add( "lts", null );
+        Add( cmds, new CKliLTSClone() );
+        Add( cmds, new CKliLTSCreate() );
+
         Add( cmds, new CKliLog() );
         Add( cmds, new CKliStatus() );
 

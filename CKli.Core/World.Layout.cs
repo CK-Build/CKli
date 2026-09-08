@@ -483,7 +483,15 @@ sealed partial class World
     {
         var result = new Dictionary<Uri, NormalizedPath>( GitRepositoryKey.OrdinalIgnoreCaseUrlEqualityComparer );
         var nativeWorldRootPath = Path.GetFullPath( _name.WorldRoot ) + Path.DirectorySeparatorChar;
-        if( Read( monitor, this, nativeWorldRootPath, nativeWorldRootPath, result, forXif ) )
+        // The other worlds of the stack have their own root folder below the StackRoot (which is the default
+        // world's root): they are not part of this world's physical layout. Without this, the default world of
+        // a stack with a cloned LTS world sees the LTS world's repositories as misplaced and moves them into
+        // itself (and "layout xif" adopts them in its definition file).
+        var otherWorldRoots = _name.Stack.WorldNames
+                                         .Where( n => n.LTSName != _name.LTSName )
+                                         .Select( n => Path.GetFullPath( n.WorldRoot ) )
+                                         .ToHashSet( StringComparer.OrdinalIgnoreCase );
+        if( Read( monitor, this, nativeWorldRootPath, nativeWorldRootPath, otherWorldRoots, result, forXif ) )
         {
             return result;
         }
@@ -493,6 +501,7 @@ sealed partial class World
                           World world,
                           string path,
                           string nativeWorldRootPath,
+                          HashSet<string> otherWorldRoots,
                           Dictionary<Uri, NormalizedPath> result,
                           bool forXif )
         {
@@ -505,6 +514,12 @@ sealed partial class World
                     || subFolder.Equals( StackRepository.PrivateStackName, StringComparison.OrdinalIgnoreCase ) )
                 {
                     // The Stack repository must not appear in the physical layout.
+                    continue;
+                }
+                if( otherWorldRoots.Contains( p ) )
+                {
+                    // Another world of the stack: its repositories belong to it, not to this world.
+                    monitor.Debug( $"Skipping world folder '{new NormalizedPath( p ).LastPart}'." );
                     continue;
                 }
                 var pGitConfig = p + "/.git/config";
@@ -548,7 +563,7 @@ sealed partial class World
                 }
                 else
                 {
-                    success &= Read( monitor, world, p, nativeWorldRootPath, result, forXif );
+                    success &= Read( monitor, world, p, nativeWorldRootPath, otherWorldRoots, result, forXif );
                 }
             }
             return success;

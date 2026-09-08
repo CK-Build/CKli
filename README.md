@@ -100,8 +100,15 @@ the current version is a pre release.
 This command transparently updates the CKli version used by the `CKli.Plugins` solution. If a `Tests/Plugins.Tests` project
 exists in the `CKi`, the version of the `CKli.Testing` package reference is also updated.
 
-### `clone <url> --private --allow-duplicate --ignore-parent-stack --with-ref-clone --without-ref-clone`
-Clones a Stack and all its current World repositories in the current directory.
+### `clone <url> --lts-name <@ltsName> --max-dop <n> --private --allow-duplicate --ignore-parent-stack --with-ref-clone --without-ref-clone`
+Clones a Stack and the repositories of one of its Worlds in the current directory: its default World unless
+`--lts-name` is specified.
+
+`--lts-name <@ltsName>` clones the repositories of that Long Term Support World instead, in the Stack's own
+`@ltsName/` folder. The Stack must have that World (see [`lts create`](#lts-create-ltsname)); to obtain a
+second World of an already cloned Stack, use [`lts clone`](#lts-clone-ltsname).
+
+`--max-dop <n>` limits the parallelism when cloning the repositories.
 
 `--private` drives the name of the Stack repository folder: it is `.PrivateStack/`
 instead of `.PublicStack/`.
@@ -119,6 +126,16 @@ Stacks is handled: each Stack is cloned once.
 
 A reference is a public Stack unless it carries `Private="true"` (and a public Stack cannot reference a
 private one: this is an error). A reference with `DefaultClone="false"` is skipped by default.
+
+A reference that carries `LTSName="@net8"` selects the Long Term Support World of the referenced Stack that is
+used: the repositories of **that** World are the ones cloned (in the referenced Stack's `@net8/` folder rather
+than at its root), and the recursion then follows that World's own references. A referenced Stack that has no
+such World is an error.
+
+A Stack is cloned only once, so when two references name the same Stack with two different Worlds, the second
+World is **added** to the clone rather than cloned again — exactly what `lts clone` does — and its own
+references are then followed too. When the Stack was instead found already cloned somewhere else on this
+machine, that folder is left untouched and the `lts clone` command line to run there is reported.
 
 `--with-ref-clone` clones every reference, including the `DefaultClone="false"` ones.
 
@@ -267,6 +284,24 @@ Examples:
 - `ckli exec dotnet build --ckli-all` builds all the Repo of the Stack (the current state of the working folder).
 - `ckli exec git pull --tags --force` updates all the tags from the remotes, replacing the local ones (kind of `ckli tag pull *` that
    is not currently supported).
+
+## LTS World commands (create, clone)
+
+A Stack has one default World and any number of Long Term Support Worlds. A World is defined by a
+`{StackName}@{ltsName}.xml` file in the Stack repository and its repositories live in the Stack's own
+`@ltsName/` folder — so the Worlds of a Stack are siblings, not copies of it. A LTS name must be at
+least 3 characters starting with `@`, then only ASCII lowercase letters, digits, `-`, `_` and `.`.
+
+### `lts create <@ltsName>`
+Creates a new LTS World from the current default World. Must be run from the default World.
+
+### `lts clone <@ltsName>`
+Clones the repositories of an existing LTS World of the current Stack into its `@ltsName/` folder. Use this
+when the Stack is already cloned; `clone --lts-name` is the equivalent for a Stack that is not.
+
+Only the missing repositories are cloned, so running it again does nothing. Opening a World for the first
+time also generates its plugin solution inside the Stack repository, so the command commits the Stack: no
+`push` is needed for the World to exist locally, but a `push --stack-only` publishes that plugin solution.
 
 ## Tag commands (list, fetch, pull, push, delete) 
 

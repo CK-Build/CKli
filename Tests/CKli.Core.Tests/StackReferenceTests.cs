@@ -182,9 +182,9 @@ public class StackReferenceTests
         var withIssues = TestEnv.OpenRemotes( "WithIssues" );
 
         // CKt -> One -> WithIssues -> CKt: the cycle must not loop forever.
-        ArrangeReference( context, ckt.StackUri, "CKt", $"""<Reference Url="{one.StackUri}" />""" );
-        ArrangeReference( context, one.StackUri, "One", $"""<Reference Url="{withIssues.StackUri}" />""" );
-        ArrangeReference( context, withIssues.StackUri, "WithIssues", $"""<Reference Url="{ckt.StackUri}" />""" );
+        ArrangeReference( ckt.StackUri, "CKt", one.StackUri );
+        ArrangeReference( one.StackUri, "One", withIssues.StackUri );
+        ArrangeReference( withIssues.StackUri, "WithIssues", ckt.StackUri );
 
         StackRepository.ClearRegistry( TestHelper.Monitor ).ShouldBeTrue();
         var target = context.ChangeDirectory( "Target" );
@@ -197,17 +197,112 @@ public class StackReferenceTests
                  .Count()
                  .ShouldBe( 3, "The cycle back to CKt cloned nothing more." );
 
-        static void ArrangeReference( CKliEnv context, Uri stackUri, string name, string reference )
+        void ArrangeReference( Uri stackUri, string name, Uri referenced )
         {
-            var path = context.CurrentDirectory.Combine( "Arrange" ).AppendPart( name );
-            using var git = GitRepository.Clone( TestHelper.Monitor,
-                                                 new GitRepositoryKey( context.SecretsStore, stackUri, isPublic: true ),
-                                                 context.Committer,
-                                                 path,
-                                                 path.LastPart ).ShouldNotBeNull();
-            SetReferences( git.WorkingFolder.AppendPart( $"{name}.xml" ), reference );
-            git.Commit( TestHelper.Monitor, "Reference update." ).ShouldBe( CommitResult.Committed );
-            git.PushBranch( TestHelper.Monitor, git.Repository.Head, autoCreateRemoteBranch: true ).ShouldBeTrue();
+            ArrangeStack( context, stackUri, name,
+                          git => SetReferences( git.WorkingFolder.AppendPart( $"{name}.xml" ),
+                                                $"""<Reference Url="{referenced}" />""" ) );
+        }
+    }
+
+    /// <summary>
+    /// Clones a Stack remote directly (into an "Arrange/" folder), applies an edit to its working
+    /// folder and pushes it: this is how a &lt;Reference /&gt; reaches a remote that "ckli clone" then reads.
+    /// </summary>
+    static void ArrangeStack( CKliEnv context, Uri stackUri, string name, Action<GitRepository> editor )
+    {
+        var path = context.CurrentDirectory.Combine( "Arrange" ).AppendPart( name );
+        using var git = GitRepository.Clone( TestHelper.Monitor,
+                                             new GitRepositoryKey( context.SecretsStore, stackUri, isPublic: true ),
+                                             context.Committer,
+                                             path,
+                                             path.LastPart ).ShouldNotBeNull();
+        editor( git );
+        git.Commit( TestHelper.Monitor, "Arrange." ).ShouldBe( CommitResult.Committed );
+        git.PushBranch( TestHelper.Monitor, git.Repository.Head, autoCreateRemoteBranch: true ).ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task clone_honors_the_reference_LTSName_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+
+        // The One-Stack gets a "@net8" LTS world with the same single repository as its default one...
+        ArrangeStack( context, one.StackUri, "One", git =>
+        {
+            File.WriteAllText( git.WorkingFolder.AppendPart( "One@net8.xml" ),
+                               """
+                               <One LTSName="@net8">
+                                 <Repository Url="OneRepo" />
+                               </One>
+                               """ );
+        } );
+        // ...and the CKt-Stack references that world.
+        ArrangeStack( context, ckt.StackUri, "CKt", git =>
+        {
+            SetReferences( git.WorkingFolder.AppendPart( "CKt.xml" ),
+                           $"""<Reference Url="{one.StackUri}" LTSName="@net8" />""" );
+        } );
+
+        StackRepository.ClearRegistry( TestHelper.Monitor ).ShouldBeTrue();
+        var target = context.ChangeDirectory( "Target" );
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, target, "clone", ckt.StackUri )).ShouldBeTrue();
+
+        Directory.Exists( target.CurrentDirectory.Combine( "One/.PublicStack" ) ).ShouldBeTrue();
+        Directory.Exists( target.CurrentDirectory.Combine( "One/@net8/OneRepo" ) )
+                 .ShouldBeTrue( "The LTS world's repositories are cloned in its own folder." );
+        Directory.Exists( target.CurrentDirectory.Combine( "One/OneRepo" ) )
+                 .ShouldBeFalse( "The default world's repositories are not the ones that are used." );
+    }
+
+    [Test]
+    public async Task clone_fails_when_the_referenced_Stack_has_no_such_LTS_world_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+
+        // The One-Stack has no LTS world at all: only its default one.
+        ArrangeStack( context, ckt.StackUri, "CKt", git =>
+        {
+            SetReferences( git.WorkingFolder.AppendPart( "CKt.xml" ),
+                           $"""<Reference Url="{one.StackUri}" LTSName="@net8" />""" );
+        } );
+
+        StackRepository.ClearRegistry( TestHelper.Monitor ).ShouldBeTrue();
+        var target = context.ChangeDirectory( "Target" );
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, target, "clone", ckt.StackUri )).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( "Stack 'One' has no '@net8' Long Term Support world." ) );
+        }
+    }
+
+    [Test]
+    public async Task an_invalid_LTSName_prevents_the_world_to_be_loaded_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", ckt.StackUri )).ShouldBeTrue();
+        context = context.ChangeDirectory( "CKt" );
+        var xmlPath = context.CurrentDirectory.Combine( ".PublicStack/CKt.xml" );
+
+        SetReferences( xmlPath, $"""<Reference Url="{one.StackUri}" LTSName="@net8" />""" );
+        ReadReferences( context ).Count.ShouldBe( 1 );
+
+        // Like the 2 boolean attributes, an invalid LTSName throws: it never reaches a consumer.
+        SetReferences( xmlPath, $"""<Reference Url="{one.StackUri}" LTSName="net8" />""" );
+        using( TestHelper.Monitor.CollectEntries( out var entries ) )
+        {
+            using var stack = StackRepository.TryOpenFromPath( TestHelper.Monitor, context, out _, skipPullStack: true )
+                                             .ShouldNotBeNull();
+            stack.DefaultWorldName.LoadDefinitionFile( TestHelper.Monitor ).ShouldBeNull();
+            entries.ShouldContain( e => e.Exception != null
+                                        && e.Exception.Message.Contains( """Invalid LTSName="net8".""" ) );
         }
     }
 

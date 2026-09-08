@@ -22,7 +22,7 @@ namespace CKli.Core;
 ///         from any local path.
 ///     </item>
 ///     <item>
-///         Calling <see cref="CloneAsync(IActivityMonitor, CKli.Core.CKliEnv, Uri, bool, bool, bool, string, CancellationToken)"/>
+///         Calling <see cref="CloneAsync(IActivityMonitor, CKli.Core.CKliEnv, Uri, bool, bool, bool, string, int, string, CancellationToken)"/>
 ///         from the remote Uri of the stack.
 ///     </item>
 /// </list>
@@ -215,6 +215,52 @@ public sealed partial class StackRepository : IDisposable
             return worldName;
         }
         return DefaultWorldName.CheckDefinitionFileExists( monitor ) ? _defaultWorldName : null;
+    }
+
+    /// <summary>
+    /// Gets the world of this stack from an optional LTS name: the <see cref="DefaultWorldName"/> when
+    /// <paramref name="ltsName"/> is null, the matching <see cref="WorldNames"/> otherwise.
+    /// <para>
+    /// When no world has this LTS name, an error is logged and null is returned.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="ltsName">The Long Term Support name (with its leading '@') or null for the default world.</param>
+    /// <returns>The world name or null if not found.</returns>
+    public LocalWorldName? FindWorldName( IActivityMonitor monitor, string? ltsName )
+    {
+        if( ltsName == null ) return DefaultWorldName;
+        var world = WorldNames.FirstOrDefault( n => n.LTSName == ltsName );
+        if( world == null )
+        {
+            monitor.Error( $"""
+                Stack '{StackName}' has no '{ltsName}' Long Term Support world.
+                Its worlds are: {WorldNames.Select( n => n.FullName ).Concatenate()}
+                """ );
+        }
+        return world;
+    }
+
+    /// <summary>
+    /// Opens one of this stack's <see cref="WorldNames"/>. This is the explicit counterpart of
+    /// <see cref="TryOpenWorldFromPath"/>: the world is named instead of being resolved from a path.
+    /// <para>
+    /// The world's <see cref="LocalWorldName.WorldRoot"/> doesn't need to exist: a world is defined by its
+    /// xml definition file in the stack repository. This is what enables a world that has never been cloned
+    /// to be opened and its repositories to be obtained by <see cref="World.FixLayout"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="worldName">The world to open. Must belong to this stack.</param>
+    /// <param name="withPlugins">False to totally skip plugin loading. This should only be used in very special scenarii.</param>
+    /// <returns>The world or null on error.</returns>
+    public World? OpenWorld( IActivityMonitor monitor, LocalWorldName worldName, bool withPlugins = true )
+    {
+        Throw.CheckArgument( worldName != null && worldName.Stack == this );
+        Throw.CheckState( "A stack has a single opened world.", _world == null );
+        var w = World.Create( monitor, _context.Screen.ScreenType, this, worldName.WorldRoot, withPlugins );
+        if( w != null ) _world = w;
+        return w;
     }
 
     /// <summary>
@@ -633,8 +679,8 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
-    /// Clones a Stack and all its default world repositories to the local file system in a new folder
-    /// from a stack repository.
+    /// Clones a Stack and all the repositories of one of its worlds to the local file system in a new folder
+    /// from a stack repository. The world is the default one unless <paramref name="ltsName"/> is specified.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">
@@ -658,6 +704,11 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="maxDop">
     /// Maximal parallel repository clone.
     /// </param>
+    /// <param name="ltsName">
+    /// The Long Term Support name (with its leading '@') of the world whose repositories must be cloned.
+    /// When null, the repositories of the <see cref="DefaultWorldName"/> are cloned. When the Stack has no such
+    /// world, this is an error (see <see cref="FindWorldName(IActivityMonitor, string?)"/>).
+    /// </param>
     /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The repository or null on error.</returns>
     public static async Task<StackRepository?> CloneAsync( IActivityMonitor monitor,
@@ -668,9 +719,11 @@ public sealed partial class StackRepository : IDisposable
                                                            bool ignoreParentStack = false,
                                                            string stackBranchName = "main",
                                                            int maxDop = 0,
+                                                           string? ltsName = null,
                                                            CancellationToken cancellation = default )
     {
         bool isTestRun = CKliRootEnv.IsTestRun;
+        Throw.CheckArgument( ltsName == null || WorldName.IsValidLTSName( ltsName ) );
         Throw.CheckNotNullArgument( monitor );
         Throw.CheckNotNullArgument( context );
         // The nominal case is that we cannot clone a stack inside another stack. But when ignoreParentStack
@@ -810,8 +863,11 @@ public sealed partial class StackRepository : IDisposable
                 SetupNewLocalDirectory( gitPath );
                 Registry.RegisterNewStack( monitor, gitPath, url );
                 var result = new StackRepository( git, stackRoot, context, stackNameFromUrl );
-                // Now we can clone the world's repositories.
-                if( await CloneWorldAsync( monitor, result, result.DefaultWorldName, maxDop, cancellation ) )
+                // Now we can clone the world's repositories: ltsName selects the world of this Stack
+                // to clone instead of the default one (it comes from a <Reference LTSName="..." />).
+                var world = result.FindWorldName( monitor, ltsName );
+                if( world != null
+                    && await CloneWorldAsync( monitor, result, world, maxDop, cancellation ) )
                 {
                     return result;
                 }
@@ -1016,6 +1072,50 @@ public sealed partial class StackRepository : IDisposable
             return new StackRepository( gitRepository, stackRoot, context, stackName );
         }
     }
+    /// <summary>
+    /// The .gitignore pattern for the generated <c>CKli.CompiledPlugins.cs</c> of every world of a Stack.
+    /// <para>
+    /// It is deliberately unanchored: the file lives in <c>{StackName}-Plugins{LTSName}/CKli.Plugins/</c>, so
+    /// a pattern anchored on a folder name would be wrong for every Stack not named "CKli" and for every LTS
+    /// world (whose plugin solution is in the world's own sub folder of the Stack).
+    /// </para>
+    /// </summary>
+    internal const string CompiledPluginsIgnorePattern = "CKli.CompiledPlugins.cs";
+
+    /// <summary>
+    /// Ensures that the Stack repository's .gitignore ignores the generated <c>CKli.CompiledPlugins.cs</c>.
+    /// <para>
+    /// This repairs the Stacks created before the pattern was fixed. It is called when a world is added to a
+    /// Stack, which is when the previous pattern (anchored on "/CKli-Plugins/") starts to be harmful.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>True on success, false on error.</returns>
+    internal bool EnsureCompiledPluginsIgnored( IActivityMonitor monitor )
+    {
+        var ignore = StackWorkingFolder.AppendPart( ".gitignore" );
+        try
+        {
+            var lines = File.Exists( ignore ) ? File.ReadAllLines( ignore ) : [];
+            if( lines.Any( l => l.AsSpan().Trim().SequenceEqual( CompiledPluginsIgnorePattern ) ) )
+            {
+                return true;
+            }
+            monitor.Info( $"Adding '{CompiledPluginsIgnorePattern}' to '{ignore}'." );
+            // Inserts before a trailing "!.gitignore" negation if there is one: order matters for git.
+            var negation = Array.FindLastIndex( lines, l => l.AsSpan().Trim().SequenceEqual( "!.gitignore" ) );
+            var updated = lines.ToImmutableArray()
+                               .Insert( negation < 0 ? lines.Length : negation, CompiledPluginsIgnorePattern );
+            File.WriteAllLines( ignore, updated );
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While updating '{ignore}'.", ex );
+            return false;
+        }
+    }
+
     static void SetupNewLocalDirectory( NormalizedPath gitPath )
     {
         var localDir = gitPath.AppendPart( "$Local" );
@@ -1024,12 +1124,12 @@ public sealed partial class StackRepository : IDisposable
             Directory.CreateDirectory( localDir );
             // The .gitignore ignores it. It is created only once.
             var ignore = gitPath.AppendPart( ".gitignore" );
-            if( !File.Exists( ignore ) ) File.WriteAllText( ignore, """
+            if( !File.Exists( ignore ) ) File.WriteAllText( ignore, $"""
                 $Local/
                 Logs/
                 .vs/
                 .idea/
-                /CKli-Plugins/CKli.Plugins/CKli.CompiledPlugins.cs
+                {CompiledPluginsIgnorePattern}
                 !.gitignore
 
                 """ );

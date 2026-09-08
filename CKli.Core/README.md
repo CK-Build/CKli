@@ -110,7 +110,7 @@ or be grouped in an optional `<References>` element:
 
   <References>
     <Reference Url="https://github.com/Invenietis/CK-Database-Stack" DefaultClone="false" />
-    <Reference Url="https://github.com/Invenietis/Signature-Stack" Private="true" />
+    <Reference Url="https://github.com/Invenietis/Signature-Stack" Private="true" LTSName="@net8" />
   </References>
 
 </CK-Build>
@@ -121,6 +121,11 @@ or be grouped in an optional `<References>` element:
 | `Url` | *required* | The remote url of the referenced Stack. |
 | `DefaultClone` | `true` | Whether `ckli clone` clones this reference. |
 | `Private` | `false` | Whether the referenced Stack is private (a `.PrivateStack/` folder). |
+| `LTSName` | *(none)* | The Long Term Support world of the referenced Stack that is used. |
+
+`LTSName` is the only one with no default value: when it is absent, the referenced Stack's **default** world is
+the one that is used. Its value must satisfy `WorldName.IsValidLTSName` (`"@net8"`) and, like the 2 booleans, an
+invalid one throws when the file is loaded rather than reaching a consumer.
 
 **A public Stack cannot reference a private one**: this is an error that prevents the world to be loaded
 (the reference would be useless to anyone who can read the public Stack but not the private one).
@@ -139,6 +144,37 @@ url is cloned once. Two flags override the `DefaultClone` attributes:
 | `ckli clone <url>` | Clones the references whose `DefaultClone` is not `false`. |
 | `ckli clone <url> --with-ref-clone` | Clones every reference. |
 | `ckli clone <url> --without-ref-clone` | Clones no reference at all. |
+
+`LTSName` selects **which world of the referenced Stack is used**, and `ckli clone` honors it: the referenced
+Stack is cloned as usual and then the repositories of that world are the ones cloned, in the world's own
+`<StackRoot>/@ltsName/` folder instead of the Stack root. `StackRepository.CloneAsync` takes the `ltsName` and
+resolves it through `FindWorldName`; a referenced Stack that has no such world is an **error** that fails the
+whole clone. The recursion then reads the references of *that* world, not of the referenced Stack's default one.
+
+A Stack is still cloned **once**. When two references name the same Stack with two different worlds, the
+second world is *added* to that clone through the same `CKliLTSClone.AddWorld` that `ckli lts clone` uses, and
+its own references are followed too. `CKliClone.CloneState` is what makes this terminate: it keys the handled
+set on `(url, LTSName)` — not on the url alone — and remembers the `StackRoot` of the Stacks that this command
+cloned. A Stack found already cloned *elsewhere* on the machine is never touched: that folder is not this
+command's to modify, so the `lts clone` command line to run there is reported instead.
+
+### Opening a world doesn't require its folder
+
+`World.Create` only parses the path and reads the xml definition file, so `StackRepository.OpenWorld` can open
+a world that has never been cloned — and `World.FixLayout` then clones its missing repositories. That is the
+whole of `ckli lts clone`: create the folder, open the world, fix the layout. Two consequences that are easy
+to miss:
+
+- **A world's physical layout excludes the other worlds' roots.** `ReadPhysicalLayout` skips them explicitly.
+  Without it the default world (rooted at the StackRoot) sees an LTS world's repositories as misplaced copies
+  of its own and `layout fix` *moves* them out of it — `layout xif` adopts them, and `issue --fix` does the
+  move with `deleteAliens: true`.
+- **Opening a world writes into the Stack repository**: `PluginMachinery` creates its
+  `{LTSName}/{StackName}-Plugins{LTSName}/` solution there, which is tracked content. `StackRepository.Close`
+  only commits a dirty definition file, so whoever adds a world commits the Stack itself.
+  `StackRepository.CompiledPluginsIgnorePattern` is deliberately unanchored for the same reason: the previous
+  `/CKli-Plugins/CKli.Plugins/CKli.CompiledPlugins.cs` matched only the default world of a Stack literally
+  named "CKli". `EnsureCompiledPluginsIgnored` repairs older Stacks when a world is added.
 
 The `World` type is the primary type of the CKli API and the most complex one because it handles the plugins life cycle (loading, compiling, unloading).
 
