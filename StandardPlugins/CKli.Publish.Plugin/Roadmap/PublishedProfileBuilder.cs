@@ -7,6 +7,7 @@ using CKli.VersionTag.Plugin;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace CKli.Publish.Plugin;
@@ -251,7 +252,33 @@ sealed class PublishedProfileBuilder
                 direct.Add( monitor, s.Repo, c );
             }
         }
-        return produced.Build( monitor, world, profileVersion, direct.Build( monitor ) );
+        // What a restore brings beyond the direct dependencies: the union of what NuGet resolved
+        // transitively for each repository. This is read, never computed - see BuildContentInfo.Transitive.
+        var transitive = new TransitiveDependencyUnion();
+        foreach( var s in roadmap.OrderedSolutions )
+        {
+            if( !TryGetFinalContent( s, out _, out var content ) ) continue;
+            // A repository that produces nothing has no Repository entry in the profile, so a resolution
+            // could not name it: it contributes nothing at all.
+            if( !produced.IsProducer( s.Repo ) ) continue;
+            if( !content.HasTransitive )
+            {
+                monitor.Trace( $"'{s.Repo.DisplayPath}' has no recorded transitive packages: they are unknown "
+                               + "(which is not the same as knowing there are none), so this repository "
+                               + "contributes nothing to the profile's transitive dependencies." );
+                continue;
+            }
+            foreach( var p in content.Transitive )
+            {
+                transitive.Add( s.Repo.CKliRepoId, p );
+            }
+        }
+        var directDependencies = direct.Build( monitor );
+        // A null direct set is already an error: the anchors it provides would be missing.
+        var transitiveDependencies = directDependencies == null
+                                        ? null
+                                        : transitive.Build( monitor, produced, direct );
+        return produced.Build( monitor, world, profileVersion, directDependencies, transitiveDependencies );
 
         static bool TryGetFinalContent( Roadmap.BuildSolution s, out SVersion version, out BuildContentInfo content )
         {
@@ -442,6 +469,32 @@ sealed class PublishedProfileBuilder
         public bool Contains( string packageId ) => _packages.ContainsKey( packageId );
 
         /// <summary>
+        /// Gets the version a package identifier is produced in.
+        /// </summary>
+        /// <param name="packageId">The package identifier.</param>
+        /// <param name="version">The produced version.</param>
+        /// <returns>True if the identifier is produced, false otherwise.</returns>
+        public bool TryGetVersion( string packageId, [NotNullWhen( true )] out SVersion? version )
+        {
+            if( _packages.TryGetValue( packageId, out var e ) )
+            {
+                version = e.Version;
+                return true;
+            }
+            version = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Gets whether a repository produces at least one package: only such a repository appears in the
+        /// profile's <see cref="PublishedProfile.Repositories"/>, and only such a repository can therefore
+        /// be named by a <see cref="VersionResolution"/>.
+        /// </summary>
+        /// <param name="repo">The repository.</param>
+        /// <returns>True if the repository produces at least one package, false otherwise.</returns>
+        public bool IsProducer( Repo repo ) => _packages.Values.Any( e => e.Producer == repo );
+
+        /// <summary>
         /// Gets the profile or null when any package identifier has been added in more than one version or when
         /// the <paramref name="directDependencies"/> are incoherent.
         /// </summary>
@@ -451,11 +504,15 @@ sealed class PublishedProfileBuilder
         /// <param name="directDependencies">
         /// The profile's direct dependencies or null if they are incoherent (the conflicts have been logged).
         /// </param>
+        /// <param name="transitiveDependencies">
+        /// What a restore brings beyond them. Null when the <paramref name="directDependencies"/> are.
+        /// </param>
         /// <returns>The profile or null.</returns>
         public PublishedProfile? Build( IActivityMonitor monitor,
                                         World world,
                                         SVersion profileVersion,
-                                        ImmutableArray<PackageInstance>? directDependencies )
+                                        ImmutableArray<PackageInstance>? directDependencies,
+                                        TransitiveDependencies? transitiveDependencies )
         {
             if( _conflictCount > 0 )
             {
@@ -476,9 +533,11 @@ sealed class PublishedProfileBuilder
                                                 world.Name,
                                                 profileVersion,
                                                 repositories,
-                                                directDependencies.Value );
+                                                directDependencies.Value,
+                                                transitiveDependencies );
             monitor.Trace( $"Published profile '{profile}' carries {_packages.Count} produced package(s) from "
-                           + $"{repositories.Length} repository(ies) and {directDependencies.Value.Length} direct dependency(ies)." );
+                           + $"{repositories.Length} repository(ies), {directDependencies.Value.Length} direct "
+                           + $"dependency(ies) and {profile.TransitiveDependencies} transitive one(s)." );
             return profile;
         }
     }
@@ -540,6 +599,23 @@ sealed class PublishedProfileBuilder
         }
 
         /// <summary>
+        /// Gets the version a package identifier is consumed in.
+        /// </summary>
+        /// <param name="packageId">The package identifier.</param>
+        /// <param name="version">The consumed version.</param>
+        /// <returns>True if the identifier is a direct dependency, false otherwise.</returns>
+        public bool TryGetVersion( string packageId, [NotNullWhen( true )] out SVersion? version )
+        {
+            if( _packages.TryGetValue( packageId, out var e ) )
+            {
+                version = e.Package.Version;
+                return true;
+            }
+            version = null;
+            return false;
+        }
+
+        /// <summary>
         /// Gets the direct dependencies or null when any package identifier has been consumed in more than one
         /// version. Sorting is the <see cref="PublishedProfile"/>'s business.
         /// </summary>
@@ -554,6 +630,128 @@ sealed class PublishedProfileBuilder
                 return null;
             }
             return [.. _packages.Values.Select( e => e.Package )];
+        }
+    }
+
+    /// <summary>
+    /// Accumulates what NuGet resolved transitively for each repository of the publication
+    /// (<see cref="BuildContentInfo.Transitive"/>) and turns the union into the profile's
+    /// <see cref="PublishedProfile.TransitiveDependencies"/>.
+    /// <para>
+    /// Nothing is walked here and nothing is resolved: each repository's set is already NuGet's own answer -
+    /// target framework aware, pruned, one version per identifier per repository. All this does is put the
+    /// answers side by side and record where they disagree.
+    /// </para>
+    /// <para>
+    /// Disagreement is expected rather than exceptional: the 'D' mapping aligns the DIRECT external
+    /// references across repositories, not their transitive resolutions, so two repositories whose graphs
+    /// differ legitimately land on two versions of a package neither of them references. A single repository
+    /// can do it alone too - <see cref="BuildResult.ReadConsumedPackages"/> flattens the target frameworks, so
+    /// two of them resolving differently gives one identifier two versions.
+    /// </para>
+    /// </summary>
+    sealed class TransitiveDependencyUnion
+    {
+        // packageId -> resolved version -> the repositories that resolved it.
+        readonly Dictionary<string, Dictionary<SVersion, List<RandomId>>> _packages;
+
+        public TransitiveDependencyUnion()
+        {
+            _packages = new Dictionary<string, Dictionary<SVersion, List<RandomId>>>( StringComparer.OrdinalIgnoreCase );
+        }
+
+        /// <summary>
+        /// Records that a repository's restore resolved a package instance.
+        /// </summary>
+        /// <param name="repositoryId">The repository that resolved it.</param>
+        /// <param name="package">The resolved package instance.</param>
+        public void Add( RandomId repositoryId, PackageInstance package )
+        {
+            if( !_packages.TryGetValue( package.PackageId, out var versions ) )
+            {
+                _packages.Add( package.PackageId, versions = new Dictionary<SVersion, List<RandomId>>() );
+            }
+            if( !versions.TryGetValue( package.Version, out var repositories ) )
+            {
+                versions.Add( package.Version, repositories = new List<RandomId>() );
+            }
+            // The same repository appears once per project and per target framework in the recorded set.
+            if( !repositories.Contains( repositoryId ) ) repositories.Add( repositoryId );
+        }
+
+        /// <summary>
+        /// Gets the profile's transitive dependencies. Never null: a publication that recorded nothing
+        /// simply has none.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="produced">The produced packages: the first anchor.</param>
+        /// <param name="direct">The direct dependencies: the second anchor.</param>
+        /// <returns>The transitive dependencies.</returns>
+        public TransitiveDependencies Build( IActivityMonitor monitor,
+                                             ProducedPackages produced,
+                                             DirectDependencies direct )
+        {
+            var regular = ImmutableArray.CreateBuilder<PackageInstance>();
+            var ambiguous = ImmutableArray.CreateBuilder<AmbiguousDependency>();
+            foreach( var (packageId, versions) in _packages )
+            {
+                // An identifier the profile already states is anchored on that statement: only a resolution
+                // GREATER than it is worth recording, since a smaller one is invisible to a restore and
+                // "an identifier is both stated and transitively resolved" is the common case.
+                if( produced.TryGetVersion( packageId, out var anchor ) )
+                {
+                    AddAnchored( ambiguous, packageId, anchor, VersionSource.ProducedPackages, versions );
+                }
+                else if( direct.TryGetVersion( packageId, out anchor ) )
+                {
+                    AddAnchored( ambiguous, packageId, anchor, VersionSource.DirectDependencies, versions );
+                }
+                else if( versions.Count == 1 )
+                {
+                    foreach( var (version, _) in versions )
+                    {
+                        regular.Add( new PackageInstance( packageId, version ) );
+                    }
+                }
+                else
+                {
+                    // Nothing anchors this identifier: a consumer that takes several of this profile's
+                    // packages gets the greatest of the resolutions (NuGet's highest-wins).
+                    var resolutions = ToResolutions( versions );
+                    var highest = resolutions.Max( r => r.Version )!;
+                    ambiguous.Add( new AmbiguousDependency( packageId,
+                                                            highest,
+                                                            VersionSource.TransitiveDependencies,
+                                                            resolutions ) );
+                }
+            }
+            var result = new TransitiveDependencies( regular.DrainToImmutable(), ambiguous.DrainToImmutable() );
+            if( !result.Ambiguous.IsEmpty )
+            {
+                // Out of our control - these are external packages nobody here references - so this is
+                // reported, not gated.
+                monitor.Warn( $"{result.Ambiguous.Length} transitive package(s) resolved to more than one version "
+                              + "across this publication, or to a version this publication does not carry: "
+                              + $"{string.Join( ", ", result.Ambiguous.Select( a => a.PackageId ) )}." );
+            }
+            return result;
+
+            static void AddAnchored( ImmutableArray<AmbiguousDependency>.Builder ambiguous,
+                                     string packageId,
+                                     SVersion anchor,
+                                     VersionSource resolvedFrom,
+                                     Dictionary<SVersion, List<RandomId>> versions )
+            {
+                var greater = versions.Where( kv => kv.Key > anchor ).ToDictionary( kv => kv.Key, kv => kv.Value );
+                // Nothing greater: the profile's own entry says it all.
+                if( greater.Count == 0 ) return;
+                ambiguous.Add( new AmbiguousDependency( packageId, anchor, resolvedFrom, ToResolutions( greater ) ) );
+            }
+
+            static ImmutableArray<VersionResolution> ToResolutions( Dictionary<SVersion, List<RandomId>> versions )
+            {
+                return [.. versions.Select( kv => new VersionResolution( kv.Key, [.. kv.Value] ) )];
+            }
         }
     }
 }

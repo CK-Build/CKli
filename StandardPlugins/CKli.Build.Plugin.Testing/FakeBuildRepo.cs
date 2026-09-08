@@ -22,6 +22,9 @@ public sealed partial class FakeBuildRepo
     readonly NormalizedPath _displayPath;
     readonly string _defaultProjectName;
     readonly SVersion? _initialVersion;
+    readonly ImmutableArray<PackageInstance> _initialConsumed;
+    readonly string? _initialVersionTagName;
+    ImmutableArray<PackageInstance> _transitivePackages;
     CKliEnv? _repoRoot;
 
     internal FakeBuildRepo( FakeBuildWorld world,
@@ -43,6 +46,7 @@ public sealed partial class FakeBuildRepo
         var consumed = references.Select( r => new PackageInstance( r.DefaultProjectName, r.RequiredInitialVersion ) )
                                  .Order()
                                  .ToImmutableArray();
+        _initialConsumed = consumed;
         var refLines = string.Concat( consumed.Select( c => $"{Environment.NewLine}        <PackageReference Include=\"{c.PackageId}\" Version=\"{c.Version}\" />" ) );
         using( var e = CreateEditor() )
         {
@@ -65,12 +69,20 @@ public sealed partial class FakeBuildRepo
             {
                 e.GitRepository.Repository.Tags.Remove( "v0.0.0+fake" );
                 var content = new BuildContentInfo( consumed, produced: [_defaultProjectName], assetFileNames: [] );
-                e.GitRepository.Repository.Tags.Add( $"{initialVersion.ParsedPrefix}/v{initialVersion}",
-                                                     e.GitRepository.Repository.Head.Tip,
-                                                     e.GitRepository.Committer,
-                                                     content.ToString() );
+                // The name is kept rather than recomputed: RewriteInitialVersionTag must find this very tag.
+                _initialVersionTagName = e.GitRepository.Repository.Tags
+                                          .Add( $"{initialVersion.ParsedPrefix}/v{initialVersion}",
+                                                e.GitRepository.Repository.Head.Tip,
+                                                e.GitRepository.Committer,
+                                                content.ToString() )
+                                          .FriendlyName;
             }
         }
+        // The fake build function is static and installed globally: this is how it finds back the
+        // declarations of the repository it builds. See CKliBuildPluginTestHelperExtensions.
+        CKliBuildPluginTestHelperExtensions.RegisterFakeBuildRepo( world.Stack.Remotes.GetUriFor( RepositoryName,
+                                                                                                  mustExist: false ),
+                                                                   this );
     }
 
     /// <summary>
@@ -90,6 +102,61 @@ public sealed partial class FakeBuildRepo
                               _initialVersion != null );
             return _initialVersion;
         }
+    }
+
+    /// <summary>
+    /// Gets or sets the transitive packages that a fake build of this repository records in its
+    /// <see cref="BuildContentInfo.Transitive"/>: what a restore would bring beyond the
+    /// &lt;PackageReference&gt; of its projects.
+    /// <para>
+    /// The fake build restores nothing, so declaring them here is the only way a transitive set can exist in
+    /// this harness. The default is <c>default</c> - "not recorded", <see cref="BuildContentInfo.HasTransitive"/>
+    /// being false - which is NOT the empty array ("recorded, and a restore brings nothing"): the two states
+    /// differ and both are reachable from here.
+    /// </para>
+    /// <para>
+    /// Setting this also rewrites the annotation of the <see cref="InitialVersion"/> tag when there is one, so
+    /// the declaration covers the build this repository already carries - which is what a publication that does
+    /// not rebuild it reads. The tag is replaced on its own commit: no commit is added, so no "--ci.N" moves.
+    /// </para>
+    /// </summary>
+    public ImmutableArray<PackageInstance> TransitivePackages
+    {
+        get => _transitivePackages;
+        set
+        {
+            if( !value.IsDefault )
+            {
+                // BuildContentInfo requires a strictly sorted array: a test declares a set, not an order.
+                value = value.Sort();
+                for( int i = 1; i < value.Length; ++i )
+                {
+                    Throw.CheckArgument( $"Duplicate transitive package '{value[i]}'.", value[i - 1] != value[i] );
+                }
+            }
+            _transitivePackages = value;
+            RewriteInitialVersionTag();
+        }
+    }
+
+    // The initial version tag is written by the constructor, before a test can declare anything: its annotation
+    // is refreshed here rather than making the declaration a CreateRepoAsync parameter, which could not then be
+    // changed between two builds.
+    void RewriteInitialVersionTag()
+    {
+        if( _initialVersionTagName == null ) return;
+        using var e = CreateEditor();
+        var tags = e.GitRepository.Repository.Tags;
+        var tag = tags[_initialVersionTagName];
+        Throw.CheckState( $"Initial version tag '{_initialVersionTagName}' not found in '{DisplayPath}'.",
+                          tag != null );
+        var target = tag.Target;
+        var content = new BuildContentInfo( _initialConsumed,
+                                            produced: [_defaultProjectName],
+                                            assetFileNames: [],
+                                            _transitivePackages );
+        tags.Remove( tag );
+        tags.Add( _initialVersionTagName, target, e.GitRepository.Committer, content.ToString() );
     }
 
     /// <summary>

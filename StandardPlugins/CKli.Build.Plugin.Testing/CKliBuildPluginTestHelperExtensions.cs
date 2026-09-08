@@ -7,6 +7,7 @@ using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.IO;
 using System.IO.Compression;
@@ -71,9 +72,10 @@ public static partial class CKliBuildPluginTestHelperExtensions
     ///     the solution and "dotnet package list" is replaced by the &lt;PackageReference&gt; found in the project files.
     ///     </item>
     ///     <item>
-    ///     Nothing is restored, so there is no NuGet resolution to read the transitive packages from:
-    ///     <see cref="BuildContentInfo.HasTransitive"/> is false on a fake build. Recording an empty set
-    ///     instead would assert that a restore brings nothing, which is a different and false statement.
+    ///     Nothing is restored, so there is no NuGet resolution to read the transitive packages from: they
+    ///     are the ones a test declared on <see cref="FakeBuildRepo.TransitivePackages"/>, and
+    ///     <see cref="BuildContentInfo.HasTransitive"/> is false when it declared none. Defaulting to an empty
+    ///     set instead would assert that a restore brings nothing, which is a different and false statement.
     ///     </item>
     ///     <item>
     ///     The "Deployment" assets are not faked: <see cref="BuildContentInfo.AssetFileNames"/> is always empty.
@@ -117,7 +119,7 @@ public static partial class CKliBuildPluginTestHelperExtensions
 
         // Instead of "dotnet package list --include-transitive --format json", the consumed packages are the
         // <PackageReference> of the projects and of their reachable "Directory.Build.props". The transitive
-        // ones are left unrecorded: see the remarks above.
+        // ones can only be declared: see the remarks above.
         // GitSolutionContent.Consumed is a set: ordering it gives the strictly sorted array that BuildContentInfo requires.
         var consumed = solution.Consumed.Order().ToImmutableArray();
 
@@ -151,7 +153,7 @@ public static partial class CKliBuildPluginTestHelperExtensions
             {
                 return null;
             }
-            var content = new BuildContentInfo( consumed, produced, assetFileNames: [] );
+            var content = new BuildContentInfo( consumed, produced, assetFileNames: [], GetTransitivePackages( repo ) );
             var (tag, version) = buildInfo.ApplyReleaseBuildTag( monitor, context, content );
             if( tag == null )
             {
@@ -169,6 +171,27 @@ public static partial class CKliBuildPluginTestHelperExtensions
         {
             FileHelper.DeleteFolder( monitor, outputPath );
         }
+    }
+
+    // A test declares a repository's transitive packages on its FakeBuildRepo, but the fake build function is
+    // static and installed globally by SetBuilderFunction: this dictionary is the join between the CKli Repo the
+    // build is given and the FakeBuildRepo that declares. The key is the origin url because it is what a second
+    // clone of the same remotes shares with the first one (a coworking test builds from both), and because it
+    // embeds the test folder: an entry left by a previous test cannot be hit.
+    static readonly ConcurrentDictionary<string, FakeBuildRepo> _fakeBuildRepos = new( StringComparer.Ordinal );
+
+    internal static void RegisterFakeBuildRepo( Uri originUrl, FakeBuildRepo repo )
+    {
+        _fakeBuildRepos[originUrl.AbsoluteUri] = repo;
+    }
+
+    // An unknown repository - nothing was ever declared, or the Repo comes from no FakeBuildRepo at all - leaves
+    // the transitive packages unrecorded, which is what every fake build did before this seam existed.
+    static ImmutableArray<PackageInstance> GetTransitivePackages( Repo repo )
+    {
+        return _fakeBuildRepos.TryGetValue( repo.OriginUrl.AbsoluteUri, out var fake )
+                ? fake.TransitivePackages
+                : default;
     }
 
     /// <summary>

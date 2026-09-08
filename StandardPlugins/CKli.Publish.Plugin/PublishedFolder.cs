@@ -450,6 +450,13 @@ public sealed partial class PublishedFolder
 
     // Returns null when the profile carries none of the fixed packages: only the repositories and the
     // packages that actually change are rebuilt, the others are shared with the origin.
+    //
+    // The dependencies are carried over: a fix successor is a projection of its origin and OnFixBuildAsync
+    // has no roadmap to recompute them from. They can therefore be stale - a fix that changed an external
+    // reference is not reflected here - which is acceptable only because a fix is a minimal patch on a
+    // released line. The one thing that CANNOT be carried verbatim is an ambiguity anchored on a produced
+    // package whose version the fix moves: its anchor has to move with it, and resolutions that the new
+    // version has caught up with stop being disagreements at all.
     PublishedProfile? CreateSupersedingProfile( PublishedProfile origin, IReadOnlyDictionary<PackageInstance, SVersion> fixedPackages )
     {
         ImmutableArray<Repository>.Builder? repositories = null;
@@ -476,7 +483,45 @@ public sealed partial class PublishedFolder
                 : new PublishedProfile( origin.StackUrl,
                                         origin.World,
                                         CreateSupersedingProfileVersion( origin.Version ),
-                                        repositories.DrainToImmutable() );
+                                        repositories.DrainToImmutable(),
+                                        origin.DirectDependencies,
+                                        CarryTransitiveDependencies( origin, fixedPackages ) );
+    }
+
+    // Re-anchors the ambiguities that name a fixed produced package and drops the ones the fix resolved.
+    // Everything else - the regular entries, and any ambiguity anchored elsewhere - is shared with the origin:
+    // their identifiers are external packages that a fix does not move.
+    static TransitiveDependencies CarryTransitiveDependencies( PublishedProfile origin,
+                                                               IReadOnlyDictionary<PackageInstance, SVersion> fixedPackages )
+    {
+        var t = origin.TransitiveDependencies;
+        ImmutableArray<AmbiguousDependency>.Builder? ambiguous = null;
+        for( int i = 0; i < t.Ambiguous.Length; ++i )
+        {
+            var a = t.Ambiguous[i];
+            if( a.ResolvedFrom != VersionSource.ProducedPackages
+                || !fixedPackages.TryGetValue( new PackageInstance( a.PackageId, a.Version ), out var superseding ) )
+            {
+                if( ambiguous != null ) ambiguous.Add( a );
+                continue;
+            }
+            if( ambiguous == null )
+            {
+                ambiguous = ImmutableArray.CreateBuilder<AmbiguousDependency>( t.Ambiguous.Length );
+                ambiguous.AddRange( t.Ambiguous.Take( i ) );
+            }
+            // Only the harmful direction is reported: a resolution the superseding version has reached or
+            // passed is no longer a disagreement, and an ambiguity with nothing left to report disappears.
+            var greater = a.Resolutions.Where( r => r.Version > superseding ).ToImmutableArray();
+            if( greater.IsEmpty ) continue;
+            ambiguous.Add( new AmbiguousDependency( a.PackageId,
+                                                    superseding,
+                                                    VersionSource.ProducedPackages,
+                                                    greater ) );
+        }
+        return ambiguous == null
+                ? t
+                : new TransitiveDependencies( t.Regular, ambiguous.DrainToImmutable() );
     }
 
     /// <summary>

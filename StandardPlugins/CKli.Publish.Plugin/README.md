@@ -130,6 +130,15 @@ produced identifiers are exactly the fixed version's (`BuildPlugin.Fix` enforces
 `Repository` is superseded, *all* of its packages move together; the per-package loop is how the
 instance-keyed map is consumed, not a way to move only some of them.
 
+The successor also carries its origin's `DirectDependencies` and `TransitiveDependencies`: a fix
+successor is a projection of its origin and `OnFixBuildAsync` has no roadmap to recompute them from.
+They can therefore be **stale** — a fix that changed an external reference is not reflected — which is
+acceptable only because a fix is a minimal patch on a released line. The one thing that cannot be
+carried verbatim is an ambiguity anchored on a produced package whose version the fix moves: its anchor
+moves with it, and a resolution the superseding version has caught up with stops being a disagreement,
+so such an ambiguity shrinks or disappears. `SameProducedPackages` still compares produced packages
+only, so none of this affects idempotency.
+
 It is idempotent. A retry of an interrupted fix publication finds that some profile already carries the
 resulting produced packages — `OnFixedPackages` compares produced packages, not versions — and adds
 nothing. As with the other `PublishedFolder` writers, the Stack is then committed with a message naming
@@ -243,6 +252,8 @@ it has been built, so this is the only place a complete profile exists.
 | `World` | `World.Name` (a `LocalWorldName`, hence a `WorldName`). |
 | `Version` | `PublishedFolder.CreateNewProfileVersion` — see [The profile version](#the-profile-version). |
 | `Repositories` | One `Repository` per `Repo`, keyed by `(Repo.OriginUrl, Repo.CKliRepoId)` and holding the `PackageInstance`s it **produces**. |
+| `DirectDependencies` | Every `BuildContentInfo.Consumed` package that the final produced index does not carry. |
+| `TransitiveDependencies` | The union of every `BuildContentInfo.Transitive` — NuGet's own resolution — classified against the two sets above. |
 
 A package always belongs to the repository that *produces* it: a version that appears only because
 another solution consumes it is recorded against its producer, never against its consumer. So a
@@ -256,6 +267,50 @@ solution consumes at the version it consumes; a second version for one identifie
 state and the publication pushes nothing. This is what `Roadmap.PackageMapping`, a function of the
 package identifier, cannot express — a single repository consuming the same package identifier in
 two versions through conditional package references across target frameworks, in particular.
+
+#### What the repositories consume
+
+Beyond what they produce, the profile records what its repositories **consume**.
+
+`DirectDependencies` is every `BuildContentInfo.Consumed` package that this publication does not
+produce, accumulated by the nested class of the same name. Its filter is the **final produced index**,
+never `roadmap.Graph.ProducedPackages`: the graph only sees a project as packable once something in
+the stack references it, so it under approximates what a solution produces, and a stale reference in a
+frozen `Consumed` would then make a produced identifier look external — which the profile's constructor
+rejects with an `ArgumentException`. One extra pass over the solutions makes the invariant hold by
+construction.
+
+That set is expected to be coherent — one version per identifier — because the 'D' discrepancies
+mapping aligns every clashing external reference onto the greatest one and a solution that disagrees is
+forced to build. So its conflict branch is an assertion with a message rather than a gate, and the
+message names **both** colliding repositories and versions: the 'D' guarantee runs through the *shallow*
+read of the project files while this set comes from the MSBuild evaluated `Consumed`, and the two can
+diverge — a repository this publication did not rebuild keeps a frozen `Consumed`, and a genuine NuGet
+version range resolves to something other than the project's text.
+
+`TransitiveDependencies` is what a restore brings beyond those: the union of every repository's
+`BuildContentInfo.Transitive`, which is NuGet's own answer rather than a computed closure (see
+[the ArtifactHandler plugin](../CKli.ArtifactHandler.Plugin/README.md#recording-what-a-build-produced--buildcontentinfo--buildresult)). The nested
+`TransitiveDependencyUnion` puts those answers side by side and classifies each identifier:
+
+- **already carried** by `ProducedPackages` or `DirectDependencies` — only a resolution *greater* than
+  that entry is recorded, as an ambiguity anchored on it. A smaller one is invisible to a restore, and
+  "an identifier is both stated and transitively resolved" is the common case: burying the list with it
+  would make it useless.
+- otherwise **one** resolved version — a `Regular` entry; **several** — an ambiguity resolved from the
+  transitive packages themselves, at the greatest of them (NuGet's highest-wins across the packages a
+  consumer takes together).
+
+A `VersionResolution` names the repositories that resolved it, by their `Repo.CKliRepoId`. Two of them
+contribute nothing at all: a repository that produces no package has no `Repository` entry in the
+profile, so a resolution could not name it; and a repository whose build predates the
+`--include-transitive` capture has no set — `HasTransitive` false means *unknown*, which is not *empty*.
+
+Disagreement here is expected rather than exceptional: the 'D' mapping aligns the **direct** external
+references across repositories, not their transitive resolutions. Two repositories whose graphs differ
+legitimately land on two versions of a package neither of them references, and a single repository does
+it alone when two of its target frameworks resolve differently. These are external packages nobody here
+references, so they are reported with a warning and never gated.
 
 ### The profile version
 
