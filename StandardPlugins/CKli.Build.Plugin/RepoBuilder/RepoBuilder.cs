@@ -142,7 +142,11 @@ public class RepoBuilder : RepoInfo
             }
             if( DotNetBuildTestPack( monitor, buildInfo, runTest, outputPath, cancellation )
                 && !cancellation.IsCancellationRequested
-                && BuildResult.GetConsumedPackages( monitor, Repo, buildInfo.ToString(), out var consumedPackages ) )
+                && BuildResult.GetConsumedPackages( monitor,
+                                                    Repo,
+                                                    buildInfo.ToString(),
+                                                    out var consumedPackages,
+                                                    out var transitivePackages ) )
             {
                 // Everything went fine, it's time to cleanup the working folder and we are rather aggressive here:
                 // we use a git reset hard, delete any untracked files and eventually removes any empty folder.
@@ -161,7 +165,10 @@ public class RepoBuilder : RepoInfo
                 if( HandleDeployAssets( monitor, deploymentFolder, buildInfo.Version, out var assetsFolder, out var assetFileNames )
                     && _repoArtifact.PublishToNuGetLocalFeed( monitor, buildInfo.Version, outputPath, out var publishedPackages ) ) 
                 {
-                    var content = new BuildContentInfo( [.. consumedPackages], publishedPackages, assetFileNames );
+                    var content = new BuildContentInfo( consumedPackages,
+                                                        publishedPackages,
+                                                        assetFileNames,
+                                                        transitivePackages );
                     var (tag,version) = buildInfo.ApplyReleaseBuildTag( monitor, context, content );
                     if( tag == null )
                     {

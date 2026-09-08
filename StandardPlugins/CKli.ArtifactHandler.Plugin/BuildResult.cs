@@ -156,10 +156,16 @@ public sealed partial class BuildResult
     public override string ToString() => _buildContentInfo.ToString();
 
     /// <summary>
-    /// Calls 'dotnet package list --format json --no-restore' and parses the result. The resulting
-    /// packages are all the top level packages from all the projects for all the target frameworks
-    /// (the same <see cref="PackageInstance.PackageId"/> may appear with different versions if
-    /// conditional package references exist with restricted NuGet version ranges).
+    /// Calls 'dotnet package list --include-transitive --format json --no-restore' and parses the result.
+    /// The <paramref name="packages"/> are all the top level packages from all the projects for all the
+    /// target frameworks (the same <see cref="PackageInstance.PackageId"/> may appear with different
+    /// versions if conditional package references exist with restricted NuGet version ranges) and the
+    /// <paramref name="transitive"/> ones are everything a restore brings beyond them.
+    /// <para>
+    /// The transitive packages come from NuGet's own resolution: they are target framework aware, pruned
+    /// (a framework provided package is not listed) and carry a single version per identifier. There is
+    /// nothing left to resolve in them and no closure to compute: this is the answer, not the input to one.
+    /// </para>
     /// <para>
     /// We could have captured the Requested (the version bound) in addition to the Resolved package version.
     /// This would allow a better impact computation by early filtering out useless package upgrades. This
@@ -169,7 +175,8 @@ public sealed partial class BuildResult
     /// <param name="monitor">The monitor.</param>
     /// <param name="repo">The repository to consider.</param>
     /// <param name="buildInfo">A build info description (used by log).</param>
-    /// <param name="packages">The set of incoming packages or null on error.</param>
+    /// <param name="packages">The set of incoming top level packages. Empty on error.</param>
+    /// <param name="transitive">The packages a restore brings beyond the <paramref name="packages"/>. Empty on error.</param>
     /// <returns>True on success, false on error.</returns>
     /// <remarks>
     /// Collecting the package dependencies can be done in multiple ways:
@@ -192,15 +199,19 @@ public sealed partial class BuildResult
     /// </list>
     /// =&gt; The simplest and most robust way is the 'dotnet package list --format json'.
     /// </remarks>
-    public static bool GetConsumedPackages( IActivityMonitor monitor, Repo repo, string buildInfo, out ImmutableArray<PackageInstance> packages )
+    public static bool GetConsumedPackages( IActivityMonitor monitor,
+                                            Repo repo,
+                                            string buildInfo,
+                                            out ImmutableArray<PackageInstance> packages,
+                                            out ImmutableArray<PackageInstance> transitive )
     {
         var stdOut = new StringBuilder();
-        if( !repo.RunDotnet( monitor, "package list --format json --no-restore", stdOut ) )
+        if( !repo.RunDotnet( monitor, "package list --include-transitive --format json --no-restore", stdOut ) )
         {
-            packages = [];
+            packages = transitive = [];
             return false;
         }
-        return ReadConsumedPackages( monitor, stdOut.ToString(), buildInfo, out packages );
+        return ReadConsumedPackages( monitor, stdOut.ToString(), buildInfo, out packages, out transitive );
     }
 
     /// <summary>
@@ -209,28 +220,34 @@ public sealed partial class BuildResult
     /// <param name="monitor">The monitor.</param>
     /// <param name="jsonPackageList">The json string to parse.</param>
     /// <param name="buildInfo">Any object: its ToString() method will be used for error and warning logs.</param>
-    /// <param name="packages">The consumed package instances.</param>
+    /// <param name="packages">The consumed top level package instances.</param>
+    /// <param name="transitive">
+    /// The transitive package instances. Empty when the json has been obtained without
+    /// '--include-transitive': the property is simply absent then.
+    /// </param>
     /// <returns>True on success, false on error.</returns>
     public static bool ReadConsumedPackages( IActivityMonitor monitor,
                                              string jsonPackageList,
                                              object buildInfo,
-                                             out ImmutableArray<PackageInstance> packages )
+                                             out ImmutableArray<PackageInstance> packages,
+                                             out ImmutableArray<PackageInstance> transitive )
     {
         try
         {
             using var d = JsonDocument.Parse( jsonPackageList );
             if( !ReadProblems( monitor, buildInfo, d ) )
             {
-                packages = [];
+                packages = transitive = [];
                 return false;
             }
-            packages = ReadPackages( d );
+            packages = ReadPackages( d, "topLevelPackages" );
+            transitive = ReadPackages( d, "transitivePackages" );
             return true;
         }
         catch( Exception ex )
         {
             monitor.Error( $"While reading Package list for '{buildInfo}'.", ex );
-            packages = [];
+            packages = transitive = [];
             return false;
         }
 
@@ -259,7 +276,10 @@ public sealed partial class BuildResult
             return true;
         }
 
-        static ImmutableArray<PackageInstance> ReadPackages( JsonDocument d )
+        // The SortedSet gives the strictly sorted, deduplicated array that BuildContentInfo requires: the
+        // same package appears once per project and per target framework. An identifier CAN remain at two
+        // versions (two target frameworks resolving differently); that is a valid PackageInstance ordering.
+        static ImmutableArray<PackageInstance> ReadPackages( JsonDocument d, string listName )
         {
             var result = new SortedSet<PackageInstance>();
             if( d.RootElement.TryGetProperty( "projects"u8, out var projects ) )
@@ -270,15 +290,17 @@ public sealed partial class BuildResult
                     {
                         foreach( var f in frameworks.EnumerateArray() )
                         {
-                            if( f.TryGetProperty( "topLevelPackages"u8, out var topLevelPackages ) )
+                            // Absent rather than empty when 'dotnet package list' ran without
+                            // '--include-transitive', or when a project has no such package at all.
+                            if( f.TryGetProperty( listName, out var packages ) )
                             {
-                                foreach( var package in topLevelPackages.EnumerateArray() )
+                                foreach( var package in packages.EnumerateArray() )
                                 {
                                     string? packageId;
                                     if( !package.TryGetProperty( "id"u8, out var eId )
                                         || string.IsNullOrWhiteSpace( packageId = eId.GetString() ) )
                                     {
-                                        Throw.InvalidDataException( $"Missing, null or empty 'topLevelPackages.id' property." );
+                                        Throw.InvalidDataException( $"Missing, null or empty '{listName}.id' property." );
                                     }
                                     else
                                     {

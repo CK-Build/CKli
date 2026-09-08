@@ -71,6 +71,11 @@ public static partial class CKliBuildPluginTestHelperExtensions
     ///     the solution and "dotnet package list" is replaced by the &lt;PackageReference&gt; found in the project files.
     ///     </item>
     ///     <item>
+    ///     Nothing is restored, so there is no NuGet resolution to read the transitive packages from:
+    ///     <see cref="BuildContentInfo.HasTransitive"/> is false on a fake build. Recording an empty set
+    ///     instead would assert that a restore brings nothing, which is a different and false statement.
+    ///     </item>
+    ///     <item>
     ///     The "Deployment" assets are not faked: <see cref="BuildContentInfo.AssetFileNames"/> is always empty.
     ///     </item>
     /// </list>
@@ -110,8 +115,9 @@ public static partial class CKliBuildPluginTestHelperExtensions
         var solution = shallow.GetRequiredContent( monitor, repo, buildCommit, useWorkingFolder: false );
         if( solution == null ) return null;
 
-        // Instead of "dotnet package list --format json", the consumed packages are the <PackageReference> of
-        // the projects and of their reachable "Directory.Build.props".
+        // Instead of "dotnet package list --include-transitive --format json", the consumed packages are the
+        // <PackageReference> of the projects and of their reachable "Directory.Build.props". The transitive
+        // ones are left unrecorded: see the remarks above.
         // GitSolutionContent.Consumed is a set: ordering it gives the strictly sorted array that BuildContentInfo requires.
         var consumed = solution.Consumed.Order().ToImmutableArray();
 

@@ -29,7 +29,7 @@ commit, gaps in the Major.Minor.Patch sequence, orphaned CI tags, etc. `VersionT
 
 | Plugin | Relationship |
 |---|---|
-| `CKli.ArtifactHandler.Plugin` | Required dependency (constructor-injected). Supplies `BuildContentInfo` (the `Consumed`/`Produced`/`AssetFileNames` payload written into a tag's annotation) and performs the actual artifact deletion behind `DestroyLocalRelease`. |
+| `CKli.ArtifactHandler.Plugin` | Required dependency (constructor-injected). Supplies `BuildContentInfo` (the `Consumed`/`Produced`/`AssetFileNames`/`Transitive` payload written into a tag's annotation) and performs the actual artifact deletion behind `DestroyLocalRelease`. |
 | `CKli.BranchModel.Plugin` | Required dependency. `VersionTagPlugin` registers itself as the World's `ITagCommitProvider` (`branchModel.SetTagCommitProvider(this)`) so that `HotBranch.Synchronize` can resolve, for `Release`/`CI`-linked branches, "what was last built on the parent branch". |
 | A Build plugin (e.g. the project that drives `dotnet build`/`pack`) | Consumer. Calls `VersionTagInfo.TryGetCommitBuildInfo` to validate a candidate (commit, version) pair before building, then `CommitBuildInfo.ApplyReleaseBuildTag` to tag the result. |
 | `CKli.Publish.Plugin` | Consumer of the release graph (`ReleaseDatabase`) and of published/local version state to decide what can be pushed to a feed. |
@@ -166,7 +166,7 @@ A version tag's `SVersion.ParsedPrefix` and build metadata drive how it's interp
 | `TagCommit : ITagCommit` | One valid version tag bound to its commit; exposes `IsFakeVersion`/`IsDeprecatedVersion`/`IsRegularVersion`/`IsBuildingOrLocal`, an optional paired `CI0Version`/`CI0VersionTag`, an optional paired `FakeVersion`, and `CanBearVersion` (guards against 2 incompatible versions on one commit). |
 | `TagCommitTree` | A breadth-first slice of commit history between a branch tip and `HotZoneInfo.LastStable`; computes `SVersionChange` (via prior tags + Conventional Commits parsing) and the actual next `SVersion` (`ComputeTargetVersion`). |
 | `CommitBuildInfo` | Result of a validated "can I build this (commit, version)" check; exposes `InformationalVersion`, `ReleaseConfiguration`, and `ApplyReleaseBuildTag` to actually write the tag. |
-| `BuildContentInfo` *(from CKli.ArtifactHandler.Plugin)* | The parsed content of a version tag's annotation: `Consumed` (`PackageInstance` list) / `Produced` (package ids) / `AssetFileNames`. Backbone of the release graph. |
+| `BuildContentInfo` *(from CKli.ArtifactHandler.Plugin)* | The parsed content of a version tag's annotation: `Consumed` (`PackageInstance` list) / `Produced` (package ids) / `AssetFileNames` / `Transitive` (NuGet's resolved transitive packages, absent from an annotation written before they were recorded — see `HasTransitive`). Backbone of the release graph. |
 | `DeprecatedTagInfo` | Parsed content of a `+deprecated` tag's annotation: `Reason`, `Expiration`, `DaysDelay`, `HasExpired`, plus the original `ContentInfo`. |
 | `VersionTagPlugin.ReleaseDatabase` | World-wide, lazily-built graph of `RepoReleaseInfo` nodes, indexed by produced `PackageInstance`; supports `GetDirectConsumers`/`GetAllConsumers` traversal used by `version deprecate`. |
 | `RepoReleaseInfo` / `RepoKey` | A (repo, version) release node with its direct/all producers and consumers, and `HasAllLocalArtifacts`. |
