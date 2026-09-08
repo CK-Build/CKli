@@ -77,6 +77,12 @@ public static class CKliCommands
 
         Add( cmds, new CKliUpdate() );
 
+        cmds.Add( "world", null );
+        cmds.Add( "world reference", null );
+        Add( cmds, new CKliWorldReferenceList() );
+        Add( cmds, new CKliWorldReferenceRemove() );
+        Add( cmds, new CKliWorldReferenceSet() );
+
         static void Add( Dictionary<string, Command?> commands, Command c ) => commands.Add( c.CommandPath, c );
 
         _commands = CommandNamespace.UnsafeCreate( cmds );

@@ -176,6 +176,30 @@ public partial class GitRepositoryKey
     public bool IsStackRepository => RepositoryName.EndsWith( "-Stack", StringComparison.OrdinalIgnoreCase ) && _repoName.Length >= 8;
 
     /// <summary>
+    /// Gets whether a repository url is the one of a Stack named <paramref name="stackName"/>: the url's last
+    /// part is "{stackName}-Stack" or "{stackName}" (case insensitive).
+    /// </summary>
+    /// <param name="url">The repository url.</param>
+    /// <param name="stackName">The stack name (or the "-Stack" repository name).</param>
+    /// <returns>True if the url is the one of this Stack.</returns>
+    public static bool IsStackNamed( Uri url, string stackName )
+    {
+        Throw.CheckNotNullArgument( url );
+        return IsStackNamed( System.IO.Path.GetFileName( url.ToString().AsSpan() ), stackName );
+    }
+
+    /// <inheritdoc cref="IsStackNamed(Uri, string)"/>
+    /// <param name="repositoryName">The repository name (the last part of the url).</param>
+    /// <param name="stackName">The stack name (or the "-Stack" repository name).</param>
+    public static bool IsStackNamed( ReadOnlySpan<char> repositoryName, string stackName )
+    {
+        Throw.CheckNotNullOrWhiteSpaceArgument( stackName );
+        return repositoryName.Equals( stackName, StringComparison.OrdinalIgnoreCase )
+               || (repositoryName.EndsWith( "-Stack", StringComparison.OrdinalIgnoreCase )
+                   && repositoryName[..^6].Equals( stackName, StringComparison.OrdinalIgnoreCase ));
+    }
+
+    /// <summary>
     /// Checks that <see cref="OriginUrl"/> is a "-Stack" url or emits an error.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>

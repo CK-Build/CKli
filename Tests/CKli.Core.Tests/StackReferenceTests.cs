@@ -281,6 +281,93 @@ public class StackReferenceTests
     }
 
     [Test]
+    public async Task world_reference_set_creates_then_merges_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+        var withIssues = TestEnv.OpenRemotes( "WithIssues" );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", ckt.StackUri )).ShouldBeTrue();
+        context = context.ChangeDirectory( "CKt" );
+
+        // Creation: no optional attribute.
+        (await Set( context, one.StackUri )).ShouldBeTrue();
+        var references = ReadReferences( context );
+        references.Count.ShouldBe( 1 );
+        references[0].Attribute( XNames.Url )!.Value.ShouldBe( one.StackUri.ToString() );
+        references[0].Attribute( XNames.DefaultClone ).ShouldBeNull();
+        references[0].Attribute( XNames.Private ).ShouldBeNull();
+        CheckStackCommit( context, "Set reference to Stack" );
+
+        // --no-default-clone sets DefaultClone="false".
+        (await Set( context, one.StackUri, "--no-default-clone" )).ShouldBeTrue();
+        references = ReadReferences( context );
+        references.Count.ShouldBe( 1, "The reference has been updated, not duplicated." );
+        ((bool?)references[0].Attribute( XNames.DefaultClone )).ShouldBe( false );
+
+        // This merges: a "set" that names no attribute leaves the existing ones as they are.
+        (await Set( context, one.StackUri )).ShouldBeTrue();
+        ((bool?)ReadReferences( context )[0].Attribute( XNames.DefaultClone )).ShouldBe( false );
+
+        // --default-clone removes the attribute since true is its default value.
+        (await Set( context, one.StackUri, "--default-clone" )).ShouldBeTrue();
+        ReadReferences( context )[0].Attribute( XNames.DefaultClone ).ShouldBeNull();
+
+        // Another url is another reference.
+        (await Set( context, withIssues.StackUri, "--no-default-clone" )).ShouldBeTrue();
+        references = ReadReferences( context );
+        references.Count.ShouldBe( 2 );
+        references[0].Attribute( XNames.Url )!.Value.ShouldBe( one.StackUri.ToString() );
+        references[1].Attribute( XNames.Url )!.Value.ShouldBe( withIssues.StackUri.ToString() );
+    }
+
+    [Test]
+    public async Task world_reference_set_handles_the_optional_LTSName_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", ckt.StackUri )).ShouldBeTrue();
+        context = context.ChangeDirectory( "CKt" );
+
+        // LTSName has no default value: when no --lts-name is specified, the attribute is simply absent.
+        (await Set( context, one.StackUri )).ShouldBeTrue();
+        ReadReferences( context )[0].Attribute( XNames.LTSName ).ShouldBeNull();
+
+        (await Set( context, one.StackUri, "--lts-name", "@net8" )).ShouldBeTrue();
+        var references = ReadReferences( context );
+        references.Count.ShouldBe( 1, "The reference has been updated, not duplicated." );
+        references[0].Attribute( XNames.LTSName )!.Value.ShouldBe( "@net8" );
+
+        // This merges: the other attributes are set without touching the LTSName.
+        (await Set( context, one.StackUri, "--no-default-clone" )).ShouldBeTrue();
+        references = ReadReferences( context );
+        references[0].Attribute( XNames.LTSName )!.Value.ShouldBe( "@net8" );
+        ((bool?)references[0].Attribute( XNames.DefaultClone )).ShouldBe( false );
+
+        // --lts-name replaces it and --default-world removes it.
+        (await Set( context, one.StackUri, "--lts-name", "@net9" )).ShouldBeTrue();
+        ReadReferences( context )[0].Attribute( XNames.LTSName )!.Value.ShouldBe( "@net9" );
+        (await Set( context, one.StackUri, "--default-world" )).ShouldBeTrue();
+        ReadReferences( context )[0].Attribute( XNames.LTSName ).ShouldBeNull();
+
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await Set( context, one.StackUri, "--lts-name", "@net8", "--default-world" )).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( "--lts-name and flag --default-world are mutually exclusive" ) );
+        }
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            // A LTS name must start with '@' and be lower case.
+            (await Set( context, one.StackUri, "--lts-name", "Net8" )).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( "Invalid --lts-name 'Net8'." ) );
+        }
+        ReadReferences( context )[0].Attribute( XNames.LTSName ).ShouldBeNull( "Nothing has been written." );
+    }
+
+    [Test]
     public async Task an_invalid_LTSName_prevents_the_world_to_be_loaded_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
@@ -304,6 +391,199 @@ public class StackReferenceTests
             entries.ShouldContain( e => e.Exception != null
                                         && e.Exception.Message.Contains( """Invalid LTSName="net8".""" ) );
         }
+    }
+
+    [Test]
+    public async Task world_reference_set_refuses_invalid_references_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", ckt.StackUri )).ShouldBeTrue();
+        context = context.ChangeDirectory( "CKt" );
+
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await Set( context, one.StackUri, "--private", "--public" ))
+                .ShouldBeFalse( "The 2 flags are mutually exclusive." );
+            logs.ShouldContain( l => l.Contains( "--private and --public are mutually exclusive" ) );
+        }
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            // A reference names a Stack: the url must have the "-Stack" suffix.
+            (await Set( context, new Uri( ckt.StackUri.ToString().Replace( "-Stack", "-NotAStack" ) ) )).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( "must have '-Stack' suffix" ) );
+        }
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await Set( context, ckt.StackUri )).ShouldBeFalse( "A Stack cannot reference itself." );
+            logs.ShouldContain( l => l.Contains( "cannot reference itself" ) );
+        }
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            // This is the invariant that ReadReferences enforces by throwing: writing it would produce a
+            // world definition file that can no more be loaded.
+            (await Set( context, one.StackUri, "--private" )).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( "a public Stack cannot reference a private one." ) );
+        }
+        ReadReferences( context ).ShouldBeEmpty( "Nothing has been written." );
+    }
+
+    [Test]
+    public async Task world_reference_set_resolves_the_name_of_a_locally_cloned_Stack_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", ckt.StackUri )).ShouldBeTrue();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", one.StackUri )).ShouldBeTrue();
+        var cktContext = context.ChangeDirectory( "CKt" );
+
+        // The stack name of a Stack that is cloned on this machine is resolved to its url.
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, cktContext, "world", "reference", "set", "One" )).ShouldBeTrue();
+        var references = ReadReferences( cktContext );
+        references.Count.ShouldBe( 1 );
+        references[0].Attribute( XNames.Url )!.Value.ShouldBe( one.StackUri.ToString() );
+
+        // The repository name works too and updates the very same reference.
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, cktContext, "world", "reference", "set", "One-Stack", "--no-default-clone" ))
+            .ShouldBeTrue();
+        references = ReadReferences( cktContext );
+        references.Count.ShouldBe( 1 );
+        ((bool?)references[0].Attribute( XNames.DefaultClone )).ShouldBe( false );
+
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, cktContext, "world", "reference", "set", "NotCloned" )).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( "no Stack named" ) );
+        }
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            // The One-Stack is cloned in a ".PublicStack" folder here: this is the ground truth.
+            (await Set( cktContext, one.StackUri, "--private" )).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( "The --private flag contradicts it." ) );
+        }
+    }
+
+    [Test]
+    public async Task world_reference_remove_is_idempotent_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+        var withIssues = TestEnv.OpenRemotes( "WithIssues" );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", ckt.StackUri )).ShouldBeTrue();
+        context = context.ChangeDirectory( "CKt" );
+
+        (await Set( context, one.StackUri )).ShouldBeTrue();
+        (await Set( context, withIssues.StackUri )).ShouldBeTrue();
+        ReadReferences( context ).Count.ShouldBe( 2 );
+
+        // By stack name.
+        (await Remove( context, "One" )).ShouldBeTrue();
+        var references = ReadReferences( context );
+        references.Count.ShouldBe( 1 );
+        references[0].Attribute( XNames.Url )!.Value.ShouldBe( withIssues.StackUri.ToString() );
+        CheckStackCommit( context, "Removed reference to Stack" );
+
+        // By url.
+        (await Remove( context, withIssues.StackUri.ToString() )).ShouldBeTrue();
+        ReadReferences( context ).ShouldBeEmpty();
+
+        // Removing what is not there is not an error.
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await Remove( context, "One" )).ShouldBeTrue();
+            logs.ShouldContain( l => l.Contains( "No <Reference /> matching 'One'" ) );
+        }
+    }
+
+    [Test]
+    public async Task world_reference_set_and_remove_handle_the_References_group_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+        var withIssues = TestEnv.OpenRemotes( "WithIssues" );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", ckt.StackUri )).ShouldBeTrue();
+        context = context.ChangeDirectory( "CKt" );
+        var xmlPath = context.CurrentDirectory.Combine( ".PublicStack/CKt.xml" );
+
+        SetReferences( xmlPath,
+                       $"""
+                        <References>
+                          <Reference Url="{one.StackUri}" />
+                        </References>
+                        """ );
+        // A new reference joins the existing group.
+        (await Set( context, withIssues.StackUri )).ShouldBeTrue();
+        var references = ReadReferences( context );
+        references.Count.ShouldBe( 2 );
+        references.ShouldAllBe( e => e.Parent!.Name == XNames.References );
+
+        // The group that becomes empty is removed.
+        (await Remove( context, "One" )).ShouldBeTrue();
+        (await Remove( context, "WithIssues" )).ShouldBeTrue();
+        ReadReferences( context ).ShouldBeEmpty();
+        XDocument.Load( xmlPath ).Root!.Elements( XNames.References ).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task world_reference_list_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+        var display = (StringScreen)context.Screen;
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", ckt.StackUri )).ShouldBeTrue();
+        context = context.ChangeDirectory( "CKt" );
+
+        display.Clear();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "world", "reference", "list" )).ShouldBeTrue();
+        display.ToString().ShouldContain( "has no <Reference />" );
+
+        (await Set( context, one.StackUri, "--no-default-clone" )).ShouldBeTrue();
+        display.Clear();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "world", "reference", "list" )).ShouldBeTrue();
+        var text = display.ToString();
+        text.ShouldContain( "1 reference(s) in world 'CKt':" );
+        text.ShouldContain( one.StackUri.ToString() );
+        text.ShouldContain( "no-clone" );
+        text.ShouldContain( "public" );
+        text.ShouldContain( "(default world)", customMessage: "No LTSName attribute." );
+        text.ShouldContain( "(not cloned here)", customMessage: "The One-Stack has not been cloned by this test." );
+
+        (await Set( context, one.StackUri, "--lts-name", "@net8" )).ShouldBeTrue();
+        display.Clear();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "world", "reference", "list" )).ShouldBeTrue();
+        display.ToString().ShouldContain( "@net8" );
+    }
+
+    static ValueTask<bool> Set( CKliEnv context, Uri stackUrl, params string[] flags )
+    {
+        return CKliCommands.ExecAsync( TestHelper.Monitor,
+                                       context,
+                                       ["world", "reference", "set", stackUrl, .. flags] );
+    }
+
+    static ValueTask<bool> Remove( CKliEnv context, string nameOrUrl )
+    {
+        return CKliCommands.ExecAsync( TestHelper.Monitor, context, "world", "reference", "remove", nameOrUrl );
+    }
+
+    /// <summary>
+    /// The commands commit their change in the Stack repository: no "push --stack-only" is required
+    /// for the change to be durable locally.
+    /// </summary>
+    static void CheckStackCommit( CKliEnv context, string expectedMessage )
+    {
+        using var git = new LibGit2Sharp.Repository( context.CurrentDirectory.AppendPart( ".PublicStack" ) );
+        git.Head.Tip.Message.ShouldContain( expectedMessage );
     }
 
     static IReadOnlyList<XElement> ReadReferences( CKliEnv context )

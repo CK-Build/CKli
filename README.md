@@ -141,6 +141,8 @@ machine, that folder is left untouched and the `lts clone` command line to run t
 
 `--without-ref-clone` clones no reference at all.
 
+The references themselves are managed by the [`world reference`](#world-commands-reference-list-set-remove) commands.
+
 ### `create <url> --private`
 Creates a new Stack by creating the remote repository (the url must belong to a Git hosting provider
 that CKli can handle), checks out the new stack in the current directory, initializes default files in
@@ -302,6 +304,54 @@ when the Stack is already cloned; `clone --lts-name` is the equivalent for a Sta
 Only the missing repositories are cloned, so running it again does nothing. Opening a World for the first
 time also generates its plugin solution inside the Stack repository, so the command commits the Stack: no
 `push` is needed for the World to exist locally, but a `push --stack-only` publishes that plugin solution.
+
+## World commands (reference list, set, remove)
+
+These commands manage the `<Reference Url="..." />` elements of the current World's definition file: the other
+Stacks that this World uses and that the `clone` command clones next to it. They exist so that the definition
+file never has to be edited by hand.
+
+Like `repo add`/`repo remove`, `set` and `remove` update the World's definition file in the Stack repository and
+create a commit: to publish the change, a `push` (typically with `--stack-only`) must be executed. If the current
+World is a LTS one (`CK@Net8`), `--allow-lts` must be specified — and a warning is emitted because `clone` honors
+the references of the **default** World only: a reference declared in a LTS World is never cloned.
+
+### `world reference list`
+Lists the references of the current World with their `DefaultClone`, `Private` and `LTSName` state and where each
+referenced Stack is cloned on this machine (or that it is not).
+
+### `world reference set <stackUrlOrName> --lts-name <@ltsName> --default-world --no-default-clone --default-clone --private --public --allow-lts`
+Creates or updates a reference. The `<stackUrlOrName>` is the url of the referenced Stack; the **name** of a Stack
+that is cloned on this machine (`CK-Database` or `CK-Database-Stack`) can be used instead and is resolved to its url.
+The url must have the `-Stack` suffix and a Stack cannot reference itself.
+
+This **merges**: only the attributes named by the option or the flags are changed, so `world reference set <url>` on
+an existing reference just makes sure it is there and leaves its attributes as they are.
+
+`--lts-name <@ltsName>` sets `LTSName="@net8"`: the Long Term Support World of the referenced Stack that this World
+uses. Unlike the 2 booleans below, this attribute has no default value — when it is absent, the referenced Stack's
+**default** World is the one that is used — so `--default-world` is what removes it. The 2 are mutually exclusive and
+the name must satisfy the same rule as `lts create`: at least 3 characters starting with `@`, then only ASCII
+lowercase letters, digits, `-`, `_` and `.`.
+
+`clone` honors it: the repositories of that LTS World are the ones cloned, in the referenced Stack's
+`@ltsName/` folder. A referenced Stack that has no such World fails the clone.
+
+`--no-default-clone` sets `DefaultClone="false"` (`clone` then skips this reference unless `--with-ref-clone` is used)
+and `--default-clone` removes the attribute since `true` is its default value.
+
+`--private` sets `Private="true"` and `--public` removes the attribute (`false` is its default value). Each pair is
+mutually exclusive. A public Stack cannot reference a private one: this is refused (writing it would produce a
+definition file that can no more be loaded).
+
+When the referenced Stack is cloned on this machine, its `.PublicStack/`or `.PrivateStack/` folder is the ground
+truth: `Private="true"` is inferred when the reference is created without `--private` nor `--public`, an explicit
+flag that contradicts it is an error, and an existing reference that contradicts it is reported as a warning.
+
+### `world reference remove <nameOrUrl> --allow-lts`
+Removes a reference. The `<nameOrUrl>` is its url, the referenced repository name (`XXX-Stack`) or its stack
+name (`XXX`) — the url is required when a name matches more than one reference. Removing a reference that doesn't
+exist is not an error, and a `<References>` element that becomes empty is removed.
 
 ## Tag commands (list, fetch, pull, push, delete) 
 

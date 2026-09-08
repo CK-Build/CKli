@@ -21,7 +21,7 @@ public sealed class WorldDefinitionFile
     static Func<IActivityMonitor,string,string>? _repositoryUrlHook;
     readonly XElement _root;
     readonly XElement _plugins;
-    readonly IReadOnlyList<XElement> _references;
+    readonly List<XElement> _references;
     readonly LocalWorldName _world;
     List<World.RepoLayout>? _layout;
     Dictionary<XName, (XElement Config, bool IsDisabled)>? _pluginsConfiguration;
@@ -56,7 +56,7 @@ public sealed class WorldDefinitionFile
     /// </summary>
     public static LayoutRepoOrder RepoOrder { get; set; }
 
-    WorldDefinitionFile( LocalWorldName world, XElement root, XElement plugins, IReadOnlyList<XElement> references )
+    WorldDefinitionFile( LocalWorldName world, XElement root, XElement plugins, List<XElement> references )
     {
         Throw.DebugAssert( root.Document != null );
         _root = root;
@@ -207,6 +207,173 @@ public sealed class WorldDefinitionFile
         }
         return SaveFile( monitor )
                && _world.Stack.Commit( monitor, $"{(enable ? "En" : "Dis")}abling '{shortPluginName}' plugin." );
+    }
+
+    /// <summary>
+    /// Finds the <see cref="References"/> that match a stack name or url.
+    /// <para>
+    /// The <paramref name="nameOrUrl"/> can be the reference url, the referenced repository name ("XXX-Stack")
+    /// or the stack name ("XXX"). Comparisons are case insensitive.
+    /// </para>
+    /// <para>
+    /// More than one element can be returned when 2 references share the same stack name (on 2 different
+    /// hosts): only the url can disambiguate them.
+    /// </para>
+    /// </summary>
+    /// <param name="nameOrUrl">The reference url, repository name or stack name.</param>
+    /// <returns>The matching references (may be empty).</returns>
+    public IReadOnlyList<XElement> FindReferences( string nameOrUrl )
+    {
+        Throw.CheckNotNullOrWhiteSpaceArgument( nameOrUrl );
+        return _references.Where( e => MatchReference( e, nameOrUrl ) ).ToList();
+    }
+
+    static bool MatchReference( XElement e, string nameOrUrl )
+    {
+        var sUrl = e.Attribute( XNames.Url )?.Value;
+        if( sUrl == null ) return false;
+        // The raw string comparison comes first: a hand written Url may not be a valid url and
+        // "ckli world reference remove" must be able to remove such a reference.
+        if( sUrl.Equals( nameOrUrl, StringComparison.OrdinalIgnoreCase ) ) return true;
+        if( Uri.TryCreate( sUrl, UriKind.Absolute, out var url )
+            && Uri.TryCreate( nameOrUrl, UriKind.Absolute, out var candidate )
+            && GitRepositoryKey.OrdinalIgnoreCaseUrlEqualityComparer.Equals( url, candidate ) )
+        {
+            return true;
+        }
+        // Matches the repository name ("XXX-Stack") or the stack name ("XXX").
+        return GitRepositoryKey.IsStackNamed( Path.GetFileName( sUrl.AsSpan() ), nameOrUrl );
+    }
+
+    /// <summary>
+    /// Creates or updates a &lt;Reference Url="..." /&gt; element, saves this file and commits the change
+    /// in the Stack repository.
+    /// <para>
+    /// This merges: a null <paramref name="defaultClone"/>, <paramref name="isPrivate"/> or <paramref name="ltsName"/>
+    /// leaves the corresponding attribute as it is (absent when the reference is created). Since the 2 booleans default
+    /// to true and false respectively, a true <paramref name="defaultClone"/> and a false <paramref name="isPrivate"/>
+    /// remove them. LTSName has no default value: the empty string removes it.
+    /// </para>
+    /// <para>
+    /// A new element is added to the last &lt;References&gt; element when this file has one, as a direct child
+    /// of the root otherwise.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="url">The referenced Stack url.</param>
+    /// <param name="defaultClone">The DefaultClone attribute value (null to leave it as it is).</param>
+    /// <param name="isPrivate">The Private attribute value (null to leave it as it is).</param>
+    /// <param name="ltsName">
+    /// The LTSName attribute value: a valid <see cref="WorldName.IsValidLTSName(ReadOnlySpan{char})"/>, the empty
+    /// string to remove the attribute, or null to leave it as it is.
+    /// </param>
+    /// <returns>True on success, false on error.</returns>
+    public bool SetReference( IActivityMonitor monitor, Uri url, bool? defaultClone, bool? isPrivate, string? ltsName = null )
+    {
+        GitRepositoryKey.ThrowArgumentExceptionOnInvalidUrl( url );
+        Throw.CheckArgument( ltsName == null || ltsName.Length == 0 || WorldName.IsValidLTSName( ltsName ) );
+
+        var found = FindReferences( url.ToString() );
+        if( found.Count > 1 )
+        {
+            monitor.Error( $"""
+                Duplicate <Reference Url="{url}" /> found in world '{_world.FullName}':
+                {found.Select( e => e.ToString() ).Concatenate( Environment.NewLine )}
+                They must be manually fixed.
+                """ );
+            return false;
+        }
+        var e = found.Count == 1 ? found[0] : null;
+        // A public Stack cannot reference a private one: ReadReferences throws on this, so writing it
+        // would produce a world definition file that can no more be loaded (and no more be fixed by
+        // the "ckli world reference remove" command).
+        bool willBePrivate = isPrivate ?? (e != null && (bool?)e.Attribute( XNames.Private ) is true);
+        if( willBePrivate && _world.Stack.IsPublic )
+        {
+            monitor.Error( $"""
+                Cannot reference the private Stack '{url}': the Stack '{_world.Stack.StackName}' is public
+                and a public Stack cannot reference a private one.
+                """ );
+            return false;
+        }
+        using( StartEdit() )
+        {
+            if( e == null )
+            {
+                e = new XElement( XNames.Reference, new XAttribute( XNames.Url, url.ToString() ) );
+                // Keeps the existing grouping: the last <References> element when there is one.
+                var group = _root.Elements( XNames.References ).LastOrDefault() ?? _root;
+                group.Add( e );
+            }
+            if( defaultClone.HasValue )
+            {
+                e.SetAttributeValue( XNames.DefaultClone, defaultClone.Value ? null : "false" );
+            }
+            if( isPrivate.HasValue )
+            {
+                e.SetAttributeValue( XNames.Private, isPrivate.Value ? "true" : null );
+            }
+            if( ltsName != null )
+            {
+                e.SetAttributeValue( XNames.LTSName, ltsName.Length == 0 ? null : ltsName );
+            }
+            RefreshReferences();
+        }
+        return SaveFile( monitor )
+               && _world.Stack.Commit( monitor, $"Set reference to Stack '{url}' in world '{_world.FullName}'." );
+    }
+
+    /// <summary>
+    /// Removes a &lt;Reference /&gt; element, saves this file and commits the change in the Stack repository.
+    /// <para>
+    /// When no reference matches, a warning is emitted and true is returned: removing a reference is idempotent.
+    /// A &lt;References&gt; element that becomes empty is removed.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="nameOrUrl">The reference url, repository name or stack name (see <see cref="FindReferences(string)"/>).</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool RemoveReference( IActivityMonitor monitor, string nameOrUrl )
+    {
+        var found = FindReferences( nameOrUrl );
+        if( found.Count == 0 )
+        {
+            monitor.Warn( $"No <Reference /> matching '{nameOrUrl}' in world '{_world.FullName}'." );
+            return true;
+        }
+        if( found.Count > 1 )
+        {
+            monitor.Error( $"""
+                '{nameOrUrl}' matches {found.Count} references in world '{_world.FullName}':
+                {found.Select( e => e.ToString() ).Concatenate( Environment.NewLine )}
+                Their url must be used to remove one of them.
+                """ );
+            return false;
+        }
+        var e = found[0];
+        var url = e.Attribute( XNames.Url )!.Value;
+        using( StartEdit() )
+        {
+            var parent = e.Parent;
+            Throw.DebugAssert( parent != null );
+            e.Remove();
+            // Mirrors RemoveRepository( removeEmptyFolder: true ): a <References> group that has nothing
+            // left in it is removed.
+            if( parent != _root && !parent.HasElements )
+            {
+                parent.Remove();
+            }
+            RefreshReferences();
+        }
+        return SaveFile( monitor )
+               && _world.Stack.Commit( monitor, $"Removed reference to Stack '{url}' from world '{_world.FullName}'." );
+    }
+
+    void RefreshReferences()
+    {
+        Throw.DebugAssert( _allowEdit );
+        _references.Clear();
+        _references.AddRange( CollectReferences( _root ) );
     }
 
     /// <summary>
@@ -502,11 +669,34 @@ public sealed class WorldDefinitionFile
     }
 
     /// <summary>
+    /// Collects the &lt;Reference /&gt; elements in document order without any validation.
+    /// This is used to refresh the <see cref="References"/> after an edit: the file has necessarily
+    /// been loaded (and validated) by <see cref="ReadReferences"/> before any edit can occur.
+    /// </summary>
+    static IEnumerable<XElement> CollectReferences( XElement root )
+    {
+        foreach( var e in root.Elements() )
+        {
+            if( e.Name == XNames.Reference )
+            {
+                yield return e;
+            }
+            else if( e.Name == XNames.References )
+            {
+                foreach( var r in e.Elements( XNames.Reference ) )
+                {
+                    yield return r;
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Collects the &lt;Reference /&gt; elements (direct children of the root or children of the optional
     /// &lt;References&gt; element) and validates their attributes: an invalid one throws and this prevents
     /// the world to be loaded.
     /// </summary>
-    static IReadOnlyList<XElement> ReadReferences( IActivityMonitor monitor, LocalWorldName world, XElement root )
+    static List<XElement> ReadReferences( IActivityMonitor monitor, LocalWorldName world, XElement root )
     {
         List<XElement>? references = null;
         foreach( var e in root.Elements() )
@@ -534,7 +724,7 @@ public sealed class WorldDefinitionFile
                 }
             }
         }
-        return (IReadOnlyList<XElement>?)references ?? [];
+        return references ?? new List<XElement>();
 
         static void Add( LocalWorldName world, XElement e, ref List<XElement>? references )
         {

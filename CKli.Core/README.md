@@ -134,6 +134,15 @@ The references are exposed as raw `IReadOnlyList<XElement>` by `WorldDefinitionF
 attributes are validated when the file is loaded) and are honored by the `ckli clone` command **only**:
 `StackRepository.CloneAsync` clones one Stack and its default world repositories, nothing more.
 
+`WorldDefinitionFile.SetReference` and `RemoveReference` write them (and `FindReferences` resolves a url,
+a repository name or a stack name to the matching elements). Like `EnablePlugin`, they own the whole
+sequence: the edit, `SaveFile` and the commit in the Stack repository. `SetReference` merges — a null
+`defaultClone`, `isPrivate` or `ltsName` leaves the corresponding attribute as it is, and since `LTSName` has
+no default value the empty string is what removes it — and it **refuses** a private
+reference from a public Stack: the invariant above is enforced by an exception at load time, so writing
+such a file would make it unloadable, and unfixable by `RemoveReference`. These are the two commands
+`ckli world reference set` and `ckli world reference remove` (see the [command reference](../README.md#world-commands-reference-list-set-remove)).
+
 Once a Stack is cloned, `ckli clone` reads the references of its default world and, for each of them,
 clones the referenced Stack **next to** it (never inside it) or checks that it is already cloned somewhere
 on this machine, then recurses into that Stack's own references. A cycle between Stacks is handled: each
