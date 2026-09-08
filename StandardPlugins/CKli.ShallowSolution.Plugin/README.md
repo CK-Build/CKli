@@ -115,10 +115,35 @@ actual solution walker:
 | Member | Meaning |
 |---|---|
 | `Projects` (`IReadOnlyList<Project>`) | One entry per `.csproj`. `Project.Path`, `Project.Name` (file name without `.csproj`), and `Project.IsPackable` (lazily read from `<PropertyGroup><IsPackable>`, `null` if absent). |
-| `Consumed` (`IReadOnlySet<PackageInstance>`) | Every package id + `SVersion` found across `<PackageReference>` (in `.csproj` and `Directory.Build.props`) and `<PackageVersion>` (in `Directory.Packages.props`, i.e. NuGet Central Package Management). A `<PackageReference VersionOverride="...">` wins over its own `Version`; a `<PackageReference>` with neither attribute contributes nothing (its version is assumed centrally managed). |
+| `Consumed` (`IReadOnlySet<PackageInstance>`) | Every package id + `SVersion` found across `<PackageReference>` (in `.csproj` and `Directory.Build.props`) and `<PackageVersion>` (in `Directory.Packages.props`, i.e. NuGet Central Package Management). A `<PackageReference VersionOverride="...">` wins over its own `Version`; a `<PackageReference>` with neither attribute contributes nothing (its version is assumed centrally managed). **One version per package identifier** — see below. |
 | `HasUpdates(mapping)` | Whether any consumed package would change version under a single `IPackageMapping`. |
 | `HasUpdates(mapping, ref updates)` | Same, and collects the diffs into a `PackageMapper`. |
 | `HasUpdates(action, mappings...)` | Checks several mappings in priority order per package, invoking `action(package, newVersion, mappingIndex)` for each match. |
+
+#### One version per package identifier, per repository
+
+A repository may reference a package identifier in **one version only**. `GitSolutionContent.AddConsumed` enforces
+it while collecting, and a violation is an **error**: the solution does not load at all, so every command that needs
+it fails with a message naming the identifier, both versions and both files.
+
+This is decided on the *shallow* read, which ignores every `Condition` — so two conditional
+`<PackageReference>` across target frameworks are two versions and are refused like any other pair. That is
+deliberate: a single version per identifier is what the whole dependency model is made of. The mapping that aligns
+and rewrites references (`IPackageMapping`, and `Roadmap.PackageMapping` above it) maps a package identifier to a
+single version and structurally *cannot* express two, and a produced package carries one version for each of its
+dependencies.
+
+Note what is **not** covered by this rule:
+
+- **Discrepancies between repositories are expected and are not an error.** They are transient and healed by the
+  build: `HotGraph.PackageUpdater.Discrepancies` collects them across solutions and `DiscrepanciesMapping` maps each
+  to the greatest referenced version, which `MutableSolution.UpdatePackages` then writes. Only the repository-local
+  case is refused, and precisely *because* nothing can heal it: aligning it would silently rewrite one of the two
+  references and change what the developer wrote.
+- **A `VersionOverride` is exempt.** Under Central Package Management it exists precisely to differ from the declared
+  `<PackageVersion>`, and it is the only legal way to say so (a `<PackageReference Version="...">` alongside a
+  `<PackageVersion>` is the NuGet error NU1008). It is not recorded as the first version met either, so a later
+  regular reference is compared against the central declaration rather than against the override.
 
 `GitSolution : GitSolutionContent` adds nothing but identity: the `Repo` and `Branch` it was read from (used by
 callers, e.g. `HotZone.Plugin`, that need to report *where* a project/package came from). It is only constructible

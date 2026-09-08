@@ -17,6 +17,9 @@ public partial class GitSolutionContent
 {
     readonly HashSet<PackageInstance> _consumed;
     readonly List<Project> _projects;
+    // The version first met for each package identifier and the file that carries it: this is what
+    // rejects a solution referencing one identifier in two versions. Only used while loading.
+    readonly Dictionary<string, (SVersion Version, NormalizedPath Path)> _firstMet;
 
     /// <summary>
     /// Gets the projects.
@@ -87,6 +90,7 @@ public partial class GitSolutionContent
     {
         _consumed = new HashSet<PackageInstance>();
         _projects = new List<Project>();
+        _firstMet = new Dictionary<string, (SVersion, NormalizedPath)>( StringComparer.OrdinalIgnoreCase );
     }
 
     internal static GitSolutionContent? Create( IActivityMonitor monitor, INormalizedFileProvider files, XDocument doc )
@@ -133,7 +137,10 @@ public partial class GitSolutionContent
                     return false;
                 }
                 Throw.DebugAssert( version != null );
-                _consumed.Add( new PackageInstance( packageId, version ) );
+                if( !AddConsumed( monitor, path, packageId, version ) )
+                {
+                    return false;
+                }
             }
         }
         return true;
@@ -147,21 +154,72 @@ public partial class GitSolutionContent
                 {
                     return false;
                 }
-                if( !CommonSolution.ReadVersionAttribute( monitor, path, e, XNames.VersionOverride, null, out var _, out var version )
-                    || (version == null
-                        && !CommonSolution.ReadVersionAttribute( monitor, path, e, XNames.Version, null, out var _, out version )) )
+                if( !CommonSolution.ReadVersionAttribute( monitor, path, e, XNames.VersionOverride, null, out var _, out var versionOverride ) )
                 {
                     return false;
                 }
-                if( version != null )
+                if( versionOverride != null )
                 {
-                    _consumed.Add( new PackageInstance( packageId, version ) );
+                    // A VersionOverride is exempt from the one version per identifier rule: under central
+                    // package management it exists precisely to differ from the declared <PackageVersion>,
+                    // and it is the only way to say so (a <PackageReference Version="..."/> alongside a
+                    // <PackageVersion> is the NuGet error NU1008). It is not recorded as the first met one
+                    // either: a later regular reference must be compared to the declaration, not to this.
+                    _consumed.Add( new PackageInstance( packageId, versionOverride ) );
+                    continue;
+                }
+                if( !CommonSolution.ReadVersionAttribute( monitor, path, e, XNames.Version, null, out var _, out var version ) )
+                {
+                    return false;
+                }
+                // A <PackageReference> with neither attribute contributes nothing: its version is
+                // centrally managed and the <PackageVersion> declaration is what carries it.
+                if( version != null && !AddConsumed( monitor, path, packageId, version ) )
+                {
+                    return false;
                 }
             }
             return true;
         }
     }
 
-
+    // Collects a package instance and enforces the one version per package identifier rule.
+    //
+    // A repository may reference a package identifier in ONE version only. This is deliberately decided
+    // on the shallow read, which ignores every Condition: two conditional <PackageReference> across
+    // target frameworks are two versions and are refused like any other pair. A single version per
+    // identifier is what the whole dependency model is made of - the mapping that aligns and rewrites
+    // references is a package identifier to version map and structurally cannot express two, and a
+    // produced package carries one version for each of its dependencies.
+    //
+    // Discrepancies BETWEEN repositories are a different matter entirely: they are expected, transient
+    // and healed by the build (the greatest referenced version wins). Only this repository local case is
+    // an error, and it is one precisely because nothing can heal it: aligning it would silently rewrite
+    // one of the two references and change what the developer wrote.
+    bool AddConsumed( IActivityMonitor monitor, NormalizedPath path, string packageId, SVersion version )
+    {
+        if( _firstMet.TryGetValue( packageId, out var already ) )
+        {
+            if( already.Version != version )
+            {
+                monitor.Error( $"""
+                                Package '{packageId}' is referenced in two versions by this repository:
+                                '{already.Version}' in '{already.Path}'
+                                '{version}' in '{path}'
+                                A repository must reference one version per package identifier,
+                                conditional references across target frameworks included: the dependency
+                                alignment maps a package identifier to a single version and cannot
+                                express two.
+                                """ );
+                return false;
+            }
+        }
+        else
+        {
+            _firstMet.Add( packageId, (version, path) );
+        }
+        _consumed.Add( new PackageInstance( packageId, version ) );
+        return true;
+    }
 }
 
