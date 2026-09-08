@@ -13,7 +13,7 @@ static class CommonSolution
 {
     /// <summary>
     /// Loads all projects defined in a .slnx file (&lt;Project Path="..." .../&gt;) as well
-    /// as all "Directory.Package.props" and "Directory.Build.props" (case insensitive) from
+    /// as all "Directory.Packages.props" and "Directory.Build.props" (case insensitive) from
     /// each project folder up to the root.
     /// </summary>
     /// <param name="monitor">The monitor.</param>

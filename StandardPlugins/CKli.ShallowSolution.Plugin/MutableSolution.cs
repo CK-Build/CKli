@@ -41,7 +41,7 @@ public sealed class MutableSolution
     /// </para>
     /// <para>
     /// This implementation is brutal: we consider all the projects in the solution (that must be a .slnx) 
-    /// and any Directory.Package.props or Directory.Build.props files from their folder to the solution root and updates
+    /// and any Directory.Packages.props or Directory.Build.props files from their folder to the solution root and updates
     /// the PackageVersion or PackageReference elements.
     /// </para>
     /// </summary>
@@ -89,7 +89,11 @@ public sealed class MutableSolution
                                     IPackageMapping mapping,
                                     PackageMapper? updated )
         {
-            if( Path.GetFileName( path.AsSpan() ).Equals( "Directory.Package.props", StringComparison.OrdinalIgnoreCase ) )
+            // "Directory.Packages.props" (plural) is the MSBuild name and the one CommonSolution loads: a
+            // singular spelling here silently sent that file to the <PackageReference> branch below, where it
+            // has none, so a centrally managed <PackageVersion> was never updated and the alignment could
+            // never converge.
+            if( Path.GetFileName( path.AsSpan() ).Equals( "Directory.Packages.props", StringComparison.OrdinalIgnoreCase ) )
             {
                 foreach( var e in projectRoot.Descendants( XNames.PackageVersion ) )
                 {

@@ -123,7 +123,7 @@ public partial class GitSolutionContent
         }
         else
         {
-            Throw.DebugAssert( path.LastPart.Equals( "Directory.Package.props", StringComparison.OrdinalIgnoreCase ) );
+            Throw.DebugAssert( path.LastPart.Equals( "Directory.Packages.props", StringComparison.OrdinalIgnoreCase ) );
             foreach( var e in project.Descendants( XNames.PackageVersion ) )
             {
                 var packageId = CommonSolution.GetIncludedName( monitor, path, e, CK.Core.LogLevel.Error );
