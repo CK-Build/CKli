@@ -3,7 +3,6 @@ using CKli.Core;
 using Microsoft.Extensions.FileProviders;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Xml;
 using System.Xml.Linq;
 
 namespace CKli;
@@ -31,9 +30,11 @@ public sealed record FakeBuildProject( string ProjectName, ImmutableArray<Packag
     /// <returns>The package references.</returns>
     public static ImmutableArray<PackageInstance> ReadReferences( IFileInfo f )
     {
-        using( var r = XmlReader.Create( f.CreateReadStream() ) )
+        // XDocument.Load and not XNode.ReadFrom on a fresh XmlReader: that reader is in the Initial
+        // state, and ReadFrom requires an Interactive one ("The XmlReader state should be Interactive.").
+        using( var s = f.CreateReadStream() )
         {
-            return ((XElement)XNode.ReadFrom( r ))
+            return XDocument.Load( s ).Root!
                         .Elements( XNames.ItemGroup )
                         .Elements( XNames.PackageReference )
                         .Select( r => new PackageInstance( (string)r.Attribute( XNames.Include )!, SVersion.Parse( (string)r.Attribute( XNames.Version )! ) ) )

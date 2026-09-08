@@ -6,6 +6,7 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace CKli;
@@ -57,9 +58,13 @@ public sealed partial class FakeBuildRepo
 
         /// <summary>
         /// Read the projects of this repository from the branch than must exist.
+        /// <para>
+        /// Every folder is visited: a <see cref="FakeBuildRepo"/> writes its projects in a subfolder
+        /// named after them, never at the repository root.
+        /// </para>
         /// </summary>
         /// <param name="branchName">The branch name.</param>
-        /// <returns>The projects.</returns>
+        /// <returns>The projects, their <see cref="FakeBuildProject.ProjectName"/> without the ".csproj".</returns>
         public ImmutableArray<FakeBuildProject> ReadProjects( string branchName )
         {
             var b = _git.Repository.Branches[branchName];
@@ -68,10 +73,25 @@ public sealed partial class FakeBuildRepo
                 Throw.ArgumentException( nameof( branchName ), $"Branch '{branchName}' doesn't exist in {_git}." );
             }
             var files = INormalizedFileProvider.GetFiles( b.Tip, useWorkingFolder: true, _repo.World.Stack.TestEnv.FileProviderCache );
-            return files.GetDirectoryContents( default )!
-                            .Where( f => f.Name.EndsWith( ".csproj" ) )
-                            .Select( f => new FakeBuildProject( f.Name, FakeBuildProject.ReadReferences( f ) ) )
-                            .ToImmutableArray();
+            var result = ImmutableArray.CreateBuilder<FakeBuildProject>();
+            Collect( default );
+            return result.DrainToImmutable();
+
+            void Collect( NormalizedPath folder )
+            {
+                foreach( var f in files.GetDirectoryContents( folder )! )
+                {
+                    if( f.IsDirectory )
+                    {
+                        Collect( folder.AppendPart( f.Name ) );
+                    }
+                    else if( f.Name.EndsWith( ".csproj", StringComparison.OrdinalIgnoreCase ) )
+                    {
+                        result.Add( new FakeBuildProject( f.Name[..^".csproj".Length],
+                                                          FakeBuildProject.ReadReferences( f ) ) );
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -111,6 +131,11 @@ public sealed partial class FakeBuildRepo
 
         /// <summary>
         /// Adds or updates a package reference to an existing project and commit.
+        /// <para>
+        /// Updating replaces the version of the existing &lt;PackageReference&gt;, it does NOT append a
+        /// second one: a duplicate item is not what a caller means by "update", and a repository that
+        /// references one package identifier in two versions is refused by the shallow read.
+        /// </para>
         /// </summary>
         /// <param name="projectName">The project name that must exist in the repository.</param>
         /// <param name="packageId">The referenced package identifier.</param>
@@ -125,6 +150,17 @@ public sealed partial class FakeBuildRepo
                 if( content == null )
                 {
                     Throw.InvalidOperationException( $"Project '{fName}' doesn't exist in {_repo.DisplayPath}." );
+                }
+                // A targeted text replacement rather than an XElement round trip: re-serializing the
+                // project would normalize its layout and dirty the file beyond this edit, which is
+                // enough to turn a roadmap's CommitResult.NoChanges into a real commit and shift every
+                // "--ci.N" downstream.
+                var rExisting = new Regex( "(<PackageReference\\s+Include=\"" + Regex.Escape( packageId )
+                                           + "\"\\s+Version=\")[^\"]*(\")",
+                                           RegexOptions.IgnoreCase );
+                if( rExisting.IsMatch( content ) )
+                {
+                    return rExisting.Replace( content, m => m.Groups[1].Value + version + m.Groups[2].Value, 1 );
                 }
                 return content.Replace( "</ItemGroup>", $"""
                             <PackageReference Include="{packageId}" Version="{version}" />
@@ -162,7 +198,9 @@ public sealed partial class FakeBuildRepo
                                                         : $"More than one reference '{packageId}' in project '{fName}' in {_repo.DisplayPath}." );
                 }
                 e.Remove();
-                return e.ToString();
+                // root, not e: e is the List<XElement> that has just been detached, and its ToString()
+                // is its type name.
+                return root.ToString();
             } );
         }
 
