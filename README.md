@@ -297,6 +297,25 @@ least 3 characters starting with `@`, then only ASCII lowercase letters, digits,
 ### `lts create <@ltsName>`
 Creates a new LTS World from the current default World. Must be run from the default World.
 
+The new World's definition file is a clone of the current one, and the plugins are given the opportunity to
+adjust it through the `WorldEvents.CreateLTS` event. The
+[VersionTag plugin](StandardPlugins/CKli.VersionTag.Plugin/README.md#worldeventscreatelts--cutting-the-version-range-of-a-new-lts)
+uses it to split the version range — the new World keeps the versions produced so far and the default World
+starts a new Major above them — and to reduce the new World's branch model to its root branch.
+
+The World must be **fully published** for this to be possible: no version or branch issue anywhere, every
+repository currently offering a published version (no `+fake`, no `+deprecated`), no pending `local/` or
+`building/` release left anywhere, and every `dev/` root branch integrated. Otherwise the command fails,
+listing every repository that is in the way, and nothing is written — neither the new definition file nor the
+`InfVersion` the current World would have received.
+
+The pending-release rule is the one that bites in practice: a `local/` build is below the cut, so it would end
+up in the new LTS World while the code it came from stays in the default one. Publish it (or let a new build
+supersede it) first.
+
+Only the definition file is created. The new World's repositories and its plugin solution appear when it is
+first opened, which is what [`lts clone`](#lts-clone-ltsname) does.
+
 ### `lts clone <@ltsName>`
 Clones the repositories of an existing LTS World of the current Stack into its `@ltsName/` folder. Use this
 when the Stack is already cloned; `clone --lts-name` is the equivalent for a Stack that is not.

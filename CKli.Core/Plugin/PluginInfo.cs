@@ -6,7 +6,8 @@ using System.Xml.Linq;
 namespace CKli.Core;
 
 /// <summary>
-/// Plugin description.
+/// Immutable plugin description. This is available on the <see cref="PrimaryPluginContext.PluginInfo"/> from a primary:
+/// it is a protected information and it is up to each plugin to publicly expose it or not.
 /// </summary>
 public sealed class PluginInfo
 {
@@ -74,12 +75,17 @@ public sealed class PluginInfo
                                                                                     : null;
 
     /// <summary>
+    /// Gets the <see cref="XName"/> of the plugin. This is the <see cref="XElement.Name"/> of the configurations (in the world's &lt;Plugins&gt; section
+    /// and in each &lt;Repository&gt; for the per-repository configuration element).
+    /// </summary>
+    /// <returns>The name to use for this plugin.</returns>
+    public XName GetXName() => _xPluginName;
+
+    /// <summary>
     /// Returns the <see cref="FullPluginName"/>.
     /// </summary>
     /// <returns>The full plugin name.</returns>
     public override string ToString() => FullPluginName;
-
-    internal XName GetXName() => _xPluginName;
 }
 
 

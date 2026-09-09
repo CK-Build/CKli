@@ -32,7 +32,7 @@ public abstract class WorldEventArgs : EventMonitoredArgs
     public CKliEnv Context => _context;
 
     /// <summary>
-    /// The source World.
+    /// The source World (the current <see cref="PluginBase.World"/>).
     /// </summary>
     public World World => _world;
 

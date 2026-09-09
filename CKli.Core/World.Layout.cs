@@ -130,9 +130,9 @@ sealed partial class World
             if( gitRepository == null ) return false;
             // The working folder is successfully cloned.
             // We raise the RepoAdded event here: the plugins can play with the GitRepository.
-            if( _events.RepoAddedEventSender.HasHandlers )
+            if( _events._repoAddedEventSender.HasHandlers )
             {
-                if( !await _events.RepoAddedEventSender.SafeRaiseAsync( monitor, new RepoAddedEventArgs( monitor, _stackRepository.Context, this, gitRepository, xRepo ) ).ConfigureAwait( false ) )
+                if( !await _events._repoAddedEventSender.SafeRaiseAsync( monitor, new RepoAddedEventArgs( monitor, _stackRepository.Context, this, gitRepository, xRepo ) ).ConfigureAwait( false ) )
                 {
                     return false;
                 }

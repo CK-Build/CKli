@@ -8,12 +8,16 @@ namespace CKli.Core;
 public sealed partial class World
 {
     /// <summary>
-    /// First step to create a LTS: the <paramref name="ltsName"/> must not exist (both the definition file and the
-    /// <see cref="PluginMachinery.CKliPluginsFolderName"/>).
+    /// First step to create a LTS: the <paramref name="ltsName"/> must not exist (neither the definition file nor
+    /// the world root folder).
     /// <para>
-    /// This creates LTS world by cloning the current one: the <see cref="WorldDefinitionFile.XmlRoot"/> is cloned,
-    /// the <see cref="WorldEvents.CreateLTS"/> event is raised (the plugins must handle the <see cref="CreateLTSEventArgs.LTSDefinition"/>
-    /// file) and the "CKli.Plugins/" solution folder is copied.
+    /// This creates the LTS world by cloning the current one: the <see cref="WorldDefinitionFile.XmlRoot"/> is cloned
+    /// and the <see cref="WorldEvents.CreateLTS"/> event is raised (the plugins must handle the
+    /// <see cref="CreateLTSEventArgs.LTSDefinition"/>).
+    /// </para>
+    /// <para>
+    /// The new world's plugin solution is not created here: the <see cref="PluginMachinery"/> generates it on the
+    /// first open of the new world (this is what "ckli lts clone" relies on).
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
@@ -41,22 +45,22 @@ public sealed partial class World
 
         var newDefFile = new XDocument( _definitionFile.XmlRoot );
         var newDefinition = newDefFile.Root!;
-        newDefinition.Name = ltsName;
-        if( _events.CreateLTSEventSender.HasHandlers )
+        // The root element name cannot be the LTS name: '@' is not a valid XML name character.
+        // Nothing reads the root element name (the world's LTS name comes from its file name): the
+        // LTSName attribute is here to identify the world when reading the file.
+        newDefinition.SetAttributeValue( XNames.LTSName, ltsName );
+        if( _events._createLTSEventSender.HasHandlers )
         {
-            if( !await _events.CreateLTSEventSender.SafeRaiseAsync( monitor, new CreateLTSEventArgs( monitor, context, this, ltsName, newDefinition ) ).ConfigureAwait( false ) )
+            var e = new CreateLTSEventArgs( monitor, context, this, ltsName, newDefinition );
+            if( !await _events._createLTSEventSender.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) || !e.Success )
             {
                 return false;
             }
             // Silently skip any (stupid) change.
-            newDefinition.Name = ltsName;
+            newDefinition.Name = _definitionFile.XmlRoot.Name;
+            newDefinition.SetAttributeValue( XNames.LTSName, ltsName );
         }
         XmlHelper.SafeSave( newDefFile, newFileDesc );
-
-        var source = new DirectoryInfo( _stackRepository.StackWorkingFolder.AppendPart( PluginMachinery.CKliPluginsFolderName ) );
-        var target = new DirectoryInfo( newRoot.AppendPart( PluginMachinery.CKliPluginsFolderName ) );
-        FileUtil.CopyDirectory( source, target );
-
         return true;
     }
 

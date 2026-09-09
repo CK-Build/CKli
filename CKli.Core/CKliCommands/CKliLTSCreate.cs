@@ -60,6 +60,7 @@ sealed class CKliLTSCreate : Command
             {
                 return false;
             }
+            // Only save the default World definition on success.
             return stack.Close( monitor );
         }
         finally
