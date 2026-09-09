@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CK.Core;
@@ -7,6 +8,8 @@ using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;
 using static CK.Testing.MonitorTestHelper;
+// LibGit2Sharp has a LogLevel too.
+using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core.Tests.GitHosting;
 
@@ -94,6 +97,93 @@ public class FileSystemProviderTests
             info.ShouldBeNull();
             logs.ShouldContain( l => Regex.IsMatch( l.Replace( '\\', '/' ),
                                                     @"Expected bare \.git repository at '.*/CKli'\." ) );
+        }
+    }
+
+    [Test]
+    public async Task reading_a_file_from_a_bare_repo_Async()
+    {
+        var p = GetFileHostingProvider();
+        // OpenRemotes re-extracts the bare repositories: this test doesn't depend on what another one left.
+        TestEnv.OpenRemotes( "CKt" );
+        var bareCKtStack = TestHelper.TestProjectFolder.Combine( "Remotes/bare/CKt/CKt-Stack" );
+        var bareCKtCore = TestHelper.TestProjectFolder.Combine( "Remotes/bare/CKt/CKt-Core" );
+
+        // A null refName is the bare repository's HEAD: HasDefaultBranch is false, so there is nothing else
+        // to mean. This fixture is "master" only (there is no "main" in it).
+        var (success, content) = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtStack, "CKt.xml" );
+        success.ShouldBeTrue();
+        var xml = Encoding.UTF8.GetString( content.ShouldNotBeNull() );
+        xml.ShouldContain( "<CKt" );
+
+        // Naming the branch explicitly reads the very same bytes.
+        var onMaster = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtStack, "CKt.xml", refName: "master" );
+        onMaster.Success.ShouldBeTrue();
+        onMaster.Content.ShouldNotBeNull().ShouldBe( content );
+
+        // A commit sha is a refName too.
+        using( var repo = new Repository( bareCKtStack.AppendPart( ".git" ) ) )
+        {
+            var onSha = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtStack, "CKt.xml", refName: repo.Head.Tip.Sha );
+            onSha.Success.ShouldBeTrue();
+            onSha.Content.ShouldNotBeNull().ShouldBe( content );
+        }
+
+        // A file in a folder.
+        var nested = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtCore, "CKt.Core/CKt.Core.csproj" );
+        nested.Success.ShouldBeTrue();
+        Encoding.UTF8.GetString( nested.Content.ShouldNotBeNull() ).ShouldContain( "<Project" );
+    }
+
+    [Test]
+    public async Task a_missing_file_ref_or_repo_is_not_an_error_Async()
+    {
+        var p = GetFileHostingProvider();
+        TestEnv.OpenRemotes( "CKt" );
+        var bareCKtStack = TestHelper.TestProjectFolder.Combine( "Remotes/bare/CKt/CKt-Stack" );
+
+        // The 3 "nothing to read" cases all answer (true,null) and log at the notFoundLogLevel: this is
+        // why GetFileContentAsync must not be used to probe for a repository's existence.
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            var missingFile = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtStack, "No/Way.json",
+                                                           notFoundLogLevel: LogLevel.Warn );
+            missingFile.Success.ShouldBeTrue();
+            missingFile.Content.ShouldBeNull();
+            logs.ShouldContain( l => Regex.IsMatch( l, @"File 'No/Way\.json' not found in 'file://.*CKt-Stack'@[0-9a-f]{40}\." ) );
+
+            // "main" is not in this fixture: the CKt-Stack remote is "master" only.
+            var missingRef = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtStack, "CKt.xml", refName: "main",
+                                                          notFoundLogLevel: LogLevel.Warn );
+            missingRef.Success.ShouldBeTrue();
+            missingRef.Content.ShouldBeNull();
+            logs.ShouldContain( l => Regex.IsMatch( l, @"No branch, tag or commit 'main' in 'file://.*CKt-Stack'\." ) );
+
+            var missingRepo = await p.GetFileContentAsync( TestHelper.Monitor,
+                                                           TestHelper.TestProjectFolder.AppendPart( "No way" ),
+                                                           "CKt.xml",
+                                                           notFoundLogLevel: LogLevel.Warn );
+            missingRepo.Success.ShouldBeTrue();
+            missingRepo.Content.ShouldBeNull();
+            logs.ShouldContain( l => Regex.IsMatch( l, @"Repository 'file://.*No way' not found: no file to read\." ) );
+        }
+    }
+
+    [Test]
+    public async Task reading_a_folder_instead_of_a_file_is_an_error_Async()
+    {
+        var p = GetFileHostingProvider();
+        TestEnv.OpenRemotes( "CKt" );
+        var bareCKtCore = TestHelper.TestProjectFolder.Combine( "Remotes/bare/CKt/CKt-Core" );
+
+        // "CKt.Core" exists in the tree but it is a Tree, not a Blob: unlike a missing entry, this is an
+        // error - the caller asked for something that is there and is not a file.
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            var (success, content) = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtCore, "CKt.Core" );
+            success.ShouldBeFalse();
+            content.ShouldBeNull();
+            logs.ShouldContain( l => Regex.IsMatch( l, @"'CKt\.Core' in 'file://.*CKt-Core'@[0-9a-f]{40} is a Tree, not a file\." ) );
         }
     }
 

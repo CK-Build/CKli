@@ -6,6 +6,7 @@ using Shouldly;
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
@@ -117,6 +118,9 @@ public class CommonProviderTests
 
         await TestReleasesAsync( p, testRepoName, info, creds );
 
+        // TestReleasesAsync has pushed a README.md on DefaultBranchName and tagged it "v1.0.0".
+        await ReadingFilesAsync( p, testRepoName ).ConfigureAwait( false );
+
         await DeleteTestRepoCreateAsync( p, testRepoName ).ConfigureAwait( false );
 
         // Creating a private (or public) repository. This leaves the repository created: see this method's
@@ -145,6 +149,41 @@ public class CommonProviderTests
                 info.Exists.ShouldBeFalse();
             }
             return info;
+        }
+
+        /// <summary>
+        /// Reads the README.md that <see cref="PushFirstCommit"/> committed, by default branch, by branch
+        /// name and by tag, and checks that nothing to read is not an error.
+        /// </summary>
+        static async Task ReadingFilesAsync( GitHostingProvider p, string testRepoName )
+        {
+            const string expected = "Created by the CKli CommonProviderTests.";
+
+            // A null refName is the repository's default branch (its HEAD when HasDefaultBranch is false).
+            var (success, content) = await p.GetFileContentAsync( TestHelper.Monitor, testRepoName, "README.md" )
+                                            .ConfigureAwait( false );
+            success.ShouldBeTrue();
+            Encoding.UTF8.GetString( content.ShouldNotBeNull() ).ShouldBe( expected );
+
+            // By branch name, then by tag: both are refNames.
+            foreach( var refName in new[] { DefaultBranchName, "v1.0.0" } )
+            {
+                var byRef = await p.GetFileContentAsync( TestHelper.Monitor, testRepoName, "README.md", refName )
+                                   .ConfigureAwait( false );
+                byRef.Success.ShouldBeTrue( $"Reading at '{refName}'." );
+                Encoding.UTF8.GetString( byRef.Content.ShouldNotBeNull() ).ShouldBe( expected, $"Reading at '{refName}'." );
+            }
+
+            // Nothing to read is a success with a null content, never an error.
+            var missingFile = await p.GetFileContentAsync( TestHelper.Monitor, testRepoName, "No/Way.json" )
+                                     .ConfigureAwait( false );
+            missingFile.Success.ShouldBeTrue();
+            missingFile.Content.ShouldBeNull();
+
+            var missingRef = await p.GetFileContentAsync( TestHelper.Monitor, testRepoName, "README.md", "no-such-branch" )
+                                    .ConfigureAwait( false );
+            missingRef.Success.ShouldBeTrue();
+            missingRef.Content.ShouldBeNull();
         }
 
         static async Task TestReleasesAsync( GitHostingProvider p,

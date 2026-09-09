@@ -80,6 +80,27 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         return repoPath;
     }
 
+    /// <inheritdoc />
+    protected override async Task<(bool Success, byte[]? Content)> GetFileContentAsync( IActivityMonitor monitor,
+                                                                                        HttpClient client,
+                                                                                        NormalizedPath repoPath,
+                                                                                        NormalizedPath filePath,
+                                                                                        string? refName,
+                                                                                        LogLevel notFoundLogLevel,
+                                                                                        CancellationToken cancellation )
+    {
+        // No "ref" query parameter means the repository's default branch.
+        var url = $"repos/{repoPath}/contents/{Uri.EscapeDataString( filePath )}";
+        if( refName != null ) url += $"?ref={Uri.EscapeDataString( refName )}";
+        using var request = new HttpRequestMessage( HttpMethod.Get, url );
+        // DefaultConfigure sets "application/vnd.github+json", which would answer an object whose "content"
+        // is base64: the "raw" media type answers the bytes. A request Accept replaces the client's one.
+        request.Headers.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/vnd.github.raw" ) );
+        using var response = await client.SendAsync( request, cancellation ).ConfigureAwait( false );
+        return await ReadFileResponseAsync( monitor, response, repoPath, filePath, notFoundLogLevel, cancellation )
+                        .ConfigureAwait( false );
+    }
+
     protected override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                                  HttpClient client,
                                                                                  NormalizedPath repoPath,

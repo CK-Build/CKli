@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
@@ -255,6 +256,84 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                          HttpClient client,
                                                          NormalizedPath repoPath,
                                                          CancellationToken cancellation );
+
+    /// <inheritdoc />
+    public sealed override async Task<(bool Success, byte[]? Content)> GetFileContentAsync( IActivityMonitor monitor,
+                                                                                            NormalizedPath repoPath,
+                                                                                            NormalizedPath filePath,
+                                                                                            string? refName = null,
+                                                                                            LogLevel notFoundLogLevel = LogLevel.Trace,
+                                                                                            CancellationToken cancellation = default )
+    {
+        Throw.CheckArgument( !filePath.IsEmptyPath );
+        using var _ = monitor.OpenInfo( $"Reading file '{filePath}' of '{repoPath}'@'{refName ?? "(default branch)"}' on '{BaseUrl}'." );
+        if( !EnsureReadAccess( monitor, ref repoPath, out var client, cancellation ) )
+        {
+            return (false, null);
+        }
+        try
+        {
+            return await GetFileContentAsync( monitor, client, repoPath, filePath, refName, notFoundLogLevel, cancellation )
+                            .ConfigureAwait( false );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( ex );
+            return (false, null);
+        }
+        finally
+        {
+            client.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Provider-specific file read implementation using an HttpClient.
+    /// <para>
+    /// <see cref="ReadFileResponseAsync"/> handles the response, including the not found case.
+    /// </para>
+    /// </summary>
+    protected abstract Task<(bool Success, byte[]? Content)> GetFileContentAsync( IActivityMonitor monitor,
+                                                                                  HttpClient client,
+                                                                                  NormalizedPath repoPath,
+                                                                                  NormalizedPath filePath,
+                                                                                  string? refName,
+                                                                                  LogLevel notFoundLogLevel,
+                                                                                  CancellationToken cancellation );
+
+    /// <summary>
+    /// Handles the response of a file read: reads the bytes on success, answers <c>(true,null)</c> on a
+    /// <see cref="HttpStatusCode.NotFound"/> (logging at <paramref name="notFoundLogLevel"/>) and logs the
+    /// response as an error otherwise.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="response">The response to handle.</param>
+    /// <param name="repoPath">The repository path (used by the not found message).</param>
+    /// <param name="filePath">The file path (used by the not found message).</param>
+    /// <param name="notFoundLogLevel">The log level to use when the file doesn't exist.</param>
+    /// <param name="cancellation">Cancellation token.</param>
+    /// <returns>Whether the call succeeded, and the file content if it exists.</returns>
+    protected async Task<(bool Success, byte[]? Content)> ReadFileResponseAsync( IActivityMonitor monitor,
+                                                                                 HttpResponseMessage response,
+                                                                                 NormalizedPath repoPath,
+                                                                                 NormalizedPath filePath,
+                                                                                 LogLevel notFoundLogLevel,
+                                                                                 CancellationToken cancellation )
+    {
+        if( response.StatusCode == HttpStatusCode.NotFound )
+        {
+            monitor.Log( notFoundLogLevel, $"File '{filePath}' not found in '{BaseUrl}/{repoPath}'." );
+            return (true, null);
+        }
+        if( !response.IsSuccessStatusCode )
+        {
+            await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+            return (false, null);
+        }
+        var content = await response.Content.ReadAsByteArrayAsync( cancellation ).ConfigureAwait( false );
+        monitor.Trace( $"Read {content.Length} byte(s)." );
+        return (true, content);
+    }
 
     /// <inheritdoc />
     public sealed override async Task<(bool Success, PublishedReleaseInfo? Info)> GetReleaseAsync( IActivityMonitor monitor,

@@ -83,6 +83,83 @@ sealed class FileSystemProvider : GitHostingProvider
         }
     }
 
+    /// <inheritdoc />
+    public override Task<(bool Success, byte[]? Content)> GetFileContentAsync( IActivityMonitor monitor,
+                                                                               NormalizedPath repoPath,
+                                                                               NormalizedPath filePath,
+                                                                               string? refName = null,
+                                                                               LogLevel notFoundLogLevel = LogLevel.Trace,
+                                                                               CancellationToken cancellation = default )
+    {
+        Throw.CheckArgument( !filePath.IsEmptyPath );
+        return Task.FromResult( GetFileContent( monitor, repoPath, filePath, refName, notFoundLogLevel ) );
+    }
+
+    (bool Success, byte[]? Content) GetFileContent( IActivityMonitor monitor,
+                                                    NormalizedPath repoPath,
+                                                    NormalizedPath filePath,
+                                                    string? refName,
+                                                    LogLevel notFoundLogLevel )
+    {
+        using var _ = monitor.OpenInfo( $"Reading file '{filePath}' of '{repoPath}'@'{refName ?? "(HEAD)"}'." );
+        try
+        {
+            var pGit = Path.Combine( Path.GetFullPath( repoPath ), ".git" );
+            if( !Directory.Exists( pGit ) )
+            {
+                monitor.Log( notFoundLogLevel, $"Repository '{BaseUrl}{repoPath}' not found: no file to read." );
+                return (true, null);
+            }
+            using var repo = new Repository( pGit );
+            // HasDefaultBranch is false here: a bare repository exposes no default branch to its clients,
+            // its HEAD is the closest equivalent and it is what a clone would land on.
+            Commit? commit;
+            if( refName == null )
+            {
+                commit = repo.Head.Tip;
+                if( commit == null )
+                {
+                    monitor.Log( notFoundLogLevel, $"Repository '{BaseUrl}{repoPath}' HEAD has no commit." );
+                    return (true, null);
+                }
+            }
+            else
+            {
+                // A branch, then a tag, then anything the object database can resolve (a sha, "HEAD~2"...).
+                commit = repo.Branches[refName]?.Tip
+                         ?? (repo.Tags[refName]?.PeeledTarget as Commit)
+                         ?? repo.Lookup<Commit>( refName );
+                if( commit == null )
+                {
+                    monitor.Log( notFoundLogLevel, $"No branch, tag or commit '{refName}' in '{BaseUrl}{repoPath}'." );
+                    return (true, null);
+                }
+            }
+            var entry = commit[filePath];
+            if( entry == null )
+            {
+                monitor.Log( notFoundLogLevel, $"File '{filePath}' not found in '{BaseUrl}{repoPath}'@{commit.Sha}." );
+                return (true, null);
+            }
+            if( entry.TargetType != TreeEntryTargetType.Blob )
+            {
+                monitor.Error( $"'{filePath}' in '{BaseUrl}{repoPath}'@{commit.Sha} is a {entry.TargetType}, not a file." );
+                return (false, null);
+            }
+            var blob = (Blob)entry.Target;
+            using var s = blob.GetContentStream();
+            var content = new byte[blob.Size];
+            s.ReadExactly( content );
+            monitor.Trace( $"Read {content.Length} byte(s)." );
+            return (true, content);
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While reading file '{filePath}' of '{repoPath}'.", ex );
+            return (false, null);
+        }
+    }
+
     public override Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                        NormalizedPath repoPath,
                                                                        bool? isPrivate,

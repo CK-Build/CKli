@@ -90,6 +90,36 @@ public abstract partial class GitHostingProvider
                                                                         CancellationToken cancellation = default );
 
     /// <summary>
+    /// Reads the content of a file from a repository without cloning it.
+    /// <para>
+    /// A missing file is not an error: this returns <c>(true,null)</c> and logs at <paramref name="notFoundLogLevel"/>.
+    /// Providers differ in what they can distinguish here - a missing file, a missing <paramref name="refName"/>
+    /// and a missing repository may all answer the same <c>(true,null)</c> - so this must not be used to
+    /// probe for a repository's existence: <see cref="GetRepositoryInfoAsync"/> does that.
+    /// </para>
+    /// <para>
+    /// The content is returned as bytes rather than as a string: the callers of this parse utf-8 Json (a
+    /// <c>PublishedIndex</c>, a <c>PublishedProfile</c>) and a decoding step would only be undone.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The activity monitor.</param>
+    /// <param name="repoPath">The repository path in this provider.</param>
+    /// <param name="filePath">The path of the file in the repository ("Published/index.json").</param>
+    /// <param name="refName">
+    /// The branch, tag or commit to read the file from. Defaults to null: the repository's default branch
+    /// (its HEAD when <see cref="HasDefaultBranch"/> is false).
+    /// </param>
+    /// <param name="notFoundLogLevel">The log level to use when the file doesn't exist.</param>
+    /// <param name="cancellation">Optional cancellation token.</param>
+    /// <returns>Whether the call succeeded, and the file content if it exists (null otherwise or on error).</returns>
+    public abstract Task<(bool Success, byte[]? Content)> GetFileContentAsync( IActivityMonitor monitor,
+                                                                               NormalizedPath repoPath,
+                                                                               NormalizedPath filePath,
+                                                                               string? refName = null,
+                                                                               LogLevel notFoundLogLevel = LogLevel.Trace,
+                                                                               CancellationToken cancellation = default );
+
+    /// <summary>
     /// Creates a new repository. Whether an initial empty commit is created or not depends on the implementation.
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>

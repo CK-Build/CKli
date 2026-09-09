@@ -53,6 +53,23 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         return repoPath;
     }
 
+    /// <inheritdoc />
+    protected override async Task<(bool Success, byte[]? Content)> GetFileContentAsync( IActivityMonitor monitor,
+                                                                                        HttpClient client,
+                                                                                        NormalizedPath repoPath,
+                                                                                        NormalizedPath filePath,
+                                                                                        string? refName,
+                                                                                        LogLevel notFoundLogLevel,
+                                                                                        CancellationToken cancellation )
+    {
+        // The "raw" endpoint answers the bytes. No "ref" query parameter means the default branch.
+        var url = $"repos/{repoPath}/raw/{Uri.EscapeDataString( filePath )}";
+        if( refName != null ) url += $"?ref={Uri.EscapeDataString( refName )}";
+        using var response = await client.GetAsync( url, cancellation ).ConfigureAwait( false );
+        return await ReadFileResponseAsync( monitor, response, repoPath, filePath, notFoundLogLevel, cancellation )
+                        .ConfigureAwait( false );
+    }
+
     protected override async Task<HostedRepositoryInfo?> GetRepositoryInfoAsync( IActivityMonitor monitor,
                                                                                  HttpClient client,
                                                                                  NormalizedPath repoPath,

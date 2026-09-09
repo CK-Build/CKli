@@ -110,6 +110,44 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
     }
 
     /// <inheritdoc />
+    protected override async Task<(bool Success, byte[]? Content)> GetFileContentAsync( IActivityMonitor monitor,
+                                                                                        HttpClient client,
+                                                                                        NormalizedPath repoPath,
+                                                                                        NormalizedPath filePath,
+                                                                                        string? refName,
+                                                                                        LogLevel notFoundLogLevel,
+                                                                                        CancellationToken cancellation )
+    {
+        if( refName == null )
+        {
+            // Unlike GitHub and Gitea, the GitLab files API has no "the default branch" default: "ref" is
+            // required. The project has to be read to know it - one extra request, only when no ref is given.
+            var info = await GetRepositoryInfoAsync( monitor, client, repoPath, mustExist: false, cancellation )
+                                .ConfigureAwait( false );
+            if( info == null ) return (false, null);
+            if( !info.Exists )
+            {
+                monitor.Log( notFoundLogLevel, $"Repository '{BaseUrl}/{repoPath}' not found: no file to read." );
+                return (true, null);
+            }
+            refName = info.DefaultBranch;
+            if( refName == null )
+            {
+                // An empty project has no default branch, so it has no file either.
+                monitor.Log( notFoundLogLevel, $"Repository '{BaseUrl}/{repoPath}' has no default branch: no file to read." );
+                return (true, null);
+            }
+            monitor.Trace( $"Using the default branch '{refName}'." );
+        }
+        // GitLab uses URL-encoded project and file paths: group%2Fsubgroup%2Frepo, Published%2Findex.json.
+        var url = $"projects/{HttpUtility.UrlEncode( repoPath )}/repository/files/{HttpUtility.UrlEncode( filePath )}/raw"
+                  + $"?ref={Uri.EscapeDataString( refName )}";
+        using var response = await client.GetAsync( url, cancellation ).ConfigureAwait( false );
+        return await ReadFileResponseAsync( monitor, response, repoPath, filePath, notFoundLogLevel, cancellation )
+                        .ConfigureAwait( false );
+    }
+
+    /// <inheritdoc />
     protected override async Task<HostedRepositoryInfo?> CreateRepositoryAsync( IActivityMonitor monitor,
                                                                                 HttpClient client,
                                                                                 NormalizedPath repoPath,

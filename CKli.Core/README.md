@@ -257,12 +257,40 @@ Task<HostedRepositoryInfo?> GetRepositoryInfoAsync(...)
 Task<HostedRepositoryInfo?> CreateRepositoryAsync(...)
 Task<bool> DeleteRepositoryAsync(...)
 Task<bool> ArchiveRepositoryAsync(...)
+Task<(bool Success, byte[]? Content)> GetFileContentAsync(...)
 Task<string?> CreateDraftReleaseAsync(...)
 Task<bool> AddReleaseAssetAsync(...)
 Task<bool> FinalizeReleaseAsync(...)
 ```
 
 HTTP-based providers extend `HttpGitHostingProvider`, which handles authentication, per-request `HttpClient` lifecycle, and retry hooks via `OnSendHookAsync`.
+
+## Reading a file without cloning
+
+`GetFileContentAsync( monitor, repoPath, filePath, refName, notFoundLogLevel, cancellation )` reads one file
+out of a repository that is **not cloned** — which is the whole point: a World's `<Reference />` names another
+Stack that may have no clone on this machine at all, so its `Published/index.json` has to be reached remotely.
+
+It answers a `(bool Success, byte[]? Content)`, the same shape as `GetReleaseAsync`, because *nothing to read*
+is a legitimate answer and not a failure:
+
+| Result | Meaning |
+|---|---|
+| `(true, bytes)` | The file was read. |
+| `(true, null)` | There is nothing to read. Logged at `notFoundLogLevel` (`Trace` by default). |
+| `(false, null)` | The call failed (network, credentials, or the path names a folder). |
+
+**`(true, null)` deliberately merges the missing file, the missing `refName` and the missing repository**: the
+providers cannot all tell them apart, so relying on the distinction would work on one host and not on another.
+Do not use this to probe for a repository's existence — `GetRepositoryInfoAsync` does that, and it does
+distinguish.
+
+`refName` is a branch, a tag or a commit, and defaults to null: the repository's default branch, or its `HEAD`
+when `HasDefaultBranch` is false. That default costs GitLab one extra request — unlike GitHub and Gitea its
+files API has no "default branch" default, so the project has to be read to learn it.
+
+The content is `byte[]` rather than `string` because the callers parse utf-8 Json (`PublishedIndex`,
+`PublishedProfile`), and a decoding step would only have to be undone.
 
 `HostedRepositoryInfo` (sealed record) carries: `RepoPath`, `Exists`, `IsPrivate`, `IsArchived`, `Description`, `CloneUrl`, `WebUrl`, `CreatedAt`, `UpdatedAt`.
 
