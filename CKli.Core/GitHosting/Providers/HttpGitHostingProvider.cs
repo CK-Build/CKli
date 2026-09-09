@@ -349,7 +349,8 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
         }
         try
         {
-            return await GetReleaseAsync( monitor, client, repoPath, releaseId, cancellation ).ConfigureAwait( false );
+            return await GetReleaseAsync( monitor, client, repoPath, releaseId, notFoundLogLevel, cancellation )
+                            .ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -364,11 +365,15 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
 
     /// <summary>
     /// Provider-specific single-release read implementation using an HttpClient.
+    /// <para>
+    /// <see cref="GitHostingProvider.LogReleaseNotFound"/> answers the not found case.
+    /// </para>
     /// </summary>
     protected abstract Task<(bool Success, PublishedReleaseInfo? Info)> GetReleaseAsync( IActivityMonitor monitor,
                                                                                          HttpClient client,
                                                                                          NormalizedPath repoPath,
                                                                                          string releaseId,
+                                                                                         LogLevel notFoundLogLevel,
                                                                                          CancellationToken cancellation );
 
     /// <inheritdoc />

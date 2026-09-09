@@ -271,8 +271,10 @@ HTTP-based providers extend `HttpGitHostingProvider`, which handles authenticati
 out of a repository that is **not cloned** — which is the whole point: a World's `<Reference />` names another
 Stack that may have no clone on this machine at all, so its `Published/index.json` has to be reached remotely.
 
-It answers a `(bool Success, byte[]? Content)`, the same shape as `GetReleaseAsync`, because *nothing to read*
-is a legitimate answer and not a failure:
+It answers a `(bool Success, byte[]? Content)`, the same shape as `GetReleaseAsync` — the two share the
+convention that *nothing to read* is a legitimate answer and not a failure, and that `notFoundLogLevel`
+decides whether it is said out loud (`Trace` by default), so a caller for which the absence matters gets it
+reported without having to say anything itself:
 
 | Result | Meaning |
 |---|---|

@@ -299,6 +299,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
                                                                                                HttpClient client,
                                                                                                NormalizedPath repoPath,
                                                                                                string releaseId,
+                                                                                               LogLevel notFoundLogLevel,
                                                                                                CancellationToken cancellation )
     {
         using var response = await client.GetAsync( $"repos/{repoPath}/releases/{releaseId}", cancellation ).ConfigureAwait( false );
@@ -309,7 +310,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         }
         if( response.StatusCode == HttpStatusCode.NotFound )
         {
-            return (true, null);
+            return LogReleaseNotFound( monitor, notFoundLogLevel, repoPath, releaseId );
         }
         Throw.DebugAssert( response.IsSuccessStatusCode );
         try

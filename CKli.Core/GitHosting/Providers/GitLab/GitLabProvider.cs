@@ -394,6 +394,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
                                                                                                HttpClient client,
                                                                                                NormalizedPath repoPath,
                                                                                                string releaseId,
+                                                                                               LogLevel notFoundLogLevel,
                                                                                                CancellationToken cancellation )
     {
         var projectPath = HttpUtility.UrlEncode( repoPath );
@@ -406,7 +407,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         }
         if( response.StatusCode == HttpStatusCode.NotFound )
         {
-            return (true, null);
+            return LogReleaseNotFound( monitor, notFoundLogLevel, repoPath, releaseId );
         }
         Throw.DebugAssert( response.IsSuccessStatusCode );
         try

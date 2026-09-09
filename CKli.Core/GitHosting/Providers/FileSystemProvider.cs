@@ -339,7 +339,7 @@ sealed class FileSystemProvider : GitHostingProvider
     public override Task<(bool Success, PublishedReleaseInfo? Info)> GetReleaseAsync( IActivityMonitor monitor,
                                                                                       NormalizedPath repoPath,
                                                                                       string releaseId,
-                                                                                      LogLevel notFoundLevel = LogLevel.Trace,
+                                                                                      LogLevel notFoundLogLevel = LogLevel.Trace,
                                                                                       CancellationToken cancellation = default )
     {
         try
@@ -350,8 +350,7 @@ sealed class FileSystemProvider : GitHostingProvider
             }
             if( !Directory.Exists( releaseId ) )
             {
-                monitor.Log( notFoundLevel, $"Release identifier '{releaseId}' doesn't exist." );
-                return Task.FromResult( (true, (PublishedReleaseInfo?)null) ); ;
+                return Task.FromResult( LogReleaseNotFound( monitor, notFoundLogLevel, repoPath, releaseId ) );
             }
             var name = Path.GetFileName( releaseId );
             var assets = Directory.GetFiles( releaseId ).Select( p => Path.GetFileName( p ) ?? p ).ToList();

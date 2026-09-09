@@ -356,6 +356,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                                                HttpClient client,
                                                                                                NormalizedPath repoPath,
                                                                                                string releaseId,
+                                                                                               LogLevel notFoundLogLevel,
                                                                                                CancellationToken cancellation )
     {
         // Support release identifiers that may be the encoded string produced by CreateDraftReleaseAsync ("<id>|<uploadUrlBase>").
@@ -370,7 +371,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         }
         if( response.StatusCode == HttpStatusCode.NotFound )
         {
-            return (true, null);
+            return LogReleaseNotFound( monitor, notFoundLogLevel, repoPath, releaseId );
         }
         Throw.DebugAssert( response.IsSuccessStatusCode );
 

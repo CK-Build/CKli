@@ -197,21 +197,40 @@ public abstract partial class GitHostingProvider
     /// <summary>
     /// Gets the <see cref="PublishedReleaseInfo"/> of a given <paramref name="releaseId"/>.
     /// <para>
-    /// This returns null if the release doesn't exist but <paramref name="notFoundLevel"/> enables
-    /// to to 
+    /// A release that doesn't exist is not an error: this returns <c>(true,null)</c> and logs at
+    /// <paramref name="notFoundLogLevel"/> - so a caller for which the absence matters can have it
+    /// reported without having to say anything itself.
     /// </para>
     /// </summary>
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
     /// <param name="releaseId">The release identifier.</param>
-    /// <param name="notFoundLevel">The log level to use when the release doesn't exist.</param>
+    /// <param name="notFoundLogLevel">The log level to use when the release doesn't exist.</param>
     /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>Whether the call succeed and the published release info if found, null otherwise or on error.</returns>
     public abstract Task<(bool Success, PublishedReleaseInfo? Info)> GetReleaseAsync( IActivityMonitor monitor,
                                                                                       NormalizedPath repoPath,
                                                                                       string releaseId,
-                                                                                      LogLevel notFoundLevel = LogLevel.Trace,
+                                                                                      LogLevel notFoundLogLevel = LogLevel.Trace,
                                                                                       CancellationToken cancellation = default );
+
+    /// <summary>
+    /// Logs that a release doesn't exist at <paramref name="notFoundLogLevel"/> and returns the
+    /// <c>(true,null)</c> that says so: every provider answers the absence the same way.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="notFoundLogLevel">The log level to use.</param>
+    /// <param name="repoPath">The repository path.</param>
+    /// <param name="releaseId">The release identifier that doesn't exist.</param>
+    /// <returns>Always <c>(true,null)</c>.</returns>
+    protected (bool Success, PublishedReleaseInfo? Info) LogReleaseNotFound( IActivityMonitor monitor,
+                                                                            LogLevel notFoundLogLevel,
+                                                                            NormalizedPath repoPath,
+                                                                            string releaseId )
+    {
+        monitor.Log( notFoundLogLevel, $"Release '{releaseId}' not found in '{BaseUrl}/{repoPath}'." );
+        return (true, null);
+    }
 
     /// <summary>
     /// Deletes a <see cref="PublishedReleaseInfo"/>. This must be idempotent (deleting an unexisting release is a no-op).

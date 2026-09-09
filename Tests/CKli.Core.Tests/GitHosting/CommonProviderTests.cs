@@ -10,6 +10,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
+// LibGit2Sharp has a LogLevel too.
+using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core.Tests.GitHosting;
 
@@ -214,9 +216,24 @@ public class CommonProviderTests
             // Idempotence.
             (await p.DeleteReleaseAsync( TestHelper.Monitor, testRepoName, releaseId )).ShouldBeTrue();
 
-            (success, releaseInfo) = await p.GetReleaseAsync( TestHelper.Monitor, testRepoName, releaseId );
-            success.ShouldBeTrue();
-            releaseInfo.ShouldBeNull();
+            // A release that no more exists is a success with a null info, and the notFoundLogLevel decides
+            // whether that is said out loud: it must reach the provider implementation (it used to be
+            // dropped on the way, so no provider ever logged anything and the parameter did nothing).
+            // CollectEntries defaults to Error and above: Warn must be asked for explicitly.
+            using( TestHelper.Monitor.CollectEntries( out var entries, LogLevelFilter.Warn ) )
+            {
+                (success, releaseInfo) = await p.GetReleaseAsync( TestHelper.Monitor, testRepoName, releaseId );
+                success.ShouldBeTrue();
+                releaseInfo.ShouldBeNull();
+                entries.ShouldNotContain( e => e.Text.Contains( "not found" ),
+                                          "The default notFoundLogLevel is Trace." );
+
+                (success, releaseInfo) = await p.GetReleaseAsync( TestHelper.Monitor, testRepoName, releaseId, LogLevel.Warn );
+                success.ShouldBeTrue();
+                releaseInfo.ShouldBeNull();
+                entries.ShouldContain( e => e.MaskedLevel == LogLevel.Warn
+                                            && e.Text.Contains( $"Release '{releaseId}' not found" ) );
+            }
 
             static void CheckTestRelease( PublishedReleaseInfo i, string expectedReleaseId )
             {
