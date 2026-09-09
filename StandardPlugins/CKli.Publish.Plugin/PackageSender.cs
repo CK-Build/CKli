@@ -61,14 +61,9 @@ sealed class PackageSender
         Throw.DebugAssert( _feeds.Contains( feed ) && feed.Credentials != null );
         int idx = _feeds.IndexOf( feed );
         ref var c = ref _clients[idx];
-        if( c == null )
-        {
-            var apiKey = _secretsStore.TryGetRequiredSecret( monitor, feed.Credentials.SecretKey );
-            if( apiKey != null )
-            {
-                c = new NuGetFeedClient( feed.Url, apiKey );
-            }
-        }
+        // The feed resolves its own API key: it is the one that knows that its Credentials.SecretKey is
+        // a key in the store (unlike its PublicReadCredentials, which are used as is).
+        c ??= feed.CreatePushClient( monitor, _secretsStore );
         return c;
     }
 
@@ -86,13 +81,9 @@ sealed class PackageSender
                     var clients = new List<NuGetFeedClient>();
                     foreach( var f in _feeds.Where( f => f.CanPush( branch.VersionKind, isCI ) ) )
                     {
+                        // A null client is a secret that could not be resolved: CreatePushClient has said so.
                         var client = EnsureClient( monitor, f );
                         if( client == null )
-                        {
-                            return null;
-                        }
-                        var apiKey = _secretsStore.TryGetRequiredSecret( monitor, f.Credentials!.SecretKey );
-                        if( apiKey == null )
                         {
                             return null;
                         }

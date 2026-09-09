@@ -1,4 +1,5 @@
 using CK.Core;
+using CKli.Core;
 using System.Xml.Linq;
 
 namespace CKli.ArtifactHandler.Plugin;
@@ -165,6 +166,67 @@ public sealed class NuGetFeed
     public bool CanPush( CSVersionKind kind, bool isCI ) => _credentials != null
                                                             && _pushQualityFilter.HasValue
                                                             && _pushQualityFilter.Value.Accepts( kind, isCI );
+
+    /// <summary>
+    /// Creates a client that can read this feed - <see cref="NuGetFeedClient.GetVersionsAsync"/> - but not
+    /// write to it: <see cref="NuGetFeedClient.CanWrite"/> is false even when this feed has an API key.
+    /// <para>
+    /// This resolves whichever of the 3 credential shapes applies (see this class' documentation): none at
+    /// all for a true public feed, the <see cref="PublicReadCredentials"/> user name and password, or the
+    /// <see cref="Credentials"/> API key of a private feed.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The store that resolves this feed's secret.</param>
+    /// <param name="skipCache">
+    /// True to bypass the NuGet on-disk metadata cache. Defaults to false: reading is not a management
+    /// operation, slightly stale metadata is acceptable and throughput matters.
+    /// </param>
+    /// <returns>The client or null when a required secret cannot be resolved.</returns>
+    public NuGetFeedClient? CreateReadClient( IActivityMonitor monitor, ISecretsStore secretsStore, bool skipCache = false )
+    {
+        Throw.CheckNotNullArgument( secretsStore );
+        // PublicReadCredentials come first: they are the shape that exists precisely to read.
+        if( _publicReadCredentials != null )
+        {
+            // Nothing is resolved here: both are used as is. That is the whole point of these credentials -
+            // they are written as-is in the repositories' nuget.config and committed - and the constructor
+            // guarantees a user name (they are never an API key).
+            return new NuGetFeedClient( _url,
+                                        _publicReadCredentials.UserNameKey,
+                                        _publicReadCredentials.SecretKey,
+                                        canWrite: false,
+                                        skipCache );
+        }
+        if( _credentials != null )
+        {
+            // Here the SecretKey is a key in the store (the constructor guarantees an API key, so there is
+            // no user name to go with it).
+            var secret = secretsStore.TryGetRequiredSecret( monitor, _credentials.SecretKey );
+            if( secret == null ) return null;
+            return new NuGetFeedClient( _url, userName: null, secret, canWrite: false, skipCache );
+        }
+        // A true public feed: no credentials at all.
+        return new NuGetFeedClient( _url, userName: null, secret: null, canWrite: false, skipCache );
+    }
+
+    /// <summary>
+    /// Creates a client that can push to and delete from this feed. <see cref="Credentials"/> must not be
+    /// null - <see cref="CanPush(CSVersionKind, bool)"/> is what decides whether a given version may be
+    /// pushed - and its API key is the credential used.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The store that resolves this feed's <see cref="Credentials"/>.</param>
+    /// <returns>The client or null when the API key cannot be resolved.</returns>
+    public NuGetFeedClient? CreatePushClient( IActivityMonitor monitor, ISecretsStore secretsStore )
+    {
+        Throw.CheckNotNullArgument( secretsStore );
+        Throw.CheckState( Credentials != null );
+        var apiKey = secretsStore.TryGetRequiredSecret( monitor, _credentials!.SecretKey );
+        if( apiKey == null ) return null;
+        // skipCache is true here: a push or a delete must see the actual current state of the feed.
+        return new NuGetFeedClient( _url, userName: null, secret: apiKey, canWrite: true, skipCache: true );
+    }
 
     /// <summary>
     /// Returns the "Name (Url)".

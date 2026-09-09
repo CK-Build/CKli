@@ -1,7 +1,7 @@
 using CK.Core;
 using System.Threading.Tasks;
 
-namespace CKli.Publish.Plugin;
+namespace CKli.ArtifactHandler.Plugin;
 
 public sealed partial class NuGetFeedClient
 {

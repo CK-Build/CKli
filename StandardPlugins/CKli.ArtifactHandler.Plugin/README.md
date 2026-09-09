@@ -82,7 +82,7 @@ The text form is therefore a **stored format**, and it is a sequence of sections
 <ArtifactHandler>
   <NuGet>
     <Feed Name="NuGet" Url="https://api.nuget.org/v3/index.json" PushQualityFilter="[,].ci">
-      <PushCredentials SecretKey="NUGET_ORG_PUSH_API_KEY" />
+      <Credentials SecretKey="NUGET_ORG_PUSH_API_KEY" />
     </Feed>
   </NuGet>
 </ArtifactHandler>
@@ -90,11 +90,56 @@ The text form is therefore a **stored format**, and it is a sequence of sections
 
 Each `NuGetFeed` carries:
 
-- `PushCredentials` — an optional `NuGetFeedCredentials` naming the secret (resolved through `ISecretsStore`, see `CKli.Core`) required to push. No `PushCredentials` means CKli will never push to that feed.
+- `Credentials` (`<Credentials SecretKey="..." />`) — an optional `NuGetFeedCredentials` whose `SecretKey`
+  names a secret **resolved through `ISecretsStore`** (see `CKli.Core`). It is always an API key
+  (`IsAPIKey` is true, there is no user name). No `Credentials` means CKli will never push to that feed.
 - `PushQualityFilter` — a `CSVersionKindFilter` restricting which version kinds (CI, prerelease, stable...) may be pushed to the feed.
-- `FakeReadCredentials` — an optional username/password pair written verbatim into the repository's `nuget.config` `<packageSourceCredentials>`, working around hosts (GitHub Packages is called out explicitly) that require authentication even to anonymously read a public feed.
+- `PublicReadCredentials` (`<PublicReadCredentials UserNameKey="..." SecretKey="..." />`) — an optional
+  user name / password pair, working around hosts (GitHub Packages is called out explicitly) that require
+  authentication even to read a public feed. **Both values are used as they are**: nothing is resolved
+  through the store, and they are written verbatim into the repository's `nuget.config`
+  `<packageSourceCredentials>` and committed. It is never an API key.
+
+The two are mutually exclusive, and which of the three shapes a feed has — neither, `PublicReadCredentials`,
+or `Credentials` — is exactly what `NuGetFeed.CreateReadClient` dispatches on.
 
 `ApplyConfiguredNuGetFeeds(monitor, root, out actions)` and `GetDefaultNuGetConfig(monitor)` turn this feed list into (or reconcile it against) an actual `nuget.config` `<configuration>` XML document — sources, package source mapping (`*` pattern per source), and credentials — which is exactly what `HandleNuGetConfig` uses to keep every repository's `nuget.config` file correct.
+
+### `NuGetFeedClient` — talking to a feed
+
+`NuGetFeedClient` (`NuGetFeed/NuGetFeedClient.cs`, `IDisposable`) wraps the NuGet client SDK for one feed:
+`GetVersionsAsync` lists the versions of a package identifier, `PushAsync` and `DeleteAsync` write. A
+`file://` folder feed is handled by reading and writing the V3 expanded folder layout directly, so it works
+offline — which is what makes it usable from the test fixtures' `FakeFeed/`.
+
+It is not constructed directly. The **feed** creates it, because the feed is what knows which of the three
+credential shapes above applies to it:
+
+```csharp
+public NuGetFeedClient? CreateReadClient( IActivityMonitor monitor, ISecretsStore secretsStore, bool skipCache = false );
+public NuGetFeedClient? CreatePushClient( IActivityMonitor monitor, ISecretsStore secretsStore );
+```
+
+Both answer null when a required secret cannot be resolved (and say why). `CreateReadClient` handles all
+three shapes — no credentials, `PublicReadCredentials` used as they are, or the `Credentials` API key
+resolved from the store — and produces a client whose `CanWrite` is **false**: `PushAsync` and `DeleteAsync`
+then throw an `InvalidOperationException` rather than failing somewhere inside NuGet with a null API key.
+`CreatePushClient` requires `Credentials` and is what `CKli.Publish.Plugin`'s `PackageSender` uses;
+`CanPush( kind, isCI )` remains what decides whether a *given version* may go to the feed.
+
+`skipCache` bypasses NuGet's on-disk metadata cache. It defaults to false for a read client (stale metadata
+is acceptable and throughput matters) and is always true for a push client, which must see the feed's actual
+current state.
+
+> Reading a feed is why this plugin is no longer push-only. `NuGetFeedClient` lived in
+`CKli.Publish.Plugin` until 2026-09-09; a consumer that only wants to *look up* versions has no business
+depending on the publication plugin, and feeds are this plugin's concern.
+
+- `LoggerAdapter` (`NuGetFeed/NuGetFeedClient.LoggerAdapter.cs`, a private nested class) adapts CKli's
+  `IActivityLineEmitter` to NuGet's `ILogger`.
+- The credential providers are registered on a **static** `HttpHandlerResourceV3.CredentialService` and never
+  removed. Each answers for its own feed url only, so two clients on the same feed with different credentials
+  would both answer and the first registered wins. No code creates such a pair.
 
 ### Other helpers
 
@@ -104,4 +149,6 @@ Each `NuGetFeed` carries:
 ## Dependencies
 
 - **`CKli.BranchModel.Plugin`** (project reference): supplies the `ContentIssue` event this plugin hooks to manage `nuget.config` files across all content-managed branches.
-- **`NuGet.Protocol`** (NuGet package): used indirectly through `NuGetHelper` (from `CKli.Core`) for cache and configuration operations.
+- **`NuGet.Credentials`** (NuGet package): used by `NuGetFeedClient`, which also brings `NuGet.Protocol`,
+  `NuGet.Packaging`, `NuGet.Configuration` and `NuGet.Common` transitively. (`CKli.Core`'s `NuGetHelper`
+  needs none of them: it manipulates `nuget.config` XML and shells out to `dotnet`.)

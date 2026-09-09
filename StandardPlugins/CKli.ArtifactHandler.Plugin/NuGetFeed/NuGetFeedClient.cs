@@ -14,18 +14,25 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace CKli.Publish.Plugin;
+namespace CKli.ArtifactHandler.Plugin;
 
 /// <summary>
 /// Simplified client for interacting with a NuGet feed: list versions, push packages,
-/// delete or unlist package versions. Authentication uses an API key.
+/// delete or unlist package versions.
+/// <para>
+/// A client is created from a <see cref="NuGetFeed"/>: <see cref="NuGetFeed.CreateReadClient"/> for a
+/// read-only one (<see cref="CanWrite"/> is false) and <see cref="NuGetFeed.CreatePushClient"/> for one
+/// that can also push and delete.
+/// </para>
 /// </summary>
 public sealed partial class NuGetFeedClient : IDisposable
 {
     const int _perPackagePushTimeoutSecond = 60;
 
     readonly string _feedUrl;
-    readonly string _apiKey;
+    // Null when this client cannot write: a truly public feed has no credentials at all, and a feed with
+    // PublicReadCredentials has a user name and a password rather than an API key.
+    readonly string? _apiKey;
     readonly string? _localPath;
     readonly SourceRepository _sourceRepository;
     readonly SourceCacheContext _cacheContext;
@@ -33,14 +40,23 @@ public sealed partial class NuGetFeedClient : IDisposable
     sealed class MicroProvider : ICredentialProvider
     {
         readonly Uri _sourceUri;
-        readonly string _apiKey;
+        readonly string _userName;
+        readonly string _secret;
         readonly string _id;
 
-        internal MicroProvider( Uri sourceUri, string apiKey, int idx )
+        /// <param name="sourceUri">The feed this provider answers for, and only this one.</param>
+        /// <param name="userName">
+        /// The user name. Null for an API key: NuGet sends it as the password of any user name, so a
+        /// generated one is used.
+        /// </param>
+        /// <param name="secret">The API key or the password.</param>
+        /// <param name="idx">Disambiguates the <see cref="Id"/> of the registered providers.</param>
+        internal MicroProvider( Uri sourceUri, string? userName, string secret, int idx )
         {
             _sourceUri = sourceUri;
-            _apiKey = apiKey;
             _id = $"Ckli{idx}";
+            _userName = userName ?? _id;
+            _secret = secret;
         }
 
         public string Id => _id;
@@ -54,7 +70,7 @@ public sealed partial class NuGetFeedClient : IDisposable
                                                   CancellationToken cancellationToken )
         {
             return Task.FromResult( uri == _sourceUri
-                                        ? new CredentialResponse( new NetworkCredential( _id, _apiKey ) )
+                                        ? new CredentialResponse( new NetworkCredential( _userName, _secret ) )
                                         : new CredentialResponse( CredentialStatus.ProviderNotApplicable ) );
         }
     }
@@ -74,31 +90,62 @@ public sealed partial class NuGetFeedClient : IDisposable
 
     /// <summary>
     /// Initializes a new <see cref="NuGetFeedClient"/>.
+    /// <para>
+    /// <see cref="NuGetFeed.CreateReadClient"/> and <see cref="NuGetFeed.CreatePushClient"/> are how a
+    /// client is obtained: they resolve the feed's secrets and know which of the credential shapes below
+    /// applies to it.
+    /// </para>
     /// </summary>
     /// <param name="feedUrl">The NuGet feed URL (V3 index.json, V2 endpoint or file system folder path).</param>
-    /// <param name="apiKey">The API key used for push and delete operations.</param>
-    /// <param name="skipCache">
-    /// When true (the default), bypasses the NuGet on-disk metadata cache and always hits
-    /// the network. This ensures <see cref="GetVersionsAsync"/> always reflects the actual
-    /// current state of the feed, which is critical for management operations (push, delete,
-    /// unlist). Set to false only for read-only auditing scenarios where slightly stale
-    /// metadata is acceptable and throughput matters.
+    /// <param name="userName">
+    /// The user name, when the secret is a password (a feed's <see cref="NuGetFeed.PublicReadCredentials"/>).
+    /// Null when <paramref name="secret"/> is an API key: NuGet sends an API key as the password of any user
+    /// name, so a generated one is used.
     /// </param>
-    public NuGetFeedClient( string feedUrl, string apiKey, bool skipCache = true )
+    /// <param name="secret">
+    /// The API key or the password. Null for a truly public feed: no credentials are registered at all and
+    /// <see cref="CanWrite"/> is false.
+    /// </param>
+    /// <param name="canWrite">
+    /// Whether <paramref name="secret"/> is an API key that <see cref="PushAsync(IActivityLineEmitter, SVersion, string, CancellationToken)"/>
+    /// and <see cref="DeleteAsync(IActivityLineEmitter, string, SVersion, CancellationToken)"/> may use.
+    /// </param>
+    /// <param name="skipCache">
+    /// When true, bypasses the NuGet on-disk metadata cache and always hits the network. This ensures
+    /// <see cref="GetVersionsAsync"/> always reflects the actual current state of the feed, which is
+    /// critical for management operations (push, delete, unlist). False is for read-only scenarios where
+    /// slightly stale metadata is acceptable and throughput matters.
+    /// </param>
+    internal NuGetFeedClient( string feedUrl, string? userName, string? secret, bool canWrite, bool skipCache )
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( feedUrl );
-        Throw.CheckNotNullOrWhiteSpaceArgument( apiKey );
+        Throw.CheckArgument( !canWrite || (secret != null && userName == null) );
+        Throw.CheckArgument( userName == null || secret != null );
         _feedUrl = feedUrl;
-        _apiKey = apiKey;
+        if( canWrite ) _apiKey = secret;
         _sourceRepository = Repository.Factory.GetCoreV3( feedUrl );
         var uri = _sourceRepository.PackageSource.SourceUri;
         if( uri.IsFile )
         {
             _localPath = uri.LocalPath;
         }
-        _credentialProviders.Add( new MicroProvider( uri, _apiKey, _credentialProviders.Count ) );
+        if( secret != null )
+        {
+            // The providers are registered on a static CredentialService and never removed, and each one
+            // answers for its own feed only. Two clients on the same feed with different credentials
+            // therefore both answer and the first registered wins: this has always been so and no code
+            // creates such a pair.
+            _credentialProviders.Add( new MicroProvider( uri, userName, secret, _credentialProviders.Count ) );
+        }
         _cacheContext = new SourceCacheContext { NoCache = skipCache };
     }
+
+    /// <summary>
+    /// Gets whether this client can <see cref="PushAsync(IActivityLineEmitter, SVersion, string, CancellationToken)"/>
+    /// and <see cref="DeleteAsync(IActivityLineEmitter, string, SVersion, CancellationToken)"/>: it has been
+    /// created with an API key. Calling them otherwise throws an <see cref="InvalidOperationException"/>.
+    /// </summary>
+    public bool CanWrite => _apiKey != null;
 
     /// <inheritdoc/>
     public void Dispose() => _cacheContext.Dispose();
@@ -177,6 +224,7 @@ public sealed partial class NuGetFeedClient : IDisposable
                                          SVersion version,
                                          CancellationToken cancellationToken = default )
     {
+        Throw.CheckState( CanWrite );
         Throw.CheckNotNullOrWhiteSpaceArgument( packageId );
         Throw.CheckNotNullArgument( version );
         logger.Trace( $"Sending delete request for '{packageId}@{version}' on '{_feedUrl}'." );
@@ -268,6 +316,7 @@ public sealed partial class NuGetFeedClient : IDisposable
                                     bool skipDuplicate,
                                     CancellationToken cancellationToken )
     {
+        Throw.CheckState( CanWrite );
         if( paths.Count == 0 )
         {
             logger.Warn( $"PushAsync: no packages to push to '{_feedUrl}'." );

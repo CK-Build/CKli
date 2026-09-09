@@ -421,9 +421,8 @@ public Task<bool> SendAsync( IActivityMonitor monitor, SVersion version,
 - `SendAsync` resolves the version's `BranchName` through `BranchNamespace.FindRequired`, then
   gets or lazily builds a `Sender` for that `(BranchName.Index, isCI)` pair (an array indexed by
   `2 * branchIndex + (isCI ? 1 : 0)`, built once under a `Lock`).
-- A `Sender` is the set of `NuGetFeedClient`s for feeds whose `PushCredentials` is non-null,
-  `IsAPIKey` (only API-key auth is supported — a feed configured with username/password
-  credentials is silently excluded), and whose `PushQualityFilter` accepts the version's
+- A `Sender` is the set of `NuGetFeedClient`s for feeds whose `Credentials` is non-null (which is
+  always an API key: `NuGetFeed`'s constructor enforces it) and whose `PushQualityFilter` accepts the version's
   `CSVersionKind`/CI flag (`NuGetFeed`/`PushQualityFilter` are defined and documented in
   `CKli.ArtifactHandler.Plugin`'s README). If no feed matches, this is an error (`monitor.Error`),
   not a silent no-op.
@@ -435,42 +434,14 @@ A second, independent `Sender.Create(monitor, versionKind, ciBuild, artifactHand
 overload exists for building a one-off `Sender` without going through `PackageSender`/`BranchName`
 resolution; it is not called from anywhere else in this plugin.
 
-### `NuGetFeedClient` — talking to a single feed
+### The feed clients
 
-`NuGetFeedClient` (`NuGetFeedClient.cs`, `IDisposable`) wraps the NuGet client SDK
-(`NuGet.Protocol`, `NuGet.Packaging`, `NuGet.Credentials`) for one feed URL + API key:
-
-```csharp
-public NuGetFeedClient( string feedUrl, string apiKey, bool skipCache = true );
-
-Task<IReadOnlyList<SVersion>?> GetVersionsAsync( IActivityLineEmitter logger, string packageId, CancellationToken = default );
-Task<bool> DeleteAsync( IActivityLineEmitter logger, string packageId, SVersion version, CancellationToken = default );
-Task<bool> DeleteAsync( IActivityLineEmitter logger, string packageId, IEnumerable<SVersion> versions, CancellationToken = default );
-Task<bool> PushAsync( IActivityLineEmitter logger, string nupkgFilePath, bool skipDuplicate = true, CancellationToken = default );
-Task<bool> PushAsync( IActivityLineEmitter logger, IEnumerable<string> nupkgFilePaths, bool skipDuplicate = true, CancellationToken = default );
-```
-
-Notable behavior:
-
-- **Local (`file://`) feeds are handled specially**, bypassing the NuGet SDK's V3 push/delete
-  APIs (which throw for file sources): versions are read straight from the expanded
-  `{root}/{id}/{version}/` folder layout, deletes remove that folder, and pushes go through
-  `OfflineFeedUtility.AddPackageToSource` instead of `PackageUpdateResource.Push`.
-- **Remote feeds** authenticate via a private static `MicroProvider : ICredentialProvider`
-  registered per-instance against `HttpHandlerResourceV3.CredentialService` — a small workaround
-  since the NuGet SDK's credential plumbing is normally driven by `nuget.config`/interactive
-  prompts, not a plain API key supplied in code.
-- `DeleteAsync`'s doc comment calls out that whether this is a hard delete or an unlist is
-  entirely server-dependent (nuget.org unlists; most private feeds like BaGet/Gitea/Nexus/Azure
-  Artifacts hard-delete). Neither `Delete` overload is called anywhere in this plugin today — they
-  exist as part of the client's public surface for other callers/tests.
-- `skipCache` (default `true`) forces `SourceCacheContext.NoCache = true` so `GetVersionsAsync`
-  always reflects the feed's actual current state — important since this client is used for
-  push/duplicate-detection decisions, not just casual browsing.
-- Versions returned by NuGet that don't parse as a CKli `SVersion` are skipped with a warning
-  rather than failing the call.
-- `LoggerAdapter` (`NuGetFeedClient.LoggerAdapter.cs`, private nested class) adapts CKli's
-  `IActivityLineEmitter` (`Trace`/`Info`/`Warn`/`Error`) to the NuGet SDK's `NuGet.Common.ILogger`.
+`NuGetFeedClient` and its `LoggerAdapter` used to live here. They moved to
+[`CKli.ArtifactHandler.Plugin`](../CKli.ArtifactHandler.Plugin/README.md#nugetfeedclient--talking-to-a-feed)
+on 2026-09-09, where the `NuGetFeed` they talk to is also defined: a consumer that only wants to look up
+the versions of a package has no business depending on the publication plugin. This plugin obtains its
+clients from `NuGetFeed.CreatePushClient( monitor, secretsStore )`, which resolves the API key and answers
+null (having said why) when it cannot.
 
 ## Configuration
 
@@ -489,7 +460,7 @@ Notable behavior:
 Everything else that governs where and how packages are pushed lives under
 `CKli.ArtifactHandler.Plugin`'s
 `<ArtifactHandler><NuGet><Feed .../></NuGet></ArtifactHandler>` element (feed URL,
-`PushQualityFilter`, `PushCredentials` naming a secret resolved via `ISecretsStore`) — see that
+`PushQualityFilter`, `Credentials` naming a secret resolved via `ISecretsStore`) — see that
 plugin's README for the exact shape. Git-hosting credentials (used to create releases) are
 likewise resolved through `GitRepositoryKey` / `ISecretsStore`, documented in `CKli.Core`'s
 `GitHosting` folder.
@@ -501,9 +472,9 @@ likewise resolved through `GitRepositoryKey` / `ISecretsStore`, documented in `C
   producers-first ordering, `IndirectPublisher`, and `BuildFinalProfile`'s conflict branch are all
   exercised only by reasoning. Constructing that state needs a fixture with a second configured
   branch.
-- `NuGetFeedClient.DeleteAsync` is fully implemented but never invoked by `PackageSender` or any
-  publisher — there is currently no CKli-level command that deletes/unlists a published package
-  version through this plugin.
+- `NuGetFeedClient.DeleteAsync` (now in `CKli.ArtifactHandler.Plugin`) is fully implemented but never
+  invoked by `PackageSender` or any publisher — there is currently no CKli-level command that
+  deletes/unlists a published package version.
 - `BasePublisher`'s `$Local` cleanup used to be skipped by matching a hard-coded test path
   (`/.PublicStack/CK-Plugins/Tests/Plugins.Tests`). That literal never matched any real folder — CKli's
   own harness lives in `CKli-Plugins`, not `CK-Plugins` — so the cleanup always ran, including in tests,

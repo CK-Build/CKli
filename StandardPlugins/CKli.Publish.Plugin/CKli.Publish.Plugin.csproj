@@ -6,10 +6,6 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="NuGet.Credentials" Version="7.3.1" />
-    </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\CKli.Build.Plugin\CKli.Build.Plugin.csproj" />
   </ItemGroup>
