@@ -340,12 +340,20 @@ same branch, so a CI profile never collides with the non-CI one that sits beside
 
 ### `PublishedFolder` — where the profiles live
 
-`PublishedFolder` (`PublishedFolder.cs`) is the mutable set of profiles stored as Json files under
-`<Stack>/Published`, exposed by `PublishPlugin.PublishedFolder` and created on demand. Files are read
+`PublishedFolder` (`PublishedFolder.cs`) is the mutable set of profiles stored as Json files under the
+World's `LocalWorldName.SharedDataFolder` — `.PublicStack/Published` for the default World and
+`.PublicStack/{LTSName}/Published` for a Long Term Support one — exposed by
+`PublishPlugin.PublishedFolder` and created on demand. Files are read
 lazily and every modification (`Add`, `Remove`, `Deprecate`, `OnDeprecatedPackage`) stays in memory
 until `Save` writes the added and updated ones and deletes the files of the removed ones.
 `GetProfileFilePath` delegates to the abstraction's `PublishedProfile.GetProfilePath`, so a profile
 file is always at the canonical path for its version — `LoadAll` ignores any `*.json` that is not.
+
+It is **World scoped, not Stack scoped**: the Worlds of a Stack publish independently, so their profiles
+share neither a folder, nor an index, nor the next free `Version` Patch of the day. That is the same
+`SharedDataFolder` convention the plugin solution (`{SharedDataFolder}/{World}-Plugins`) and the
+CommonFiles folder (`{SharedDataFolder}/Common`) already follow — and a consumer reading a reference's
+published index therefore reads `{LTSName}/Published/index.json` for an LTS World.
 
 Because the folder lives inside the Stack repository's working folder, the
 `World.StackRepository.PushChanges` that follows a successful publication commits and pushes the new

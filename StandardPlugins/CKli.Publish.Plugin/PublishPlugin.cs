@@ -112,9 +112,17 @@ public sealed class PublishPlugin : PrimaryPluginBase
     public bool KeepLocalReleaseAfterPublish => _keepLocalReleaseAfterPublish;
 
     /// <summary>
-    /// Gets the "<see cref="StackRepository.StackWorkingFolder"/>/Published" folder.
+    /// Gets the "<see cref="LocalWorldName.SharedDataFolder"/>/Published" folder: this is
+    /// ".PublicStack/Published" for the default World and ".PublicStack/{LTSName}/Published" for a Long
+    /// Term Support one.
+    /// <para>
+    /// It is World scoped, not Stack scoped: the Worlds of a Stack publish independently and their profiles
+    /// must not share a folder - nor an index, nor the next free <see cref="PublishedProfile.Version"/>
+    /// Patch of the day. This follows the same convention as the plugin solution
+    /// ("{SharedDataFolder}/{World}-Plugins") and the CommonFiles folder ("{SharedDataFolder}/Common").
+    /// </para>
     /// </summary>
-    public PublishedFolder PublishedFolder => _publishedFolder ??= new PublishedFolder( World.StackRepository.StackWorkingFolder.AppendPart("Published"), createIfMissing: true );
+    public PublishedFolder PublishedFolder => _publishedFolder ??= new PublishedFolder( World.Name.SharedDataFolder.AppendPart( "Published" ), createIfMissing: true );
 
     async Task OnFixBuildAsync( IActivityMonitor monitor, FixBuildEventArgs e, CancellationToken cancellation )
     {
