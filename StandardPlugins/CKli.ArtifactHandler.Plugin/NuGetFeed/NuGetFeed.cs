@@ -55,7 +55,7 @@ public sealed class NuGetFeed
         Throw.CheckArgument( "The credentials must be an API key (a secret): the SecretKey must be resolved by a SecretsStore (UserName is 'CKli').",
                               credentials == null || credentials.IsAPIKey );
         Throw.CheckArgument( "Both credentials and publicReadCredentials cannot be specified at the same time.",
-                              publicReadCredentials == null || publicReadCredentials == null );
+                              credentials == null || publicReadCredentials == null );
         _name = name;
         _url = url;
         _credentials = credentials;
