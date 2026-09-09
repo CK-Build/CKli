@@ -270,31 +270,31 @@ sealed class CKliClone : Command
         var definitionFile = world.LoadDefinitionFile( monitor );
         if( definitionFile == null ) return false;
         bool success = true;
-        foreach( var e in definitionFile.References )
+        foreach( var r in definitionFile.References )
         {
-            var sUrl = e.Attribute( XNames.Url )?.Value;
-            if( !Uri.TryCreate( sUrl, UriKind.Absolute, out var url ) )
+            if( !r.HasValidUrl )
             {
                 monitor.Error( $"""
                         Invalid element in '{world.XmlDescriptionFilePath}':
-                        {e}
+                        {r}
                         Attribute Url="..." is missing or is not an absolute url.
                         """ );
                 success = false;
                 continue;
             }
+            var url = r.Url;
             // The boolean and LTSName attributes have been validated by WorldDefinitionFile.ReadReferences.
-            if( refMode == ReferenceMode.Default && (bool?)e.Attribute( XNames.DefaultClone ) is false )
+            if( refMode == ReferenceMode.Default && !r.DefaultClone )
             {
                 monitor.Info( $"""
                         Skipping:
-                        {e}
+                        {r}
                         Use --with-ref-clone to clone it.
                         """ );
                 continue;
             }
             // LTSName selects the world of the referenced Stack to clone: absent means its default world.
-            var refLTSName = e.Attribute( XNames.LTSName )?.Value;
+            var refLTSName = r.LTSName;
             if( !state.HandledWorlds.Add( (url, refLTSName) ) )
             {
                 monitor.Trace( $"Reference to {WorldDisplay( refLTSName )} of '{url}' has already been handled." );
@@ -323,7 +323,7 @@ sealed class CKliClone : Command
                 continue;
             }
             references ??= new List<(Uri, bool, string?)>();
-            references.Add( (url, !((bool?)e.Attribute( XNames.Private ) is true), refLTSName) );
+            references.Add( (url, !r.IsPrivate, refLTSName) );
         }
         return success;
     }

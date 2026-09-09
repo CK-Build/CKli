@@ -586,11 +586,20 @@ public class StackReferenceTests
         git.Head.Tip.Message.ShouldContain( expectedMessage );
     }
 
+    /// <summary>
+    /// The underlying elements of the <see cref="WorldDefinitionFile.References"/>: these tests assert that
+    /// an attribute is absent rather than that it has its default value, and <see cref="WorldReference"/>
+    /// cannot express that.
+    /// </summary>
     static IReadOnlyList<XElement> ReadReferences( CKliEnv context )
     {
         using var stack = StackRepository.TryOpenFromPath( TestHelper.Monitor, context, out _, skipPullStack: true )
                                          .ShouldNotBeNull();
-        return stack.DefaultWorldName.LoadDefinitionFile( TestHelper.Monitor ).ShouldNotBeNull().References;
+        return stack.DefaultWorldName.LoadDefinitionFile( TestHelper.Monitor )
+                                     .ShouldNotBeNull()
+                                     .References
+                                     .Select( r => r.XElement )
+                                     .ToList();
     }
 
     /// <summary>

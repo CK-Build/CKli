@@ -189,7 +189,7 @@ sealed class CKliWorldReferenceSet : Command
     /// ground truth for the Private attribute: it is inferred when the reference is created without any flag
     /// and an explicit contradiction is an error (the reference would clone into the wrong folder).
     /// </summary>
-    static bool CheckPrivate( IActivityMonitor monitor, Uri url, XElement? existing, ref bool? isPrivate )
+    static bool CheckPrivate( IActivityMonitor monitor, Uri url, WorldReference? existing, ref bool? isPrivate )
     {
         var local = StackRepository.FindExistingStacks( monitor, url );
         if( local.Count == 0 )
@@ -217,7 +217,7 @@ sealed class CKliWorldReferenceSet : Command
                 isPrivate = true;
             }
         }
-        else if( ((bool?)existing.Attribute( XNames.Private ) is true) != localIsPrivate )
+        else if( existing.IsPrivate != localIsPrivate )
         {
             monitor.Warn( $"""
                 Stack '{url}' is cloned as {(localIsPrivate ? "private" : "public")} on this machine but:

@@ -21,7 +21,7 @@ public sealed class WorldDefinitionFile
     static Func<IActivityMonitor,string,string>? _repositoryUrlHook;
     readonly XElement _root;
     readonly XElement _plugins;
-    readonly List<XElement> _references;
+    readonly List<WorldReference> _references;
     readonly LocalWorldName _world;
     List<World.RepoLayout>? _layout;
     Dictionary<XName, (XElement Config, bool IsDisabled)>? _pluginsConfiguration;
@@ -56,7 +56,7 @@ public sealed class WorldDefinitionFile
     /// </summary>
     public static LayoutRepoOrder RepoOrder { get; set; }
 
-    WorldDefinitionFile( LocalWorldName world, XElement root, XElement plugins, List<XElement> references )
+    WorldDefinitionFile( LocalWorldName world, XElement root, XElement plugins, List<WorldReference> references )
     {
         Throw.DebugAssert( root.Document != null );
         _root = root;
@@ -106,7 +106,10 @@ public sealed class WorldDefinitionFile
     /// <summary>
     /// Gets the &lt;Reference Url="..." /&gt; elements of this world: the other Stacks that this world uses.
     /// They can be direct children of the root or be grouped in an optional &lt;References&gt; element.
-    /// Must not be mutated otherwise a <see cref="InvalidOperationException"/> is raised.
+    /// <para>
+    /// These are refreshed by <see cref="SetReference"/> and <see cref="RemoveReference"/>, so a
+    /// <see cref="WorldReference"/> obtained before such an edit is stale.
+    /// </para>
     /// <para>
     /// A reference is honored by the "ckli clone" command only: it clones (or checks that it is already cloned)
     /// the referenced Stack next to this one, recursively. The optional DefaultClone attribute (that defaults
@@ -117,7 +120,7 @@ public sealed class WorldDefinitionFile
     /// private one: this is an error that prevents this world to be loaded.
     /// </para>
     /// </summary>
-    public IReadOnlyList<XElement> References => _references;
+    public IReadOnlyList<WorldReference> References => _references;
 
     /// <summary>
     /// Gets &lt;Plugins CompileMode="..." /&gt;.
@@ -222,27 +225,10 @@ public sealed class WorldDefinitionFile
     /// </summary>
     /// <param name="nameOrUrl">The reference url, repository name or stack name.</param>
     /// <returns>The matching references (may be empty).</returns>
-    public IReadOnlyList<XElement> FindReferences( string nameOrUrl )
+    public IReadOnlyList<WorldReference> FindReferences( string nameOrUrl )
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( nameOrUrl );
-        return _references.Where( e => MatchReference( e, nameOrUrl ) ).ToList();
-    }
-
-    static bool MatchReference( XElement e, string nameOrUrl )
-    {
-        var sUrl = e.Attribute( XNames.Url )?.Value;
-        if( sUrl == null ) return false;
-        // The raw string comparison comes first: a hand written Url may not be a valid url and
-        // "ckli world reference remove" must be able to remove such a reference.
-        if( sUrl.Equals( nameOrUrl, StringComparison.OrdinalIgnoreCase ) ) return true;
-        if( Uri.TryCreate( sUrl, UriKind.Absolute, out var url )
-            && Uri.TryCreate( nameOrUrl, UriKind.Absolute, out var candidate )
-            && GitRepositoryKey.OrdinalIgnoreCaseUrlEqualityComparer.Equals( url, candidate ) )
-        {
-            return true;
-        }
-        // Matches the repository name ("XXX-Stack") or the stack name ("XXX").
-        return GitRepositoryKey.IsStackNamed( Path.GetFileName( sUrl.AsSpan() ), nameOrUrl );
+        return _references.Where( r => r.Match( nameOrUrl ) ).ToList();
     }
 
     /// <summary>
@@ -278,16 +264,16 @@ public sealed class WorldDefinitionFile
         {
             monitor.Error( $"""
                 Duplicate <Reference Url="{url}" /> found in world '{_world.FullName}':
-                {found.Select( e => e.ToString() ).Concatenate( Environment.NewLine )}
+                {found.Select( r => r.ToString() ).Concatenate( Environment.NewLine )}
                 They must be manually fixed.
                 """ );
             return false;
         }
-        var e = found.Count == 1 ? found[0] : null;
+        var e = found.Count == 1 ? found[0].XElement : null;
         // A public Stack cannot reference a private one: ReadReferences throws on this, so writing it
         // would produce a world definition file that can no more be loaded (and no more be fixed by
         // the "ckli world reference remove" command).
-        bool willBePrivate = isPrivate ?? (e != null && (bool?)e.Attribute( XNames.Private ) is true);
+        bool willBePrivate = isPrivate ?? (found.Count == 1 && found[0].IsPrivate);
         if( willBePrivate && _world.Stack.IsPublic )
         {
             monitor.Error( $"""
@@ -345,13 +331,14 @@ public sealed class WorldDefinitionFile
         {
             monitor.Error( $"""
                 '{nameOrUrl}' matches {found.Count} references in world '{_world.FullName}':
-                {found.Select( e => e.ToString() ).Concatenate( Environment.NewLine )}
+                {found.Select( r => r.ToString() ).Concatenate( Environment.NewLine )}
                 Their url must be used to remove one of them.
                 """ );
             return false;
         }
-        var e = found[0];
-        var url = e.Attribute( XNames.Url )!.Value;
+        // Match answers false when the Url attribute is missing, so a found reference has a RawUrl.
+        var e = found[0].XElement;
+        var url = found[0].RawUrl!;
         using( StartEdit() )
         {
             var parent = e.Parent;
@@ -673,19 +660,19 @@ public sealed class WorldDefinitionFile
     /// This is used to refresh the <see cref="References"/> after an edit: the file has necessarily
     /// been loaded (and validated) by <see cref="ReadReferences"/> before any edit can occur.
     /// </summary>
-    static IEnumerable<XElement> CollectReferences( XElement root )
+    static IEnumerable<WorldReference> CollectReferences( XElement root )
     {
         foreach( var e in root.Elements() )
         {
             if( e.Name == XNames.Reference )
             {
-                yield return e;
+                yield return new WorldReference( e );
             }
             else if( e.Name == XNames.References )
             {
                 foreach( var r in e.Elements( XNames.Reference ) )
                 {
-                    yield return r;
+                    yield return new WorldReference( r );
                 }
             }
         }
@@ -696,9 +683,9 @@ public sealed class WorldDefinitionFile
     /// &lt;References&gt; element) and validates their attributes: an invalid one throws and this prevents
     /// the world to be loaded.
     /// </summary>
-    static List<XElement> ReadReferences( IActivityMonitor monitor, LocalWorldName world, XElement root )
+    static List<WorldReference> ReadReferences( IActivityMonitor monitor, LocalWorldName world, XElement root )
     {
-        List<XElement>? references = null;
+        List<WorldReference>? references = null;
         foreach( var e in root.Elements() )
         {
             if( e.Name == XNames.Reference )
@@ -724,25 +711,24 @@ public sealed class WorldDefinitionFile
                 }
             }
         }
-        return references ?? new List<XElement>();
+        return references ?? new List<WorldReference>();
 
-        static void Add( LocalWorldName world, XElement e, ref List<XElement>? references )
+        static void Add( LocalWorldName world, XElement e, ref List<WorldReference>? references )
         {
-            // Reads the 2 optional boolean attributes here: an invalid value throws (the world cannot be loaded)
-            // instead of failing later in the "ckli clone" command that consumes them.
-            _ = (bool?)e.Attribute( XNames.DefaultClone );
-            // Same for the optional LTSName: it has no default value (when absent, the referenced Stack's
-            // default world is the one that is used) but an invalid one must not reach any consumer.
-            var ltsName = e.Attribute( XNames.LTSName )?.Value;
-            if( ltsName != null && !WorldName.IsValidLTSName( ltsName ) )
+            // The WorldReference constructor reads the 2 optional boolean attributes: an invalid value throws
+            // there (the world cannot be loaded) instead of failing later in a command that consumes them.
+            var r = new WorldReference( e );
+            // The optional LTSName has no default value (when absent, the referenced Stack's default world is
+            // the one that is used) but an invalid one must not reach any consumer.
+            if( r.LTSName != null && !WorldName.IsValidLTSName( r.LTSName ) )
             {
                 Throw.CKException( $"""
                     Invalid element:
                     {e}
-                    Invalid LTSName="{ltsName}". {InvalidLTSNameMessage}
+                    Invalid LTSName="{r.LTSName}". {InvalidLTSNameMessage}
                     """ );
             }
-            if( (bool?)e.Attribute( XNames.Private ) is true && world.Stack.IsPublic )
+            if( r.IsPrivate && world.Stack.IsPublic )
             {
                 Throw.CKException( $"""
                     Invalid element:
@@ -750,8 +736,8 @@ public sealed class WorldDefinitionFile
                     A public Stack cannot reference a private one.
                     """ );
             }
-            references ??= new List<XElement>();
-            references.Add( e );
+            references ??= new List<WorldReference>();
+            references.Add( r );
         }
     }
 

@@ -130,13 +130,25 @@ invalid one throws when the file is loaded rather than reaching a consumer.
 **A public Stack cannot reference a private one**: this is an error that prevents the world to be loaded
 (the reference would be useless to anyone who can read the public Stack but not the private one).
 
-The references are exposed as raw `IReadOnlyList<XElement>` by `WorldDefinitionFile.References` (their
-attributes are validated when the file is loaded) and are honored by the `ckli clone` command **only**:
-`StackRepository.CloneAsync` clones one Stack and its default world repositories, nothing more.
+`WorldDefinitionFile.References` exposes them as `IReadOnlyList<WorldReference>` — a read-only view of the
+element with the 4 attributes above already read: `Url`, `DefaultClone`, `IsPrivate` and `LTSName`. They are
+honored by the `ckli clone` command **only**: `StackRepository.CloneAsync` clones one Stack and its default
+world repositories, nothing more.
+
+Two things `WorldReference` deliberately keeps visible. `Url` is **nullable**, beside a `RawUrl` and a
+`HasValidUrl`: the url is *not* validated when the world is loaded, because a hand written one may be
+malformed and `ckli world reference remove` must still be able to remove such a reference — so `world
+reference list` shows it in red and `ckli clone` refuses it. And `XElement` is still there, because the view
+cannot express the difference between an absent attribute and one set to its default value; that difference
+is what the tests of these attributes assert.
+
+`WorldReference.Match` answers whether a reference matches a url, a repository name (`XXX-Stack`) or a stack
+name (`XXX`) — case insensitively, comparing the raw url first so that a malformed one can still be named.
 
 `WorldDefinitionFile.SetReference` and `RemoveReference` write them (and `FindReferences` resolves a url,
-a repository name or a stack name to the matching elements). Like `EnablePlugin`, they own the whole
-sequence: the edit, `SaveFile` and the commit in the Stack repository. `SetReference` merges — a null
+a repository name or a stack name to the matching references, through `Match`). Like `EnablePlugin`, they own
+the whole sequence: the edit, `SaveFile` and the commit in the Stack repository. A `WorldReference` obtained
+before such an edit is stale: the list is rebuilt. `SetReference` merges — a null
 `defaultClone`, `isPrivate` or `ltsName` leaves the corresponding attribute as it is, and since `LTSName` has
 no default value the empty string is what removes it — and it **refuses** a private
 reference from a public Stack: the invariant above is enforced by an exception at load time, so writing

@@ -53,32 +53,27 @@ sealed class CKliWorldReferenceList : Command
                 return true;
             }
             var rows = s.Unit;
-            foreach( var e in references )
+            foreach( var r in references )
             {
-                var sUrl = e.Attribute( XNames.Url )?.Value;
-                bool isValidUrl = sUrl != null && Uri.TryCreate( sUrl, UriKind.Absolute, out var url );
-                IRenderable cUrl = sUrl == null
+                IRenderable cUrl = r.RawUrl == null
                                     ? s.Text( """(missing Url="..." attribute)""", ConsoleColor.Red )
-                                    : isValidUrl
-                                        ? s.Text( sUrl, ConsoleColor.Blue ).HyperLink( new Uri( sUrl ) )
-                                        : s.Text( sUrl, ConsoleColor.Red );
-                // The attributes have been validated when the definition file has been loaded.
-                bool defaultClone = (bool?)e.Attribute( XNames.DefaultClone ) is not false;
-                bool isPrivate = (bool?)e.Attribute( XNames.Private ) is true;
-                // LTSName has no default value: when absent, the referenced Stack's default world is used.
-                var ltsName = e.Attribute( XNames.LTSName )?.Value;
-                var where = isValidUrl
-                                ? StackRepository.FindExistingStacks( monitor, new Uri( sUrl! ) )
+                                    : r.HasValidUrl
+                                        ? s.Text( r.RawUrl, ConsoleColor.Blue ).HyperLink( r.Url )
+                                        : s.Text( r.RawUrl, ConsoleColor.Red );
+                var where = r.HasValidUrl
+                                ? StackRepository.FindExistingStacks( monitor, r.Url )
                                 : [];
                 rows = rows.AddBelow( cUrl.Box( marginRight: 1 )
-                                          .AddRight( s.Text( defaultClone ? "clone" : "no-clone",
-                                                             defaultClone ? ConsoleColor.DarkGreen : ConsoleColor.DarkGray )
+                                          .AddRight( s.Text( r.DefaultClone ? "clone" : "no-clone",
+                                                             r.DefaultClone ? ConsoleColor.DarkGreen : ConsoleColor.DarkGray )
                                                       .Box( marginRight: 1 ),
-                                                     s.Text( isPrivate ? "private" : "public",
-                                                             isPrivate ? ConsoleColor.DarkYellow : ConsoleColor.DarkGray )
+                                                     s.Text( r.IsPrivate ? "private" : "public",
+                                                             r.IsPrivate ? ConsoleColor.DarkYellow : ConsoleColor.DarkGray )
                                                       .Box( marginRight: 1 ),
-                                                     s.Text( ltsName ?? "(default world)",
-                                                             ltsName != null ? ConsoleColor.DarkCyan : ConsoleColor.DarkGray )
+                                                     // LTSName has no default value: when absent, the
+                                                     // referenced Stack's default world is used.
+                                                     s.Text( r.LTSName ?? "(default world)",
+                                                             r.LTSName != null ? ConsoleColor.DarkCyan : ConsoleColor.DarkGray )
                                                       .Box( marginRight: 1 ),
                                                      s.Text( where.Count > 0
                                                                 ? where[0].RemoveLastPart().Path
