@@ -526,7 +526,7 @@ public sealed partial class PublishedFolder
 
     /// <summary>
     /// Writes the added and updated profiles, deletes the files of the removed ones and, when at least one
-    /// of them changed, refreshes the <see cref="IndexFileName"/> file (see <see cref="CreateIndexUtf8Bytes"/>).
+    /// of them changed, refreshes the <see cref="IndexFileName"/> file (see <see cref="CreateIndex"/>).
     /// </summary>
     /// <returns>The number of created, updated or deleted profile files. The index doesn't count.</returns>
     public int Save()
