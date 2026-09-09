@@ -5,6 +5,7 @@ using CKli.Core;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Xml.Linq;
 
@@ -34,6 +35,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         : base( primaryContext )
     {
         World.Events.Issue += IssueRequested;
+        World.Events.CreateLTS.Sync += LTSCreated;
         _artifactHandlerPlugin = artifactHandler;
         _branchModel = branchModel;
         branchModel.SetTagCommitProvider( this );
@@ -82,11 +84,20 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     {
         Throw.CheckArgument( inf == null || inf.IsValid );
         Throw.CheckState( !HasRepoInfoBeenCreated( repo ) );
+        return DoSetInfVersion( monitor, repo, inf );
+    }
+
+    bool DoSetInfVersion( IActivityMonitor monitor, Repo repo, SVersion? inf )
+    {
         return PrimaryPluginContext.GetConfigurationFor( repo )
                                    .Edit( monitor, ( monitor, e ) =>
                                    {
                                        e.SetAttributeValue( XNames.InfVersion, inf?.ToString() );
                                        // Initially this was a MinVersion: removes it if any.
+                                       // This is only for the .Net 8 migration: MigrationPlugin.InitializeInfVersionFromMaster
+                                       // is what turns a legacy MinVersion into this InfVersion (see the "ckli maintenance
+                                       // migrate net8" step of the S0 scenario tests). It becomes removable when the Net8
+                                       // migration goes away - which requires changing the S0 test.
                                        e.SetAttributeValue( "MinVersion", null );
                                    } );
     }

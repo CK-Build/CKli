@@ -162,19 +162,33 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
         foreach( var e in exploratories )
         {
             // The Parent name is required or rejected.
+            // This is a local: the parent parameter is the one of a recursive call (it applies to every
+            // element of the list), while a top level list can perfectly hold 2 elements with 2 different
+            // Parent attributes - and GetExplo() emits exactly that.
             var parentAttr = e.Attribute( XNames.Parent );
-            if( parent == null )
+            var theParent = parent;
+            if( theParent == null )
             {
                 var pName = (string?)parentAttr;
-                parent = string.IsNullOrWhiteSpace( pName ) ? null : byName.GetValueOrDefault( pName );
-                if( parent == null )
+                if( !string.IsNullOrWhiteSpace( pName ) )
+                {
+                    // The configuration holds the name without the "{LTSName}/" prefix (this is what
+                    // BranchName.ConfigurationName and GetExplo() write) but byName is keyed by the actual
+                    // branch name. An already prefixed name is accepted, like the Name attribute below.
+                    theParent = byName.GetValueOrDefault( pName );
+                    if( theParent == null && ltsName != null )
+                    {
+                        theParent = byName.GetValueOrDefault( ltsName + '/' + pName );
+                    }
+                }
+                if( theParent == null )
                 {
                     throw new CKException( $"""Unable to find Parent="{pName}" parent branch in BranchModel configuration.""" );
                 }
             }
             else if( parentAttr != null )
             {
-                throw new CKException( $"""Unexpected Parent="..." attribute in BranchModel configuration (parent is '{parent}' branch).""" );
+                throw new CKException( $"""Unexpected Parent="..." attribute in BranchModel configuration (parent is '{theParent}' branch).""" );
             }
             var name = (string?)e.Attribute( XNames.Name );
             if( string.IsNullOrWhiteSpace( name ) )
@@ -226,7 +240,7 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                             {e}
                             """ );
             }
-            var b = new BranchName( ltsPrefixLength, linkType, name, result.Count, CSVersionKind.Exploratory, parent );
+            var b = new BranchName( ltsPrefixLength, linkType, name, result.Count, CSVersionKind.Exploratory, theParent );
             result.Add( b );
             byName.Add( b.Name, b );
             // Recursive call with explicit parent.
@@ -240,6 +254,7 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                      int mainLineCount,
                      Dictionary<string, BranchName> byName )
     {
+        Throw.DebugAssert( branches.All( b => byName[b.Name] == b ) );
         _ltsName = ltsName;
         _branches = branches;
         _root = branches[0];
@@ -388,23 +403,32 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
 
     /// <summary>
     /// Gets the branches that correspond to the <see cref="Root"/> and <see cref="CSVersionKind"/> prereleases as a string.
+    /// <para>
+    /// This is the MainLine configuration: it uses <see cref="BranchName.ConfigurationName"/>, so the
+    /// "<see cref="WorldName.LTSName"/>/" prefix does not appear (this is what the constructor's parser expects).
+    /// Use <see cref="GetDisplayTree()"/> to display the actual branch names.
+    /// </para>
     /// </summary>
     /// <returns>The mainline.</returns>
-    public string GetMainLine() => _mainLineCount == 1 ? _root.Name : GetMainLineBuilder().ToString();
+    public string GetMainLine() => _mainLineCount == 1 ? _root.ConfigurationName : GetMainLineBuilder().ToString();
 
     StringBuilder GetMainLineBuilder()
     {
-        var sb = new StringBuilder( _root.Name );
+        var sb = new StringBuilder( _root.ConfigurationName );
         for( int i = 1; i < _mainLineCount; i++ )
         {
             var b = _branches[i];
-            sb.Append( ' ' ).Append( b.LinkType.ToCodeString() ).Append( ' ' ).Append( _branches[i].Name );
+            sb.Append( ' ' ).Append( b.LinkType.ToCodeString() ).Append( ' ' ).Append( b.ConfigurationName );
         }
         return sb;
     }
 
     /// <summary>
     /// Gets the &lt;Explo ... &gt; elements if any.
+    /// <para>
+    /// Like <see cref="GetMainLine()"/> this is configuration: the Name and Parent attributes use
+    /// <see cref="BranchName.ConfigurationName"/>, without the "<see cref="WorldName.LTSName"/>/" prefix.
+    /// </para>
     /// </summary>
     /// <returns>The elements for exploratory branches.</returns>
     public IEnumerable<XElement> GetExplo()
@@ -422,12 +446,12 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
             int iParent = parent.Index - _mainLineCount;
             if( iParent >= 0 )
             {
-                e = ToXml( b.Name, b.LinkType, null );
+                e = ToXml( b.ConfigurationName, b.LinkType, null );
                 exploNodes[iParent].Add( e );
             }
             else
             {
-                e = ToXml( b.Name, b.LinkType, parent.Name );
+                e = ToXml( b.ConfigurationName, b.LinkType, parent.ConfigurationName );
             }
             exploNodes[i] = e;
         }
@@ -499,7 +523,6 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
             }
         }
     }
-
 
     /// <summary>
     /// Gets the <see cref="GetMainLine()"/> string followed by the <see cref="GetExplo()"/> elements.

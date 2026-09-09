@@ -305,6 +305,44 @@ public sealed partial class VersionTagInfo : RepoInfo
     public IReadOnlyList<Tag> RemovableTags => _removableTags;
 
     /// <summary>
+    /// Enumerates the "local/" and "building/" releases of this Repo: the versions that exist here and nowhere
+    /// else. The <see cref="RemovableTags"/> are considered, as are the <see cref="AllVersions"/>.
+    /// <para>
+    /// This is a pending development: it has to be published or destroyed (see
+    /// <see cref="DestroyLocalReleases(IActivityMonitor, Func{SVersion, bool}?, bool)"/>) before any operation
+    /// that would move it from one World to another.
+    /// </para>
+    /// <para>
+    /// This is unrelated to <see cref="HotZoneInfo.LastStable"/>: a "local/" <see cref="TagCommit"/> heads the
+    /// <see cref="LastStables"/> only when it carries a <see cref="TagCommit.FakeVersion"/>, so a repository
+    /// that offers a published version can perfectly well have pending local releases.
+    /// </para>
+    /// </summary>
+    /// <param name="filter">Optional filter.</param>
+    /// <returns>The pending "local/" and "building/" versions (may be empty).</returns>
+    public IEnumerable<SVersion> GetLocalReleases( Func<SVersion, bool>? filter = null )
+    {
+        foreach( var t in _removableTags )
+        {
+            // It is necessarily a valid SVersion with a valid prefix (otherwise it would have been
+            // collected in invalidParsedPrefixTags, nonConformantTags or invalidTags).
+            var tagName = t.FriendlyName;
+            if( tagName.StartsWith( "local/", StringComparison.Ordinal ) || tagName.StartsWith( "building/", StringComparison.Ordinal ) )
+            {
+                var v = SVersion.Parse( tagName, allowPrefix: true );
+                if( filter == null || filter( v ) ) yield return v;
+            }
+        }
+        foreach( var v in AllVersions.Select( tc => tc.Version ) )
+        {
+            if( v.IsBuildingOrLocal() && v.BuildMetaData.Length == 0 && (filter == null || filter( v )) )
+            {
+                yield return v;
+            }
+        }
+    }
+
+    /// <summary>
     /// Gets whether tag conflicts have been found.
     /// </summary>
     public bool HasTagConflicts => _tagConflicts != null;
@@ -375,23 +413,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     {
         Throw.CheckState( !HasTagConflicts );
         bool success = true;
-        var cleanupLocals = new List<SVersion>();
-        foreach( var t in _removableTags )
-        {
-            // It is necessarily a valid SVersion with a valid prefix (otherwise it would have been
-            // collected in invalidParsedPrefixTags, nonConformantTags or invalidTags).
-            var tagName = t.FriendlyName;
-            if( tagName.StartsWith( "local/", StringComparison.Ordinal ) || tagName.StartsWith( "building/", StringComparison.Ordinal ) )
-            {
-                var v = SVersion.Parse( tagName, allowPrefix: true );
-                if( filter == null || filter( v ) )
-                {
-                    cleanupLocals.Add( SVersion.Parse( tagName, allowPrefix: true ) );
-                }
-            }
-        }
-        cleanupLocals.AddRange( AllVersions.Select( tc => tc.Version )
-                                           .Where( v => v.IsBuildingOrLocal() && v.BuildMetaData.Length == 0 && (filter == null || filter( v )) ) );
+        var cleanupLocals = GetLocalReleases( filter ).ToList();
         if( cleanupLocals.Count > 0 )
         {
             using( monitor.OpenInfo( $"""

@@ -66,9 +66,16 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
 ### The branch namespace: `BranchName` / `BranchNamespace`
 
 A **`BranchName`** is an immutable node in a tree: it has a `Name`, a `DevName` ("`dev/`" +
-`Name`), an `Index` (used to align with per-repo arrays), a `Parent` (null only for the root), a
-`LinkType` describing how it is kept in sync with its parent, and a `VersionKind`
-(`CSVersionKind`, from CSemVer — `Stable`, `Alpha`..`Zulu`, or `Exploratory`).
+`Name`), a `ConfigurationName`, an `Index` (used to align with per-repo arrays), a `Parent` (null
+only for the root), a `LinkType` describing how it is kept in sync with its parent, and a
+`VersionKind` (`CSVersionKind`, from CSemVer — `Stable`, `Alpha`..`Zulu`, or `Exploratory`).
+
+**`Name` is the actual git branch name; `ConfigurationName` is the same name without the
+`{LTSName}/` prefix, and it is the only one that may be written to the configuration.** They differ
+only in an LTS world, which is what makes getting it wrong easy and expensive: the `BranchNamespace`
+constructor *prepends* the prefix as it reads, and its `MainLine` parser requires
+`^[a-z][0-9a-z_-]+`, so a prefixed `@net8/stable` written back is not merely re-prefixed — it is
+refused, and the world can no longer be loaded at all.
 
 A **`BranchNamespace`** owns the whole tree for a World:
 
@@ -115,9 +122,18 @@ rather than mutating in place. `BranchModelPlugin` persists the result back to t
   is required only on a *root* `<Explo>` (nested `<Explo>` elements inherit their XML parent).
   `Link` defaults to `CI`.
 
-`GetMainLine()` / `GetExplo()` serialize back to this same shape; `GetDisplayTree()` renders the
-whole tree indented for display (`ckli issue` and friends use `ToParentedString()` for a single
-branch).
+`GetMainLine()` / `GetExplo()` serialize back to this same shape, using `BranchName.ConfigurationName`
+so the round trip holds in an LTS world too (`BranchNamespaceTests.lts_namespace_configuration_round_trips`
+pins it). `GetDisplayTree()` renders the whole tree indented for *display* and keeps the real branch
+names (`ckli issue` and friends use `ToParentedString()` for a single branch) — the two must not be
+confused: anything that ends up in a `<BranchModel>` element goes through the former.
+
+Reading is tolerant of both forms — an `<Explo>` `Name` or `Parent` may carry the `{LTSName}/` prefix
+or not — so an LTS world's hand-written configuration keeps working either way.
+
+`BranchNamespace.CreateForLTS( ltsName )` returns a root-only namespace under a new LTS name. It is
+what [`ckli lts create`](../CKli.VersionTag.Plugin/README.md#worldeventscreatelts--cutting-the-version-range-of-a-new-lts)
+writes into the new World: an LTS starts with no pre-release and no exploratory branch open.
 
 #### Link types: how a `dev/` child is kept in sync with its parent
 

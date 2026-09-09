@@ -23,8 +23,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     /// </summary>
     /// <param name="primaryContext">The CKli plugin context.</param>
     /// <param name="shallowSolution">The shallow solution plugin.</param>
-    public BranchModelPlugin( PrimaryPluginContext primaryContext,
-                              ShallowSolutionPlugin shallowSolution )
+    public BranchModelPlugin( PrimaryPluginContext primaryContext, ShallowSolutionPlugin shallowSolution )
         : base( primaryContext )
     {
         var configElement = primaryContext.Configuration.XElement;
@@ -138,7 +137,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     public event Action<ContentIssueEventArgs>? ContentIssue;
 
     /// <summary>
-    /// Sets the <see cref="ITagCommitProvider"/> required to support <see cref="HotBranch.Synchronize(IActivityMonitor, ITagCommitProvider, BranchLinkType)"/>
+    /// Sets the <see cref="ITagCommitProvider"/> required to support <see cref="HotBranch.Synchronize(IActivityMonitor, BranchLinkType)"/>
     /// with <see cref="BranchLinkType.Release"/> and <see cref="BranchLinkType.CI"/>.
     /// </summary>
     /// <param name="commitProvider">The commit provider.</param>
@@ -149,6 +148,11 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     {
         _commitProvider = commitProvider;
     }
+
+    /// <summary>
+    /// Exposes this plugin info.
+    /// </summary>
+    public PluginInfo PluginInfo => PrimaryPluginContext.PluginInfo;
 
     internal ITagCommitProvider? TagCommitProvider => _commitProvider;
 

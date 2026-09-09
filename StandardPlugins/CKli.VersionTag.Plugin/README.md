@@ -53,7 +53,8 @@ public VersionTagPlugin( PrimaryPluginContext primaryContext,
 ```
 
 At construction it subscribes to `World.Events.Issue` (to report per-repo version-tag issues through `ckli issue`)
-and registers itself as the `ITagCommitProvider` for the `BranchModelPlugin`.
+and to `World.Events.CreateLTS` (to cut the version range between the new LTS World and the current one), and
+registers itself as the `ITagCommitProvider` for the `BranchModelPlugin`.
 
 ### Configuration
 
@@ -77,8 +78,8 @@ Per-repo, under that repo's plugin configuration element:
 
 | Attribute | Meaning |
 |---|---|
-| `InfVersion` | Exclusive lower bound: tags `<= InfVersion` are ignored. Read/written via `XNames.InfVersion`; `SetInfVersion` is the programmatic setter (must be called before the repo's `VersionTagInfo` is created — used for a one-time .NET 8 migration path). |
-| `SupVersion` | Exclusive upper bound: tags `>= SupVersion` are ignored. Only meaningful in an LTS World — in the default World it is a warning and gets stripped automatically. |
+| `InfVersion` | Exclusive lower bound: tags `<= InfVersion` are ignored. Read/written via `XNames.InfVersion`; set by [`ckli lts create`](#worldeventscreatelts--cutting-the-version-range-of-a-new-lts) on the default World, and by `SetInfVersion` for a one-time .NET 8 migration path (which must be called before the repo's `VersionTagInfo` is created). |
+| `SupVersion` | Exclusive upper bound: tags `>= SupVersion` are ignored. Only meaningful in an LTS World — in the default World it is a warning and gets stripped automatically. Set by [`ckli lts create`](#worldeventscreatelts--cutting-the-version-range-of-a-new-lts) on the new LTS World. |
 
 ### Commands
 
@@ -106,8 +107,77 @@ in **CKli.Core**, not in this plugin — VersionTag.Plugin only reasons about ta
 
 ### `World.Events` subscriptions
 
-Only `World.Events.Issue` (`IssueRequested`): for every requested repo it calls `Get(monitor, repo)` (building/caching
+`World.Events.Issue` (`IssueRequested`): for every requested repo it calls `Get(monitor, repo)` (building/caching
 the `VersionTagInfo`) and lets it `CollectIssues` into the issue screen.
+
+`World.Events.CreateLTS` (`LTSCreated`), described next.
+
+### `World.Events.CreateLTS` — cutting the version range of a new LTS
+
+`ckli lts create <@ltsName>` clones the default World's definition; this plugin's `Sync` handler
+(`VersionTagPlugin.LongTermSupport.cs`) splits the version range of every repository between the two Worlds and
+strips the new World's branch model. `ComputeRepoLTSVersions` computes the plan and validates it; `LTSCreated`
+only applies it, so a refusal writes nothing at all.
+
+Per repository the **cut** is `Major + 1` of the version it currently offers (`HotZone.LastStable`), so a `v1.2.4`
+cuts at `2.0.0-0` and a `v0.4.1` at `1.0.0-0` — the 0.x convention that treats the Minor as the breaking axis is
+deliberately *not* applied, unlike `SVersion.SetNextVersionNumbers( SVersionChange.Major )`. It becomes:
+
+- the new LTS World's `SupVersion`, so that World keeps every version produced so far (and keeps its cloned
+  `InfVersion`);
+- the default World's `InfVersion` (`RepoLTSVersion.NextInfVersion`), so that World starts a new line above the cut.
+
+**The cut is written as its `-0` prerelease** (`2.0.0-0`, not `2.0.0`). Both bounds exclude themselves, so a cut
+that a repository could actually produce would belong to *no* World at all. `-0` is the smallest possible version
+of its `Major.Minor.Patch` and is not a conformant CSemVer version, so nothing can ever land on it — and
+`BuildPlugin`'s "Missing initial version" fix, which builds its `+fake` tag from `InfVersion`'s
+`Major.Minor.Patch` alone, then starts the default World exactly *at* the cut (`v2.0.0+fake` → `v2.0.0`). This is
+the same projection `MigrationPlugin.InitializeInfVersionFromMaster` applies.
+
+`ComputeRepoLTSVersions` refuses the creation when:
+
+- any repository has a version issue, or any has a branch issue (`TryGetAllWithoutIssue` on both plugins);
+- the version a repository currently offers is `building/`/`local/`, `+fake` or `+deprecated` — there would be no
+  published version to cut at;
+- a repository has a **pending `local/`/`building/` release** (`VersionTagInfo.GetLocalReleases`), even though the
+  version it offers is published;
+- any repository's `dev/` root branch is ahead of its root branch. Code sitting there has no version, so it would
+  be inherited by the LTS World and have to be re-produced above the cut by the default World.
+
+Every offending repository is listed, not just the first, and nothing is written on refusal — `ComputeRepoLTSVersions`
+decides, `LTSCreated` only applies.
+
+The checks are independent, so several can hold at once. Each one details the repositories it concerns and
+contributes a short reason; the last error then **names the actual cause(s)** —
+`Unable to create a Long Term Support world: no published version at all and pending local releases.` — instead of
+a catch-all. That is why the message belongs to `ComputeRepoLTSVersions` and not to its caller: it is the only one
+that knows which check failed. The two `TryGetAllWithoutIssue` refusals log nothing extra, since their own message
+already names the repository *and* the operation it blocks.
+
+The pending-release check is the one none of the others can make: `HotZone.LastStable` does not see a `local/`
+release of a repository that *has* a published version (a `local/` `TagCommit` heads `LastStables` only when it
+carries a `FakeVersion`), and the `dev/` check does not either, because a non-CI build integrates and deletes the
+`dev/` branch as it goes. Left alone, such a version is *below* the cut, so it would land in the new LTS World
+while the code it was built from continues in the default one — the developer has no way to tell where his pending
+work went. `GetLocalReleases` is the probe (`RemovableTags` plus `AllVersions` filtered on `IsBuildingOrLocal`),
+shared with `DestroyLocalReleases`; the remedy is to publish the release or let a new build supersede it.
+
+The `dev/` check is a **tip-SHA comparison**, which is worth knowing when writing a test: a World arranged by the
+fake build harness never satisfies it, because the harness leaves the repositories' content — version tag included
+— on `dev/stable` with `stable` behind. An `LTSCreateTests` arrange therefore has to publish first.
+
+The new World's `<BranchModel>` keeps only its root branch (`BranchNamespace.CreateForLTS`): `MainLine` is written
+from `GetMainLine()` and the cloned `<Explo>` elements are replaced by `GetExplo()` (empty here). Both halves are
+in the **configuration** form — without the `{LTSName}/` prefix — because `BranchNamespace` prepends that prefix
+itself when it reads back, and `ParseMainLine` rejects a name that does not match `^[a-z][0-9a-z_-]+`: an
+`@net8/stable` value makes the new World unloadable (`Invalid root branch name in BranchModel MainLine
+configuration`), and a leftover `<Explo>` is the same failure from the other side (its `Parent` no longer
+resolves). That form is `BranchName.ConfigurationName`, and it is what every BranchModel config writer uses —
+see `BranchModel/README.md`.
+
+The event args expose `GetLTSRepositoryElement( Repo )` to reach a repository's `<Repository>` element in the
+clone. Use it rather than matching on the `Url` attribute: that attribute holds a *Repository Proxy* name instead
+of an url whenever `StackRepository.LocalProxyRepositoriesPath` applies (which is the case for every test fixture).
 
 ### `VersionDeprecated` — the extension point this plugin offers
 
@@ -231,7 +301,13 @@ releases it actually tagged, so the deprecation can be mirrored outside the tags
 - Comparisons and ordering intentionally reverse `SVersion.CompareTo` (`TagCommit.CompareTo`) so that
   `VersionTagInfo.LastStables` lists the newest version first.
 - `SetInfVersion` exists only to support a one-time .NET 8 migration (replacing a legacy `MinVersion` attribute) and
-  is explicitly documented as removable "one day".
+  is explicitly documented as removable "one day" — which requires changing the `S0` scenario test, whose
+  `ckli maintenance migrate net8` step is what drives `MigrationPlugin.InitializeInfVersionFromMaster` into it.
+  That is also why `DoSetInfVersion` clears a legacy `MinVersion` attribute alongside writing `InfVersion`.
+  `SetInfVersion`'s `!HasRepoInfoBeenCreated` guard is what makes it unusable from the `CreateLTS` handler (which
+  must read every `VersionTagInfo` before it can compute a cut): the two share the private `DoSetInfVersion`
+  instead, and the LTS path accepts the now-stale `VersionTagInfo` because the World is closed immediately after
+  the event.
 - The hot-zone commit walk deliberately avoids LibGit2Sharp's `CommitFilter`/`QueryBy` and walks `Commit.Parents`
   manually, because git's TREESAME pruning can skip parents when empty commits are involved (see comments in
   `HotZoneInfo.CreateTagCommitTree`).

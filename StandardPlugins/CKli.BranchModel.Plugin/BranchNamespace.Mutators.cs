@@ -112,11 +112,24 @@ public sealed partial class BranchNamespace
                                  .Select( b => (b.LinkType, b.Name, ((b.Parent == branchName ? b.Parent.Parent : b.Parent) ?? _root).Name) ) );
     }
 
+    /// <summary>
+    /// Returns a new namespace with only the <see cref="Root"/> branch. This must be called only from he default world namespace.
+    /// </summary>
+    /// <param name="ltsName">The name of the LTS world.</param>
+    /// <returns>A new namespace.</returns>
+    public BranchNamespace CreateForLTS( string ltsName )
+    {
+        Throw.CheckArgument( WorldName.IsValidLTSName( ltsName ) );
+        Throw.CheckState( "Must be called only from the default world.", _ltsName == null );
+        var root = new BranchName( ltsName.Length + 1, BranchLinkType.None, ltsName + '/' + _root.Name, 0, CSVersionKind.Stable, null );
+        return new BranchNamespace( ltsName, [root], 1, new Dictionary<string, BranchName>() { { root.Name, root } } );
+    }
+
     static (BranchNamespace, BranchName) Rebuild( string? ltsName,
-                                                 BranchName root,
-                                                 IEnumerable<(BranchLinkType T, CSVersionKind K, string N)> mainLine,
-                                                 IEnumerable<(BranchLinkType T, string N, string P)> exploratories,
-                                                 string returnedBranchName )
+                                                  BranchName root,
+                                                  IEnumerable<(BranchLinkType T, CSVersionKind K, string N)> mainLine,
+                                                  IEnumerable<(BranchLinkType T, string N, string P)> exploratories,
+                                                  string returnedBranchName )
     {
         var ns = Rebuild( ltsName, root, mainLine, exploratories );
         return (ns, ns._byName[returnedBranchName]);

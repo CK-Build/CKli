@@ -99,8 +99,8 @@ public sealed partial class VersionTagInfo
         /// <list type="bullet">
         ///     <item>It is most often a published (non "local/") regular version.</item>
         ///     <item>It can be a "+fake" (fake versions are always stable and published).</item>
-        ///     <item>It can be a "+deprecated" stable version (deprecated versions are always published).</item>
         ///     <item>It can be a "local/" stable with an associated <see cref="TagCommit.FakeVersion"/>.</item>
+        ///     <item>It may be a "+deprecated" stable version (this should not happen: the last - current - version cannot be deprecated).</item>
         /// </list>
         /// </summary>
         public TagCommit LastStable => _lastStable;

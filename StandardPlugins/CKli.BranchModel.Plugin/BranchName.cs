@@ -7,7 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace CKli.BranchModel.Plugin;
 
 /// <summary>
-/// Branch in the <see cref="BranchModelPlugin.BranchNamespace"/>.
+/// Immutable branch in the <see cref="BranchModelPlugin.BranchNamespace"/>.
 /// <para>
 /// The <see cref="Name"/> starts with the "<see cref="WorldName.LTSName"/>/" when in a LTS world.
 /// </para>
@@ -49,6 +49,17 @@ public sealed class BranchName : IEquatable<BranchName>
     /// This starts with the <see cref="WorldName.LTSName"/> in a LTS world.
     /// </summary>
     public string DevName => _devName ??= ToDevBranchName( _ltsPrefixLength, _name );
+
+    /// <summary>
+    /// Gets the <see cref="Name"/> without the "<see cref="WorldName.LTSName"/>/" prefix: this is the form that
+    /// the BranchModel configuration holds (the MainLine attribute and the &lt;Explo&gt; Name and Parent attributes).
+    /// <para>
+    /// The prefix must not be written: <see cref="BranchNamespace"/> prepends it when it reads the configuration,
+    /// and its parser rejects a name that starts with the '@' of a <see cref="WorldName.LTSName"/>. This is the
+    /// same string as <see cref="Name"/> in the default world.
+    /// </para>
+    /// </summary>
+    public string ConfigurationName => _ltsPrefixLength == 0 ? _name : _name.Substring( _ltsPrefixLength );
 
     /// <summary>
     /// Gets the index in <see cref="BranchNamespace.Branches"/>.
