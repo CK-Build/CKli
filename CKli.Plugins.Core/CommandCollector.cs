@@ -17,7 +17,38 @@ sealed partial class CommandCollector
 
     public List<PluginCommand> PluginCommands => _pluginCommands;
 
-    public CommandNamespace BuildCommands() => _commands.Build();
+    public CommandNamespace BuildCommands( IActivityMonitor monitor ) => _commands.Build( monitor );
+
+    /// <summary>
+    /// Appends a namespace description declared by a <see cref="CommandNamespaceAttribute"/> on a plugin type.
+    /// Multiple plugins can describe the same namespace: "fix" is populated by CKli.Build.Plugin and
+    /// CKli.HotZone.Plugin.
+    /// </summary>
+    public void Describe( IPluginTypeInfo typeInfo, string namespacePath, string description, string? helpUrl )
+    {
+        namespacePath = NormalizePath( namespacePath );
+        if( !Command.IsValidCommandPath( namespacePath ) )
+        {
+            Throw.CKException( $"""
+                Invalid [CommandNamespace( "{namespacePath}" )] on '{typeInfo.TypeName}': invalid namespace path.
+                """ );
+        }
+        if( string.IsNullOrWhiteSpace( description ) )
+        {
+            Throw.CKException( $"""
+                Invalid [CommandNamespace( "{namespacePath}" )] on '{typeInfo.TypeName}': the description must not be empty.
+                """ );
+        }
+        Uri? url = null;
+        if( !string.IsNullOrWhiteSpace( helpUrl ) && !Uri.TryCreate( helpUrl, UriKind.Absolute, out url ) )
+        {
+            Throw.CKException( $"""
+                Invalid [CommandNamespace( "{namespacePath}", HelpUrl = "{helpUrl}" )] on '{typeInfo.TypeName}':
+                HelpUrl must be an absolute url.
+                """ );
+        }
+        _commands.Describe( namespacePath, description, typeInfo.Plugin.FullPluginName, url );
+    }
 
     public CommandCollector()
     {

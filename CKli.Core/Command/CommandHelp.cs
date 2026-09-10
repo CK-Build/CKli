@@ -10,37 +10,44 @@ namespace CKli.Core;
 public sealed class CommandHelp
 {
     readonly ScreenType _screenType;
-    readonly Command _command;
+    readonly CommandNamespaceItem _item;
     readonly TextBlock _commandPathAndArgs;
     readonly TextBlock _description;
     readonly ImmutableArray<(TextBlock Name, TextBlock Description)> _arguments;
     readonly ImmutableArray<(TextBlock Names, TextBlock Description)> _options;
     readonly ImmutableArray<(TextBlock Names, TextBlock Description)> _flags;
+    readonly ImmutableArray<IRenderable> _helpLinks;
 
     /// <summary>
-    /// Initializes a new <see cref="CommandHelp"/>.
+    /// Initializes a new <see cref="CommandHelp"/> for a command or for a pure namespace.
+    /// A pure namespace has no <see cref="Arguments"/>, <see cref="Options"/> nor <see cref="Flags"/>.
     /// </summary>
     /// <param name="screenType">The screen type.</param>
-    /// <param name="c">The command.</param>
-    public CommandHelp( ScreenType screenType, Command c )
+    /// <param name="item">The command or the pure namespace.</param>
+    public CommandHelp( ScreenType screenType, CommandNamespaceItem item )
     {
         _screenType = screenType;
-        _command = c;
-        _description = screenType.Text( c.Description, style: TextStyle.Default );
+        _item = item;
+        _description = screenType.Text( item.Description, style: TextStyle.Default );
         var styleCommand = new TextStyle( System.ConsoleColor.DarkGreen, effect: TextEffect.Italic );
+        var c = item as Command;
         // Arguments.
-        var args = new (TextBlock, TextBlock)[c.Arguments.Length];
+        var args = new (TextBlock, TextBlock)[c?.Arguments.Length ?? 0];
         for( int i = 0; i < args.Length; i++ )
         {
-            var a = c.Arguments[i];
+            var a = c!.Arguments[i];
             args[i] = (screenType.Text( $"<{a.Name}>", styleCommand ), screenType.Text( a.Description ));
         }
         _arguments = ImmutableCollectionsMarshal.AsImmutableArray( args );
-        _commandPathAndArgs = screenType.Text( $"{c.CommandPath} {string.Join( ' ', _arguments.Select( a => a.Name.RawText ) )}", styleCommand );
+        _commandPathAndArgs = screenType.Text( $"{item.CommandPath} {string.Join( ' ', _arguments.Select( a => a.Name.RawText ) )}", styleCommand );
         // Options.
-        _options = ToRenderableOptions( screenType, c.Options );
+        _options = c != null ? ToRenderableOptions( screenType, c.Options ) : [];
         // Flags.
-        _flags = ToRenderableFlags( screenType, c.Flags );
+        _flags = c != null ? ToRenderableFlags( screenType, c.Flags ) : [];
+        // Help links.
+        _helpLinks = item.HelpUrls
+                         .Select( u => (IRenderable)screenType.Text( u.ToString(), System.ConsoleColor.Blue ).HyperLink( u ) )
+                         .ToImmutableArray();
     }
 
     /// <summary>
@@ -49,9 +56,20 @@ public sealed class CommandHelp
     public ScreenType ScreenType => _screenType;
 
     /// <summary>
-    /// Gets the command.
+    /// Gets the command or the pure namespace.
     /// </summary>
-    public Command Command => _command;
+    public CommandNamespaceItem Item => _item;
+
+    /// <summary>
+    /// Gets the command. Null when <see cref="Item"/> is a pure namespace.
+    /// </summary>
+    public Command? Command => _item as Command;
+
+    /// <summary>
+    /// Gets the renderable links to the external documentation of <see cref="Item"/>.
+    /// Empty when no <see cref="CommandNamespaceItem.HelpUrls"/> exist.
+    /// </summary>
+    public ImmutableArray<IRenderable> HelpLinks => _helpLinks;
 
     /// <summary>
     /// Gets the command path and its arguments.

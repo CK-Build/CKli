@@ -241,7 +241,7 @@ public sealed partial class PluginMachinery
             return false;
         }
         // Loads the plugins.
-        var pluginContext = _pluginContext = new PluginCollectorContext( _definitionFile.World, pluginsConfiguration );
+        var pluginContext = _pluginContext = new PluginCollectorContext( monitor, _definitionFile.World, pluginsConfiguration );
         var pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext, out bool recoverableError, out _singleFactory );
         if( pluginFactory == null )
         {

@@ -38,11 +38,9 @@ namespace CKli.Core;
 /// </list>
 /// </para>
 /// </summary>
-public abstract partial class Command
+public abstract partial class Command : CommandNamespaceItem
 {
     readonly IPluginTypeInfo? _typeInfo;
-    readonly string _commandPath;
-    readonly string _description;
     readonly ImmutableArray<(string Name, string Description)> _arguments;
     readonly ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> _options;
     readonly ImmutableArray<(ImmutableArray<string> Names, string Description)> _flags;
@@ -62,12 +60,9 @@ public abstract partial class Command
                        ImmutableArray<(string Name, string Description)> arguments,
                        ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
                        ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
+        : base( commandPath, description )
     {
-        Throw.CheckArgument( IsValidCommandPath( commandPath ) );
-        Throw.CheckNotNullArgument( description );
         _typeInfo = typeInfo;
-        _commandPath = commandPath;
-        _description = description;
         _arguments = arguments;
         _options = options;
         _flags = flags;
@@ -83,16 +78,6 @@ public abstract partial class Command
     /// Gets whether this command is disabled: its <see cref="PluginTypeInfo"/> is disabled.
     /// </summary>
     public bool IsDisabled => _typeInfo != null && _typeInfo.Status.IsDisabled();
-
-    /// <summary>
-    /// Gets the full whitespace separated command path.
-    /// </summary>
-    public string CommandPath => _commandPath;
-
-    /// <summary>
-    /// Gets the command description.
-    /// </summary>
-    public string Description => _description;
 
     /// <summary>
     /// Gets the (required) arguments and their description.
@@ -128,7 +113,7 @@ public abstract partial class Command
     /// This applies to intrinsic CKli commands and is overridden by command implemented by plugin.
     /// </summary>
     /// <returns>A readable string.</returns>
-    public override string ToString() => $"[CKli] {_commandPath}";
+    public override string ToString() => $"[CKli] {CommandPath}";
 
     /// <summary>
     /// Command handler implementation. <paramref name="cmdLine"/> is ready to be consumed, the number of

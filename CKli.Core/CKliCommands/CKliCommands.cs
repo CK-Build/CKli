@@ -17,32 +17,41 @@ public static class CKliCommands
 
     static CKliCommands()
     {
-        var cmds = new Dictionary<string, Command?>();
+        var cmds = new Dictionary<string, CommandNamespaceItem>();
         Add( cmds, new CKliClone() );
         Add( cmds, new CKliCreate() );
         Add( cmds, new CKliExec() );
         Add( cmds, new CKliFetch() );
         Add( cmds, new CKliIssue() );
 
-        cmds.Add( "branch", null );
+        NS( cmds, "branch", "Git branch operations applied to the current Repo or to all the Repos of the World." );
         Add( cmds, new CKliBranchPush() );
 
-        cmds.Add( "layout", null );
+        NS( cmds, "layout",
+            "Reconciles the World definition file and the folders and repositories that are on the disk.",
+            "https://github.com/CK-Build/CKli/blob/stable/README.md#core-commands" );
         Add( cmds, new CKliLayoutFix() );
         Add( cmds, new CKliLayoutXif() );
 
-        cmds.Add( "lts", null );
+        NS( cmds, "lts",
+            """
+            Long-Term-Support Worlds of the current Stack: a LTS World maintains a previous line of
+            the Stack (an older target framework for instance) beside its default World.
+            """,
+            "https://github.com/CK-Build/CKli/blob/stable/README.md#lts-world-commands-create-clone" );
         Add( cmds, new CKliLTSClone() );
         Add( cmds, new CKliLTSCreate() );
 
         Add( cmds, new CKliLog() );
         Add( cmds, new CKliStatus() );
 
-        cmds.Add( "remote", null );
-        cmds.Add( "remote stack", null );
+        NS( cmds, "remote", "Operations on the remote repositories rather than on their local clones." );
+        NS( cmds, "remote stack", "Operations on the Stack repository itself." );
         Add( cmds, new CKliRemoteStackMigrate() );
 
-        cmds.Add( "repo", null );
+        NS( cmds, "repo",
+            "Adds, creates and removes the Repositories of the current World.",
+            "https://github.com/CK-Build/CKli/blob/stable/README.md#core-commands" );
         Add( cmds, new CKliRepoAdd() );
         Add( cmds, new CKliRepoCreate() );
         Add( cmds, new CKliRepoRemove() );
@@ -56,7 +65,12 @@ public static class CKliCommands
         //Add( cmds, new CKliMaintenanceHostingArchive() );
         //Add( cmds, new CKliMaintenanceHostingInfo() );
 
-        cmds.Add( "plugin", null );
+        NS( cmds, "plugin",
+            """
+            Manages the plugins of the current World: the packages or source projects it uses and
+            how they are compiled into the "{WorldName}-Plugins" solution.
+            """,
+            "https://github.com/CK-Build/CKli/blob/stable/README.md#plugin-commands-info-create-add-remove-enable" );
         Add( cmds, new CKliPluginAdd() );
         Add( cmds, new CKliPluginCompile() );
         Add( cmds, new CKliPluginCreate() );
@@ -68,7 +82,13 @@ public static class CKliCommands
         Add( cmds, new CKliPull() );
         Add( cmds, new CKliPush() );
 
-        cmds.Add( "tag", null );
+        NS( cmds, "tag",
+            """
+            Git tag operations on the current Repo or on all the Repos of the World.
+            These are raw git operations: the CKli version tags themselves ("vX.Y.Z" and their
+            "local/" or "building/" prefixed forms) are handled by the VersionTag plugin.
+            """,
+            "https://github.com/CK-Build/CKli/blob/stable/README.md#tag-commands-list-fetch-pull-push-delete" );
         Add( cmds, new CKliTagFetch() );
         Add( cmds, new CKliTagDelete() );
         Add( cmds, new CKliTagList() );
@@ -77,24 +97,46 @@ public static class CKliCommands
 
         Add( cmds, new CKliUpdate() );
 
-        cmds.Add( "world", null );
-        cmds.Add( "world reference", null );
+        NS( cmds, "world",
+            "The definition of the current World.",
+            "https://github.com/CK-Build/CKli/blob/stable/README.md#world-commands-reference-list-set-remove" );
+        NS( cmds, "world reference",
+            """
+            The <Reference /> elements of the current World: the other Stacks whose published
+            packages this World consumes. A reference is cloned next to the World.
+            """,
+            "https://github.com/CK-Build/CKli/blob/stable/README.md#world-commands-reference-list-set-remove" );
         Add( cmds, new CKliWorldReferenceList() );
         Add( cmds, new CKliWorldReferenceRemove() );
         Add( cmds, new CKliWorldReferenceSet() );
 
-        static void Add( Dictionary<string, Command?> commands, Command c ) => commands.Add( c.CommandPath, c );
+        static void Add( Dictionary<string, CommandNamespaceItem> commands, Command c ) => commands.Add( c.CommandPath, c );
+
+        // Describes an intrinsic CKli namespace. Its Origin is null: it always comes first when a
+        // plugin also describes the namespace.
+        static void NS( Dictionary<string, CommandNamespaceItem> commands, string path, string description, string? helpUrl = null )
+        {
+            commands.Add( path, new CommandNamespaceItem( path,
+                                                          [new CommandNamespaceItem.DescriptionPart( description,
+                                                                                                     null,
+                                                                                                     helpUrl != null ? new Uri( helpUrl ) : null )] ) );
+        }
 
         _commands = CommandNamespace.UnsafeCreate( cmds );
 
 #if DEBUG
         var c = new CommandNamespaceBuilder();
-        foreach( var (path,cmd) in cmds )
+        foreach( var (path,item) in cmds )
         {
-            if( cmd != null ) c.Add( cmd );
+            if( item is Command cmd ) c.Add( cmd );
+            else c.Describe( path, item.Description, helpUrl: item.HelpUrl );
         }
-        var safeBuild = c.Build();
+        var safeBuild = c.Build( new ActivityMonitor() );
         Throw.DebugAssert( _commands.Namespace.Keys.Concatenate() == safeBuild.Namespace.Keys.Concatenate() );
+        // Each NS() above must describe an actual namespace (one that at least one command populates)
+        // and each namespace must be described: no CKli namespace is left with no description.
+        Throw.DebugAssert( "All the intrinsic namespaces are described.",
+                           safeBuild.Namespace.Values.All( i => i is Command || i.DescriptionParts.Length == 1 ) );
 #endif
     }
 

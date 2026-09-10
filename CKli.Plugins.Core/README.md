@@ -99,7 +99,7 @@ when the World's plugin configuration changes without needing a rebuild trigger 
 | `ReflectionPluginCollector.PluginType` (nested) | Implements `IPluginTypeInfo` for a reflection-discovered type; knows how to `Instantiate(world, instantiated)` via its `ConstructorInfo`. |
 | `ReflectionPluginCollector.Factory` (nested) | Implements `IPluginFactory`. `Create` instantiates the plugin graph via reflection; `GenerateCode` emits the compiled-plugins source. |
 | `PluginTypeInfo` | Plain, immutable `IPluginTypeInfo` implementation used by **generated** code (mirrors what `PluginType` computes at reflection time). |
-| `CommandCollector` | Reflects `[CommandPath]` methods off a plugin type, validates their parameter shape, and builds `ReflectionPluginCommand` instances plus the `CommandNamespace`. |
+| `CommandCollector` | Reflects `[CommandPath]` methods and `[CommandNamespace]` attributes off a plugin type, validates their parameter shape, and builds `ReflectionPluginCommand` instances plus the `CommandNamespace`. |
 | `PluginCommand` (in `CKli.Core` namespace, defined here) | Abstract base (`Command` subclass) shared by `ReflectionPluginCommand` and every generated `Cmd_<path>` class. |
 | `ReflectionPluginCommand` | Reflection-based `PluginCommand`: invokes the target method via `MethodInfo.Invoke`. |
 | `PluginCollectionImpl` | The `PluginCollection` returned to the host: binds each `PluginCommand` to its live plugin instance. |
@@ -222,8 +222,15 @@ overridden by `[OptionName("--branch,-b")]` (first name long `--...`, subsequent
 parameter/method can carry a `[Description("...")]`.
 
 The result is wrapped into a `ReflectionPluginCommand` and added both to `CommandCollector.PluginCommands` (the flat
-list `Factory` needs) and to a `CommandNamespaceBuilder` (`BuildCommands()` produces the `CommandNamespace` used for
-command-path lookup/dispatch and help rendering).
+list `Factory` needs) and to a `CommandNamespaceBuilder` (`BuildCommands( monitor )` produces the `CommandNamespace`
+used for command-path lookup/dispatch and help rendering).
+
+A plugin class can also carry any number of `[CommandNamespace( path, description, HelpUrl = "..." )]` attributes:
+`ReflectionPluginCollector` reads them off the type (their `HelpUrl` is a *named* argument, hence
+`CustomAttributeData.NamedArguments`) and forwards them to `CommandCollector.Describe`, which validates the path and
+the url then appends the contribution. Several plugins describing the same namespace is the normal case — see
+[Command namespaces](../CKli.Core/README.md#command-namespaces). The monitor `BuildCommands` needs is
+`PluginCollectorContext.Monitor`, valid for the collection phase only.
 
 ## `PluginCommand` / `ReflectionPluginCommand`
 

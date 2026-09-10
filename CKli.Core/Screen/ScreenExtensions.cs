@@ -159,6 +159,11 @@ public static class ScreenExtensions
                 head = head.AddBelow( c.ScreenType.Text( "Flags:" ).Box( marginLeft: 2 ) )
                            .AddBelow( c.Flags.Select( f => f.Names.Box( marginLeft: 3, marginRight: 1 ).AddRight( f.Description ) ) );
             }
+            if( c.HelpLinks.Length > 0 )
+            {
+                head = head.AddBelow( c.ScreenType.Text( "See:" ).Box( marginLeft: 2 ) )
+                           .AddBelow( c.HelpLinks.Select( l => l.Box( marginLeft: 3 ) ) );
+            }
             return head;
         }
 

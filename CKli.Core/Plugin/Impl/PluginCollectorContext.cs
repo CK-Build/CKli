@@ -14,19 +14,32 @@ public sealed class PluginCollectorContext
 {
     readonly WorldName _worldName;
     readonly IReadOnlyDictionary<XName, (XElement Config, bool IsDisabled)> _pluginsConfiguration;
+    readonly IActivityMonitor _monitor;
     byte[]? _signature;
 
     /// <summary>
     /// Initializes a new <see cref="PluginCollectorContext"/>.
     /// </summary>
+    /// <param name="monitor">The monitor to use during the collection.</param>
     /// <param name="worldName">The world name.</param>
     /// <param name="pluginsConfiguration">The plugins configuration.</param>
-    public PluginCollectorContext( WorldName worldName,
+    public PluginCollectorContext( IActivityMonitor monitor,
+                                   WorldName worldName,
                                    IReadOnlyDictionary<XName, (XElement Config, bool IsDisabled)> pluginsConfiguration )
     {
+        _monitor = monitor;
         _worldName = worldName;
         _pluginsConfiguration = pluginsConfiguration;
     }
+
+    /// <summary>
+    /// Gets the monitor of the collection phase.
+    /// <para>
+    /// This is only valid while the plugins are collected (while <c>IPluginCollector.BuildPluginFactory</c>
+    /// runs): the resulting <see cref="IPluginFactory"/> must not use it.
+    /// </para>
+    /// </summary>
+    public IActivityMonitor Monitor => _monitor;
 
     /// <summary>
     /// Gets the world name.

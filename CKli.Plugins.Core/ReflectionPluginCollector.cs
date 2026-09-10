@@ -176,7 +176,7 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
         return new Factory( _pluginInfos.DrainToImmutable(),
                             activationList,
                             _context,
-                            _commandCollector.BuildCommands(),
+                            _commandCollector.BuildCommands( _context.Monitor ),
                             _commandCollector.PluginCommands );
     }
 
@@ -252,6 +252,26 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
         if( activationIndex >= 0 )
         {
             activationList.Add( result );
+        }
+        // Collects the command namespace descriptions. A namespace is not owned by a single plugin:
+        // any number of them can describe the same one, the contributions are appended.
+        foreach( var a in type.GetCustomAttributesData() )
+        {
+            if( a.AttributeType == typeof( CommandNamespaceAttribute ) )
+            {
+                string? helpUrl = null;
+                foreach( var named in a.NamedArguments )
+                {
+                    if( named.MemberName == nameof( CommandNamespaceAttribute.HelpUrl ) )
+                    {
+                        helpUrl = (string?)named.TypedValue.Value;
+                    }
+                }
+                _commandCollector.Describe( result,
+                                            (string)a.ConstructorArguments[0].Value!,
+                                            (string)a.ConstructorArguments[1].Value!,
+                                            helpUrl );
+            }
         }
         // Discover and collects commands.
         var members = type.GetMethods();

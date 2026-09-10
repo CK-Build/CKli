@@ -105,7 +105,7 @@ sealed partial class ReflectionPluginCollector
             GeneratePluginCommandsArray( b );
 
             b.Append( """
-                    var cmds = new Dictionary<string,Command>();
+                    var cmds = new Dictionary<string,CommandNamespaceItem>();
                     foreach( var c in pluginCommands )
                     {
                         cmds.Add( c.CommandPath, c );
@@ -113,12 +113,28 @@ sealed partial class ReflectionPluginCollector
 
             """ );
 
-            foreach( var (path, cmd) in _commands.Namespace )
+            foreach( var (path, item) in _commands.Namespace )
             {
-                if( cmd == null )
+                if( item is Command ) continue;
+                // A pure namespace: its description parts (possibly none) are already ordered.
+                b.Append( "        cmds.Add( " );
+                AppendSourceString( b, path ).Append( ", new CommandNamespaceItem( " );
+                AppendSourceString( b, path ).Append( ", [" );
+                bool atLeastOnePart = false;
+                foreach( var p in item.DescriptionParts )
                 {
-                    b.Append( "       cmds.Add( \"" ).Append( path ).Append("\", null );" ).AppendLine();
+                    if( atLeastOnePart ) b.Append( ", " );
+                    atLeastOnePart = true;
+                    b.Append( "new CommandNamespaceItem.DescriptionPart( " );
+                    AppendSourceString( b, p.Text ).Append( ", " );
+                    if( p.Origin == null ) b.Append( "null" );
+                    else AppendSourceString( b, p.Origin );
+                    b.Append( ", " );
+                    if( p.HelpUrl == null ) b.Append( "null" );
+                    else AppendSourceString( b.Append( "new Uri( " ), p.HelpUrl.ToString() ).Append( " )" );
+                    b.Append( " )" );
                 }
+                b.Append( "] ) );" ).AppendLine();
             }
             b.Append( $$"""
                     return new Generated( infos, pluginCommands, CommandNamespace.UnsafeCreate( cmds ) );

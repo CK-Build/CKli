@@ -371,12 +371,11 @@ The static `CKliCommands` (in the `CKli` namespace) registers all intrinsic comm
 that describes and implements a CKli command:
 
 ```csharp
-public abstract class Command
+public abstract class Command : CommandNamespaceItem
 {
     protected Command( string commandPath, string description, ... ) { ... }
 
-    public string CommandPath { get; }
-    public string Description { get; }
+    // CommandPath and Description come from CommandNamespaceItem.
     // Arguments, Options, Flags, InteractiveMode...
     internal protected abstract ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                                       CKliEnv context,
@@ -391,6 +390,25 @@ an adapter on the command method.
 
 - The `CKliEnv` is a immutable command context that gives access to the "current" directory to consider and the screen (for display).
 - The `CommandLineArguments` parses and consumes tokens: `EatArgument()`, `EatFlag(name)`, `Close(monitor)`. It detects remaining (non consumed) tokens.
+
+## Command namespaces
+
+A `CommandNamespace` is a dictionary of `CommandNamespaceItem` indexed by path. An item that is a `Command` is executable;
+an item that is not is a **pure namespace** — `"world reference"` exists because `"world reference list"` does, and
+`CommandNamespaceBuilder` declares such parents automatically.
+
+A pure namespace is owned by nobody: `"fix"` is populated by `CKli.Build.Plugin` and `CKli.HotZone.Plugin`,
+`"maintenance"` by `CKli.Build.Plugin` and `CKli.Migration.Plugin`. Its description is consequently a list of
+`CommandNamespaceItem.DescriptionPart` (`Text`, `Origin`, `HelpUrl`) that are **appended**: any number of plugins can
+describe the same namespace with `[CommandNamespace( path, description, HelpUrl = "..." )]` on the plugin class, and
+each contribution keeps its own link to an external documentation. `CommandNamespaceBuilder.Build( monitor )` orders
+the parts on their `Origin` plugin name — the intrinsic CKli ones (a null `Origin`) first — so that the plugin
+activation order cannot leak into the rendered help. `Description` joins them one blank line apart: they are
+paragraphs written by different people, not one text.
+
+The intrinsic namespaces are described by `CKliCommands` itself. Describing a namespace that no command populates is
+**warned and ignored**, not refused: a plugin may legitimately describe a namespace that a currently disabled plugin fills.
+A namespace with no description at all is valid — it is up to the help renderer to display the child commands instead.
 
 ## Plugin commands
 

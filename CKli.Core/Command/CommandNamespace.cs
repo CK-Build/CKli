@@ -14,11 +14,11 @@ public sealed class CommandNamespace
     /// <summary>
     /// An empty command namespace.
     /// </summary>
-    public static readonly CommandNamespace Empty = new CommandNamespace( new Dictionary<string, Command?>() );
+    public static readonly CommandNamespace Empty = new CommandNamespace( new Dictionary<string, CommandNamespaceItem>() );
 
-    readonly Dictionary<string, Command?> _commands;
+    readonly Dictionary<string, CommandNamespaceItem> _commands;
 
-    internal CommandNamespace( Dictionary<string, Command?> commands )
+    internal CommandNamespace( Dictionary<string, CommandNamespaceItem> commands )
     {
         _commands = commands;
     }
@@ -28,14 +28,22 @@ public sealed class CommandNamespace
     /// This is used by compiled plugins (and by intrinsic CKli commands in Release).
     /// </summary>
     /// <param name="commands">The already built command namespace.</param>
-    public static CommandNamespace UnsafeCreate( Dictionary<string, Command?> commands ) => new CommandNamespace( commands );
+    public static CommandNamespace UnsafeCreate( Dictionary<string, CommandNamespaceItem> commands ) => new CommandNamespace( commands );
 
     /// <summary>
-    /// Finds a command from its command path.
+    /// Finds a command from its command path. A pure namespace is not a command: null is returned
+    /// for it (use <see cref="FindItem(string)"/> to obtain it).
     /// </summary>
     /// <param name="commandPath">The command path.</param>
     /// <returns>The command if it exists, null otherwise.</returns>
-    public Command? Find( string commandPath ) => _commands.GetValueOrDefault( commandPath );
+    public Command? Find( string commandPath ) => _commands.GetValueOrDefault( commandPath ) as Command;
+
+    /// <summary>
+    /// Finds a command or a pure namespace from its path.
+    /// </summary>
+    /// <param name="commandPath">The command or namespace path.</param>
+    /// <returns>The item if it exists, null otherwise.</returns>
+    public CommandNamespaceItem? FindItem( string commandPath ) => _commands.GetValueOrDefault( commandPath );
 
     /// <summary>
     /// Gets a list of <see cref="CommandHelp"/> from an optional command path.
@@ -50,20 +58,47 @@ public sealed class CommandNamespace
     public List<CommandHelp> GetForHelp( ScreenType screenType, string? helpPath, CommandNamespace? otherCommands )
     {
         // No optimization here. This is the help.
-        IEnumerable<Command> commands = _commands.Where( kv => kv.Value != null ).Select( kv => kv.Value )!;
-        if( otherCommands  != null ) commands = commands.Concat( otherCommands._commands.Where( kv => kv.Value != null ).Select( kv => kv.Value ) )!;
+        IEnumerable<Command> commands = _commands.Values.OfType<Command>();
+        if( otherCommands  != null ) commands = commands.Concat( otherCommands._commands.Values.OfType<Command>() );
+        CommandNamespaceItem? describedNamespace = null;
         if( !string.IsNullOrEmpty( helpPath ) )
         {
             var prefix = helpPath + ' ';
             commands = commands.Where( c => c.CommandPath == helpPath || c.CommandPath.StartsWith( prefix ) );
+            describedNamespace = GetDescribedNamespace( helpPath, otherCommands );
         }
-        return commands.OrderBy( c => c.CommandPath ).Select( c => new CommandHelp( screenType, c ) ).ToList();
+        var result = commands.OrderBy( c => c.CommandPath ).Select( c => new CommandHelp( screenType, c ) ).ToList();
+        // When the help is about a namespace, its own description (if any) heads the list.
+        if( describedNamespace != null )
+        {
+            result.Insert( 0, new CommandHelp( screenType, describedNamespace ) );
+        }
+        return result;
     }
 
     /// <summary>
-    /// Gets the commands and the pure namespace entries.
+    /// Gets the described namespace item for a path, merging the parts of the two namespaces when
+    /// both describe it. Null if the path is a command, is unknown or has no description at all.
     /// </summary>
-    public IReadOnlyDictionary<string, Command?> Namespace => _commands;
+    CommandNamespaceItem? GetDescribedNamespace( string helpPath, CommandNamespace? otherCommands )
+    {
+        var mine = _commands.GetValueOrDefault( helpPath );
+        if( mine is Command ) return null;
+        var other = otherCommands?._commands.GetValueOrDefault( helpPath );
+        if( other is Command ) other = null;
+        if( mine == null || mine.DescriptionParts.Length == 0 ) return other?.DescriptionParts.Length > 0 ? other : null;
+        if( other == null || other.DescriptionParts.Length == 0 ) return mine;
+        // Reorder: "mine" is the World's namespace and "other" the CKli one, but the CKli parts
+        // must come first, exactly as when a single namespace is built.
+        return new CommandNamespaceItem( helpPath,
+                                         CommandNamespaceItem.OrderParts( mine.DescriptionParts.AddRange( other.DescriptionParts ) ) );
+    }
+
+    /// <summary>
+    /// Gets the commands and the pure namespace entries: a <see cref="CommandNamespaceItem"/> that is
+    /// not a <see cref="Command"/> is a pure namespace.
+    /// </summary>
+    public IReadOnlyDictionary<string, CommandNamespaceItem> Namespace => _commands;
 
     internal void Clear() => _commands.Clear();
 
@@ -101,9 +136,9 @@ public sealed class CommandNamespace
         while( _commands.TryGetValue( nextPath, out var next ) )
         {
             path = nextPath;
-            if( next != null )
+            if( next is Command c )
             {
-                cmd = next;
+                cmd = c;
             }
             if( ++pathCount == sArgs.Count )
             {
