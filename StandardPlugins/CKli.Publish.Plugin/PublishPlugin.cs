@@ -303,6 +303,14 @@ public sealed class PublishPlugin : PrimaryPluginBase
                             try
                             {
                                 publishedFolder.Add( publish.FinalProfile! );
+                                // This publication supersedes the CI ones it follows on its branch (all of them
+                                // when it is not a CI publication): they describe a state that no longer applies
+                                // and would otherwise accumulate, one per CI build.
+                                var superseded = publishedFolder.RemoveSupersededCIProfiles( profileVersion );
+                                if( superseded.Length > 0 )
+                                {
+                                    monitor.Info( $"Removed {superseded.Length} superseded CI profile(s): '{superseded.Select( v => v.ToString() ).Concatenate( "', '" )}'." );
+                                }
                                 publishedFolder.Save();
                             }
                             catch( Exception ex )

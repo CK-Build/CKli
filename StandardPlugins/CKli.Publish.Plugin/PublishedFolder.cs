@@ -72,6 +72,13 @@ public sealed partial class PublishedFolder
         /// </summary>
         public bool IsDirty => !ReferenceEquals( _saved, _current );
 
+        /// <summary>
+        /// Gets whether this <see cref="Version"/> is used: a profile is in the file, in memory, or the file
+        /// exists but cannot be read. False for a version that has only been probed (<see cref="NoFile"/>)
+        /// and true for one that has been removed but whose number has been minted.
+        /// </summary>
+        public bool IsUsed => _saved != null || _current != null || _loadError != null;
+
         internal static FileCacheInfo NoFile( SVersion version, string jsonFilePath )
         {
             return new FileCacheInfo( version, jsonFilePath, null, null );
@@ -222,16 +229,28 @@ public sealed partial class PublishedFolder
         return FindFreePatch( origin.SetVersionNumbers( origin.Major, origin.Minor, origin.Patch + 1 ) );
     }
 
-    // Increments the Patch until the version is free. A file that exists but cannot be read counts as
-    // used: Save would replace it.
+    // Mints the Patch above every version already used that day on that branch - never in a hole - and the
+    // regular and the CI form of a branch SHARE that counter (SVersion.BranchName is the same for both).
+    // This is what makes the numbers meaningful once RemoveSupersededCIProfiles deletes profiles: reusing a
+    // freed number would let a version stop identifying a publication, and would let a freshly minted CI
+    // form sort below the release it actually follows.
+    // A file that exists but cannot be read counts as used: Save would replace it.
     SVersion FindFreePatch( SVersion v )
     {
-        for(; ; )
+        LoadAll();
+        int patch = v.Patch;
+        foreach( var (version, info) in _profiles )
         {
-            var info = LoadInfo( v );
-            if( info.Current == null && info.LoadError == null ) return v;
-            v = v.SetVersionNumbers( v.Major, v.Minor, v.Patch + 1 );
+            if( info.IsUsed
+                && version.Patch >= patch
+                && version.Major == v.Major
+                && version.Minor == v.Minor
+                && version.BranchName == v.BranchName )
+            {
+                patch = version.Patch + 1;
+            }
         }
+        return patch == v.Patch ? v : v.SetVersionNumbers( v.Major, v.Minor, patch );
     }
 
     /// <summary>
@@ -310,6 +329,53 @@ public sealed partial class PublishedFolder
         if( info.Current == null ) return false;
         info.Current = null;
         return true;
+    }
+
+    /// <summary>
+    /// Removes the CI profiles of a branch that a publication supersedes: a publication supersedes the CI
+    /// publications that precede it on its own branch, and a non CI one supersedes them all.
+    /// <para>
+    /// A superseded CI publication describes a state that no longer applies - and whose packages the CI feeds
+    /// eventually unlist - so it is deleted rather than kept, exactly like
+    /// <see cref="OnExpiredPackage(string, SVersion)"/> does. This is what keeps a folder from growing with one
+    /// profile per CI build, and it is what lets a reader take a CI profile it finds in the index at face value:
+    /// at most one alive CI profile per branch remains, and it is newer than every non CI publication of that
+    /// branch.
+    /// </para>
+    /// <para>
+    /// Only the alive profiles are considered: a <see cref="PublishedProfile.IsDeprecated"/> one is a record of
+    /// a problem and is left alone. The non CI profiles are never removed. All the files are read.
+    /// </para>
+    /// </summary>
+    /// <param name="publishedVersion">
+    /// The version of the profile that has just been published. Must be a Conformant <see cref="SVersion"/>.
+    /// </param>
+    /// <returns>The removed versions, in ascending order. Empty when nothing was superseded.</returns>
+    public ImmutableArray<SVersion> RemoveSupersededCIProfiles( SVersion publishedVersion )
+    {
+        ArgumentNullException.ThrowIfNull( publishedVersion );
+        var branchName = publishedVersion.BranchName;
+        if( branchName == null )
+        {
+            throw new ArgumentException( $"Version '{publishedVersion}' must be a Conformant SVersion.",
+                                         nameof( publishedVersion ) );
+        }
+        LoadAll();
+        var removed = ImmutableArray.CreateBuilder<SVersion>();
+        foreach( var info in _profiles.Values )
+        {
+            var p = info.Current;
+            if( p == null || p.IsDeprecated ) continue;
+            var v = p.Version;
+            if( !v.IsCI || v.BranchName != branchName || v == publishedVersion ) continue;
+            // A CI publication supersedes only the CI publications that precede it: a more recent one (there
+            // should be none) is not superseded by it.
+            if( publishedVersion.IsCI && v > publishedVersion ) continue;
+            info.Current = null;
+            removed.Add( v );
+        }
+        removed.Sort();
+        return removed.DrainToImmutable();
     }
 
     /// <summary>

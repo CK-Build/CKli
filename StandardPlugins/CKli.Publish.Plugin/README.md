@@ -1,4 +1,4 @@
-# CKli.Publish.Plugin
+﻿# CKli.Publish.Plugin
 
 `CKli.Publish.Plugin` is the plugin that performs the **remote** side of a release: pushing built
 NuGet packages to configured feeds, creating (draft, then finalized) releases on the repository's
@@ -75,7 +75,8 @@ blocking it):
    `PublishedFolder` (see [The profile version](#the-profile-version)), and
    `PublishRoadmap.PublishAsync` runs the actual publication with a `RoadmapPublisher` and an
    `IndirectPublisher`.
-3. On success, the `FinalProfile` is added to the `PublishedFolder` and `Save`d, then
+3. On success, the `FinalProfile` is added to the `PublishedFolder`, the CI profiles it supersedes are
+   removed (see [Superseded CI profiles](#superseded-ci-profiles)) and the folder is `Save`d, then
    `World.StackRepository.PushChanges` commits and pushes it along with everything else the Stack
    accumulated. A failure to write the profile file is logged and does **not** fail the publication:
    the publication itself cannot be undone.
@@ -320,8 +321,11 @@ repositories at several versions are published together, so no package version c
 day of the publication:
 
 - `Major` is the year and `Minor` is the day in the year — `2026.254` is the 11th of September 2026.
-- `Patch` starts at 0 and is incremented until the version is free in the folder. A file that exists
-  but cannot be read counts as used, since `Save` would replace it.
+- `Patch` starts at 0 and is minted **above every version already used that day on that branch** -
+  never in a hole. A file that exists but cannot be read counts as used, since `Save` would replace it.
+  The regular and the CI form of a branch **share** that counter (they have the same
+  `SVersion.BranchName`): a number is never reused, so a version keeps identifying one publication even
+  though a superseded CI profile gets deleted - see [Superseded CI profiles](#superseded-ci-profiles).
 - `branchKind`, `exploratoryName` and `isCIBuild` come from what is actually built
   (`roadmap.Graph.BranchName.VersionKind`, `roadmap.Graph.BranchName.ExploratoryName` and
   `roadmap.IsCIBuild`), so the version belongs to the branch that produced it — and that is what
@@ -338,13 +342,37 @@ day of the publication:
 The CI number is always 0: the `Patch` is what distinguishes two publications of the same day on the
 same branch, so a CI profile never collides with the non-CI one that sits beside it.
 
+### Superseded CI profiles
+
+Every CI build publishes a profile, so without pruning a folder would grow by one file per CI build -
+and the index is fetched by whoever reads the World from outside. `PublishedFolder.RemoveSupersededCIProfiles(publishedVersion)`
+is called by `PublishPlugin` between the `Add` and the `Save` of a publication:
+
+| The publication | Removes |
+|---|---|
+| a CI one | the CI profiles that **precede** it on its own branch |
+| a non-CI one | **every** CI profile of its own branch |
+
+Only the alive profiles are considered - a `IsDeprecated` one is a record of a problem and is left
+alone - non-CI profiles are never removed, and another branch is never touched. Deleting rather than
+keeping is what `OnExpiredPackage` already does, and for the same reason: a superseded CI publication
+describes a state that no longer applies, whose packages the CI feeds eventually unlist. The folder is
+in the Stack repository, so a removed profile stays in its history.
+
+The invariant this leaves is what makes a reader simple: **at most one alive CI profile per branch, and
+it is newer than every non-CI publication of that branch**. A consumer that wants the CI line can take
+the CI profile it finds in the index at face value, with no "is it superseded" arithmetic. Note that
+pruning never removes the maximum version, which is what keeps the shared `Patch` counter above
+(a freed number is never reused) derivable from the folder itself.
+
 ### `PublishedFolder` — where the profiles live
 
 `PublishedFolder` (`PublishedFolder.cs`) is the mutable set of profiles stored as Json files under the
 World's `LocalWorldName.SharedDataFolder` — `.PublicStack/Published` for the default World and
 `.PublicStack/{LTSName}/Published` for a Long Term Support one — exposed by
 `PublishPlugin.PublishedFolder` and created on demand. Files are read
-lazily and every modification (`Add`, `Remove`, `Deprecate`, `OnDeprecatedPackage`) stays in memory
+lazily and every modification (`Add`, `Remove`, `Deprecate`, `OnDeprecatedPackage`,
+`RemoveSupersededCIProfiles`) stays in memory
 until `Save` writes the added and updated ones and deletes the files of the removed ones.
 `GetProfileFilePath` delegates to the abstraction's `PublishedProfile.GetProfilePath`, so a profile
 file is always at the canonical path for its version — `LoadAll` ignores any `*.json` that is not.
@@ -361,7 +389,8 @@ profile. `Tests/Plugins.Tests`' `PublishedFolderTests` covers the folder on its 
 `PublishedProfileTests` covers what a real publication leaves in it and what a `version deprecate`
 does to it.
 
-Three entry points write to it: `OnRoadmapBuildAsync` adds a profile,
+Three entry points write to it: `OnRoadmapBuildAsync` adds a profile and removes the CI ones it
+supersedes,
 [`OnVersionDeprecated`](#onversiondeprecated--version-deprecate) marks the ones that carry a deprecated
 package — or removes them, once that deprecation has expired — and
 [`OnFixBuildAsync`](#onfixbuildasync--fix-build--fix-publish) supersedes the ones a fix invalidates.
