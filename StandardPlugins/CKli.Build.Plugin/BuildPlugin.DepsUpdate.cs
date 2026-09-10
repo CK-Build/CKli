@@ -1,0 +1,245 @@
+﻿using CK.Core;
+using CKli.BranchModel.Plugin;
+using CKli.Core;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace CKli.Build.Plugin;
+
+public sealed partial class BuildPlugin
+{
+    const string _dDepsAll = "Consider all the Repos, not only the current repositories.";
+    const string _dDepsNarrow = "Keep the update to the current repositories and their upstreams: don't bring the downstreams of an updated repository in.";
+    const string _dDepsNoFetch = "Don't fetch the repositories first. The analysis is then only as fresh as the last fetch.";
+    const string _dDepsCI = "Consider the CI published profiles of the World References.";
+    const string _dDepsPrerelease = "Consider the prerelease versions of the feeds even on the root branch.";
+    const string _dDepsStable = "Consider only the stable versions of the feeds.";
+
+    /// <summary>
+    /// Analyzes the external dependencies of a World and reports the upgrades that would align them.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The command context.</param>
+    /// <param name="branch">The branch to consider.</param>
+    /// <param name="all">True to consider all the Repos.</param>
+    /// <param name="narrow">True to exclude the downstreams of an updated repository.</param>
+    /// <param name="noFetch">True to skip the fetch.</param>
+    /// <param name="ci">True to consider the CI published profiles of the References.</param>
+    /// <param name="prerelease">True to consider the prereleases of the feeds.</param>
+    /// <param name="stable">True to consider only the stable versions of the feeds.</param>
+    /// <param name="dryRun">True to only display the upgrades.</param>
+    /// <returns>True on success, false on error.</returns>
+    [Description( """
+        Aligns the external package dependencies of a World on the versions its World References publish and,
+        for the identifiers no reference anchors, on the greatest version its feeds offer.
+        Only --dry-run is implemented for now: it reports what would be updated.
+        """ )]
+    [CommandPath( "deps update" )]
+    public async Task<bool> DepsUpdateAsync( IActivityMonitor monitor,
+                                             CKliEnv context,
+                                             [Description( _dBranch )]
+                                             [OptionName( _oBranch )]
+                                             string? branch = null,
+                                             [Description( _dDepsAll )]
+                                             bool all = false,
+                                             [Description( _dDepsNarrow )]
+                                             bool narrow = false,
+                                             [Description( _dDepsNoFetch )]
+                                             bool noFetch = false,
+                                             [Description( _dDepsCI )]
+                                             bool ci = false,
+                                             [Description( _dDepsPrerelease )]
+                                             bool prerelease = false,
+                                             [Description( _dDepsStable )]
+                                             bool stable = false,
+                                             [Description( "Only display the upgrades." )]
+                                             [OptionName( _oDryRun )]
+                                             bool dryRun = false )
+    {
+        if( stable && prerelease )
+        {
+            monitor.Error( "--stable and --prerelease are exclusive." );
+            return false;
+        }
+        var cancellation = PrimaryPluginContext.Cancellation;
+        // The World must be coherent before anything is computed: no repository dirty (a commit would sweep
+        // uncommitted work in), no version tag issue and no branch model issue. This is refused, never healed.
+        if( !_hotZone.CheckBasicPreconditions( monitor, "updating the dependencies", out var allRepos ) )
+        {
+            return false;
+        }
+        // Consider the repositories selected by the current path as the Pivots.
+        var pivots = all
+                        ? allRepos
+                        : World.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
+        if( pivots == null ) return false;
+
+        // This command is online by design: it asks every feed for the versions it offers and reads the
+        // References over http. Being stale about our own repositories while being fresh about the outside
+        // world makes no sense, and it is what makes the divergence check below mean anything.
+        if( !noFetch && !FetchAll( monitor, allRepos, cancellation ) )
+        {
+            return false;
+        }
+        if( !CheckNoRemoteDivergence( monitor, allRepos ) )
+        {
+            return false;
+        }
+        var branchName = ResolveBranchName( monitor, pivots, branch );
+        if( branchName == null ) return false;
+
+        var graph = _hotZone.GetHotGraph( monitor, branchName, isCIBuild: false, pivots );
+        if( graph == null ) return false;
+
+        var options = new UpgradeMap.Options( Narrow: narrow,
+                                              ConsiderCI: ci,
+                                              StableOnly: stable || (!prerelease && branchName.IsRoot) );
+        var map = await UpgradeMap.CreateAsync( monitor, context, World, graph, _versionTag, _artifactHandler, options, cancellation )
+                                  .ConfigureAwait( false );
+        if( map == null ) return false;
+
+        DisplayUpgrades( monitor, context, map );
+        if( !dryRun )
+        {
+            monitor.Error( """
+                Applying the upgrades is not implemented yet: use --dry-run to obtain the report above.
+                (The apply path opens the missing branches, rewrites the projects with MutableSolution.UpdatePackages and commits.)
+                """ );
+            return false;
+        }
+        return true;
+    }
+
+    // A fetch updates the remote tracking references only: no branch moves and no content changes.
+    bool FetchAll( IActivityMonitor monitor, IReadOnlyList<Repo> repos, CancellationToken cancellation )
+    {
+        using( monitor.OpenInfo( $"Fetching {repos.Count} repositories." ) )
+        {
+            bool success = true;
+            foreach( var repo in repos )
+            {
+                success &= repo.GitRepository.FetchRemoteBranches( monitor, withTags: false, cancellation: cancellation );
+            }
+            return success;
+        }
+    }
+
+    // A branch that is behind its tracked remote is refused, not merged: this command requires a coherent
+    // World instead of producing one, so its report and what an apply would write are the same content.
+    // Being ahead is fine: there is nothing to merge.
+    static bool CheckNoRemoteDivergence( IActivityMonitor monitor, IReadOnlyList<Repo> repos )
+    {
+        List<string>? behind = null;
+        foreach( var repo in repos )
+        {
+            foreach( var b in repo.GitRepository.Repository.Branches )
+            {
+                if( b.IsRemote || b.TrackedBranch == null ) continue;
+                var d = b.TrackingDetails;
+                if( d.BehindBy is > 0 )
+                {
+                    (behind ??= new List<string>()).Add( $"'{repo.DisplayPath}' branch '{b.FriendlyName}' is {d.BehindBy} commit(s) behind '{b.TrackedBranch.FriendlyName}'" );
+                }
+            }
+        }
+        if( behind != null )
+        {
+            monitor.Error( $"""
+                The World is not up to date with its remotes, so an analysis of it would not describe what an update
+                would write. Run 'ckli pull' first.
+                {behind.Concatenate( Environment.NewLine )}
+                """ );
+            return false;
+        }
+        return true;
+    }
+
+    static void DisplayUpgrades( IActivityMonitor monitor, CKliEnv context, UpgradeMap map )
+    {
+        var screen = context.Screen.ScreenType;
+        if( map.IsEmpty )
+        {
+            context.Screen.Display( screen.Text( $"""
+                Nothing to update on branch '{map.Graph.BranchName}': the {map.Graph.Solutions.Count} repositories of this
+                World already reference the {map.Targets.Count( t => t.HasTarget )} resolved external package(s) in their target version.
+                """ ) );
+            return;
+        }
+        var b = new System.Text.StringBuilder();
+        b.Append( "Dependency upgrades of branch '" ).Append( map.Graph.BranchName ).Append( "'" );
+        if( map.AnalysisOptions.Narrow ) b.Append( " (--narrow: upstreams only)" );
+        b.AppendLine( ":" );
+        foreach( var r in map.Upgrades )
+        {
+            b.Append( "- " ).Append( r.Repo.DisplayPath );
+            if( r.IsPivot ) b.Append( " (pivot)" );
+            if( r.NeedsBranch ) b.Append( $" [the '{map.Graph.BranchName}' branch would be created]" );
+            b.AppendLine();
+            foreach( var u in r.Upgrades )
+            {
+                b.Append( "    " )
+                 .Append( u.IsDowngrade ? "▼ " : "▲ " )
+                 .Append( u.Current.PackageId )
+                 .Append( ' ' )
+                 .Append( u.Current.Version )
+                 .Append( " → " )
+                 .Append( u.Target );
+                var t = map.Targets.FirstOrDefault( x => x.PackageId.Equals( u.Current.PackageId, StringComparison.OrdinalIgnoreCase ) );
+                if( t?.Origin != null ) b.Append( "  (" ).Append( t.Origin ).Append( ')' );
+                b.AppendLine();
+            }
+        }
+        b.Append( map.UpgradeCount ).Append( " upgrade(s) in " ).Append( map.Upgrades.Length ).Append( " repositories" );
+        if( map.DowngradeCount > 0 )
+        {
+            b.Append( ", including " ).Append( map.DowngradeCount ).Append( " downgrade(s) (▼)" );
+        }
+        b.AppendLine( "." );
+        var blocked = map.Targets.Where( t => t.State is UpgradeMap.TargetState.Conflict ).ToList();
+        if( blocked.Count > 0 )
+        {
+            b.Append( blocked.Count ).AppendLine( " package(s) are blocked by disagreeing World References:" );
+            foreach( var t in blocked )
+            {
+                b.Append( "    " ).Append( t.PackageId ).Append( ": " ).AppendLine( t.Origin );
+            }
+        }
+        context.Screen.Display( screen.Text( b.ToString() ) );
+    }
+
+    // Same resolution as the build commands: the pivots' "dev/" stripped current branch, or --branch.
+    BranchName? ResolveBranchName( IActivityMonitor monitor, IReadOnlyList<Repo> pivots, string? branch )
+    {
+        if( branch == null )
+        {
+            branch = pivots[0].GitStatus.CurrentBranchName;
+            if( branch.StartsWith( "dev/", StringComparison.OrdinalIgnoreCase ) ) branch = branch.Substring( 4 );
+            for( int i = 1; i < pivots.Count; ++i )
+            {
+                var other = pivots[i].GitStatus.CurrentBranchName;
+                if( other.StartsWith( "dev/", StringComparison.OrdinalIgnoreCase ) ) other = other.Substring( 4 );
+                if( other != branch )
+                {
+                    monitor.Error( $"""
+                        Multiple Repo are selected and current checked out branches differ, the --branch <name> must be specified.
+                        (At least, '{pivots[0].DisplayPath}' is on '{branch}' and '{pivots[i].DisplayPath}' is on '{other}'.)
+                        """ );
+                    return null;
+                }
+            }
+            if( branch == "(no branch)" )
+            {
+                monitor.Error( $"""
+                    A branch must be checked out or the --branch <name> must be specified.
+                    (At least, '{pivots[0].DisplayPath}' is on detached head state).
+                    """ );
+                return null;
+            }
+            monitor.Info( ScreenType.CKliScreenTag, $"Selecting --branch '{branch}'." );
+        }
+        return _branchModel.BranchNamespace.FindRequired( monitor, branch );
+    }
+}
