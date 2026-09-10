@@ -1,4 +1,4 @@
-# CKli.Build.Plugin
+﻿# CKli.Build.Plugin
 
 **CKli.Build.Plugin** is the StandardPlugin that turns a set of Git repositories into a **build roadmap** and executes it:
 it decides, repository by repository, whether a build is required, computes the version to produce, updates inter-repo
@@ -104,6 +104,7 @@ All build-family commands share a common set of options (declared once as `const
 | `fix publish` | `FixPublishAsync` | Builds and publishes the current `FixWorkflow`; on success the workflow is finished. |
 | `maintenance rebuild old` | `RebuildOldAsync` | Walks each Repo's stable tags from the newest down, force-rebuilding until one succeeds; tags failing commits `+invalid` (unless `warnOnly`). |
 | `maintenance rebuild version` | `RebuildVersionAsync` | Force-rebuilds one specific version tag of the current repository (used to refresh a tag's recorded build content, e.g. to fix lightweight/unreadable tags). |
+| `deps update` | `DepsUpdateAsync` | Aligns the World's **external** package dependencies on the versions its World References publish, and on what its feeds offer for the identifiers no reference anchors (see below). |
 
 `build`/`publish` and `*build`/`*publish` differ only in the `isPullBuild` flag passed down to roadmap computation
 (`*` commands include upstream producers as pivots); `publish`/`*publish` additionally set `mustPublish: true`. All four
@@ -123,6 +124,58 @@ a single `BuildDate` for the whole operation, and the `Success`/`SetFailed()` pa
 There is also a static test seam independent of events: `BuildPlugin.SetBuilderFunction(BuilderFunction?)` replaces the
 delegate (`BuilderFunction`, default `RealBuildAsync`) that `CoreBuildAsync` calls to perform the actual build - mainly
 used to inject a fake builder in tests, and it returns the previous function so callers can chain to the real one.
+
+### `deps update`: aligning the external dependencies
+
+`build` propagates the packages the World *produces*. `deps update` (`BuildPlugin.DepsUpdate.cs` and
+`UpgradeMap*.cs`) does the other half: it aligns what the World *consumes* from the outside.
+
+For each package identifier the graph consumes externally
+(`HotGraph.Solution.ExternalDependencies`), `UpgradeMap` resolves one target version from three sources,
+in this order - and memoizes it, because the identifier set grows while a feed lookup is the expensive part:
+
+| Source | Rule |
+|---|---|
+| A `<VersionTag><Packages>` pin | **No target at all.** A pin is an authoritative exception, and it prunes the closure: a pinned identifier can never promote an upstream. |
+| The World References' published profiles | A profile's `ProducedPackages` are the first candidates - they are why the reference exists - and win inside a profile, then its `DirectDependencies`, then its regular `TransitiveDependencies`. Two references disagreeing **blocks that package**, not the command. An `AmbiguousDependency` nobody anchors is warned about: the feed will answer instead, and it may disagree with that very reference. |
+| The World's configured NuGet feeds | The greatest version they offer. |
+
+There is no finer version filter than stable/not: `CSVersionKindFilter` rejects every non-CSemVer version, so
+most third party prereleases (`2.0.0-rc.2.23479.6`) would never be seen. Plain SemVer precedence applies - a
+root branch takes only `SVersion.IsStable`, a prerelease or exploratory branch takes everything - and a CI
+version is never a target (the CI notion here lives in the References, not in a feed).
+
+**Who participates.** The pivots to start with, exactly as the build commands compute them. Then an upstream
+that needs an upgrade joins: it will be rebuilt, and a repository we open a branch on and rebuild is a
+first-class participant. Unless `--narrow`, the **downstreams** of an updated participant join too: `build`
+already rebuilds every transitive downstream of anything it builds, so that wide set is exactly what the
+build that follows would touch - the report shows the real blast radius rather than half of it.
+
+**The World is required to be coherent, never made coherent.** `HotZonePlugin.CheckBasicPreconditions` first
+(no dirty repository - `GitRepository.Commit` stages everything, so a commit would sweep uncommitted work in -
+no version tag issue, no branch model issue), then a fetch, then a **refusal** when a branch is behind its
+tracked remote ("run `ckli pull` first"). The fetch is what makes that check mean anything: the command is
+online by design (it queries every feed and reads the References over http), so being stale about our own
+repositories would be incoherent.
+
+**What applying does**, per participant, upstreams first and all of it repo-local: `EnsureExists` - which
+creates a missing branch at `HotBranch.GetStartCommit`, *the very commit whose content was analyzed* - then
+`EnsureDevBranch`, a checkout of the `dev/` branch, `MutableSolution.UpdatePackages` with an **exact**
+`PackageMapper` (only the version that repository really references is rewritten) and a commit naming what
+moved. `Synchronize` is deliberately **not** called: a stale World has already been refused, so it has nothing
+to do, and it is the only step that could move a tip away from what the report describes. That is what keeps
+`--dry-run` and the write on the same content.
+
+| Option | Meaning |
+|---|---|
+| `--branch,-b <name>` | As for the build commands. |
+| `all` | Consider all the Repos as pivots. |
+| `narrow` | Keep the update to the pivots and their upstreams: don't bring the downstreams of an updated repository in. |
+| `noFetch` | Don't fetch first. The analysis is then only as fresh as the last fetch - and the divergence refusal cannot fire. |
+| `ci` | Consider the **CI published profiles** of the World References. Note that this is not the `--ci` of the build commands: nothing is built here, and the graph is always computed with `isCIBuild: false`. A published folder holds at most one alive CI profile per branch and it is newer than every non-CI publication of that branch, so the one that is there simply applies - there is no "is it superseded" question to answer. |
+| `prerelease` / `stable` | Override the stable/not filter of the feeds. Mutually exclusive. |
+| `allowDowngrade` | Apply the updates that move a version **down**. A World Reference may legitimately pin lower than what this World references - alignment is the point - but without this flag a map containing a downgrade reports and writes nothing. |
+| `--dry-run,-d` | Only display the upgrades. |
 
 ### The `Roadmap`: computing what to build
 

@@ -1,4 +1,4 @@
-# CKli
+﻿# CKli
 
 CKli is a tool for <u>multi-repositories</u> stacks.
 It allows to automate actions (build, package upgrade, etc...), on <u>Worlds</u> (a group of repositories),
@@ -428,6 +428,31 @@ By default, only local tags are deleted and the command must be run from within 
 
 `--allow-multi-repo` allows the command to proceed when the current path is above multiple Repos.
 By default, the current path must be within a single Repo.
+
+## Dependency commands (deps update)
+
+Unlike every other command described above, this one comes from a **plugin** (the Standard
+`CKli.Build.Plugin`), so it exists only in a World that enables it. It is mentioned here because it is the
+"package upgrade" half of what CKli automates - the `build` and `publish` commands are the other half, and
+they are documented with it in
+[`CKli.Build.Plugin`'s README](StandardPlugins/CKli.Build.Plugin/README.md#deps-update-aligning-the-external-dependencies).
+
+### `deps update --branch <name> --all --narrow --no-fetch --ci --prerelease --stable --allow-downgrade --dry-run`
+
+Aligns the **external** package dependencies of a World: the packages its repositories consume but don't
+produce. A target version comes from a `<VersionTag><Packages>` pin (which means "never touch this"), from
+the published profiles of the World `<Reference>`s, or - for the identifiers no reference anchors - from the
+greatest version the World's feeds offer.
+
+It updates the pivot repositories, the upstreams that need it, and by default the downstreams of everything it
+updates (`--narrow` keeps it to the upstreams): that is what a `ckli build` afterwards would rebuild anyway.
+
+The World must be up to date and clean: the command fetches, then **refuses** to run when a branch is behind
+its remote rather than merging it for you - run `ckli pull` first. A repository that doesn't have the branch
+yet gets it created, at the commit its branch model says it must start from.
+
+Use `--dry-run` to see the report without writing anything. Downgrades are reported apart and require
+`--allow-downgrade` to be applied.
 
 ## Plugin commands (info, create, add, remove, enable)
 
