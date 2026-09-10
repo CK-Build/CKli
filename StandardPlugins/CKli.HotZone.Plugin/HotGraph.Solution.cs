@@ -179,10 +179,11 @@ public sealed partial class HotGraph
 
             if( _versionInfo == null || _versionInfo.IsDirty )
             {
-                // The SolutionVersionInfo depends on the currentTip.
+                // The SolutionVersionInfo depends on the commit the solution has been read from (the branch's
+                // tip, or the commit the graph branch would be created at when it is missing here).
                 // We store this commit's sha in the SolutionVersionInfo: IsDirty uses it.
-                var currentTip = _solution.GitBranch.Tip;
-                var tagCommitTree = vInfo.HotZone.GetRequiredTagCommitTree( monitor, _solution.GitBranch );
+                var currentTip = _solution.Commit;
+                var tagCommitTree = vInfo.HotZone.GetRequiredTagCommitTree( monitor, currentTip );
                 if( tagCommitTree != null )
                 {
                     _versionInfo = new SolutionVersionInfo( this, vInfo, currentTip.Sha, tagCommitTree );

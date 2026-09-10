@@ -189,7 +189,79 @@ public sealed class HotBranch
 
 
     /// <summary>
-    /// Ensure that the <see cref="GitBranch"/> exists: creating it from the closest existing branch
+    /// Gets the commit that this non existing branch would be created at: the <see cref="BranchName.LinkType"/>
+    /// decides it, because creation is the only moment it can be honored.
+    /// <list type="bullet">
+    ///     <item>
+    ///     <see cref="BranchLinkType.None"/> and <see cref="BranchLinkType.Manual"/> propagate nothing from
+    ///     the parent: the closest existing branch's tip.
+    ///     </item>
+    ///     <item>
+    ///     <see cref="BranchLinkType.Full"/>: the closest existing branch's "dev/" tip when it exists (its
+    ///     regular tip otherwise) - this is what <see cref="Synchronize"/> would have merged.
+    ///     </item>
+    ///     <item>
+    ///     <see cref="BranchLinkType.Release"/> and <see cref="BranchLinkType.CI"/>: the last built commit of
+    ///     the closest existing branch (CI builds are considered only for the CI link), obtained from the
+    ///     <see cref="BranchModelPlugin.SetTagCommitProvider(ITagCommitProvider)"/>. When no provider has been
+    ///     set (a World without the VersionTag plugin) this falls back on the closest existing branch's tip;
+    ///     when the provider fails (unhealthy version tags) this fails.
+    ///     </item>
+    /// </list>
+    /// <para>
+    /// <see cref="Exists"/> must be false. This is what <see cref="EnsureExists(IActivityMonitor)"/> creates
+    /// the branch at: whoever needs to know the content this branch will start with must read this commit.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>The commit to start from or null on error.</returns>
+    public Commit? GetStartCommit( IActivityMonitor monitor )
+    {
+        Throw.CheckState( !Exists );
+        var closest = _info.GetRequiredClosestExistingBranch( monitor, _name );
+        if( closest == null ) return null;
+        Throw.DebugAssert( closest.Exists );
+        var linkType = _name.LinkType;
+        // No propagation from the parent at all: the branch must start somewhere and that is the
+        // closest active branch. This is also the root branch's link type, but a missing root branch
+        // has already been rejected by GetRequiredClosestExistingBranch.
+        if( linkType is BranchLinkType.None or BranchLinkType.Manual )
+        {
+            return closest.GitBranch.Tip;
+        }
+        // The child follows the parent's "dev/" branch: starting there is what Synchronize would have
+        // obtained by merging it, without the merge commit.
+        if( linkType is BranchLinkType.Full )
+        {
+            return (closest.GitDevBranch ?? closest.GitBranch).Tip;
+        }
+        Throw.DebugAssert( linkType is BranchLinkType.Release or BranchLinkType.CI );
+        var commitProvider = _info._plugin.TagCommitProvider;
+        if( commitProvider == null )
+        {
+            // A World can enable the BranchModel without the VersionTag plugin: there is no notion of a
+            // "last built commit" here. The floor keeps the branch creatable (Synchronize would throw).
+            monitor.Warn( $"""
+                    No ITagCommitProvider available: unable to honor the '{linkType}' link type of branch '{_name}'
+                    in '{Repo.DisplayPath}'. Using the '{closest.BranchName}' branch tip.
+                    """ );
+            return closest.GitBranch.Tip;
+        }
+        var tagCommit = commitProvider.GetCommit( monitor, closest, linkType is BranchLinkType.CI );
+        if( tagCommit == null )
+        {
+            monitor.Error( $"""
+                    Unable to find the last {(linkType is BranchLinkType.CI ? "built" : "released")} commit of branch
+                    '{closest.BranchName}' in '{Repo.DisplayPath}': the '{linkType}' link type of branch '{_name}'
+                    cannot be honored.
+                    """ );
+            return null;
+        }
+        return tagCommit.Commit;
+    }
+
+    /// <summary>
+    /// Ensure that the <see cref="GitBranch"/> exists: creating it at <see cref="GetStartCommit(IActivityMonitor)"/>
     /// if needed.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -197,18 +269,14 @@ public sealed class HotBranch
     public bool EnsureExists( IActivityMonitor monitor )
     {
         if( _link != null ) return true;
-        var closest = _info.GetRequiredClosestExistingBranch( monitor, _name );
-        if( closest == null ) return false;
-        Throw.DebugAssert( closest.Exists );
-        // The branch provided by the user doesn't exist. We create the hot branch
-        // from the closest one.
+        // The branch provided by the user doesn't exist: the link type decides where it starts.
+        var startCommit = GetStartCommit( monitor );
+        if( startCommit == null ) return false;
         Throw.DebugAssert( """
                     Nothing could have fetched or create the branch since the HotBranch has been created
                     (GetBranch has been called - an existing remote would have created the local).
                     """, Repo.GitRepository.GetBranch( monitor, _name.Name, CK.Core.LogLevel.None ) == null );
-        // Since the branch doesn't exist, we create it from its closest active branch regardless
-        // of any configured link type (the branch must start somewhere).
-        var gitBranch = Repo.GitRepository.EnsureIntegratedBranch( monitor, _name.Name, closest.GitBranch.Tip );
+        var gitBranch = Repo.GitRepository.EnsureIntegratedBranch( monitor, _name.Name, startCommit );
         return gitBranch != null && Refresh( monitor );
     }
 

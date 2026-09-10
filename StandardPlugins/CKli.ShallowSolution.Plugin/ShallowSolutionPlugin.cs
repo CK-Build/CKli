@@ -88,7 +88,7 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
     /// <returns>True on success (the <paramref name="solution"/> may be null), false on error.</returns>
     public bool TryGetShallowSolution( IActivityMonitor monitor, Repo repo, Branch branch, bool useWorkingFolder, out GitSolution? solution )
     {
-        var (files, doc) = GetSolutionXDocument( monitor, repo, branch, required: false, useWorkingFolder );
+        var (files, doc) = GetSolutionXDocument( monitor, repo, branch, branch.Tip, required: false, useWorkingFolder );
         if( doc == null )
         {
             solution = null;
@@ -97,7 +97,7 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
         using( monitor.OpenInfo( $"Loading shallow solution from '{repo.DisplayPath}' branch '{branch.FriendlyName}'." ) )
         {
             Throw.DebugAssert( files != null );
-            solution = GitSolution.Create( monitor, repo, branch, files, doc );
+            solution = GitSolution.Create( monitor, repo, branch, branch.Tip, files, doc );
             return solution != null;
         }
     }
@@ -117,31 +117,57 @@ public sealed class ShallowSolutionPlugin : PrimaryPluginBase
     /// <returns>The solution or null on error.</returns>
     public GitSolution? GetShallowSolution( IActivityMonitor monitor, Repo repo, Branch branch, bool useWorkingFolder )
     {
+        return GetShallowSolution( monitor, repo, branch, branch.Tip, useWorkingFolder );
+    }
+
+    /// <summary>
+    /// Same as <see cref="GetShallowSolution(IActivityMonitor, Repo, Branch, bool)"/> but reads the
+    /// <paramref name="commit"/> instead of the <paramref name="branch"/>'s tip.
+    /// <para>
+    /// The commit must belong to the branch's history: the branch is the context of the read (it is the
+    /// <see cref="GitSolution.GitBranch"/>), the commit is what is read. This is how a branch that doesn't
+    /// exist yet is read from the commit it would be created at (see <c>HotBranch.GetStartCommit</c>): the
+    /// content that is analyzed is then exactly the content that branch will start with.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="repo">The repository.</param>
+    /// <param name="branch">The branch through which the solution is reached.</param>
+    /// <param name="commit">The commit from which the solution must be read.</param>
+    /// <param name="useWorkingFolder">
+    /// True to use the file system if the commit is checked out.
+    /// False to always use the committed content and ignores the current file system.
+    /// </param>
+    /// <returns>The solution or null on error.</returns>
+    public GitSolution? GetShallowSolution( IActivityMonitor monitor, Repo repo, Branch branch, Commit commit, bool useWorkingFolder )
+    {
         Throw.CheckArgument( !branch.IsRemote );
-        using( monitor.OpenInfo( $"Loading shallow solution from '{repo.DisplayPath}' branch '{branch.FriendlyName}'." ) )
+        Throw.CheckNotNullArgument( commit );
+        using( monitor.OpenInfo( $"Loading shallow solution from '{repo.DisplayPath}' branch '{branch.FriendlyName}'{(commit == branch.Tip ? "" : $" at commit '{commit.Sha.AsSpan( 0, 7 )}'")}." ) )
         {
-            var (files, doc) = GetSolutionXDocument( monitor, repo, branch, required: true, useWorkingFolder );
+            var (files, doc) = GetSolutionXDocument( monitor, repo, branch, commit, required: true, useWorkingFolder );
             if( doc == null )
             {
                 return null;
             }
             Throw.DebugAssert( files != null );
-            return GitSolution.Create( monitor, repo, branch, files, doc );
+            return GitSolution.Create( monitor, repo, branch, commit, files, doc );
         }
     }
 
     (INormalizedFileProvider? Files, XDocument? Doc) GetSolutionXDocument( IActivityMonitor monitor,
                                                                            Repo repo,
                                                                            Branch branch,
+                                                                           Commit commit,
                                                                            bool required,
                                                                            bool useWorkingFolder )
     {
         try
         {
-            var (files, fileName, doc) = GetSolutionXDocument( repo, branch.Tip, useWorkingFolder );
+            var (files, fileName, doc) = GetSolutionXDocument( repo, commit, useWorkingFolder );
             if( doc == null && required )
             {
-                monitor.Error( $"Expecting file '{fileName}' in '{repo.DisplayPath}', branch '{branch.FriendlyName}'." );
+                monitor.Error( $"Expecting file '{fileName}' in '{repo.DisplayPath}', branch '{branch.FriendlyName}'{(commit == branch.Tip ? "" : $" at commit '{commit.Sha.AsSpan( 0, 7 )}'")}." );
             }
             return (files, doc);
         }

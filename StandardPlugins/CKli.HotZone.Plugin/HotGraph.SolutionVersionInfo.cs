@@ -37,7 +37,11 @@ public sealed partial class HotGraph
         }
 
 
-        internal bool IsDirty => _builtTipSha != _solution.GitSolution.GitBranch.Tip.Sha;
+        // The commit the solution has been read from, not the current branch tip: this is dirty when the
+        // solution itself has been replaced (SetDevSolution reads another commit), not when the branch moved
+        // under a solution nobody re-read. A solution bound to a commit (the graph branch is missing in the
+        // repository and this is the commit it would be created at) is never dirty by design.
+        internal bool IsDirty => _builtTipSha != _solution.GitSolution.Commit.Sha;
 
         /// <summary>
         /// Captures the last <see cref="Version"/>, its <see cref="TagCommit"/> and <see cref="BranchName"/>, to consider in a build

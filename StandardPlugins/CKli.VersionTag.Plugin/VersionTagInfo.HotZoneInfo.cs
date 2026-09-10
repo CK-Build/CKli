@@ -1,6 +1,7 @@
-using CK.Core;
+﻿using CK.Core;
 using CKli.Core;
 using LibGit2Sharp;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -209,6 +210,23 @@ public sealed partial class VersionTagInfo
             {
                 monitor.Error( ActivityMonitor.Tags.ToBeInvestigated,
                                $"Unable to get tag commit tree from branch '{branch.CanonicalName}' to {_lastStable} in '{_info.Repo.DisplayPath}'." );
+            }
+            return t;
+        }
+
+        /// <summary>
+        /// Gets the <see cref="TagCommitTree"/> for a commit and emits an error on failure.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="commit">The commit to consider.</param>
+        /// <returns>The tree or null if <see cref="LastStable"/> is not reachable from <paramref name="commit"/>.</returns>
+        public TagCommitTree? GetRequiredTagCommitTree( IActivityMonitor monitor, Commit commit )
+        {
+            var t = GetTagCommitTree( commit );
+            if( t == null )
+            {
+                monitor.Error( ActivityMonitor.Tags.ToBeInvestigated,
+                               $"Unable to get tag commit tree from commit '{commit.Sha.AsSpan( 0, 7 )}' to {_lastStable} in '{_info.Repo.DisplayPath}'." );
             }
             return t;
         }

@@ -1,8 +1,9 @@
-using CK.Core;
+﻿using CK.Core;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
+using LibGit2Sharp;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -214,22 +215,33 @@ public sealed partial class HotGraph
         return success;
     }
 
-    internal bool AddSolution( IActivityMonitor monitor, BranchModelInfo branchInfo, HotBranch closestBranch, bool isPivot, ref bool isDevSolution )
+    internal bool AddSolution( IActivityMonitor monitor,
+                               BranchModelInfo branchInfo,
+                               HotBranch closestBranch,
+                               Commit? startCommit,
+                               bool isPivot,
+                               ref bool isDevSolution )
     {
         Throw.DebugAssert( _solutions[branchInfo.Repo.Index] == null );
         Throw.DebugAssert( closestBranch.GitBranch != null );
         Throw.DebugAssert( "isDevSolution => We are on the theoretical graph branch.", !isDevSolution || closestBranch.BranchName == _branchName );
+        Throw.DebugAssert( "A start commit is the graph branch's one: it is missing in this repository.",
+                           startCommit == null || (!isDevSolution && closestBranch.BranchName != _branchName) );
 
-        // Read the .slnx from the "dev/" or the regular branch.
-        var shallow = _shallowSolution.GetShallowSolution( monitor,
-                                                           branchInfo.Repo,
-                                                           (isDevSolution ? closestBranch.GitDevBranch : null) ?? closestBranch.GitBranch,
-                                                           useWorkingFolder: false );
+        // Read the .slnx from the "dev/" or the regular branch...
+        var readBranch = (isDevSolution ? closestBranch.GitDevBranch : null) ?? closestBranch.GitBranch;
+        // ...or, when the graph branch is missing here, from the commit it would be created at: the content
+        // that is analyzed must be the content that branch will start with.
+        var shallow = startCommit != null
+                        ? _shallowSolution.GetShallowSolution( monitor, branchInfo.Repo, readBranch, startCommit, useWorkingFolder: false )
+                        : _shallowSolution.GetShallowSolution( monitor, branchInfo.Repo, readBranch, useWorkingFolder: false );
         if( shallow == null )
         {
             // Unable to read the solution from the initial branch. But we can save the situation if
             // the branch was the regular one: the "dev/" may contain a valid solution.
-            if( !isDevSolution && closestBranch.GitDevBranch != null )
+            // This doesn't apply to a start commit: any other content would not be the one the branch
+            // will start with.
+            if( startCommit == null && !isDevSolution && closestBranch.GitDevBranch != null )
             {
                 shallow = _shallowSolution.GetShallowSolution( monitor, branchInfo.Repo, closestBranch.GitDevBranch, useWorkingFolder: false );
             }

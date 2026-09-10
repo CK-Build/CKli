@@ -1,10 +1,11 @@
-using CK.Core;
+﻿using CK.Core;
 using CK.PerfectEvent;
 using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
+using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -147,9 +148,19 @@ public sealed partial class HotZonePlugin : PrimaryPluginBase
                     //   But for non-ci builds, we initially consider the "/dev" only for the repos that are in pivots.
                     bool isDevSolution = (hotBranch.BranchName == branchName) && (isCIBuild || isContainedInPivots);
 
+                    // When the graph branch doesn't exist in this repository, the solution must be read from the
+                    // commit that branch would be created at: the BranchLinkType decides it and EnsureExists
+                    // creates the branch there, so what is analyzed is what the branch will start with.
+                    Commit? startCommit = null;
+                    if( hotBranch.BranchName != branchName )
+                    {
+                        startCommit = branchInfo.Branches[branchName.Index].GetStartCommit( monitor );
+                        if( startCommit == null ) return null;
+                    }
+
                     // isDevSolution may transition from false to true if the solution failed to be read in the
                     // regular branch but is valid in the "dev/".
-                    if( !graph.AddSolution( monitor, branchInfo, hotBranch, hasPivots && isContainedInPivots, ref isDevSolution ) )
+                    if( !graph.AddSolution( monitor, branchInfo, hotBranch, startCommit, hasPivots && isContainedInPivots, ref isDevSolution ) )
                     {
                         return null;
                     }
