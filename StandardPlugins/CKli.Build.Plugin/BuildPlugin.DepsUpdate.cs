@@ -1,6 +1,7 @@
-﻿using CK.Core;
+using CK.Core;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
+using CKli.ShallowSolution.Plugin;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +18,7 @@ public sealed partial class BuildPlugin
     const string _dDepsCI = "Consider the CI published profiles of the World References.";
     const string _dDepsPrerelease = "Consider the prerelease versions of the feeds even on the root branch.";
     const string _dDepsStable = "Consider only the stable versions of the feeds.";
+    const string _dDepsAllowDowngrade = "Apply the updates that move a version down (a Reference may pin lower than what this World references).";
 
     /// <summary>
     /// Analyzes the external dependencies of a World and reports the upgrades that would align them.
@@ -30,12 +32,14 @@ public sealed partial class BuildPlugin
     /// <param name="ci">True to consider the CI published profiles of the References.</param>
     /// <param name="prerelease">True to consider the prereleases of the feeds.</param>
     /// <param name="stable">True to consider only the stable versions of the feeds.</param>
+    /// <param name="allowDowngrade">True to apply the updates that move a version down.</param>
     /// <param name="dryRun">True to only display the upgrades.</param>
     /// <returns>True on success, false on error.</returns>
     [Description( """
         Aligns the external package dependencies of a World on the versions its World References publish and,
         for the identifiers no reference anchors, on the greatest version its feeds offer.
-        Only --dry-run is implemented for now: it reports what would be updated.
+        The repositories are updated on their "dev/" branch, which is created when it doesn't exist yet.
+        Use --dry-run to only report what would be updated.
         """ )]
     [CommandPath( "deps update" )]
     public async Task<bool> DepsUpdateAsync( IActivityMonitor monitor,
@@ -55,6 +59,8 @@ public sealed partial class BuildPlugin
                                              bool prerelease = false,
                                              [Description( _dDepsStable )]
                                              bool stable = false,
+                                             [Description( _dDepsAllowDowngrade )]
+                                             bool allowDowngrade = false,
                                              [Description( "Only display the upgrades." )]
                                              [OptionName( _oDryRun )]
                                              bool dryRun = false )
@@ -102,15 +108,81 @@ public sealed partial class BuildPlugin
         if( map == null ) return false;
 
         DisplayUpgrades( monitor, context, map );
-        if( !dryRun )
+        return dryRun || Apply( monitor, context, map, branchName, allowDowngrade );
+    }
+
+    // Writes the upgrades: the participants come upstream first (Upgrades is ordered by the solutions'
+    // OrderedIndex). Everything here is repo-local.
+    bool Apply( IActivityMonitor monitor, CKliEnv context, UpgradeMap map, BranchName branchName, bool allowDowngrade )
+    {
+        if( map.IsEmpty ) return true;
+        if( map.DowngradeCount > 0 && !allowDowngrade )
         {
-            monitor.Error( """
-                Applying the upgrades is not implemented yet: use --dry-run to obtain the report above.
-                (The apply path opens the missing branches, rewrites the projects with MutableSolution.UpdatePackages and commits.)
+            monitor.Error( $"""
+                {map.DowngradeCount} of these {map.UpgradeCount} updates move a version DOWN (▼ above). A World Reference
+                may legitimately pin lower than what this World references - alignment is the point - but this is not
+                applied unless --allow-downgrade is specified.
                 """ );
             return false;
         }
+        using( monitor.OpenInfo( $"Updating {map.Upgrades.Length} repositories on branch '{branchName}'." ) )
+        {
+            foreach( var r in map.Upgrades )
+            {
+                var repo = r.Repo;
+                using( monitor.OpenInfo( $"Updating {r.Upgrades.Length} package(s) in '{repo.DisplayPath}'." ) )
+                {
+                    // The branch we analyzed: not necessarily the solution's own one, which is the closest
+                    // existing branch when this repository doesn't have it yet.
+                    var b = r.Solution.BranchInfo.Branches[branchName.Index];
+                    // EnsureExists creates it at GetStartCommit: the very commit whose content has been
+                    // analyzed. Synchronize is deliberately NOT called - a stale World has been refused,
+                    // so there is nothing for it to do, and it is the only step that could move a tip
+                    // away from what this report describes.
+                    if( !b.Exists && !b.EnsureExists( monitor ) ) return false;
+                    b.EnsureDevBranch();
+                    // Development always takes place in the "dev/" branch.
+                    if( !repo.GitRepository.Checkout( monitor, b.GitDevBranch ) ) return false;
+
+                    var mapping = new PackageMapper();
+                    foreach( var u in r.Upgrades )
+                    {
+                        // An exact mapping: only the version this repository actually references is rewritten.
+                        mapping.Add( u.Current.PackageId, u.Current.Version, u.Target );
+                    }
+                    var updated = new PackageMapper();
+                    if( !_solutionPlugin.UpdatePackages( monitor, repo, mapping, updated ) ) return false;
+                    if( updated.Count != r.Upgrades.Length )
+                    {
+                        monitor.Warn( $"""
+                            Expected {r.Upgrades.Length} package(s) to be updated in '{repo.DisplayPath}' but {updated.Count} were:
+                            a reference may be centrally managed in a file this update doesn't reach.
+                            """ );
+                    }
+                    if( !b.Commit( monitor, CreateCommitMessage( r ) ) ) return false;
+                }
+            }
+        }
+        context.Screen.Display( context.Screen.ScreenType.Text( $"""
+            Updated {map.UpgradeCount} package(s) in {map.Upgrades.Length} repositories on '{branchName.DevName}'.
+            Run 'ckli build' to rebuild them.
+            """ ) );
         return true;
+    }
+
+    static string CreateCommitMessage( UpgradeMap.RepoUpgrades r )
+    {
+        var b = new System.Text.StringBuilder();
+        b.Append( "chore: aligning " )
+         .Append( r.Upgrades.Length )
+         .AppendLine( r.Upgrades.Length == 1 ? " external dependency." : " external dependencies." )
+         .AppendLine();
+        foreach( var u in r.Upgrades )
+        {
+            b.Append( "- " ).Append( u.Current.PackageId ).Append( ' ' )
+             .Append( u.Current.Version ).Append( " -> " ).AppendLine( u.Target.ToString() );
+        }
+        return b.ToString();
     }
 
     // A fetch updates the remote tracking references only: no branch moves and no content changes.
