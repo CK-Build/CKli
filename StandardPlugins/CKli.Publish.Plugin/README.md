@@ -1,4 +1,4 @@
-﻿# CKli.Publish.Plugin
+# CKli.Publish.Plugin
 
 `CKli.Publish.Plugin` is the plugin that performs the **remote** side of a release: pushing built
 NuGet packages to configured feeds, creating (draft, then finalized) releases on the repository's

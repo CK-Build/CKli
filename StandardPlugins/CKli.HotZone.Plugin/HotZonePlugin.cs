@@ -1,4 +1,4 @@
-﻿using CK.Core;
+using CK.Core;
 using CK.PerfectEvent;
 using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;

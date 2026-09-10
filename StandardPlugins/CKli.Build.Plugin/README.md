@@ -1,4 +1,4 @@
-﻿# CKli.Build.Plugin
+# CKli.Build.Plugin
 
 **CKli.Build.Plugin** is the StandardPlugin that turns a set of Git repositories into a **build roadmap** and executes it:
 it decides, repository by repository, whether a build is required, computes the version to produce, updates inter-repo

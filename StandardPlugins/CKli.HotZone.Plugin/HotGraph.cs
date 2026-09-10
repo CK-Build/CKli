@@ -1,4 +1,4 @@
-﻿using CK.Core;
+using CK.Core;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;

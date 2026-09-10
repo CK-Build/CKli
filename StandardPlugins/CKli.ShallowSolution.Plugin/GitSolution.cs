@@ -1,4 +1,4 @@
-﻿using CK.Core;
+using CK.Core;
 using CKli.Core;
 using LibGit2Sharp;
 using System;

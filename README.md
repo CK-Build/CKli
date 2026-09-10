@@ -1,4 +1,4 @@
-﻿# CKli
+# CKli
 
 CKli is a tool for <u>multi-repositories</u> stacks.
 It allows to automate actions (build, package upgrade, etc...), on <u>Worlds</u> (a group of repositories),
