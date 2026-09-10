@@ -105,7 +105,13 @@ sealed class CKliPull : Command
         {
             foreach( var repo in repos )
             {
-                return PullOne( monitor, repo, withTags, continueOnError, cancellation );
+                if( !PullOne( monitor, repo, withTags, continueOnError, cancellation ) )
+                {
+                    success = false;
+                    // Same behavior as the ParallelErrorBehavior.SoftStop used by "ckli pull":
+                    // on error, no new repository is considered unless --continue-on-error.
+                    if( !continueOnError ) break;
+                }
             }
         }
         return success;
