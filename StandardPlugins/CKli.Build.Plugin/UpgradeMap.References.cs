@@ -110,7 +110,14 @@ public sealed partial class UpgradeMap
         }
         // The Published folder is World scoped: an LTS World has its own below its name.
         var folder = r.LTSName is null ? "Published/" : $"{r.LTSName}/Published/";
-        var (success, content) = await provider.GetFileContentAsync( monitor, repoPath, folder + PublishedIndex.IndexFileName, cancellation: cancellation )
+        // The Stack branch is named explicitly: letting this default to the remote's default branch would
+        // read whatever that happens to be, and a (true, null) answer cannot tell a missing file from a
+        // missing ref - a reference read from the wrong branch would silently look like "publishes nothing".
+        var (success, content) = await provider.GetFileContentAsync( monitor,
+                                                                     repoPath,
+                                                                     folder + PublishedIndex.IndexFileName,
+                                                                     refName: StackRepository.BranchName,
+                                                                     cancellation: cancellation )
                                               .ConfigureAwait( false );
         if( !success ) return null;
         if( content == null )
@@ -166,7 +173,12 @@ public sealed partial class UpgradeMap
                                                            CancellationToken cancellation )
     {
         var path = PublishedProfile.GetProfilePath( version, folder, ".json" );
-        var (success, content) = await provider.GetFileContentAsync( monitor, repoPath, path, cancellation: cancellation )
+        // Same as the index above: the Stack branch, never the remote's default one.
+        var (success, content) = await provider.GetFileContentAsync( monitor,
+                                                                     repoPath,
+                                                                     path,
+                                                                     refName: StackRepository.BranchName,
+                                                                     cancellation: cancellation )
                                               .ConfigureAwait( false );
         if( !success || content == null )
         {
