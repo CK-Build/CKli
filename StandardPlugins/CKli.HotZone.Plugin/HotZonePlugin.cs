@@ -16,6 +16,14 @@ namespace CKli.HotZone.Plugin;
 /// <summary>
 /// Handles the "hot zone" of a repository.
 /// </summary>
+[CommandNamespace( "fix",
+    """
+    Drives the Fix Workflow that patches an already published version: "fix start" checks out the
+    "fix/vMajor.Minor" branch of every repository that must be patched, "fix push" shares them with
+    another developer (who joins with "fix start" on the same version), "fix info" dumps the current
+    workflow and "fix cancel" abandons it.
+    """,
+    HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/Fix-Workflow.md" )]
 public sealed partial class HotZonePlugin : PrimaryPluginBase
 {
     readonly PerfectEventSender<FixWorkflowStartEventArgs> _onFixStart;

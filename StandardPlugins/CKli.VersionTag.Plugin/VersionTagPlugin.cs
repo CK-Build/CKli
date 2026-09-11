@@ -14,6 +14,13 @@ namespace CKli.VersionTag.Plugin;
 /// <summary>
 /// Handles version tags for a <see cref="Repo"/>.
 /// </summary>
+[CommandNamespace( "version",
+    """
+    The CSemVer version tags of a repository: "version bump" declares the version a repository will
+    produce next (a "+fake" tag, a starting version and not a floor) and "version deprecate" marks a
+    published version as deprecated and propagates it to its consumers.
+    """,
+    HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.VersionTag.Plugin/README.md#commands" )]
 public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>, BranchModel.Plugin.ITagCommitProvider
 {
     readonly ArtifactHandlerPlugin _artifactHandlerPlugin;

@@ -16,6 +16,27 @@ namespace CKli.Build.Plugin;
 /// <summary>
 /// Plugin that implements the build commands.
 /// </summary>
+[CommandNamespace( "deps",
+    """
+    Aligns what the World consumes, where "build" propagates what it produces: the external package
+    references of its repositories are moved onto the versions its World References publish.
+    """,
+    HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.Build.Plugin/README.md#deps-update-aligning-the-external-dependencies" )]
+[CommandNamespace( "fix",
+    """
+    Builds and publishes a Fix Workflow: "fix build" produces "local/" versions in your own feed,
+    "fix publish" the real ones. There is no CI fix build in between.
+    """,
+    HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.Build.Plugin/README.md#fix-build--fix-publish-the-fix-workflow" )]
+[CommandNamespace( "maintenance",
+    "Rebuilds versions that have already been released.",
+    HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.Build.Plugin/README.md#a-note-on-rebuildoldasyncrebuildversionasync" )]
+[CommandNamespace( "maintenance rebuild",
+    """
+    Reproduces a released version on its own commit: the version is rebuilt as it was, never
+    incremented. Useful to check that an old release still builds with the current tooling.
+    """,
+    HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.Build.Plugin/README.md#a-note-on-rebuildoldasyncrebuildversionasync" )]
 public sealed partial class BuildPlugin : PrimaryPluginBase
 {
     const string _dBranch = "Specify the branch to consider. By default, the current head is considered when in a Repo.";

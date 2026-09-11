@@ -21,6 +21,18 @@ namespace CKli.Migration.Plugin;
 /// <summary>
 /// Very optional plugin. Contains temporary utlities.
 /// </summary>
+[CommandNamespace( "maintenance",
+    """
+    One-off conversions of repositories created under older CKli conventions. These commands are
+    transient: they disappear with this plugin once no repository needs them anymore.
+    """,
+    HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.Migration.Plugin/README.md#command" )]
+[CommandNamespace( "maintenance migrate",
+    """
+    Converts a repository to the current CKli conventions: branch model, version tagging, build
+    tooling and solution file format.
+    """,
+    HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.Migration.Plugin/README.md#command" )]
 public sealed class MigrationPlugin : PrimaryPluginBase
 {
     readonly ArtifactHandlerPlugin _artifactHandler;
