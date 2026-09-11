@@ -616,12 +616,14 @@ Unlike every other command described above, this one comes from a **plugin** (th
 they are documented with it in
 [`CKli.Build.Plugin`'s README](StandardPlugins/CKli.Build.Plugin/README.md#deps-update-aligning-the-external-dependencies).
 
-### `deps update --branch <name> --all --narrow --no-fetch --ci --prerelease --stable --allow-downgrade --dry-run`
+### `deps update --branch <name> --all --narrow --no-fetch --ci --with-nuget --prerelease --stable --allow-downgrade --dry-run`
 
 Aligns the **external** package dependencies of a World: the packages its repositories consume but don't
-produce. A target version comes from a `<VersionTag><Packages>` pin (which means "never touch this"), from
-the published profiles of the World `<Reference>`s, or - for the identifiers no reference anchors - from the
-greatest version the World's feeds offer.
+produce. A target version comes from a `<VersionTag><Packages>` pin (which means "never touch this") or from
+the published profiles of the World `<Reference>`s - and those references are the **only** source unless
+`--with-nuget` is specified, which lets the greatest version the World's NuGet feeds offer answer the
+identifiers no reference anchors. No feed is ever queried without that flag (`--prerelease` and `--stable`,
+which only filter what a feed offers, then require it).
 
 It updates the pivot repositories, the upstreams that need it, and by default the downstreams of everything it
 updates (`--narrow` keeps it to the upstreams): that is what a `ckli build` afterwards would rebuild anyway.
