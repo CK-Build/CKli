@@ -82,20 +82,32 @@ its regular fix-up pass.
 
 ```
 [CommandPath("maintenance migrate net8")]
-bool MigrateNet8( IActivityMonitor monitor, bool hardResetAll = false, bool restoreRemotes = false )
+bool MigrateNet8( IActivityMonitor monitor,
+                  CKliEnv context,
+                  bool all = false,
+                  bool hardResetAll = false,
+                  bool restoreRemotes = false )
 ```
+
+Like `ckli pull`, `ckli status` or `ckli deps update`, the command works on the
+**repositories selected by the current directory**
+(`World.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false )`):
+inside a Repo it migrates that one, inside a folder holding several it migrates
+those, and at the World root it migrates them all. Selecting nothing is an error,
+not a silent no-op.
 
 | Parameter | Meaning |
 |---|---|
-| `hardResetAll` | Deletes every repo folder under the World root (except the `-Stack` folder itself) before proceeding, so `World.GetAllDefinedRepo` re-clones everything from scratch. |
-| `restoreRemotes` | For each repo: drops the local `develop`/`stable`/`dev/stable` branches and local-only version tags, re-fetches `develop` from the remote, and wipes/recreates the local NuGet (`ArtifactHandlerPlugin.LocalNuGetPath`) and Assets (`LocalAssetsPath`) folders. Used to discard local experimentation and restart the migration from a clean, remote-tracked state. |
+| `--all` | Consider all the Repos of the current World even when the current path is in a Repo. |
+| `--hard-reset-all` | Deletes every repo folder under the World root (except the `-Stack` folder itself) before proceeding, so the layout fix re-clones everything from scratch. **Implies `--all`**: once the folders are gone the current directory can select nothing — it may itself be one of the folders being deleted. |
+| `--restore-remotes` | For each selected repo: drops the local `develop`/`stable`/`dev/stable` branches and local-only version tags, re-fetches `develop` from the remote, and wipes/recreates the local NuGet (`ArtifactHandlerPlugin.LocalNuGetPath`) and Assets (`LocalAssetsPath`) folders. Used to discard local experimentation and restart the migration from a clean, remote-tracked state. Note that the NuGet and Assets folders are World-global, so emptying them affects the whole World however few repos are selected. |
 
-`MigrateNet8` runs the full one-shot Net8 → Net10 conversion for the whole
-Stack, in order:
+`MigrateNet8` runs the full one-shot Net8 → Net10 conversion for the selected
+repositories, in order:
 
 1. **`CheckoutMasterIfItExistsAndFetchTags`** — fetches remote branches (no
    prune), checks out `master` where it still exists, and fetches tags for
-   every repo regardless.
+   every selected repo regardless.
 2. **`InitializeInfVersionFromMaster`** — must run *before* `RepositoryInfo.xml`
    is deleted. For each repo currently on `master` it infers an `InfVersion`
    from whichever is higher of: the version implied by the tip of a

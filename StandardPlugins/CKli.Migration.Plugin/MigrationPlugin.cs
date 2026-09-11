@@ -99,18 +99,28 @@ public sealed class MigrationPlugin : PrimaryPluginBase
     /// <summary>
     /// Implement migration from Net8 to Net10.
     /// </summary>
-    /// <param name="monitor"></param>
-    /// <param name="hardResetAll"></param>
-    /// <param name="restoreRemotes"></param>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The current environment (the current directory selects the repositories).</param>
+    /// <param name="all">True to consider all the Repos of the World regardless of the current directory.</param>
+    /// <param name="hardResetAll">True to delete all the working folders first. This implies <paramref name="all"/>.</param>
+    /// <param name="restoreRemotes">True to restore the selected repositories from their remote.</param>
     /// <returns></returns>
     [Description( "Migrate Net8 stack." )]
     [CommandPath( "maintenance migrate net8" )]
     public bool MigrateNet8( IActivityMonitor monitor,
+                             CKliEnv context,
+                             [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
+                             bool all = false,
+                             [Description( "Deletes all the working folders before migrating: they are cloned again from their remote. Implies --all." )]
                              bool hardResetAll = false,
+                             [Description( "Discards the local work: restores the 'develop' branch from its remote, drops the local only version tags and empties the local NuGet and Assets folders." )]
                              bool restoreRemotes = false )
     {
         if( hardResetAll )
         {
+            // Deleting every working folder is necessarily World wide: once the folders are gone, the
+            // current directory cannot select anything (it may be one of the folders being deleted).
+            all = true;
             using( monitor.OpenInfo( "Deleting all existing repo." ) )
             {
                 foreach( var f in Directory.EnumerateDirectories( World.Name.WorldRoot ) )
@@ -125,8 +135,10 @@ public sealed class MigrationPlugin : PrimaryPluginBase
                 }
             }
         }
-        // This will fix the layout by re-cloning all the repos.
-        var repos = World.GetAllDefinedRepo( monitor );
+        // This will fix the layout by re-cloning the repos.
+        var repos = all
+                        ? World.GetAllDefinedRepo( monitor )
+                        : World.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
         if( repos == null ) return false;
 
         if( restoreRemotes )
