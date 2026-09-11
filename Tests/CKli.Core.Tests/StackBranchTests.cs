@@ -1,58 +1,64 @@
 using CK.Core;
+using LibGit2Sharp;
 using NUnit.Framework;
 using Shouldly;
-using System.IO;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
 
 /// <summary>
-/// A Stack repository has a single branch: "main" by convention (this is what <see cref="StackRepository.CreateAsync"/>
-/// creates). A Stack repository that predates this convention has a "master" one: it must still be usable.
+/// A Stack repository has a single branch and it is <see cref="StackRepository.BranchName"/>. This is an
+/// invariant: a Stack repository that has another one is refused rather than worked on, because a Stack read
+/// from one branch and named on another cannot be made coherent (see <see cref="StackRepository.BranchName"/>).
 /// </summary>
 [TestFixture]
 public class StackBranchTests
 {
-    // Pushing the Stack requires the write PAT for the "FILESYSTEM".
-    [OneTimeSetUp]
-    public void OneTimeSetup() => TestEnv.SetFileSystemWritePAT();
-
-    [OneTimeTearDown]
-    public void OneTimeTearDown() => TestEnv.RemoveFileSystemWritePAT();
-
     [Test]
-    public async Task a_Stack_without_a_main_branch_works_on_its_default_branch_Async()
+    public async Task the_Stack_repository_is_on_the_stack_branch_and_tracks_its_remote_Async()
     {
         var root = TestEnv.EnsureCleanFolder();
-        // The CKt-Stack remote has no "main" branch: "master" is its default (and only) branch.
         var remotes = TestEnv.OpenRemotes( "CKt" );
 
-        // ckli clone file:///.../CKt-Stack
         (await CKliCommands.ExecAsync( TestHelper.Monitor, root, "clone", remotes.StackUri )).ShouldBeTrue();
+
         var inStack = root.ChangeDirectory( "CKt" );
-        using( var stack = StackRepository.TryOpenFromPath( TestHelper.Monitor, inStack, out _, skipPullStack: true )
-                                          .ShouldNotBeNull() )
-        {
-            var git = stack.GitRepository;
-            git.CurrentBranchName.ShouldBe( "master" );
-            git.Repository.Branches["main"].ShouldBeNull( "No purely local 'main' branch has been created." );
-            git.Repository.Head.TrackedBranch.ShouldNotBeNull( "The head tracks the remote: it can be pushed." );
-        }
+        using var stack = StackRepository.TryOpenFromPath( TestHelper.Monitor, inStack, out _, skipPullStack: true )
+                                         .ShouldNotBeNull();
+        var git = stack.GitRepository;
+        git.CurrentBranchName.ShouldBe( StackRepository.BranchName );
+        git.Repository.Head.TrackedBranch.ShouldNotBeNull( "The head tracks the remote: it can be pushed." );
+    }
 
-        // Before the fix, the Stack was on a purely local "main" and this failed with
-        // "Branch 'main' has no tracked branch.". This is what "ckli push" does.
-        File.WriteAllText( inStack.CurrentDirectory.Combine( ".PublicStack/Some.txt" ), "Hello!" );
-        using( var stack = StackRepository.TryOpenFromPath( TestHelper.Monitor, inStack, out _, skipPullStack: true )
-                                          .ShouldNotBeNull() )
-        {
-            stack.PushChanges( TestHelper.Monitor ).ShouldBeTrue();
-        }
+    [Test]
+    public async Task a_Stack_repository_without_the_stack_branch_is_refused_Async()
+    {
+        var root = TestEnv.EnsureCleanFolder();
+        // OpenRemotes re-extracts the bare repository on every call: renaming its branch cannot leak
+        // into another test.
+        var remotes = TestEnv.OpenRemotes( "CKt" );
+        RenameStackBranch( remotes.StackUri, StackRepository.BranchName, "master" );
 
-        // The remote has it: another clone sees it.
-        StackRepository.ClearRegistry( TestHelper.Monitor ).ShouldBeTrue();
-        var other = root.ChangeDirectory( "Other" );
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, other, "clone", remotes.StackUri )).ShouldBeTrue();
-        File.Exists( other.CurrentDirectory.Combine( "CKt/.PublicStack/Some.txt" ) ).ShouldBeTrue();
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, root, "clone", remotes.StackUri )).ShouldBeFalse();
+            logs.ShouldContain( t => t.Contains( $"has no '{StackRepository.BranchName}' branch" )
+                                     && t.Contains( "it is on 'master'" ) );
+        }
+    }
+
+    /// <summary>
+    /// Renames a branch of a bare repository and moves its HEAD onto it: this is what a Stack repository that
+    /// predates the <see cref="StackRepository.BranchName"/> convention looks like.
+    /// </summary>
+    static void RenameStackBranch( System.Uri bareStackUri, string from, string to )
+    {
+        using var repo = new Repository( Repository.Discover( bareStackUri.LocalPath ) );
+        var renamed = repo.Refs.Rename( $"refs/heads/{from}", $"refs/heads/{to}" );
+        // The Reference overload retargets the symbolic HEAD. The string one would make it direct:
+        // HEAD would be detached and the clone would land on no branch at all.
+        repo.Refs.UpdateTarget( repo.Refs.Head, renamed );
+        repo.Refs.Head.TargetIdentifier.ShouldBe( $"refs/heads/{to}" );
     }
 }

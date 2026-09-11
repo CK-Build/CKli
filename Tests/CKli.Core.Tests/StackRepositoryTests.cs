@@ -312,7 +312,7 @@ public class StackRepositoryTests
         stack.StackRoot.LastPart.ShouldBe( "CKt" );
         var git = stack.GitRepository;
         git.DisplayPath.Path.ShouldBe( "CKt/.PublicStack", "Not the 'ckt' one of the disposed handle." );
-        git.CurrentBranchName.ShouldBe( "master" );
+        git.CurrentBranchName.ShouldBe( StackRepository.BranchName );
         git.Repository.Head.Tip.ShouldNotBeNull();
     }
 

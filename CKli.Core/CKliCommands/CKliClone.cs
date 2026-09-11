@@ -176,7 +176,7 @@ sealed class CKliClone : Command
                                                           isPublic,
                                                           allowDuplicate,
                                                           ignoreParentStack,
-                                                          "main",
+                                                          StackRepository.BranchName,
                                                           maxDop,
                                                           ltsName,
                                                           scopeAlive )

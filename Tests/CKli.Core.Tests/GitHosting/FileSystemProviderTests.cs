@@ -110,16 +110,17 @@ public class FileSystemProviderTests
         var bareCKtCore = TestHelper.TestProjectFolder.Combine( "Remotes/bare/CKt/CKt-Core" );
 
         // A null refName is the bare repository's HEAD: HasDefaultBranch is false, so there is nothing else
-        // to mean. This fixture is "master" only (there is no "main" in it).
+        // to mean. A Stack repository's single branch is StackRepository.BranchName.
         var (success, content) = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtStack, "CKt.xml" );
         success.ShouldBeTrue();
         var xml = Encoding.UTF8.GetString( content.ShouldNotBeNull() );
         xml.ShouldContain( "<CKt" );
 
         // Naming the branch explicitly reads the very same bytes.
-        var onMaster = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtStack, "CKt.xml", refName: "master" );
-        onMaster.Success.ShouldBeTrue();
-        onMaster.Content.ShouldNotBeNull().ShouldBe( content );
+        var onMain = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtStack, "CKt.xml",
+                                                  refName: StackRepository.BranchName );
+        onMain.Success.ShouldBeTrue();
+        onMain.Content.ShouldNotBeNull().ShouldBe( content );
 
         // A commit sha is a refName too.
         using( var repo = new Repository( bareCKtStack.AppendPart( ".git" ) ) )
@@ -152,12 +153,12 @@ public class FileSystemProviderTests
             missingFile.Content.ShouldBeNull();
             logs.ShouldContain( l => Regex.IsMatch( l, @"File 'No/Way\.json' not found in 'file://.*CKt-Stack'@[0-9a-f]{40}\." ) );
 
-            // "main" is not in this fixture: the CKt-Stack remote is "master" only.
-            var missingRef = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtStack, "CKt.xml", refName: "main",
+            // A Stack repository has a single branch: there is no "master" in this fixture.
+            var missingRef = await p.GetFileContentAsync( TestHelper.Monitor, bareCKtStack, "CKt.xml", refName: "master",
                                                           notFoundLogLevel: LogLevel.Warn );
             missingRef.Success.ShouldBeTrue();
             missingRef.Content.ShouldBeNull();
-            logs.ShouldContain( l => Regex.IsMatch( l, @"No branch, tag or commit 'main' in 'file://.*CKt-Stack'\." ) );
+            logs.ShouldContain( l => Regex.IsMatch( l, @"No branch, tag or commit 'master' in 'file://.*CKt-Stack'\." ) );
 
             var missingRepo = await p.GetFileContentAsync( TestHelper.Monitor,
                                                            TestHelper.TestProjectFolder.AppendPart( "No way" ),

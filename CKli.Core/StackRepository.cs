@@ -45,6 +45,17 @@ public sealed partial class StackRepository : IDisposable
     /// </summary>
     public const string DuplicatePrefix = "DuplicateOf-";
 
+    /// <summary>
+    /// The one and only branch of a Stack repository.
+    /// <para>
+    /// This is an invariant, not a default: a Stack repository that has no such branch is refused by
+    /// <see cref="CloneAsync(IActivityMonitor, CKliEnv, Uri, bool, bool, bool, string, int, string?, CancellationToken)"/>
+    /// and by the <c>TryOpenFromPath</c> family. It is also the branch that anything reading a Stack
+    /// repository from its remote must name explicitly rather than relying on the remote's default branch.
+    /// </para>
+    /// </summary>
+    public const string BranchName = "main";
+
     readonly GitRepository _git;
     readonly NormalizedPath _stackRoot;
     readonly CKliEnv _context;
@@ -287,34 +298,37 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
-    /// Gets the branch to work on: <paramref name="stackBranchName"/> when the repository has it (locally or on
-    /// its "origin" remote), the repository's current branch otherwise.
+    /// Checks that the Stack repository has the <paramref name="stackBranchName"/> branch (locally or on its
+    /// "origin" remote) or emits an error.
     /// <para>
-    /// A Stack repository has a single branch, "main" by convention: this is the branch that <see cref="CreateAsync"/>
-    /// creates. A Stack repository that predates this convention has a "master" one (or any other name) and creating
-    /// a purely local "main" for it - what <see cref="GitRepository.FullCheckout(IActivityMonitor, string, bool)"/>
-    /// and <see cref="GitRepository.EnsureBranch(IActivityMonitor, string, LogLevel, LibGit2Sharp.Commit?)"/> do when
-    /// the branch is nowhere to be found - gives a Stack that can never be pushed back: <see cref="PushChanges"/>
-    /// pushes the head and the head must track a remote branch.
+    /// <see cref="BranchName"/> is an invariant of a Stack repository, so this refuses rather than adapting.
+    /// Working on whatever branch such a repository happens to be on cannot be made to hold: the Stack would
+    /// be read from one branch and every reader that names <see cref="BranchName"/> - or relies on the remote's
+    /// default branch - would look at another. Creating the missing branch locally instead is no better: that is
+    /// what <see cref="GitRepository.FullCheckout(IActivityMonitor, string, bool)"/> and
+    /// <see cref="GitRepository.EnsureBranch(IActivityMonitor, string, LogLevel, LibGit2Sharp.Commit?)"/> do when
+    /// the branch is nowhere to be found, and it gives a branch that tracks nothing, so <see cref="PushChanges"/>
+    /// (which pushes the head, and the head must track a remote branch) can never push it back.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="git">The stack repository.</param>
-    /// <param name="stackBranchName">The wanted branch name.</param>
-    /// <returns>The branch name to use.</returns>
-    static string GetStackBranchName( IActivityMonitor monitor, GitRepository git, string stackBranchName )
+    /// <param name="stackBranchName">The required branch name.</param>
+    /// <returns>True when the repository has the branch, false otherwise.</returns>
+    static bool CheckStackBranchName( IActivityMonitor monitor, GitRepository git, string stackBranchName )
     {
         // GetBranch creates the local branch that tracks the "origin/{stackBranchName}" one when it exists:
         // this is what the callers below need anyway.
         if( git.GetBranch( monitor, stackBranchName, LogLevel.None ) != null )
         {
-            return stackBranchName;
+            return true;
         }
-        var actual = git.CurrentBranchName;
-        monitor.Warn( $"""
-            Stack repository '{git.DisplayPath}' has no '{stackBranchName}' branch: working on its current branch '{actual}'.
+        monitor.Error( $"""
+            Stack repository '{git.DisplayPath}' has no '{stackBranchName}' branch (it is on '{git.CurrentBranchName}').
+            A Stack repository has a single branch and it must be '{stackBranchName}'.
+            Rename it on the remote (and make it the default branch) before using this Stack.
             """ );
-        return actual;
+        return false;
     }
 
     /// <summary>
@@ -509,7 +523,7 @@ public sealed partial class StackRepository : IDisposable
                                                     CKliEnv context,
                                                     out bool error,
                                                     bool skipPullStack = false,
-                                                    string stackBranchName = "main" )
+                                                    string stackBranchName = BranchName )
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( stackBranchName );
         error = false;
@@ -542,13 +556,22 @@ public sealed partial class StackRepository : IDisposable
                 }
                 if( !error )
                 {
-                    var b = git.EnsureBranch( monitor, GetStackBranchName( monitor, git, stackBranchName ) );
-                    if( git.Checkout( monitor, b )
-                        && (skipPullStack || git.FetchMergeHead( monitor, LibGit2Sharp.MergeFileFavor.Theirs )) )
+                    // CheckStackBranchName has created the local branch that tracks the remote one: EnsureBranch
+                    // finds it rather than creating a purely local one.
+                    if( !CheckStackBranchName( monitor, git, stackBranchName ) )
                     {
-                        return new StackRepository( git, stackRoot, context, stackNameFromUrl );
+                        error = true;
                     }
-                    error = true;
+                    else
+                    {
+                        var b = git.EnsureBranch( monitor, stackBranchName );
+                        if( git.Checkout( monitor, b )
+                            && (skipPullStack || git.FetchMergeHead( monitor, LibGit2Sharp.MergeFileFavor.Theirs )) )
+                        {
+                            return new StackRepository( git, stackRoot, context, stackNameFromUrl );
+                        }
+                        error = true;
+                    }
                 }
             }
             git.Dispose();
@@ -580,7 +603,7 @@ public sealed partial class StackRepository : IDisposable
                                      CKliEnv context,
                                      [NotNullWhen( true )] out StackRepository? stack,
                                      bool skipPullStack = false,
-                                     string stackBranchName = "main" )
+                                     string stackBranchName = BranchName )
     {
         stack = TryOpenFromPath( monitor, context, out bool error, skipPullStack, stackBranchName );
         if( error )
@@ -717,7 +740,7 @@ public sealed partial class StackRepository : IDisposable
                                                            bool isPublic,
                                                            bool allowDuplicateStack = false,
                                                            bool ignoreParentStack = false,
-                                                           string stackBranchName = "main",
+                                                           string stackBranchName = BranchName,
                                                            int maxDop = 0,
                                                            string? ltsName = null,
                                                            CancellationToken cancellation = default )
@@ -814,13 +837,13 @@ public sealed partial class StackRepository : IDisposable
                                        cancellation );
         if( git != null )
         {
-            // The clone checked out the remote's default branch: this is the one to work on when the
-            // remote has no "main" branch.
-            stackBranchName = GetStackBranchName( monitor, git, stackBranchName );
+            // The clone checked out the remote's default branch: a Stack repository must have the
+            // stack branch and it is refused when it hasn't (rather than working on another one).
             // Before doing anything else, we read the definition file and extract the actual
             // world name with the right casing. If case differ, the git handle is disposed,
             // the folder name is fixed and a new git handle is acquired on the new path.
-            if( git.FullCheckout( monitor, stackBranchName, skipFetchMerge: true )
+            if( CheckStackBranchName( monitor, git, stackBranchName )
+                && git.FullCheckout( monitor, stackBranchName, skipFetchMerge: true )
                 && GetActualStackName( monitor, git, stackNameFromUrl, out var actualStackName ) )
             {
                 if( actualStackName != stackNameFromUrl )
@@ -976,7 +999,7 @@ public sealed partial class StackRepository : IDisposable
             }
         }
         // Everything seems okay. It's time to create the remote before cloning it.
-        var remoteInfo = await hostingProvider.CreateRepositoryAsync( monitor, remoteRepoPath, !isPublic, "main", cancellation ).ConfigureAwait( false );
+        var remoteInfo = await hostingProvider.CreateRepositoryAsync( monitor, remoteRepoPath, !isPublic, BranchName, cancellation ).ConfigureAwait( false );
         if( remoteInfo == null )
         {
             return null;
@@ -996,6 +1019,21 @@ public sealed partial class StackRepository : IDisposable
                                    stackName,
                                    out gitRepository,
                                    cancellation );
+            // BranchName must be the remote's default branch, not only the branch that has been pushed:
+            // anything that reads this Stack from its remote without cloning it resolves the default branch
+            // when it names no ref. CreateRepositoryAsync is given the name but a provider may ignore it
+            // (GitHub uses the account's default), so this is set explicitly once the branch exists.
+            // SetDefaultBranchAsync is idempotent and the branch is required to exist: hence after the push.
+            if( newStack != null && hostingProvider.HasDefaultBranch )
+            {
+                if( !await hostingProvider.SetDefaultBranchAsync( monitor, remoteRepoPath, BranchName, cancellation )
+                                          .ConfigureAwait( false ) )
+                {
+                    newStack.Dispose();
+                    newStack = null;
+                    gitRepository = null;
+                }
+            }
         }
         catch( Exception ex )
         {
@@ -1041,7 +1079,7 @@ public sealed partial class StackRepository : IDisposable
                                                  gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ),
                                                  cancellation );
             if( gitRepository == null
-                || !gitRepository.FullCheckout( monitor, "main", skipFetchMerge: true ) )
+                || !gitRepository.FullCheckout( monitor, BranchName, skipFetchMerge: true ) )
             {
                 return null;
             }

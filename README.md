@@ -91,7 +91,8 @@ Below is the CKli default world definition file (there is no folder structure he
   <Repository Url="https://github.com/CK-Build/CK-Packaging-Abstractions" />
 </CKli>
 ```
-This definition file is stored in the `main` branch of a Stack repository:
+This definition file is stored in the `main` branch of a Stack repository — a Stack repository has a single
+branch and it must be `main` (a repository that hasn't got it is refused, not adapted to):
 
 ```
 ckli clone https://github.com/CK-Build/CKli-Stack

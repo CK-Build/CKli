@@ -39,10 +39,22 @@ It is cloned once into a local folder at the root of the cloned stack folder:
 
 A local registry at `%LocalAppData%/CKli/StackRepositoryRegistry.v0.txt` tracks all known stacks on the machine.
 
-A Stack repository has a single branch: `main` by convention (this is the branch that `ckli create` creates on
-the remote). A Stack repository that predates this convention has a `master` branch (or any other name): CKli
-then works on the repository's current branch. It never creates a purely local `main` for it — such a Stack
-could never be pushed back since `PushChanges` pushes the head and the head must track a remote branch.
+A Stack repository has a single branch and it is `StackRepository.BranchName` (`main`). This is an **invariant,
+not a default**: `CheckStackBranchName` refuses a Stack repository that hasn't got it — in `CloneAsync` and in
+`TryOpenFromPath`, so a clone cannot slip through and a later command cannot recreate it. Two things it is
+deliberately not doing:
+
+- *Working on whatever branch the repository is on.* That cannot be made coherent: the Stack would be read from
+  one branch while every reader that names `BranchName` looks at another. `ckli create` also makes `BranchName`
+  the remote's **default** branch (`SetDefaultBranchAsync` after the push — a provider may ignore the name given
+  to `CreateRepositoryAsync`, GitHub uses the account's), so the two agree.
+- *Creating the branch locally.* That is what `FullCheckout` and `EnsureBranch` do when they find neither a local
+  nor an `origin/` one, and it gives a branch that tracks nothing — `PushChanges` pushes the head and the head
+  must track a remote branch, so such a Stack could never be pushed back.
+
+Anything reading a Stack repository from its remote without cloning it must name `BranchName` rather than let
+`GetFileContentAsync` fall back to the remote's default branch: `CKli.Build.Plugin`'s `UpgradeMap.References`
+does exactly that for a World Reference's `Published/index.json` and profiles.
 
 A Stack repository can be moved to another remote with `ckli remote stack migrate <newUrl>`: it creates the new
 remote repository if needed, changes the `origin` url (`StackRepository.SetRemoteUrl`), pushes the Stack content
