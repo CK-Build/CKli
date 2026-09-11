@@ -25,14 +25,26 @@ public sealed partial class UpgradeMap
                                                                                 CKliEnv context,
                                                                                 World world,
                                                                                 BranchName branchName,
-                                                                                bool considerCI,
+                                                                                Options options,
                                                                                 CancellationToken cancellation )
     {
         var anchors = new Dictionary<string, ReferenceAnchor>( StringComparer.OrdinalIgnoreCase );
         var references = world.DefinitionFile.References;
         if( references.Count == 0 )
         {
-            monitor.Info( "This World has no <Reference>: the feeds are the only source of target versions." );
+            // Without --with-nuget the References are the only source, so a World that has none can have no
+            // target at all: this is a dead end, not a detail.
+            if( options.UseFeeds )
+            {
+                monitor.Info( "This World has no <Reference>: the feeds are the only source of target versions." );
+            }
+            else
+            {
+                monitor.Warn( """
+                    This World has no <Reference> and --with-nuget is not specified: nothing can anchor a target
+                    version, so there is nothing to update.
+                    """ );
+            }
             return anchors;
         }
         using( monitor.OpenInfo( $"Reading the published profiles of {references.Count} World Reference(s)." ) )
@@ -44,7 +56,7 @@ public sealed partial class UpgradeMap
                     monitor.Warn( $"Skipping reference '{r.RawUrl}': it is not a valid url." );
                     continue;
                 }
-                var profile = await ReadProfileAsync( monitor, context, r, branchName, considerCI, cancellation ).ConfigureAwait( false );
+                var profile = await ReadProfileAsync( monitor, context, r, branchName, options.ConsiderCI, cancellation ).ConfigureAwait( false );
                 if( profile == null ) continue;
                 // The produced packages come first: inside a profile they win over what it depends on.
                 foreach( var (packageId, p) in profile.ProducedPackages )
@@ -60,15 +72,20 @@ public sealed partial class UpgradeMap
                     Merge( monitor, anchors, p.PackageId, p.Version, profile, isProduced: false );
                 }
                 // An AmbiguousDependency has no single version to anchor: it is skipped, but never silently.
-                // Dropping the identifier lets the feed lookup answer, and the feed can then disagree with the
-                // very reference we are aligning on.
+                // With --with-nuget, dropping the identifier lets the feed lookup answer, and the feed can
+                // then disagree with the very reference we are aligning on.
                 foreach( var a in profile.TransitiveDependencies.Ambiguous )
                 {
                     if( anchors.ContainsKey( a.PackageId ) ) continue;
-                    monitor.Warn( $"""
-                        '{a.PackageId}' is an ambiguous transitive dependency of '{profile}' and no other source anchors it:
-                        its target will come from the feeds, which may disagree with that reference.
-                        """ );
+                    monitor.Warn( options.UseFeeds
+                                    ? $"""
+                                        '{a.PackageId}' is an ambiguous transitive dependency of '{profile}' and no other source anchors it:
+                                        its target will come from the feeds, which may disagree with that reference.
+                                        """
+                                    : $"""
+                                        '{a.PackageId}' is an ambiguous transitive dependency of '{profile}' and no other source anchors it:
+                                        it has no target and is not upgraded.
+                                        """ );
                 }
             }
         }

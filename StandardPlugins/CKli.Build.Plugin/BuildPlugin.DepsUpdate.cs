@@ -16,8 +16,9 @@ public sealed partial class BuildPlugin
     const string _dDepsNarrow = "Keep the update to the current repositories and their upstreams: don't bring the downstreams of an updated repository in.";
     const string _dDepsNoFetch = "Don't fetch the repositories first. The analysis is then only as fresh as the last fetch.";
     const string _dDepsCI = "Consider the CI published profiles of the World References.";
-    const string _dDepsPrerelease = "Consider the prerelease versions of the feeds even on the root branch.";
-    const string _dDepsStable = "Consider only the stable versions of the feeds.";
+    const string _dDepsWithNuGet = "Let the World's NuGet feeds answer the package identifiers no World Reference anchors. Without this, no feed is ever queried.";
+    const string _dDepsPrerelease = "Consider the prerelease versions of the feeds even on the root branch. Requires --with-nuget.";
+    const string _dDepsStable = "Consider only the stable versions of the feeds. Requires --with-nuget.";
     const string _dDepsAllowDowngrade = "Apply the updates that move a version down (a Reference may pin lower than what this World references).";
 
     /// <summary>
@@ -30,14 +31,16 @@ public sealed partial class BuildPlugin
     /// <param name="narrow">True to exclude the downstreams of an updated repository.</param>
     /// <param name="noFetch">True to skip the fetch.</param>
     /// <param name="ci">True to consider the CI published profiles of the References.</param>
+    /// <param name="withNuGet">True to let the feeds answer the identifiers no World Reference anchors.</param>
     /// <param name="prerelease">True to consider the prereleases of the feeds.</param>
     /// <param name="stable">True to consider only the stable versions of the feeds.</param>
     /// <param name="allowDowngrade">True to apply the updates that move a version down.</param>
     /// <param name="dryRun">True to only display the upgrades.</param>
     /// <returns>True on success, false on error.</returns>
     [Description( """
-        Aligns the external package dependencies of a World on the versions its World References publish and,
-        for the identifiers no reference anchors, on the greatest version its feeds offer.
+        Aligns the external package dependencies of a World on the versions its World References publish.
+        The World References are the only source: use --with-nuget to also align the identifiers none of them
+        anchors on the greatest version the World's NuGet feeds offer.
         The repositories are updated on their "dev/" branch, which is created when it doesn't exist yet.
         Use --dry-run to only report what would be updated.
         """ )]
@@ -55,6 +58,9 @@ public sealed partial class BuildPlugin
                                              bool noFetch = false,
                                              [Description( _dDepsCI )]
                                              bool ci = false,
+                                             [Description( _dDepsWithNuGet )]
+                                             [OptionName( "--with-nuget" )]
+                                             bool withNuGet = false,
                                              [Description( _dDepsPrerelease )]
                                              bool prerelease = false,
                                              [Description( _dDepsStable )]
@@ -70,6 +76,12 @@ public sealed partial class BuildPlugin
             monitor.Error( "--stable and --prerelease are exclusive." );
             return false;
         }
+        // Both only filter what a feed offers: accepting them without --with-nuget would silently do nothing.
+        if( !withNuGet && (stable || prerelease) )
+        {
+            monitor.Error( $"--{(stable ? "stable" : "prerelease")} only filters the versions the NuGet feeds offer: --with-nuget must be specified." );
+            return false;
+        }
         var cancellation = PrimaryPluginContext.Cancellation;
         // The World must be coherent before anything is computed: no repository dirty (a commit would sweep
         // uncommitted work in), no version tag issue and no branch model issue. This is refused, never healed.
@@ -83,9 +95,10 @@ public sealed partial class BuildPlugin
                         : World.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
         if( pivots == null ) return false;
 
-        // This command is online by design: it asks every feed for the versions it offers and reads the
-        // References over http. Being stale about our own repositories while being fresh about the outside
-        // world makes no sense, and it is what makes the divergence check below mean anything.
+        // This command is online by design: it reads the World References over http (and, with --with-nuget,
+        // asks every feed for the versions it offers). Being stale about our own repositories while being
+        // fresh about the outside world makes no sense, and it is what makes the divergence check below mean
+        // anything.
         if( !noFetch && !FetchAll( monitor, allRepos, cancellation ) )
         {
             return false;
@@ -102,6 +115,7 @@ public sealed partial class BuildPlugin
 
         var options = new UpgradeMap.Options( Narrow: narrow,
                                               ConsiderCI: ci,
+                                              UseFeeds: withNuGet,
                                               StableOnly: stable || (!prerelease && branchName.IsRoot) );
         var map = await UpgradeMap.CreateAsync( monitor, context, World, graph, _versionTag, _artifactHandler, options, cancellation )
                                   .ConfigureAwait( false );

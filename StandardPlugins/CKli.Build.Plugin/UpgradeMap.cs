@@ -18,7 +18,8 @@ namespace CKli.Build.Plugin;
 /// <para>
 /// A target comes from one of three sources, in this order: a <c>&lt;VersionTag&gt;&lt;Packages&gt;</c> pin
 /// (which is an authoritative exception and therefore has no target and prunes the closure), the World
-/// References' published profiles, and the World's configured NuGet feeds. See <see cref="TryGetTargetAsync"/>.
+/// References' published profiles, and - only when <see cref="Options.UseFeeds"/> is set - the World's
+/// configured NuGet feeds. See <see cref="TryGetTargetAsync"/>.
 /// </para>
 /// <para>
 /// The repositories that participate start with the <see cref="HotGraph.Pivots"/> and grow: an upstream that
@@ -46,11 +47,17 @@ public sealed partial class UpgradeMap
     /// profile per branch and it is newer than every non CI publication of that branch, so one that is there
     /// applies: there is no "is it superseded" question to answer.
     /// </param>
+    /// <param name="UseFeeds">
+    /// True to let the World's configured NuGet feeds answer the identifiers no World Reference anchors.
+    /// False (the default) keeps the analysis offline as far as the feeds are concerned: the World References
+    /// are then the only source of target versions.
+    /// </param>
     /// <param name="StableOnly">
     /// True to consider only <see cref="SVersion.IsStable"/> feed versions, false to consider the prereleases
-    /// too. Defaults to whether the analyzed branch is the root one.
+    /// too. Defaults to whether the analyzed branch is the root one. Only applies when <paramref name="UseFeeds"/>
+    /// is true.
     /// </param>
-    public sealed record Options( bool Narrow, bool ConsiderCI, bool StableOnly );
+    public sealed record Options( bool Narrow, bool ConsiderCI, bool UseFeeds, bool StableOnly );
 
     /// <summary>
     /// Where a target comes from, or why there is none.
@@ -58,7 +65,8 @@ public sealed partial class UpgradeMap
     public enum TargetState
     {
         /// <summary>
-        /// No source knows this identifier: no reference anchors it and no feed has it. There is no target.
+        /// No source knows this identifier: no World Reference anchors it and, when <see cref="Options.UseFeeds"/>
+        /// is set, no feed has it. There is no target.
         /// </summary>
         Unknown,
 
@@ -81,6 +89,7 @@ public sealed partial class UpgradeMap
 
         /// <summary>
         /// No reference anchors the identifier: the greatest version the World's feeds offer is the target.
+        /// Only reachable when <see cref="Options.UseFeeds"/> is set.
         /// </summary>
         Feed
     }
@@ -245,7 +254,10 @@ public sealed partial class UpgradeMap
     /// <param name="world">The World.</param>
     /// <param name="graph">The hot graph of the branch to analyze.</param>
     /// <param name="versionTag">The version tag plugin: its <c>&lt;Packages&gt;</c> configuration holds the pins.</param>
-    /// <param name="artifactHandler">The artifact handler plugin: its configured feeds are the last source.</param>
+    /// <param name="artifactHandler">
+    /// The artifact handler plugin: its configured feeds are the last source. Only solicited when
+    /// <see cref="Options.UseFeeds"/> is set.
+    /// </param>
     /// <param name="options">The analysis options.</param>
     /// <param name="cancellation">Optional cancellation token.</param>
     /// <returns>The map or null on error.</returns>
@@ -264,10 +276,14 @@ public sealed partial class UpgradeMap
         {
             var pins = versionTag.GetPackagesConfiguration( monitor );
             if( pins == null ) return null;
-            var references = await ReadReferencesAsync( monitor, context, world, graph.BranchName, options.ConsiderCI, cancellation )
+            var references = await ReadReferencesAsync( monitor, context, world, graph.BranchName, options, cancellation )
                                         .ConfigureAwait( false );
             if( references == null ) return null;
-            if( !artifactHandler.GetConfiguredNuGetFeeds( monitor, out var feeds ) ) return null;
+            // Without --with-nuget nothing is asked to any feed, so the feeds are not even read from the
+            // configuration: GetConfiguredNuGetFeeds writes the default nuget.org feed into the World when
+            // none is configured, and an analysis that will never query a feed must not do that.
+            var feeds = ImmutableArray<NuGetFeed>.Empty;
+            if( options.UseFeeds && !artifactHandler.GetConfiguredNuGetFeeds( monitor, out feeds ) ) return null;
 
             var resolver = new TargetResolver( monitor, context, pins, references, feeds, options );
             // The upgrades of every solution of the graph: the targets are memoized, so computing them for a

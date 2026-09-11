@@ -82,7 +82,15 @@ public sealed partial class UpgradeMap
                 }
                 return new Target( packageId, anchor.Version, TargetState.Reference, anchor.Origin );
             }
-            // 3 - Nothing anchors it: the greatest version the World's feeds offer.
+            // 3 - Nothing anchors it: the greatest version the World's feeds offer - but only when
+            //     --with-nuget has been specified. The References are the default source: an identifier
+            //     none of them carries is simply left alone rather than aligned on whatever a feed happens
+            //     to publish today.
+            if( !_options.UseFeeds )
+            {
+                _monitor.Trace( $"No World Reference anchors '{packageId}': not upgraded (--with-nuget is not specified)." );
+                return new Target( packageId, null, TargetState.Unknown, "no World Reference anchors it (--with-nuget is not specified)" );
+            }
             var (version, origin) = await GetGreatestFeedVersionAsync( packageId, cancellation ).ConfigureAwait( false );
             return version == null
                     ? new Target( packageId, null, TargetState.Unknown, "no reference and no feed knows it" )
