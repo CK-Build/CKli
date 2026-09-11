@@ -22,7 +22,8 @@ sealed class CKliStatus : Command
                     (["--by-branch,-b"], "Group by current branch names."),
                     (["--all"], "Lists all the Repos of the current World (even if current path is in a Repo)."),
                     (["--skip-pull-stack"], "Don't update the stack repository.")
-               ] )
+               ],
+                summary: "Lists the World's Repos, or every Stack that exists locally when outside a Stack." )
     {
     }
 

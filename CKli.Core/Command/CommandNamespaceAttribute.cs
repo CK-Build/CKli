@@ -28,6 +28,16 @@ public sealed class CommandNamespaceAttribute : Attribute
     }
 
     /// <summary>
+    /// Gets or sets the one line summary that the collapsed top-level help displays for this namespace.
+    /// When not set, the whole description is displayed (and wrapped).
+    /// <para>
+    /// When several plugins describe the namespace, their summaries are displayed one after the other:
+    /// write one that reads on its own.
+    /// </para>
+    /// </summary>
+    public string? Summary { get; set; }
+
+    /// <summary>
     /// Gets or sets an optional absolute url to an external documentation of this namespace.
     /// <para>
     /// This must be an origin url on a durable branch ("stable"), never on a transient "dev/" one.

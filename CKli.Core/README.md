@@ -410,6 +410,29 @@ The intrinsic namespaces are described by `CKliCommands` itself. Describing a na
 **warned and ignored**, not refused: a plugin may legitimately describe a namespace that a currently disabled plugin fills.
 A namespace with no description at all is valid — it is up to the help renderer to display the child commands instead.
 
+## The two help modes
+
+`ckli --help` used to list all 55 commands with every option and flag: 382 lines, of which the options and flags alone
+were 181. It is now **collapsed**: one line per depth 1 item, plus one row of child names below each namespace so that
+the map still names every command. 43 lines.
+
+The rule is simply **collapsed if and only if no help path was given**. Any `--help` that names something — a namespace
+(`ckli tag --help`) or a command (`ckli tag push --help`) — displays that whole subtree in full, exactly as before;
+the largest namespace of this stack is 58 lines, so there is nothing to collapse there.
+
+What the collapsed line shows is `CommandNamespaceItem.Summary`: the **authored** `Summary` of each description part
+(`[Description( "…", Summary = "…" )]`, `[CommandNamespace( …, Summary = "…" )]`, or the `summary:` argument of a
+`Command` constructor — it is the last parameter and defaults to null, so no existing command had to change). When a
+part has none, its whole `Text` is used with its line breaks collapsed: nothing is ever dropped, the line is just longer
+until someone writes a summary. Deliberately **not** the first line of the description — most of them are prose whose
+first line stops mid-sentence.
+
+Ordering is `CommandNamespaceItem.PathComparer`: the path without its `*` markers, then the unmarked one first, so
+`build` precedes `*build` and `publish` precedes `*publish`.
+
+The global options and flags are condensed to a single line in the collapsed help. `ckli --help --global` details them:
+`--help` may be followed by a trailing run of help modifiers, which is the only place `--global` is recognized.
+
 ## Plugin commands
 
 Commands are implemented by Plugins public methods decorated with a `[CommandPath( "..." )]` attribute. These methods must:

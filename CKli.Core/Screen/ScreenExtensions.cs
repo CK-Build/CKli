@@ -33,14 +33,16 @@ public static class ScreenExtensions
                                     List<CommandHelp> commands,
                                     CommandLineArguments cmdLine,
                                     ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions = default,
-                                    ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default )
+                                    ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags = default,
+                                    bool collapsed = false )
     {
         var h = CreateDisplayHelp( screen.ScreenType,
                                    screen is InteractiveScreen,
                                    commands,
                                    cmdLine,
                                    globalOptions,
-                                   globalFlags );
+                                   globalFlags,
+                                   collapsed );
         screen.Display( h );
     }
 
@@ -93,12 +95,18 @@ public static class ScreenExtensions
     /// <param name="cmdLine">The current command line.</param>
     /// <param name="globalOptions">The global options.</param>
     /// <param name="globalFlags">The global flags.</param>
+    /// <param name="collapsed">
+    /// True for the top level help (no help path): one line per command or namespace, no arguments,
+    /// options nor flags, and the child names below a namespace. The global options and flags are
+    /// then condensed on a single line unless <see cref="CommandLineArguments.HasGlobalHelp"/> is true.
+    /// </param>
     public static IRenderable CreateDisplayHelp( ScreenType screenType,
                                                  bool isInteractiveScreen,
                                                  List<CommandHelp> commands,
                                                  CommandLineArguments cmdLine,
                                                  ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> globalOptions,
-                                                 ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags )
+                                                 ImmutableArray<(ImmutableArray<string> Names, string Description)> globalFlags,
+                                                 bool collapsed = false )
     {
         IRenderable head = commands.Count == 1
                                 ? CreateDisplayHelpHeader( screenType, cmdLine )
@@ -122,24 +130,66 @@ public static class ScreenExtensions
         // |        --flag, -f              Description
         // 
         int minFirstCol = 0;
-        var helps = screenType.Unit.AddBelow( commands.Select( c => new Collapsable( RenderCommand( c, ref minFirstCol )
-                                                                                     .AddBelow( screenType.EmptyString ) )  ) );
+        // Collapsed: no blank line between the entries, the "> "/"│" gutter already separates them.
+        var helps = screenType.Unit.AddBelow( commands.Select( c => collapsed
+                                                                    ? new Collapsable( RenderCollapsed( c, ref minFirstCol ) )
+                                                                    : new Collapsable( RenderCommand( c, ref minFirstCol )
+                                                                                        .AddBelow( screenType.EmptyString ) ) ) );
 
-        if( !globalOptions.IsDefaultOrEmpty )
+        // In the collapsed help the global options and flags are a single line: they are the same
+        // for every command and never what the user came looking for.
+        if( collapsed && !cmdLine.HasGlobalHelp )
         {
-            helps = helps.AddBelow( screenType.Text( "Global options:" ) )
-                         .AddBelow( CommandHelp.ToRenderableOptions( screenType, globalOptions )
-                                        .Select( o => o.Names.Box( marginLeft: 1 ).AddRight( o.Description ) ) );
-         }
-        if( !globalFlags.IsDefaultOrEmpty )
+            if( !globalOptions.IsDefaultOrEmpty || !globalFlags.IsDefaultOrEmpty )
+            {
+                var names = globalOptions.IsDefaultOrEmpty
+                                ? Enumerable.Empty<string>()
+                                : globalOptions.Select( o => string.Join( '|', o.Names ) + " <value>" );
+                if( !globalFlags.IsDefaultOrEmpty )
+                {
+                    names = names.Concat( globalFlags.Select( f => string.Join( '|', f.Names ) ) );
+                }
+                helps = helps.AddBelow( screenType.EmptyString )
+                             .AddBelow( screenType.Text( "Global:" ).Box( marginRight: 1 )
+                                                  .AddRight( screenType.Text( string.Join( ", ", names ) ) ) )
+                             .AddBelow( screenType.Text( """Use "--help --global" to detail them.""",
+                                                         TextEffect.Italic ).Box( marginLeft: 8 ) );
+            }
+        }
+        else
         {
-            helps = helps.AddBelow( screenType.Text( "Global flags:" ) )
-                         .AddBelow( CommandHelp.ToRenderableFlags( screenType, globalFlags )
-                                        .Select( f => f.Names.Box( marginLeft: 1 ).AddRight( f.Description ) ) );
+            if( !globalOptions.IsDefaultOrEmpty )
+            {
+                helps = helps.AddBelow( screenType.Text( "Global options:" ) )
+                             .AddBelow( CommandHelp.ToRenderableOptions( screenType, globalOptions )
+                                            .Select( o => o.Names.Box( marginLeft: 1 ).AddRight( o.Description ) ) );
+            }
+            if( !globalFlags.IsDefaultOrEmpty )
+            {
+                helps = helps.AddBelow( screenType.Text( "Global flags:" ) )
+                             .AddBelow( CommandHelp.ToRenderableFlags( screenType, globalFlags )
+                                            .Select( f => f.Names.Box( marginLeft: 1 ).AddRight( f.Description ) ) );
 
+            }
         }
         helps = TableLayout.Create( helps, new ColumnDefinition( minWidth: 2 + minFirstCol ) );
         return head.AddBelow( helps );
+
+        // Layout:
+        // > command path <name1>           Summary on one line.
+        // > namespace                      Summary on one line.
+        // |    child1, child2, child3
+        static IRenderable RenderCollapsed( CommandHelp c, ref int minFirstCol )
+        {
+            IRenderable head = c.CommandPathAndArgs.Box( marginRight: 1 );
+            if( head.Width > minFirstCol ) minFirstCol = head.Width;
+            head = head.AddRight( c.Summary );
+            if( c.ChildNames != null )
+            {
+                head = head.AddBelow( c.ChildNames.Box( marginLeft: 3 ) );
+            }
+            return head;
+        }
 
         static IRenderable RenderCommand( CommandHelp c, ref int minFirstCol )
         {

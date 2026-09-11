@@ -21,7 +21,8 @@ sealed class ReflectionPluginCommand : PluginCommand
                                     ImmutableArray<(ImmutableArray<string> Names, string Description)> flags,
                                     MethodInfo method,
                                     int parameterCount,
-                                    MethodAsyncReturn returnType )
+                                    MethodAsyncReturn returnType,
+                                    string? summary = null )
         : base( typeInfo,
                 commandPath,
                 description,
@@ -31,7 +32,8 @@ sealed class ReflectionPluginCommand : PluginCommand
                 options,
                 flags,
                 method.Name,
-                returnType )
+                returnType,
+                summary )
     {
         _method = method;
         _parameterCount = parameterCount;

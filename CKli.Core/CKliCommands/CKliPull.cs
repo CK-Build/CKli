@@ -24,7 +24,8 @@ sealed class CKliPull : Command
                     (["--with-tags"], "Pull tags: remote tags replace local ones with the same name."),
                     (["--continue-on-error"], "Continues even on error. By default the first error stops the operation."),
                     (["--max-dop"], "Limits the parallelism when pulling the repositories."),
-             ] )
+             ],
+                summary: "Pulls the Stack repository and all Repo's local branches that track a remote branch." )
     {
     }
 

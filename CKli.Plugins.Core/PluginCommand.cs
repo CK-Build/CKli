@@ -41,8 +41,9 @@ public abstract class PluginCommand : Command
                              ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
                              ImmutableArray<(ImmutableArray<string> Names, string Description)> flags,
                              string methodName,
-                             MethodAsyncReturn returnType )
-        : base( typeInfo, commandPath, description, arguments, options, flags )
+                             MethodAsyncReturn returnType,
+                             string? summary = null )
+        : base( typeInfo, commandPath, description, arguments, options, flags, summary )
     {
         _methodName = methodName;
         _returnType = returnType;

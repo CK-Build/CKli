@@ -72,7 +72,8 @@ sealed class CKliClone : Command
                     (["--ignore-parent-stack"], "Allows the cloned Stack to be inside an existing one."),
                     (["--with-ref-clone"], "Clones every <Reference />, even the ones with DefaultClone=\"false\"."),
                     (["--without-ref-clone"], "Doesn't clone any <Reference />."),
-                ] )
+                ],
+                summary: "Clones a Stack and the repositories of one of its Worlds in the current directory." )
     {
     }
 

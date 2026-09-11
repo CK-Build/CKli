@@ -20,7 +20,8 @@ sealed class CKliFetch : Command
                     (["--all"], "Fetch from all the Repos of the current World (even if current path is in a Repo)."),
                     (["--with-tags"], "Fetch tags: locally modified tags are lost."),
                     (["--max-dop"], "Limits the parallelism when fetching the repositories."),
-             ] )
+             ],
+                summary: "Fetches all branches (and optionally tags) from the remote(s)." )
     {
     }
 

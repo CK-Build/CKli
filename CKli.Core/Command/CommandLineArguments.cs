@@ -22,6 +22,7 @@ public sealed class CommandLineArguments
     readonly ImmutableArray<string> _initial;
     readonly List<string> _args;
     readonly bool _hasHelp;
+    readonly bool _hasGlobalHelp;
     readonly bool _hasCKliDebug;
     readonly bool _hasVersion;
     readonly string? _explicitPath;
@@ -69,10 +70,30 @@ public sealed class CommandLineArguments
         }
         else
         {
-            // --help, -?, -h or ? must be the last arguments.
+            // --help, -?, -h or ? must be the last argument, except for a trailing run of help
+            // modifiers ("--global"): "ckli --help --global" is a help request.
             // Otherwise we consider it to be handled by the command (this enable exec command to use it).
-            _hasHelp = args.IndexOfAny( ["--help", "-?", "-h", "?"] ) == args.Length - 1;
-            if( _hasHelp ) args = args.Slice( 0, args.Length - 1 );
+            int iHelp = args.IndexOfAny( ["--help", "-?", "-h", "?"] );
+            if( iHelp >= 0 )
+            {
+                bool onlyModifiers = true;
+                bool global = false;
+                for( int i = iHelp + 1; i < args.Length; ++i )
+                {
+                    if( args[i] != "--global" )
+                    {
+                        onlyModifiers = false;
+                        break;
+                    }
+                    global = true;
+                }
+                if( onlyModifiers )
+                {
+                    _hasHelp = true;
+                    _hasGlobalHelp = global;
+                    args = args.Slice( 0, iHelp );
+                }
+            }
             if( args.Length > 0 )
             {
                 // If --version or -v is specified, it must comes first.
@@ -139,6 +160,13 @@ public sealed class CommandLineArguments
     /// Gets whether "--help", "-h", "-?" or "?" appeared at the end of the command line.
     /// </summary>
     public bool HasHelp => _hasHelp;
+
+    /// <summary>
+    /// Gets whether "--global" followed the help request ("ckli --help --global").
+    /// The collapsed help then details the global options and flags instead of condensing them
+    /// on a single line.
+    /// </summary>
+    public bool HasGlobalHelp => _hasGlobalHelp;
 
     /// <summary>
     /// Gets whether debugger must be launched.

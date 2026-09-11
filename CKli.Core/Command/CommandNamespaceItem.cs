@@ -26,12 +26,20 @@ public class CommandNamespaceItem
     /// A single contribution to a <see cref="CommandNamespaceItem.Description"/>.
     /// </summary>
     /// <param name="Text">The description text. Necessarily not null, empty or whitespace.</param>
+    /// <param name="Summary">
+    /// The one line summary displayed by the collapsed help. Null when it has not been authored:
+    /// the whole <paramref name="Text"/> is then displayed (and wrapped).
+    /// <para>
+    /// This is deliberately NOT the first line of the <paramref name="Text"/>: most descriptions are
+    /// prose whose first line stops in the middle of a sentence.
+    /// </para>
+    /// </param>
     /// <param name="Origin">
     /// The <see cref="PluginInfo.FullPluginName"/> that declared this part.
     /// Null for the intrinsic CKli namespaces and for any <see cref="Command"/>.
     /// </param>
     /// <param name="HelpUrl">Optional link to an external documentation of this part.</param>
-    public readonly record struct DescriptionPart( string Text, string? Origin, Uri? HelpUrl );
+    public readonly record struct DescriptionPart( string Text, string? Summary, string? Origin, Uri? HelpUrl );
 
     readonly string _commandPath;
     readonly ImmutableArray<DescriptionPart> _descriptionParts;
@@ -58,7 +66,12 @@ public class CommandNamespaceItem
             _ => string.Join( Environment.NewLine + Environment.NewLine,
                               _descriptionParts.Select( p => p.Text.Trim() ) )
         };
-        _summary = ComputeSummary( _description );
+        // A part with no authored Summary falls back to its whole Text: nothing is ever dropped from
+        // the collapsed line, it is simply longer (and wrapped) until a summary is written. Its own
+        // line breaks are collapsed so that the fallback still wraps as one paragraph.
+        _summary = _descriptionParts.Length == 0
+                    ? string.Empty
+                    : string.Join( ' ', _descriptionParts.Select( p => p.Summary ?? Flatten( p.Text ) ) );
     }
 
     /// <summary>
@@ -67,15 +80,16 @@ public class CommandNamespaceItem
     /// </summary>
     /// <param name="commandPath">The command path.</param>
     /// <param name="description">The command description.</param>
-    protected CommandNamespaceItem( string commandPath, string description )
-        : this( commandPath, CreateSinglePart( description ) )
+    /// <param name="summary">Optional one line summary. See <see cref="Summary"/>.</param>
+    protected CommandNamespaceItem( string commandPath, string description, string? summary )
+        : this( commandPath, CreateSinglePart( description, summary ) )
     {
     }
 
-    static ImmutableArray<DescriptionPart> CreateSinglePart( string description )
+    static ImmutableArray<DescriptionPart> CreateSinglePart( string description, string? summary )
     {
         Throw.CheckNotNullArgument( description );
-        return [new DescriptionPart( description, null, null )];
+        return [new DescriptionPart( description, summary, null, null )];
     }
 
     /// <summary>
@@ -91,8 +105,10 @@ public class CommandNamespaceItem
     public string Description => _description;
 
     /// <summary>
-    /// Gets the first non whitespace line of the <see cref="Description"/>: what a collapsed
-    /// help displays. Empty when this namespace has not been described.
+    /// Gets what the collapsed help displays: the <see cref="DescriptionParts"/> authored
+    /// <see cref="DescriptionPart.Summary"/>, each falling back to its whole
+    /// <see cref="DescriptionPart.Text"/> when none has been written.
+    /// Empty when this namespace has not been described.
     /// </summary>
     public string Summary => _summary;
 
@@ -150,6 +166,41 @@ public class CommandNamespaceItem
     public override string ToString() => $"[Namespace] {_commandPath}";
 
     /// <summary>
+    /// Collapses any run of whitespace (line breaks included) into a single space.
+    /// </summary>
+    /// <param name="text">The text to flatten.</param>
+    /// <returns>The single line text.</returns>
+    public static string Flatten( string text )
+    {
+        return string.Join( ' ', text.Split( (char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries ) );
+    }
+
+    /// <summary>
+    /// Orders command paths: on the path without its '*' markers first, the unmarked one before the
+    /// marked one. "build" comes before "*build" and "publish" before "*publish" — the star commands
+    /// are variations of their plain counterpart, not entries of their own.
+    /// </summary>
+    public sealed class PathComparer : IComparer<string>
+    {
+        /// <summary>
+        /// Gets the comparer.
+        /// </summary>
+        public static readonly PathComparer Default = new PathComparer();
+
+        /// <inheritdoc />
+        public int Compare( string? x, string? y )
+        {
+            if( x == null ) return y == null ? 0 : -1;
+            if( y == null ) return 1;
+            int c = x.AsSpan().Trim( '*' ).CompareTo( y.AsSpan().Trim( '*' ), StringComparison.Ordinal );
+            if( c != 0 ) return c;
+            // Same path: the one with the less '*' first.
+            c = x.Length - y.Length;
+            return c != 0 ? c : string.CompareOrdinal( x, y );
+        }
+    }
+
+    /// <summary>
     /// Orders description parts on their <see cref="DescriptionPart.Origin"/>: the intrinsic CKli ones
     /// (a null origin) first, then the plugins in ordinal order. This is the single ordering rule: the
     /// plugin activation order must never leak into the rendered help.
@@ -165,11 +216,4 @@ public class CommandNamespaceItem
         return parts.OrderBy( p => p.Origin ?? string.Empty, StringComparer.Ordinal ).ToImmutableArray();
     }
 
-    static string ComputeSummary( string description )
-    {
-        var s = description.AsSpan().Trim();
-        int idx = s.IndexOfAny( '\r', '\n' );
-        if( idx >= 0 ) s = s.Slice( 0, idx );
-        return s.ToString();
-    }
 }

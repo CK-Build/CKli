@@ -54,13 +54,19 @@ public abstract partial class Command : CommandNamespaceItem
     /// <param name="arguments">The required command arguments.</param>
     /// <param name="options">The options.</param>
     /// <param name="flags">The flags.</param>
+    /// <param name="summary">
+    /// Optional one line summary displayed by the collapsed help. See <see cref="CommandNamespaceItem.Summary"/>.
+    /// This is the last parameter so that existing commands need no change: a command with no summary
+    /// simply displays its whole description.
+    /// </param>
     protected Command( IPluginTypeInfo? typeInfo,
                        string commandPath,
                        string description,
                        ImmutableArray<(string Name, string Description)> arguments,
                        ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
-                       ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
-        : base( commandPath, description )
+                       ImmutableArray<(ImmutableArray<string> Names, string Description)> flags,
+                       string? summary = null )
+        : base( commandPath, description, summary )
     {
         _typeInfo = typeInfo;
         _arguments = arguments;

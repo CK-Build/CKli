@@ -103,9 +103,14 @@ public sealed class CommandNamespaceBuilder
     /// </summary>
     /// <param name="namespacePath">The whitespace separated namespace path.</param>
     /// <param name="description">The description. Must not be null, empty or whitespace.</param>
+    /// <param name="summary">Optional one line summary for the collapsed help.</param>
     /// <param name="origin">The full plugin name that declares this description. Null for CKli itself.</param>
     /// <param name="helpUrl">Optional link to an external documentation.</param>
-    public void Describe( string namespacePath, string description, string? origin = null, Uri? helpUrl = null )
+    public void Describe( string namespacePath,
+                          string description,
+                          string? summary = null,
+                          string? origin = null,
+                          Uri? helpUrl = null )
     {
         Throw.CheckArgument( Command.IsValidCommandPath( namespacePath ) );
         Throw.CheckNotNullOrWhiteSpaceArgument( description );
@@ -113,7 +118,7 @@ public sealed class CommandNamespaceBuilder
         {
             _descriptions.Add( namespacePath, parts = new List<CommandNamespaceItem.DescriptionPart>() );
         }
-        parts.Add( new CommandNamespaceItem.DescriptionPart( description, origin, helpUrl ) );
+        parts.Add( new CommandNamespaceItem.DescriptionPart( description, summary, origin, helpUrl ) );
     }
 
     ImmutableArray<CommandNamespaceItem.DescriptionPart> GetOrderedParts( string namespacePath )

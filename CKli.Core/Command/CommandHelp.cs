@@ -17,6 +17,8 @@ public sealed class CommandHelp
     readonly ImmutableArray<(TextBlock Names, TextBlock Description)> _options;
     readonly ImmutableArray<(TextBlock Names, TextBlock Description)> _flags;
     readonly ImmutableArray<IRenderable> _helpLinks;
+    readonly TextBlock _summary;
+    readonly TextBlock? _childNames;
 
     /// <summary>
     /// Initializes a new <see cref="CommandHelp"/> for a command or for a pure namespace.
@@ -24,11 +26,20 @@ public sealed class CommandHelp
     /// </summary>
     /// <param name="screenType">The screen type.</param>
     /// <param name="item">The command or the pure namespace.</param>
-    public CommandHelp( ScreenType screenType, CommandNamespaceItem item )
+    /// <param name="childNames">
+    /// The names of the direct children of a namespace. The collapsed help displays them so that it
+    /// remains a map of every command name. Empty for a command.
+    /// </param>
+    public CommandHelp( ScreenType screenType, CommandNamespaceItem item, ImmutableArray<string> childNames = default )
     {
         _screenType = screenType;
         _item = item;
         _description = screenType.Text( item.Description, style: TextStyle.Default );
+        _summary = screenType.Text( item.Summary, style: TextStyle.Default );
+        _childNames = childNames.IsDefaultOrEmpty
+                        ? null
+                        : screenType.Text( string.Join( ", ", childNames ),
+                                           new TextStyle( System.ConsoleColor.DarkGreen ) );
         var styleCommand = new TextStyle( System.ConsoleColor.DarkGreen, effect: TextEffect.Italic );
         var c = item as Command;
         // Arguments.
@@ -80,6 +91,18 @@ public sealed class CommandHelp
     /// Gets the command description.
     /// </summary>
     public TextBlock Description => _description;
+
+    /// <summary>
+    /// Gets what the collapsed help displays instead of the <see cref="Description"/>.
+    /// See <see cref="CommandNamespaceItem.Summary"/>.
+    /// </summary>
+    public TextBlock Summary => _summary;
+
+    /// <summary>
+    /// Gets the comma separated names of the direct children of this namespace.
+    /// Null for a command and for a namespace whose children have not been provided.
+    /// </summary>
+    public TextBlock? ChildNames => _childNames;
 
     /// <summary>
     /// Gets the arguments and their description.

@@ -260,16 +260,22 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
             if( a.AttributeType == typeof( CommandNamespaceAttribute ) )
             {
                 string? helpUrl = null;
+                string? summary = null;
                 foreach( var named in a.NamedArguments )
                 {
                     if( named.MemberName == nameof( CommandNamespaceAttribute.HelpUrl ) )
                     {
                         helpUrl = (string?)named.TypedValue.Value;
                     }
+                    else if( named.MemberName == nameof( CommandNamespaceAttribute.Summary ) )
+                    {
+                        summary = (string?)named.TypedValue.Value;
+                    }
                 }
                 _commandCollector.Describe( result,
                                             (string)a.ConstructorArguments[0].Value!,
                                             (string)a.ConstructorArguments[1].Value!,
+                                            summary,
                                             helpUrl );
             }
         }

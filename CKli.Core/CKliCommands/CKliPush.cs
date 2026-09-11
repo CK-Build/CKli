@@ -21,7 +21,8 @@ sealed class CKliPush : Command
                     (["--stack-only"], "Only push the Stack repository, not the Repos."),
                     (["--all"], "Consider all the Repos' of the current World (even if current path is in a Repo)."),
                     (["--continue-on-error"], "Continues even on error. By default the first error stops the operation."),
-                ] )
+                ],
+                summary: "Pushes the Stack repository and all Repo's local branches that track a remote branch." )
     {
     }
 

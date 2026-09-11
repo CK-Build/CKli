@@ -129,7 +129,7 @@ static ImmutableArray<(ImmutableArray<string> Names, string Description, bool Mu
 }
 
 static ImmutableArray<(ImmutableArray<string> Names, string Description)> GetGlobalFlags() => [
-        (["--version, -v"], """
+        (["--version", "-v"], """
         Displays this CKli version. 
         This flag must come first and excludes anything else.
         """),
@@ -144,7 +144,7 @@ static ImmutableArray<(ImmutableArray<string> Names, string Description)> GetGlo
                         Any other values are ignored: the default detection is applied.
              """),
         (["--ckli-debug"], "Launches a debugger when starting."),
-        (["--help, -?, -h, ?"], "Displays the help. This must be the last argument.")
+        (["--help", "-?", "-h", "?"], "Displays the help. This must be the last argument.")
     ];
 
 

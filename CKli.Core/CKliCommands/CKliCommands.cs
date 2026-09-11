@@ -29,7 +29,7 @@ public static class CKliCommands
 
         NS( cmds, "layout",
             "Reconciles the World definition file and the folders and repositories that are on the disk.",
-            "https://github.com/CK-Build/CKli/blob/stable/README.md#core-commands" );
+            helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#core-commands" );
         Add( cmds, new CKliLayoutFix() );
         Add( cmds, new CKliLayoutXif() );
 
@@ -38,7 +38,8 @@ public static class CKliCommands
             Long-Term-Support Worlds of the current Stack: a LTS World maintains a previous line of
             the Stack (an older target framework for instance) beside its default World.
             """,
-            "https://github.com/CK-Build/CKli/blob/stable/README.md#lts-world-commands-create-clone" );
+            summary: "Long-Term-Support Worlds of the current Stack.",
+            helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#lts-world-commands-create-clone" );
         Add( cmds, new CKliLTSClone() );
         Add( cmds, new CKliLTSCreate() );
 
@@ -51,7 +52,7 @@ public static class CKliCommands
 
         NS( cmds, "repo",
             "Adds, creates and removes the Repositories of the current World.",
-            "https://github.com/CK-Build/CKli/blob/stable/README.md#core-commands" );
+            helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#core-commands" );
         Add( cmds, new CKliRepoAdd() );
         Add( cmds, new CKliRepoCreate() );
         Add( cmds, new CKliRepoRemove() );
@@ -70,7 +71,8 @@ public static class CKliCommands
             Manages the plugins of the current World: the packages or source projects it uses and
             how they are compiled into the "{WorldName}-Plugins" solution.
             """,
-            "https://github.com/CK-Build/CKli/blob/stable/README.md#plugin-commands-info-create-add-remove-enable" );
+            summary: "Manages the plugins of the current World.",
+            helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#plugin-commands-info-create-add-remove-enable" );
         Add( cmds, new CKliPluginAdd() );
         Add( cmds, new CKliPluginCompile() );
         Add( cmds, new CKliPluginCreate() );
@@ -88,7 +90,8 @@ public static class CKliCommands
             These are raw git operations: the CKli version tags themselves ("vX.Y.Z" and their
             "local/" or "building/" prefixed forms) are handled by the VersionTag plugin.
             """,
-            "https://github.com/CK-Build/CKli/blob/stable/README.md#tag-commands-list-fetch-pull-push-delete" );
+            summary: "Git tag operations on the current Repo or on all the Repos of the World.",
+            helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#tag-commands-list-fetch-pull-push-delete" );
         Add( cmds, new CKliTagFetch() );
         Add( cmds, new CKliTagDelete() );
         Add( cmds, new CKliTagList() );
@@ -99,13 +102,14 @@ public static class CKliCommands
 
         NS( cmds, "world",
             "The definition of the current World.",
-            "https://github.com/CK-Build/CKli/blob/stable/README.md#world-commands-reference-list-set-remove" );
+            helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#world-commands-reference-list-set-remove" );
         NS( cmds, "world reference",
             """
             The <Reference /> elements of the current World: the other Stacks whose published
             packages this World consumes. A reference is cloned next to the World.
             """,
-            "https://github.com/CK-Build/CKli/blob/stable/README.md#world-commands-reference-list-set-remove" );
+            summary: "The other Stacks whose published packages this World consumes.",
+            helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#world-commands-reference-list-set-remove" );
         Add( cmds, new CKliWorldReferenceList() );
         Add( cmds, new CKliWorldReferenceRemove() );
         Add( cmds, new CKliWorldReferenceSet() );
@@ -114,10 +118,15 @@ public static class CKliCommands
 
         // Describes an intrinsic CKli namespace. Its Origin is null: it always comes first when a
         // plugin also describes the namespace.
-        static void NS( Dictionary<string, CommandNamespaceItem> commands, string path, string description, string? helpUrl = null )
+        static void NS( Dictionary<string, CommandNamespaceItem> commands,
+                        string path,
+                        string description,
+                        string? summary = null,
+                        string? helpUrl = null )
         {
             commands.Add( path, new CommandNamespaceItem( path,
                                                           [new CommandNamespaceItem.DescriptionPart( description,
+                                                                                                     summary,
                                                                                                      null,
                                                                                                      helpUrl != null ? new Uri( helpUrl ) : null )] ) );
         }
@@ -129,7 +138,7 @@ public static class CKliCommands
         foreach( var (path,item) in cmds )
         {
             if( item is Command cmd ) c.Add( cmd );
-            else c.Describe( path, item.Description, helpUrl: item.HelpUrl );
+            else c.Describe( path, item.Description, item.DescriptionParts[0].Summary, helpUrl: item.HelpUrl );
         }
         var safeBuild = c.Build( new ActivityMonitor() );
         Throw.DebugAssert( _commands.Namespace.Keys.Concatenate() == safeBuild.Namespace.Keys.Concatenate() );
@@ -204,7 +213,8 @@ public static class CKliCommands
             context.Screen.DisplayHelp( _commands.GetForHelp( context.Screen.ScreenType, helpPath, null ),
                                         cmdLine,
                                         (interactiveScreen != null ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
-                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
+                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default,
+                                        collapsed: string.IsNullOrEmpty( helpPath ) );
             return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, null, true ).ConfigureAwait( false );
         }
         // If it's a CKli command, we can now execute it.
@@ -235,7 +245,8 @@ public static class CKliCommands
             context.Screen.DisplayHelp( _commands.GetForHelp( context.Screen.ScreenType, helpPath, null ),
                                         cmdLine,
                                         (interactiveScreen != null ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
-                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
+                                        (interactiveScreen != null ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default,
+                                        collapsed: string.IsNullOrEmpty( helpPath ) );
             return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, null, false ).ConfigureAwait( false );
         }
 
@@ -267,10 +278,12 @@ public static class CKliCommands
                     // returned an help path, it should be the same or a better help path than
                     // the one from only the CKli commands: use it.
                     // If a world help path has been found, don't display the Global options & flags helps.
-                    context.Screen.DisplayHelp( world.Commands.GetForHelp( context.Screen.ScreenType, worldHelpPath ?? helpPath, _commands ),
+                    var actualHelpPath = worldHelpPath ?? helpPath;
+                    context.Screen.DisplayHelp( world.Commands.GetForHelp( context.Screen.ScreenType, actualHelpPath, _commands ),
                                                 cmdLine,
                                                 (worldHelpPath != null || context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalOptions?.Invoke()) ?? default,
-                                                (worldHelpPath != null || context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default );
+                                                (worldHelpPath != null || context.Screen is InteractiveScreen ? null : CKliRootEnv.GlobalFlags?.Invoke()) ?? default,
+                                                collapsed: string.IsNullOrEmpty( actualHelpPath ) );
                     return await FinalizeCommandExecutionAsync( monitor, context, cmdLine, stack, cmdLine.HasHelp ).ConfigureAwait( false );
                 }
                 // We have a plugin command (and no --help).

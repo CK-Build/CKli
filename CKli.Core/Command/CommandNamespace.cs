@@ -1,6 +1,8 @@
 using CK.Core;
 using CKli.Core;
+using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 
@@ -52,28 +54,85 @@ public sealed class CommandNamespace
     /// </para>
     /// </summary>
     /// <param name="screenType">The screen type.</param>
-    /// <param name="helpPath">The optional help path. When null, all commands are considered.</param>
+    /// <param name="helpPath">
+    /// The optional help path. When null or empty, only the depth 1 items are returned (the collapsed
+    /// map of the whole command surface): see <see cref="GetCollapsedForHelp"/>.
+    /// </param>
     /// <param name="otherCommands">Optional secondary namespace from which commands must be merged.</param>
     /// <returns>A list of commands that should display their definition.</returns>
     public List<CommandHelp> GetForHelp( ScreenType screenType, string? helpPath, CommandNamespace? otherCommands )
     {
+        // No help path: the top level is the only help that is unusable in full (55 commands, 382 lines).
+        if( string.IsNullOrEmpty( helpPath ) ) return GetCollapsedForHelp( screenType, otherCommands );
+        // A help path always displays its whole subtree: the biggest namespace of this stack is 58 lines.
         // No optimization here. This is the help.
         IEnumerable<Command> commands = _commands.Values.OfType<Command>();
         if( otherCommands  != null ) commands = commands.Concat( otherCommands._commands.Values.OfType<Command>() );
-        CommandNamespaceItem? describedNamespace = null;
-        if( !string.IsNullOrEmpty( helpPath ) )
-        {
-            var prefix = helpPath + ' ';
-            commands = commands.Where( c => c.CommandPath == helpPath || c.CommandPath.StartsWith( prefix ) );
-            describedNamespace = GetDescribedNamespace( helpPath, otherCommands );
-        }
-        var result = commands.OrderBy( c => c.CommandPath ).Select( c => new CommandHelp( screenType, c ) ).ToList();
+        var prefix = helpPath + ' ';
+        commands = commands.Where( c => c.CommandPath == helpPath || c.CommandPath.StartsWith( prefix ) );
+        var result = commands.OrderBy( c => c.CommandPath, CommandNamespaceItem.PathComparer.Default )
+                             .Select( c => new CommandHelp( screenType, c ) )
+                             .ToList();
         // When the help is about a namespace, its own description (if any) heads the list.
+        var describedNamespace = GetDescribedNamespace( helpPath, otherCommands );
         if( describedNamespace != null )
         {
             result.Insert( 0, new CommandHelp( screenType, describedNamespace ) );
         }
         return result;
+    }
+
+    /// <summary>
+    /// Gets the depth 1 items: the commands and the namespaces of the root, each namespace carrying
+    /// the names of its children so that the collapsed help remains a map of the whole command surface.
+    /// <para>
+    /// This is public mainly for tests.
+    /// </para>
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="otherCommands">Optional secondary namespace from which items must be merged.</param>
+    /// <returns>The depth 1 command helps.</returns>
+    public List<CommandHelp> GetCollapsedForHelp( ScreenType screenType, CommandNamespace? otherCommands )
+    {
+        var paths = new HashSet<string>( _commands.Keys );
+        if( otherCommands != null ) paths.UnionWith( otherCommands._commands.Keys );
+        var result = new List<CommandHelp>();
+        foreach( var path in paths.Where( p => !p.Contains( ' ' ) ).Order( CommandNamespaceItem.PathComparer.Default ) )
+        {
+            // A path cannot be a command here and a namespace there: CommandCollector refuses a
+            // [CommandPath] that is an intrinsic CKli command.
+            var cmd = Find( path ) ?? otherCommands?.Find( path );
+            if( cmd != null )
+            {
+                result.Add( new CommandHelp( screenType, cmd ) );
+            }
+            else
+            {
+                var ns = GetDescribedNamespace( path, otherCommands ) ?? new CommandNamespaceItem( path, [] );
+                result.Add( new CommandHelp( screenType, ns, GetChildNames( path, otherCommands ) ) );
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Gets the ordered names (the last segment only) of the direct children of a namespace, from
+    /// this namespace and an optional other one.
+    /// </summary>
+    /// <param name="path">The parent namespace path.</param>
+    /// <param name="otherCommands">Optional secondary namespace.</param>
+    /// <returns>The ordered child names.</returns>
+    public ImmutableArray<string> GetChildNames( string path, CommandNamespace? otherCommands )
+    {
+        var children = new HashSet<string>( _commands.Keys.Where( IsChild ) );
+        if( otherCommands != null ) children.UnionWith( otherCommands._commands.Keys.Where( IsChild ) );
+        return [.. children.Order( CommandNamespaceItem.PathComparer.Default )
+                           .Select( p => p.Substring( path.Length + 1 ) )];
+
+        bool IsChild( string p ) => p.Length > path.Length
+                                    && p.StartsWith( path, StringComparison.Ordinal )
+                                    && p[path.Length] == ' '
+                                    && !p.AsSpan( path.Length + 1 ).Contains( ' ' );
     }
 
     /// <summary>

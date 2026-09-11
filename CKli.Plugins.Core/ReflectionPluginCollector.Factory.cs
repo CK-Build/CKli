@@ -127,6 +127,9 @@ sealed partial class ReflectionPluginCollector
                     atLeastOnePart = true;
                     b.Append( "new CommandNamespaceItem.DescriptionPart( " );
                     AppendSourceString( b, p.Text ).Append( ", " );
+                    if( p.Summary == null ) b.Append( "null" );
+                    else AppendSourceString( b, p.Summary );
+                    b.Append( ", " );
                     if( p.Origin == null ) b.Append( "null" );
                     else AppendSourceString( b, p.Origin );
                     b.Append( ", " );
@@ -310,7 +313,15 @@ sealed partial class ReflectionPluginCollector
             b.Append( ' ', offset ).Append( "flags: [" ).AppendLine();
             DumpFlags( b, offset + 4, c.Flags );
             b.Append( ' ', offset ).Append( "]," ).AppendLine();
-            b.Append( " ", offset ).Append( '"' ).Append( c.MethodName ).Append( "\", MethodAsyncReturn." ).Append( c.ReturnType ).Append(" ) {}").AppendLine();
+            b.Append( " ", offset ).Append( '"' ).Append( c.MethodName ).Append( "\", MethodAsyncReturn." ).Append( c.ReturnType );
+            // The AUTHORED summary, not the computed CommandNamespaceItem.Summary (which falls
+            // back to the whole description when none has been written).
+            var authoredSummary = c.DescriptionParts[0].Summary;
+            if( authoredSummary != null )
+            {
+                AppendSourceString( b.Append( ", " ), authoredSummary );
+            }
+            b.Append( " ) {}" ).AppendLine();
 
             offset = 4;
             b.Append( ' ', offset ).Append( "protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CKliEnv context, CommandLineArguments cmdLine, System.Threading.CancellationToken scopeAlive )" )

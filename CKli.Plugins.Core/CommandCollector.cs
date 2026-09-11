@@ -24,7 +24,7 @@ sealed partial class CommandCollector
     /// Multiple plugins can describe the same namespace: "fix" is populated by CKli.Build.Plugin and
     /// CKli.HotZone.Plugin.
     /// </summary>
-    public void Describe( IPluginTypeInfo typeInfo, string namespacePath, string description, string? helpUrl )
+    public void Describe( IPluginTypeInfo typeInfo, string namespacePath, string description, string? summary, string? helpUrl )
     {
         namespacePath = NormalizePath( namespacePath );
         if( !Command.IsValidCommandPath( namespacePath ) )
@@ -47,7 +47,7 @@ sealed partial class CommandCollector
                 HelpUrl must be an absolute url.
                 """ );
         }
-        _commands.Describe( namespacePath, description, typeInfo.Plugin.FullPluginName, url );
+        _commands.Describe( namespacePath, description, summary, typeInfo.Plugin.FullPluginName, url );
     }
 
     public CommandCollector()
@@ -70,7 +70,7 @@ sealed partial class CommandCollector
                 This path is an intrinsic CKli command.
                 """ );
         }
-        var description = GetDescription( attributes );
+        var (description, summary) = GetDescriptionAndSummary( attributes );
         var parameters = method.GetParameters();
         if( parameters.Length == 0 || parameters[0].ParameterType != typeof( IActivityMonitor ) )
         {
@@ -201,13 +201,17 @@ sealed partial class CommandCollector
                                                flags.DrainToImmutable(),
                                                method,
                                                parameters.Length,
-                                               retType );
+                                               retType,
+                                               summary );
         _commands.Add( cmd );
         _pluginCommands.Add( cmd );
 
-        static string GetDescription( IList<CustomAttributeData> attributes )
+        static string GetDescription( IList<CustomAttributeData> attributes ) => GetDescriptionAndSummary( attributes ).Description;
+
+        static (string Description, string? Summary) GetDescriptionAndSummary( IList<CustomAttributeData> attributes )
         {
             var result = "<no description>";
+            string? summary = null;
             foreach( var a in attributes )
             {
                 if( a.AttributeType == typeof( DescriptionAttribute ) )
@@ -217,10 +221,18 @@ sealed partial class CommandCollector
                     {
                         result = s;
                     }
+                    foreach( var named in a.NamedArguments )
+                    {
+                        if( named.MemberName == nameof( DescriptionAttribute.Summary ) )
+                        {
+                            var sum = (string?)named.TypedValue.Value;
+                            if( !string.IsNullOrWhiteSpace( sum ) ) summary = sum;
+                        }
+                    }
                     break;
                 }
             }
-            return result;
+            return (result, summary);
         }
 
         static ImmutableArray<string> GetOptionOrFlagNames( IPluginTypeInfo typeInfo, MethodInfo method, ParameterInfo p, IList<CustomAttributeData> attributes )
