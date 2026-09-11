@@ -240,20 +240,24 @@ public sealed partial class BuildPlugin
                 """ ) );
             return;
         }
+        // A multi line TextBlock trims each of its lines (a raw string literal carries its own indentation),
+        // so this report cannot be one text: each line is its own renderable and the indented ones carry
+        // their indentation as a left margin.
+        var lines = new List<IRenderable>();
         var b = new System.Text.StringBuilder();
         b.Append( "Dependency upgrades of branch '" ).Append( map.Graph.BranchName ).Append( "'" );
         if( map.AnalysisOptions.Narrow ) b.Append( " (--narrow: upstreams only)" );
-        b.AppendLine( ":" );
+        b.Append( ':' );
+        lines.Add( TakeLine( screen, b ) );
         foreach( var r in map.Upgrades )
         {
             b.Append( "- " ).Append( r.Repo.DisplayPath );
             if( r.IsPivot ) b.Append( " (pivot)" );
             if( r.NeedsBranch ) b.Append( $" [the '{map.Graph.BranchName}' branch would be created]" );
-            b.AppendLine();
+            lines.Add( TakeLine( screen, b ) );
             foreach( var u in r.Upgrades )
             {
-                b.Append( "    " )
-                 .Append( u.IsDowngrade ? "▼ " : "▲ " )
+                b.Append( u.IsDowngrade ? "▼ " : "▲ " )
                  .Append( u.Current.PackageId )
                  .Append( ' ' )
                  .Append( u.Current.Version )
@@ -261,7 +265,7 @@ public sealed partial class BuildPlugin
                  .Append( u.Target );
                 var t = map.Targets.FirstOrDefault( x => x.PackageId.Equals( u.Current.PackageId, StringComparison.OrdinalIgnoreCase ) );
                 if( t?.Origin != null ) b.Append( "  (" ).Append( t.Origin ).Append( ')' );
-                b.AppendLine();
+                lines.Add( TakeLine( screen, b ).Box( marginLeft: 4 ) );
             }
         }
         b.Append( map.UpgradeCount ).Append( " upgrade(s) in " ).Append( map.Upgrades.Length ).Append( " repositories" );
@@ -269,17 +273,28 @@ public sealed partial class BuildPlugin
         {
             b.Append( ", including " ).Append( map.DowngradeCount ).Append( " downgrade(s) (▼)" );
         }
-        b.AppendLine( "." );
+        b.Append( '.' );
+        lines.Add( TakeLine( screen, b ) );
         var blocked = map.Targets.Where( t => t.State is UpgradeMap.TargetState.Conflict ).ToList();
         if( blocked.Count > 0 )
         {
-            b.Append( blocked.Count ).AppendLine( " package(s) are blocked by disagreeing World References:" );
+            b.Append( blocked.Count ).Append( " package(s) are blocked by disagreeing World References:" );
+            lines.Add( TakeLine( screen, b ) );
             foreach( var t in blocked )
             {
-                b.Append( "    " ).Append( t.PackageId ).Append( ": " ).AppendLine( t.Origin );
+                b.Append( t.PackageId ).Append( ": " ).Append( t.Origin );
+                lines.Add( TakeLine( screen, b ).Box( marginLeft: 4 ) );
             }
         }
-        context.Screen.Display( screen.Text( b.ToString() ) );
+        context.Screen.Display( screen.Unit.AddBelow( lines ) );
+
+        // The builder's content becomes a single line block and the builder is reset.
+        static TextBlock TakeLine( ScreenType screen, System.Text.StringBuilder b )
+        {
+            var line = screen.Text( b.ToString() );
+            b.Clear();
+            return line;
+        }
     }
 
     // Same resolution as the build commands: the pivots' "dev/" stripped current branch, or --branch.
