@@ -193,7 +193,7 @@ supports two entirely different consumers of the same collected data:
 > stale and still accepted. Worse, such a file usually still **compiles**: every flag is a `bool` and every
 > command parameter has a default, so a shifted `Flags[i]` index or a dropped trailing argument binds silently
 > to the wrong parameter. Delete `CKli.CompiledPlugins.cs` and run
-> [`ckli plugin compile`](../README.md#plugin-compile---mode-nonedebugrelease).
+> [`ckli plugin compile`](../README.md#plugin-compile---mode-nonedebugrelease---skip-pull-stack).
 
 ## `CommandCollector`: from `[CommandPath]` methods to `PluginCommand`
 

@@ -220,12 +220,24 @@ Access to private repositories (or to be able to push to public ones) uses Perso
 ```csharp
 public interface ISecretsStore
 {
-    string? TryGetRequiredSecret(IActivityMonitor monitor, IEnumerable<string> keys);
+    string? TryGetRequiredSecret(IActivityMonitor monitor, IEnumerable<string> keys, LogLevel level = LogLevel.Error);
 }
 ```
 
-The default implementation (`DotNetUserSecretsStore`) uses the standard .NET user secrets mechanism. PAT key names follow the convention `{Prefix}_READ_PAT` / `{Prefix}_WRITE_PAT` (e.g. `GITHUB_CK-Build_READ_PAT`)
-but this is eventually under control of the `GitHostingProvider`.
+The keys are ordered from the strongest to the weakest and the first one that resolves wins — which is how a read
+falls back to the write PAT. When none resolves, the store logs the `dotnet user-secrets set` line to run.
+
+The default implementation (`DotNetUserSecretsStore`) uses the standard .NET user secrets mechanism, with
+`CKliRootEnv.InstanceName` as the secrets id (`CKli` for a regular run).
+
+PAT key names follow the convention `{Prefix}_READ_PAT` / `{Prefix}_WRITE_PAT`, and the `{Prefix}` is derived from
+the origin url by `GitRepositoryAccessKey.FindOrCreate` — not by the `GitHostingProvider`, which is itself selected
+from that same url. It is the provider name plus the url's first path part (the owner), uppercased, with every
+character outside `A-Z0-9_` replaced by `_`: `https://github.com/CK-Build/CKli` gives `GITHUB_CK_BUILD`, hence
+`GITHUB_CK_BUILD_READ_PAT`. A `file://` url is the exception: its key is the bare `FILESYSTEM_GIT` with no suffix
+(`IsPublic` is null, so read and write name the same key).
+
+The [root README](../README.md#private--public-stack-and-repositories) documents this from the user's side.
 
 ### Pushing: `local/` and `building/` references never reach a remote
 

@@ -27,14 +27,33 @@ ckli update
 ```
 The `update` command handles switching from production and pre-releases easily (described below).
 
-To manually update or install a specific prerelease version:
+Stable versions are on [nuget.org](https://www.nuget.org/packages/CKli); the CI builds are on the
+Signature-OpenSource feed. To manually install a specific version (replace `<version>` with the one you want):
 ```powershell
-dotnet tool update CKli@0.9.1--ci.22 -g --prerelease --add-source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json --no-http-cache
+dotnet tool update CKli@<version> -g --prerelease --add-source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json --no-http-cache
 ```
 
 ### Run CKli
 
 If you installed CKli globally, you can run `ckli` in any command prompt to start it.
+
+`ckli --help` lists the commands and namespaces; `ckli <command> --help` details one of them
+(`--help` must be the last argument).
+
+A few options are global: they belong to `ckli` itself rather than to a command, and
+`ckli --help --global` details them.
+
+- `--path <dir>` (or `-p`) sets the working path instead of the current directory. It must come first
+  (before the command): after the command, `--path` is an option of that command.
+- `--version` (or `-v`) displays the installed CKli version. It must come first and excludes anything else.
+- `--ckli-screen <none|no-color|force-ansi>` changes the display. A non empty `NO_COLOR` environment
+  variable is honored (see <https://no-color.org/>).
+- `--ckli-debug` launches a debugger when starting.
+
+`ckli i` (or `ckli interactive`) starts an interactive loop where commands are typed one after the other
+without the `ckli` prefix. It accepts `--path` before or right after it. The commands that create or
+relocate something are rejected in interactive mode: `clone`, `create`, `lts clone`, `lts create`,
+`remote stack migrate` and `update`.
 
 ## The basics: Stack-World-Repo
 
@@ -42,15 +61,19 @@ A World is a set of Git repositories. The set is described by a simple XML file 
 repositories, organizes them in a folder structure and provides plugin configurations.
 Below is the CKli default world definition file (there is no folder structure here):
 ```xml
-<CKli MinCKliVersion="0.10.0--ci.28">
+<CKli MinCKliVersion="0.14.0">
   <Plugins CompileMode="Debug">
     <ArtifactHandler>
       <NuGet>
-        <Feed Name="NuGet" Url="https://api.nuget.org/v3/index.json" PushQualityFilter="[papa,]">
-          <PushCredentials SecretKey="NUGET_ORG_PUSH_API_KEY" />
+        <Feed Name="NuGet"
+              Url="https://api.nuget.org/v3/index.json"
+              PushQualityFilter="[papa,]">
+          <Credentials SecretKey="NUGET_ORG_PUSH_API_KEY" />
         </Feed>
-        <Feed Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json">
-          <PushCredentials SecretKey="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+        <Feed Name="Signature-OpenSource"
+              Url="https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json"
+              PushQualityFilter="[,],AllowCI">
+          <Credentials SecretKey="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
         </Feed>
       </NuGet>
     </ArtifactHandler>
@@ -65,6 +88,7 @@ Below is the CKli default world definition file (there is no folder structure he
   </Plugins>
   <Repository Url="https://github.com/CK-Build/CKli" />
   <Repository Url="https://github.com/CK-Build/CK-SVersion" />
+  <Repository Url="https://github.com/CK-Build/CK-Packaging-Abstractions" />
 </CKli>
 ```
 This definition file is stored in the `main` branch of a Stack repository:
@@ -74,16 +98,131 @@ ckli clone https://github.com/CK-Build/CKli-Stack
 ```
 
 A Stack contain at least one World: the default World that is the _current version of the Stack_.
-Long Time Support (LTS) Worlds can be created any time from the a World (typically the default one).
+Long Time Support (LTS) Worlds can be created any time from a World (typically the default one).
 
+The `<Plugins />` element above enables the 9 Standard Plugins. They are optional and each one is
+documented on its own:
+
+| Plugin | What it does |
+|---|---|
+| [`ArtifactHandler`](StandardPlugins/CKli.ArtifactHandler.Plugin/README.md) | The NuGet feeds a World reads and pushes to, and the `nuget.config` of every Repo. |
+| [`BranchModel`](StandardPlugins/CKli.BranchModel.Plugin/README.md) | The branch structure (`stable`, the prerelease chain, `dev/`, `explo/`) and the `branch` commands. |
+| [`Build`](StandardPlugins/CKli.Build.Plugin/README.md) | The `build`, `publish`, `fix` and `deps update` commands: the roadmap and what it rebuilds. |
+| [`CommonFiles`](StandardPlugins/CKli.CommonFiles.Plugin/README.md) | The files that must be identical (or reconciled) across the Repos. |
+| [`HotZone`](StandardPlugins/CKli.HotZone.Plugin/README.md) | The dependency graph of the World and the version zone each Repo is in. |
+| [`Migration`](StandardPlugins/CKli.Migration.Plugin/README.md) | One-off repository conversions (Net8 → Net10). Transient by design. |
+| [`Publish`](StandardPlugins/CKli.Publish.Plugin/README.md) | Pushing the artifacts, the releases, and the `Published/` profiles a World leaves behind. |
+| [`ShallowSolution`](StandardPlugins/CKli.ShallowSolution.Plugin/README.md) | Reading a solution and its package references straight from a branch, without MSBuild. |
+| [`VersionTag`](StandardPlugins/CKli.VersionTag.Plugin/README.md) | The version tags (`vX.Y.Z`, `local/`, `building/`, `+fake`, `+deprecated`) and their invariants. |
+
+Two workflows span several of them: [the branch model and the hot zone](StandardPlugins/HotZone-Workflow.md)
+and [the fix workflow](StandardPlugins/Fix-Workflow.md).
 
 ## Private & Public stack and repositories
-:warning: Explain PAT.
+
+### A Stack is public or private as a whole
+
+There is no per-repository setting: **every Repo of a World inherits the flag of its Stack**. The Stack
+folder name is where it is recorded — `.PublicStack/` or `.PrivateStack/` — and it is chosen once, by the
+`--private` flag of [`clone`](#clone-url---lts-name-ltsname---max-dop-n---private---allow-duplicate---ignore-parent-stack---with-ref-clone---without-ref-clone)
+or [`create`](#create-url---private---ignore-parent-stack).
+
+What the flag actually changes is what needs a secret:
+
+|  | Read (clone, fetch, pull) | Write (push, create a remote repository, publish a release) |
+|---|---|---|
+| Public Stack | no secret at all | a secret is required |
+| Private Stack | a secret is required | a secret is required |
+
+So a **write secret is always required**, even for a public Stack: only anonymous reading is free.
+
+A Stack can reference another Stack that has its own flag: see `<Reference Private="true" />` in the
+[`clone`](#clone-url---lts-name-ltsname---max-dop-n---private---allow-duplicate---ignore-parent-stack---with-ref-clone---without-ref-clone)
+and [`world reference set`](#world-reference-set-stackurlorname---lts-name-ltsname---default-world---no-default-clone---default-clone---private---public---allow-lts)
+sections. A public Stack cannot reference a private one.
+
+### The secrets are never in the definition file
+
+A World definition file only ever contains the **name of a key**, never a secret value. The value is
+resolved at runtime from a secret store, and the default store is
+[.NET user secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets) under the `CKli`
+identifier:
+
+```powershell
+dotnet user-secrets set GITHUB_CK_BUILD_WRITE_PAT <<your-token>> --id CKli
+```
+
+**You never have to work the key name out yourself.** When an operation needs a secret that is not
+registered, CKli stops and logs the exact command line to run, with the key it wants — and, when a
+stronger key would also do, the alternatives.
+
+The secret is used as the password of a `CKli` user name, so a Personal Access Token (PAT) is what a Git
+hosting provider expects here. NuGet feed API keys go in the same store, under the key each `<Feed>`
+element names: see
+[`CKli.ArtifactHandler.Plugin`'s README](StandardPlugins/CKli.ArtifactHandler.Plugin/README.md#nuget-feed-configuration--nugetfeed--nugetfeedcredentials)
+(and note that a `<PublicReadCredentials>` is the exception: its two values are literals, not store keys).
+
+### How a key name is derived
+
+Key names are **computed from the remote url**, they are not configured. A common `{Prefix}` is derived
+first, then `_READ_PAT` and `_WRITE_PAT` are appended to it.
+
+For the known cloud providers, the prefix is a provider name followed by the **first path segment of the
+url** — the owner, organization or workspace:
+
+| Url | `{Prefix}` |
+|---|---|
+| `https://github.com/CK-Build/CKli` | `GITHUB_CK_BUILD` |
+| `https://gitlab.com/acme/some-repo` | `GITLAB_ACME` |
+| `https://dev.azure.com/Signature-OpenSource/...` | `AZUREDEVOPS_SIGNATURE_OPENSOURCE` |
+| `https://bitbucket.org/acme/some-repo` | `BITBUCKET_ACME` |
+
+Everything is uppercased and any character outside `A-Z`, `0-9` and `_` becomes `_` — which is why
+`CK-Build` gives `CK_BUILD`.
+
+For a self-hosted provider, the prefix is the **authority** of the url, uppercased and secured the same
+way: `https://gitlab.acme.com/team/x` gives `GITLAB_ACME_COM`.
+
+A key is enough for Git itself, but the commands that talk to the host's own API — creating a remote
+repository, archiving one, publishing a release — need a *hosting provider*, and CKli only has three:
+GitHub, GitLab and Gitea. They are selected by `github.com` and `gitlab.com`, or by a self-hosted
+authority that contains `github`, `gitlab` or `gitea`. Azure DevOps and Bitbucket urls get a key and
+nothing else, and so does any unrecognized authority.
+
+Two consequences worth knowing:
+
+- **A key covers an owner, not a repository.** One `GITHUB_CK_BUILD_WRITE_PAT` is enough for every
+  repository of the `CK-Build` organization, and a Stack whose repositories span two organizations needs
+  one key per organization.
+- **A `file://` remote is the exception.** Its key is the bare `FILESYSTEM_GIT`, with no `_READ_PAT` /
+  `_WRITE_PAT` suffix. Its value is never actually used, but it must exist for a push to be attempted —
+  registering it is the way to state that pushing to the local file system is intended.
+
+### Read and write keys
+
+`{Prefix}_WRITE_PAT` is the stronger of the two: a read first looks for it, then falls back to
+`{Prefix}_READ_PAT`. So registering the write key alone is enough for everything, and a read-only key is
+only useful to give someone clone access without push access.
+
+The write key must let CKli push. Beyond that, the commands that reach the hosting provider's API need
+more from it:
+
+- **creating a repository** — [`create`](#create-url---private---ignore-parent-stack),
+  [`repo create`](#repo-create-url---allow-lts) and
+  [`remote stack migrate`](#remote-stack-migrate-newurl). The first two also **delete** the repository
+  they just created when the rest of the operation fails, so the key must allow that too;
+- **archiving a repository** and **changing its default branch** —
+  [`remote stack migrate`](#remote-stack-migrate-newurl) and the publication;
+- **creating, uploading to and finalizing releases** — the `Publish` plugin.
+
+On GitHub, that maps to the `repo` scope of a classic token — plus `delete_repo` if you want the rollback
+above to work — or, for a fine-grained token, Contents (read/write) and Administration (read/write) on
+the organization.
 
 ## Core commands
 These commands are implemented by `CKli.Core`. They apply to any Git repositories.
 
-### `update --stable --prerelease --allow-downgrade`
+### `update --stable --prerelease --allow-downgrade --dry-run`
 
 Auto updates CKli with a newer available version if it exists. Use `ckli --version` to display the
 currently installed version.
@@ -97,8 +236,12 @@ With `--prerelease`, prerelease versions will be considered (including CI builds
 The `--allow-downgrade` flags allows package downgrade. This is useful to come back to the last stable version when
 the current version is a pre release.
 
-This command transparently updates the CKli version used by the `CKli.Plugins` solution. If a `Tests/Plugins.Tests` project
-exists in the `CKi`, the version of the `CKli.Testing` package reference is also updated.
+`--dry-run` (or `-d`) only displays the `dotnet tool update` command line that would be run.
+
+This command transparently updates the CKli version used by the `CKli.Plugins` solution. If a `Tests/Plugins.Tests`
+project exists in the `{WorldName}-Plugins` solution, the version of the `CKli.Testing` package reference is also updated.
+
+This command is rejected in interactive mode.
 
 ### `clone <url> --lts-name <@ltsName> --max-dop <n> --private --allow-duplicate --ignore-parent-stack --with-ref-clone --without-ref-clone`
 Clones a Stack and the repositories of one of its Worlds in the current directory: its default World unless
@@ -110,8 +253,9 @@ second World of an already cloned Stack, use [`lts clone`](#lts-clone-ltsname).
 
 `--max-dop <n>` limits the parallelism when cloning the repositories.
 
-`--private` drives the name of the Stack repository folder: it is `.PrivateStack/`
-instead of `.PublicStack/`.
+`--private` declares the Stack (and therefore every repository of its Worlds) private: the Stack folder
+is `.PrivateStack/` instead of `.PublicStack/`, and a read PAT is required to clone at all — see
+[Private & Public stack and repositories](#private--public-stack-and-repositories).
 
 `--allow-duplicate` must be specified if the same Stack has already been cloned
 and is available on the local system. In such case, the Stack's folder name will be
@@ -143,14 +287,22 @@ machine, that folder is left untouched and the `lts clone` command line to run t
 
 The references themselves are managed by the [`world reference`](#world-commands-reference-list-set-remove) commands.
 
-### `create <url> --private`
+### `create <url> --private --ignore-parent-stack`
 Creates a new Stack by creating the remote repository (the url must belong to a Git hosting provider
 that CKli can handle), checks out the new stack in the current directory, initializes default files in
 the stack folder and pushes it.
 
 The `<url>` must end with the `-Stack` suffix.
 
-`--private` uses `.PrivateStack/` folder instead of `.PublicStack/`.
+`--private` creates a private remote repository and uses the `.PrivateStack/` folder instead of
+`.PublicStack/`. Whatever the choice, a write PAT is required — see
+[Private & Public stack and repositories](#private--public-stack-and-repositories).
+
+`--ignore-parent-stack` allows the new Stack to be created inside an existing one.
+
+If anything fails after the remote repository has been created, CKli deletes it again.
+
+This command is rejected in interactive mode.
 
 ### `remote stack migrate <newUrl>`
 Moves the Stack repository to a new remote: creates the new remote repository if it doesn't exist yet,
@@ -169,6 +321,10 @@ therefore finished by the next one, and a run on an already migrated Stack chang
 When the hosting provider cannot archive a repository (the file system one cannot), a warning is emitted and
 the previous repository is left as-is: it should then be archived or deleted manually.
 
+Both urls need a write PAT, and they may need two different ones: the key is derived from the url's owner,
+so moving a Stack to another organization means registering a key for that organization too — see
+[Private & Public stack and repositories](#private--public-stack-and-repositories).
+
 ### `log --folder`
 Opens the last log file. When `--folder` (or `-f`) is specified, the folder is opened instead
 of the last log file.
@@ -176,7 +332,7 @@ of the last log file.
 The `Log/` folder is `%LocalAppData%/CKli/Out-of-Stack-Logs/` when CKli doesn't start is a Stack folder, otherwise
 each Stack keeps its own logs in their `.PublicStack/Logs` (or `.PrivateStack/Logs`). 
 
-### `pull --with-tags --all --continue-on-error`
+### `pull --with-tags --all --continue-on-error --max-dop <n>`
 
 Pulls (fetch-merge) the Stack repository and all current Repos' local branches that track a remote branch.
 By default, remote tags are safely fetched, preserving local tags (see `cki tag fetch`). When `--with-tags`
@@ -186,12 +342,16 @@ By default, the current directory selects the Repos unless `--all` is specified.
 
 Any merge conflict is an error. Unless `--continue-on-error` is specified, the first error stops the operation.
 
+`--max-dop <n>` limits the parallelism.
+
 A pull (without tags) is implicitly executed first by `ckli push`. 
 
-### `fetch --all --with-tags`
+### `fetch --all --with-tags --max-dop <n>`
 Fetches all branches (and optionally the tags that are associated to any fetched objects) in the current Repos.
 
 By default, the current directory selects the Repos unless `--all` is specified.
+
+`--max-dop <n>` limits the parallelism.
 
 When `--with-tags` is specified, the fetched remote tags will replace locally defined tags if
 they reference the same object. If a local tag references a different object, this will be an error.
@@ -226,14 +386,20 @@ By default, the current directory selects the Repos unless `--all` is specified.
 Any conflict is an error. Unless `--continue-on-error` is specified, the first error stops
 the push.
 
-### `status --by-branch --all`
+### `status --by-branch --all --skip-pull-stack`
 
-When the current directory is in a World, lists the Repos with their folder path, current branch name, remote commit diffs, and remote origin url.
-Otherwise, this lists all the Stacks that are registered on
+When the current directory is in a World, lists the Repos with their folder path, current branch name,
+remote commit diffs, and remote origin url.
 
+Otherwise, this lists every Stack that is registered on this machine, with its root folder and whether
+it is public or private.
 
 When `--by-branch` (or `-b`) is specified, repositories are grouped by their current branch name
 instead of being listed in definition order.
+
+By default, the current directory selects the Repos unless `--all` is specified.
+
+`--skip-pull-stack` doesn't update the Stack repository first.
 
 ### `repo add <url> --allow-lts`
 Adds a new repository to the current world.
@@ -244,6 +410,18 @@ it is weird to add a new Repo to a Long Term Support World.
 This clones the repository in the current directory, updates the World's definition file in
 the Stack repository and creates a commit. To publish this addition, a `push` (typically
 with `--stack-only`) must be executed.
+
+### `repo create <url> --allow-lts`
+Same as `repo add` but the remote repository doesn't exist yet: it is created first (the url must belong
+to a Git hosting provider that CKli can handle, and a write PAT is required), then cloned in the current
+directory and added to the World's definition file. If anything fails after the creation, the remote
+repository is deleted again.
+
+The new repository is created private or public according to the Stack: see
+[Private & Public stack and repositories](#private--public-stack-and-repositories).
+
+As for `repo add`, `--allow-lts` is required when the current World is a LTS one, and a `push` (typically
+with `--stack-only`) publishes the addition.
 
 ### `repo remove <name or url> --allow-lts`
 Removes an existing Repo from the current world.
@@ -374,7 +552,7 @@ exist is not an error, and a `<References>` element that becomes empty is remove
 
 ## Tag commands (list, fetch, pull, push, delete) 
 
-### `tag list --local --remote --all`
+### `tag list --local --remote --diff-only --all`
 Lists local tags and/or remote tags from the current Repo or all the Repos.
 
 By default (without `--local` or `--remote`), both local and remote tags are fetched
@@ -383,6 +561,8 @@ and a diff is displayed showing tags that exist only locally, only remotely, or 
 When `--local` is specified, only local tags are listed.
 
 When `--remote` is specified, only remote tags are listed.
+
+When `--diff-only` is specified, only the differences between local and remote tags are displayed.
 
 When `--all` is specified, lists tags for all the Repos of the current World
 (even if the current path is in a Repo).
@@ -411,8 +591,6 @@ Modifications of remote tags are lost (the local version replaces them).
 Tag names must contain only ASCII characters with lowercase letters (to avoid case sensitivity issues).
 
 Tags in the `local/` and `building/` namespaces cannot be pushed (see `ckli push`).
-
-Must be run from within a Repo directory.
 
 Must be run from within a Repo directory unless `--allow-multi-repo` is specified.
 
@@ -463,12 +641,14 @@ external and optional plugins can be used.
 Plugins are written in .NET and distributed as NuGet packages or can be source code directly
 in the Stack repository.
 
-### `plugin info`
+### `plugin info --skip-pull-stack`
 
 Provides information on installed plugins, their state, Xml configuration element and an optional message
 that can be produced by the plugin itself.
 
-### `plugin compile --mode <None|Debug|Release>`
+`--skip-pull-stack` doesn't update the Stack repository first.
+
+### `plugin compile --mode <None|Debug|Release> --skip-pull-stack`
 
 Plugins are discovered once (after a creation, an install or a removal) via reflection and then compiled
 (in `Release` mode by default) with generated code that replaces all the reflection.
@@ -478,12 +658,14 @@ single static initialization function that initializes the graph of objects (com
 In very specific scenario (developing, debugging), it is possible to set the option `--mode` to `None` (plugins
 are not compiled, reflection is always used) or `Debug` to compile the plugins in debug configuration.
 
+`--skip-pull-stack` doesn't update the Stack repository first.
+
 **Whenever a command changes — created, removed, or its flags, options, parameters or return type edited —
 delete the generated `CKli.CompiledPlugins.cs` and run this command.** That file is the exact transcription of
 the `[CommandPath]` methods and nothing keeps it in step on its own: the `_configSignature` it carries detects a
 changed `<Plugins>` *configuration*, not a changed command *signature*. It must never be hand-edited to catch
-up — see [`CKli.Plugins.Core`'s README](CKli.Plugins.Core/README.md#generatecode) for why a stale one can still
-compile and still be accepted.
+up — see [`CKli.Plugins.Core`'s README](CKli.Plugins.Core/README.md#reflectionplugincollectorfactory-reflection-execution-vs-code-generation)
+for why a stale one can still compile and still be accepted.
 
 ### `plugin create <name> --allow-lts`
 Creates a new source based plugin project in the current World.
@@ -561,6 +743,18 @@ As usual, this modification will be "published" when `push` (typically with `--s
 
 ----
 # Development & Local Testing
+
+This repository holds the tool and the source of the 9 Standard Plugins. Each project documents its own
+design:
+
+| Project | |
+|---|---|
+| [`CKli.Core`](CKli.Core/README.md) | The Stack / World / Repo model, Git, the hosting providers, the secrets store, the core commands and the plugin system. |
+| [`CKli.Loader`](CKli.Loader/README.md) | The collectible `AssemblyLoadContext` the plugins are loaded into, and the assemblies the host shares with them. |
+| [`CKli.Plugins.Core`](CKli.Plugins.Core/README.md) | What a plugin is written against, and the code generation that replaces reflection once plugins are compiled. |
+| [`CKli.Testing`](CKli.Testing/README.md) | The fixture layer: fake local Git remotes and cloned folders to run real `ckli` commands with no network. |
+| [`StandardPlugins/`](#the-basics-stack-world-repo) | The 9 Standard Plugins, listed with their READMEs above. |
+
 There are 2 possible approaches to develop and test CKli itself.
 
 ## Temporarily replaces the currently installed CKli tool.
