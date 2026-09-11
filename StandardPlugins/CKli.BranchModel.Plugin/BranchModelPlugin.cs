@@ -17,6 +17,7 @@ namespace CKli.BranchModel.Plugin;
     root, the "alpha" to "zulu" prerelease chain above it, the ad hoc "explo/" branches and the
     "dev/" working branch that each of them carries.
     """,
+    Summary = "Opens, closes, switches and synchronizes the branches of the CKli branch model.",
     HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.BranchModel.Plugin/README.md#commands" )]
 public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInfo>
 {

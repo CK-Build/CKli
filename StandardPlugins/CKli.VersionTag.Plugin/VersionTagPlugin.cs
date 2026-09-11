@@ -20,6 +20,7 @@ namespace CKli.VersionTag.Plugin;
     produce next (a "+fake" tag, a starting version and not a floor) and "version deprecate" marks a
     published version as deprecated and propagates it to its consumers.
     """,
+    Summary = "The CSemVer version tags of a repository: bumping and deprecating.",
     HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.VersionTag.Plugin/README.md#commands" )]
 public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>, BranchModel.Plugin.ITagCommitProvider
 {

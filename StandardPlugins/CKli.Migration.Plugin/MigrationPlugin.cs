@@ -26,12 +26,14 @@ namespace CKli.Migration.Plugin;
     One-off conversions of repositories created under older CKli conventions. These commands are
     transient: they disappear with this plugin once no repository needs them anymore.
     """,
+    Summary = "One-off conversions of repositories created under older CKli conventions.",
     HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.Migration.Plugin/README.md#command" )]
 [CommandNamespace( "maintenance migrate",
     """
     Converts a repository to the current CKli conventions: branch model, version tagging, build
     tooling and solution file format.
     """,
+    Summary = "Converts a repository to the current CKli conventions.",
     HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.Migration.Plugin/README.md#command" )]
 public sealed class MigrationPlugin : PrimaryPluginBase
 {

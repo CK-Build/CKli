@@ -21,12 +21,14 @@ namespace CKli.Build.Plugin;
     Aligns what the World consumes, where "build" propagates what it produces: the external package
     references of its repositories are moved onto the versions its World References publish.
     """,
+    Summary = "Aligns the external dependencies of the World.",
     HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.Build.Plugin/README.md#deps-update-aligning-the-external-dependencies" )]
 [CommandNamespace( "fix",
     """
     Builds and publishes a Fix Workflow: "fix build" produces "local/" versions in your own feed,
     "fix publish" the real ones. There is no CI fix build in between.
     """,
+    Summary = "Builds and publishes a Fix Workflow.",
     HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.Build.Plugin/README.md#fix-build--fix-publish-the-fix-workflow" )]
 [CommandNamespace( "maintenance",
     "Rebuilds versions that have already been released.",
@@ -36,6 +38,7 @@ namespace CKli.Build.Plugin;
     Reproduces a released version on its own commit: the version is rebuilt as it was, never
     incremented. Useful to check that an old release still builds with the current tooling.
     """,
+    Summary = "Reproduces a released version on its own commit.",
     HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.Build.Plugin/README.md#a-note-on-rebuildoldasyncrebuildversionasync" )]
 public sealed partial class BuildPlugin : PrimaryPluginBase
 {
@@ -139,7 +142,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="dryRun"></param>
     /// <param name="all"></param>
     /// <returns></returns>
-    [Description( "Build-Test-Package and propagates packages from the current repositories to their consumers, keeping them local." )]
+    [Description( "Build-Test-Package and propagates packages from the current repositories to their consumers, keeping them local.",
+                  Summary = "Build-Test-Package, keeping the produced packages local." )]
     [CommandPath( "build" )]
     public Task<bool> BuildAsync( IActivityMonitor monitor,
                                   CKliEnv context,
@@ -183,7 +187,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="dryRun"></param>
     /// <param name="all"></param>
     /// <returns></returns>
-    [Description( "Build-Test-Package and propagates packages from the current repositories to their consumers and publishes all the artifacts." )]
+    [Description( "Build-Test-Package and propagates packages from the current repositories to their consumers and publishes all the artifacts.",
+                  Summary = "Build-Test-Package and publish all the artifacts." )]
     [CommandPath( "publish" )]
     public Task<bool> PublishAsync( IActivityMonitor monitor,
                                     CKliEnv context,
@@ -227,7 +232,11 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="dryRun"></param>
     /// <param name="all"></param>
     /// <returns></returns>
-    [Description( """Upstream closure build": considers the producers of the current repositories, propagates packages to their consumers, keeping them local.""" )]
+    [Description( """
+        Upstream closure build: considers the producers of the current repositories, propagates
+        packages to their consumers, keeping them local.
+        """,
+        Summary = "Upstream closure build: builds the producers of the current repositories." )]
     [CommandPath( "*build" )]
     public Task<bool> StarBuildAsync( IActivityMonitor monitor,
                                       CKliEnv context,
@@ -271,7 +280,11 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="dryRun"></param>
     /// <param name="all"></param>
     /// <returns></returns>
-    [Description( """Upstream closure publish": considers the producers of the current repositories, propagates packages to their consumers and publishes all the artifacts.""" )]
+    [Description( """
+        Upstream closure publish: considers the producers of the current repositories, propagates
+        packages to their consumers and publishes all the artifacts.
+        """,
+        Summary = "Upstream closure publish: publishes the producers of the current repositories." )]
     [CommandPath( "*publish" )]
     public Task<bool> StarPublishAsync( IActivityMonitor monitor,
                                         CKliEnv context,
