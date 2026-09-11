@@ -93,7 +93,13 @@ sealed class PackageSender
                     {
                         var name = $"'{branch.VersionKind.ToKindName()}' versions";
                         if( isCI ) name = "ci build of " + name;
-                        monitor.Error( $"No configured NuGet feeds with PushCredentials accept {name}." );
+                        // CanPush is false for a feed without <Credentials /> (nothing can ever be pushed to it)
+                        // and for one whose PushQualityFilter rejects this kind: name both, the fix differs.
+                        monitor.Error( $"""
+                                        No configured NuGet feed accepts {name}.
+                                        A feed can be pushed to only when it has a <Credentials SecretKey="..." /> element
+                                        and a PushQualityFilter that accepts this version kind.
+                                        """ );
                         return null;
                     }
                     sender = new Sender( _artifactHandler, clients );
