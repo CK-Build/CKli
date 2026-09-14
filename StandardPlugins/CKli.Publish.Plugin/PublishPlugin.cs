@@ -41,6 +41,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                           VersionTagPlugin versionTag )
         : base( primaryContext )
     {
+        World.Events.PluginInfo += PluginInfoRequested;
         _build = build;
         _artifactHandler = artifactHandler;
         _branchModel = branchModel;
@@ -54,6 +55,39 @@ public sealed class PublishPlugin : PrimaryPluginBase
         // Sync: this handler is file IO and git, there is nothing to await. The event is a PerfectEvent,
         // so this choice is ours alone - another listener can take the Async or ParallelAsync slot.
         _versionTag.VersionDeprecated.Sync += OnVersionDeprecated;
+    }
+
+    void PluginInfoRequested( PluginInfoEventArgs e )
+    {
+        var s = e.ScreenType;
+        IRenderable message;
+        if( _keepLocalReleaseAfterPublish )
+        {
+            message = s.Text( nameof( XNames.KeepLocalReleaseAfterPublish ), foreColor: ConsoleColor.Green )
+                       .AddRight( s.Text( "is true: the $Local/NuGet packages Assets are kept after a publication." )
+                                   .Box( marginLeft: 1 ) );
+        }
+        else
+        {
+            message = s.Text( nameof( XNames.KeepLocalReleaseAfterPublish ), foreColor: ConsoleColor.DarkGray )
+                       .AddRight( s.Text( """is false (the default): the $Local/NuGet packages Assets are removed after a publication.""" )
+                                   .Box( marginLeft: 1 ) );
+        }
+        e.AddMessage( PrimaryPluginContext, message );
+    }
+
+    /// <inheritdoc />
+    protected override Task<bool?> OnPluginSetAsync( IActivityMonitor monitor,
+                                                     PluginInfo? pluginInfo,
+                                                     string attributeName,
+                                                     string? attributeValue )
+    {
+        bool? result = null;
+        if( attributeName.Equals( XNames.KeepLocalReleaseAfterPublish.LocalName, StringComparison.OrdinalIgnoreCase ) )
+        {
+            result = PrimaryPluginContext.Configuration.SetBooleanAttribute( monitor, XNames.KeepLocalReleaseAfterPublish, attributeValue );
+        }
+        return Task.FromResult( result );
     }
 
     // A deprecated version is still carried by every profile that was published with it: the deprecation

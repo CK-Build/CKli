@@ -75,6 +75,11 @@ Global, on the `<VersionTag>` element under the World's `<Plugins>`:
 | `RemoveUselessFakeTag` (bool, default `false`) | If true, a `+fake` tag whose real version has since been published is deleted locally instead of kept around. |
 | `<Packages><Package Name="..." Version="..."/></Packages>` | World-wide declared **version bounds** for packages that are consumed but not produced by any repo in the Stack (external dependencies). Exposed via `GetPackagesConfiguration`. |
 
+The two booleans are *plugin attributes*: `ckli plugin info` describes their current value and
+[`ckli plugin set RemoveUselessFakeTag true`](../../README.md#plugin-set-name-value)
+(or `ckli plugin unset RemoveUselessFakeTag`) writes them without editing this file by hand. The
+`<Packages>` element has no such support: it must be edited in the World definition file.
+
 The `Version` is a [`SVersionBound`](https://github.com/CK-Build/CK-SVersion), not a single version: it is the
 range of versions this World accepts for that package. It is parsed by `SVersionBound.TryParse`, so it is a base
 version optionally followed by its restrictions between brackets:

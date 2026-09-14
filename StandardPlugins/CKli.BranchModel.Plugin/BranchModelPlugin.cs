@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -34,14 +33,48 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     public BranchModelPlugin( PrimaryPluginContext primaryContext, ShallowSolutionPlugin shallowSolution )
         : base( primaryContext )
     {
+        World.Events.PluginInfo += PluginInfoRequested;
+        World.Events.Issue += IssueRequested;
+        World.Events.RepoAdded.Sync += OnRepoAdded;
+        _shallowSolution = shallowSolution;
         var configElement = primaryContext.Configuration.XElement;
         _namespace = new BranchNamespace( World.Name.LTSName,
                                           configElement.Attribute( XNames.MainLine )?.Value,
                                           configElement.Elements( XNames.Explo ) );
         _autoFixUselessBranch = (bool?)configElement.Attribute( XNames.AutoFixUselessBranch ) ?? true;
-        World.Events.Issue += IssueRequested;
-        World.Events.RepoAdded.Sync += OnRepoAdded;
-        _shallowSolution = shallowSolution;
+    }
+
+    void PluginInfoRequested( PluginInfoEventArgs e )
+    {
+        var s = e.ScreenType;
+        IRenderable message;
+        if( _autoFixUselessBranch )
+        {
+            message = s.Text( nameof( XNames.AutoFixUselessBranch ), foreColor: ConsoleColor.Green )
+                       .AddRight( s.Text( "is true (the default): useless branches are automatically deleted." )
+                                   .Box( marginLeft: 1 ) );
+        }
+        else
+        {
+            message = s.Text( nameof( XNames.AutoFixUselessBranch ), foreColor: ConsoleColor.DarkGray )
+                       .AddRight( s.Text( """is false: useless branches will be removed by "ckli issue --fix".""" )
+                                   .Box( marginLeft: 1 ) );
+        }
+        e.AddMessage( PrimaryPluginContext, message );
+    }
+
+    /// <inheritdoc />
+    protected override Task<bool?> OnPluginSetAsync( IActivityMonitor monitor,
+                                                     PluginInfo? pluginInfo,
+                                                     string attributeName,
+                                                     string? attributeValue )
+    {
+        bool? result = null;
+        if( attributeName.Equals( XNames.AutoFixUselessBranch.LocalName, StringComparison.OrdinalIgnoreCase ) )
+        {
+            result = PrimaryPluginContext.Configuration.SetBooleanAttribute( monitor, XNames.AutoFixUselessBranch, attributeValue );
+        }
+        return Task.FromResult( result );
     }
 
     void OnRepoAdded( IActivityMonitor monitor, RepoAddedEventArgs e )

@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CKli.VersionTag.Plugin;
@@ -42,6 +43,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                              BranchModelPlugin branchModel )
         : base( primaryContext )
     {
+        World.Events.PluginInfo += PluginInfoRequested;
         World.Events.Issue += IssueRequested;
         World.Events.CreateLTS.Sync += LTSCreated;
         _artifactHandlerPlugin = artifactHandler;
@@ -49,6 +51,56 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         branchModel.SetTagCommitProvider( this );
         _autoFixRemovableTag = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.AutoFixRemovableTag ) ?? false;
         _removeUselessFakeTag = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.RemoveUselessFakeTag ) ?? false;
+    }
+
+    void PluginInfoRequested( PluginInfoEventArgs e )
+    {
+        var s = e.ScreenType;
+        IRenderable message; 
+        if( _autoFixRemovableTag )
+        {
+            message = s.Text( nameof( XNames.AutoFixRemovableTag ), foreColor: ConsoleColor.Green )
+                       .AddRight( s.Text( "is true: version tags that can be removed (because they are deprecated or invalid) are automatically deleted." )
+                                   .Box( marginLeft: 1 ) );
+        }
+        else
+        {
+            message = s.Text( nameof( XNames.AutoFixRemovableTag ), foreColor: ConsoleColor.DarkGray )
+                       .AddRight( s.Text( """is false (the default): version tags that can be removed are removed by "ckli issue --fix".""" )
+                                   .Box( marginLeft: 1 ) );
+        }
+        e.AddMessage( PrimaryPluginContext, message );
+        if( _removeUselessFakeTag )
+        {
+            message = s.Text( nameof( XNames.RemoveUselessFakeTag ), foreColor: ConsoleColor.Green )
+                       .AddRight( s.Text( "is true: +fake version tags that are published are automatically deleted." )
+                                   .Box( marginLeft: 1 ) );
+        }
+        else
+        {
+            message = s.Text( nameof( XNames.RemoveUselessFakeTag ), foreColor: ConsoleColor.DarkGray )
+                       .AddRight( s.Text( """is false (the default). The +fake version tags that are published are removed by "ckli issue --fix".""" )
+                                   .Box( marginLeft: 1 ) );
+        }
+        e.AddMessage( PrimaryPluginContext, message );
+    }
+
+    /// <inheritdoc />
+    protected override Task<bool?> OnPluginSetAsync( IActivityMonitor monitor,
+                                                     PluginInfo? pluginInfo,
+                                                     string attributeName,
+                                                     string? attributeValue )
+    {
+        bool? result = null;
+        if( attributeName.Equals( XNames.AutoFixRemovableTag.LocalName, StringComparison.OrdinalIgnoreCase ) )
+        {
+            result = PrimaryPluginContext.Configuration.SetBooleanAttribute( monitor, XNames.AutoFixRemovableTag, attributeValue );
+        }
+        else if( attributeName.Equals( XNames.RemoveUselessFakeTag.LocalName, StringComparison.OrdinalIgnoreCase ) )
+        {
+            result = PrimaryPluginContext.Configuration.SetBooleanAttribute( monitor, XNames.RemoveUselessFakeTag, attributeValue );
+        }
+        return Task.FromResult( result );
     }
 
     void IssueRequested( IssueEventArgs e )
