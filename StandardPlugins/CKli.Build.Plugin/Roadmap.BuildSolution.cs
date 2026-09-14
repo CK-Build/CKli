@@ -498,11 +498,10 @@ public sealed partial class Roadmap
             IRenderable r = head.MoveNext( _buildNumber > 0, marginRight: 0 );
             if( _roadmap.Graph.HasPivots )
             {
-                var prefixStyle = new TextStyle( ConsoleColor.Black, ConsoleColor.DarkYellow );
-                r = r.AddRight( PivotPrefix( head.Screen, _solution, prefixStyle, marginLeft: 1 ) );
+                r = r.AddRight( _solution.ToPivotPrefixRenderable( head.Screen, marginLeft: 1 ) );
             }
 
-            var statusAndName = RepoName( head.Screen, Repo, MustBuild );
+            var statusAndName = Repo.ToNameRenderable( head.Screen, willBeWritten: MustBuild );
             r = r.AddRight( statusAndName );
 
             var currentVersion = _lastBuild.TagCommit.Version;
@@ -528,56 +527,6 @@ public sealed partial class Roadmap
                 }
             }
             return r;
-
-            static IRenderable PivotPrefix( ScreenType screen, HotGraph.Solution solution, TextStyle style, int marginLeft )
-            {
-                if( solution.IsPivot )
-                {
-                    if( solution.IsPivotDownstream )
-                    {
-                        if( solution.IsPivotUpstream )
-                        {
-                            return screen.Text( "→⊙→" ).Box( style, marginLeft: marginLeft );
-                        }
-                        return screen.Text( "⊙→" ).Box( style, marginLeft: marginLeft, paddingLeft: 1 );
-                    }
-                    else if( solution.IsPivotUpstream )
-                    {
-                        return screen.Text( "→⊙" ).Box( style, marginLeft: marginLeft, paddingRight: 1 );
-                    }
-                    return screen.Text( "⊙" ).Box( style, marginLeft: marginLeft, paddingLeft: 1, paddingRight: 1 );
-                }
-                else if( solution.IsPivotDownstream )
-                {
-                    if( solution.IsPivotUpstream )
-                    {
-                        return screen.Text( "→·→" ).Box( style, marginLeft: marginLeft );
-                    }
-                    else
-                    {
-                        return screen.Text( "·→" ).Box( style, marginLeft: marginLeft, paddingLeft: 1 );
-                    }
-                }
-                else if( solution.IsPivotUpstream )
-                {
-                    return screen.Text( "→·" ).Box( style, marginLeft: marginLeft, paddingRight: 1 );
-                }
-                return screen.EmptyString.Box( style, marginLeft: marginLeft, marginRight: 3 );
-            }
-
-            static IRenderable RepoName( ScreenType screen, Repo repo, bool mustBuild )
-            {
-                var status = repo.GitStatus;
-                var style = mustBuild
-                                ? new TextStyle( status.IsDirty ? ConsoleColor.Red : ConsoleColor.Green, ConsoleColor.Black )
-                                : new TextStyle( status.IsDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGray, ConsoleColor.Black );
-                // First Box.
-                IRenderable r = screen.Text( repo.DisplayPath, style ).HyperLink( new Uri( repo.WorkingFolder ) );
-                r = status.IsDirty
-                            ? r.Box( paddingRight: 1 ).AddLeft( screen.Text( "✱", style.With( TextEffect.Regular ) ).Box( paddingRight: 1 ) )
-                            : r.Box( paddingLeft: 2, paddingRight: 1 );
-                return r.Box();
-            }
         }
 
         /// <summary>

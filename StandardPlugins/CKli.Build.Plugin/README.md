@@ -170,6 +170,9 @@ non-CSemVer version, so most third party prereleases (`2.0.0-rc.2.23479.6`) woul
 precedence applies - a root branch takes only `SVersion.IsStable`, a prerelease or exploratory branch takes
 everything - and a CI version is never a target (the CI notion here lives in the References, not in a feed).
 
+The report renders each participating repository with the very same row as a build roadmap - the pivot marker
+and the linked, dirty-aware name - see [The repository row](#the-repository-row-one-rendering-two-commands).
+
 **Who participates.** The pivots to start with, exactly as the build commands compute them. Then an upstream
 that needs an upgrade joins: it will be rebuilt, and a repository we open a branch on and rebuild is a
 first-class participant. Unless `--narrow`, the **downstreams** of an updated participant join too: `build`
@@ -266,6 +269,37 @@ has a greater one.
 Whether the roadmap may actually be published is decided beyond this status, by
 [`CKli.Publish.Plugin`](../CKli.Publish.Plugin)'s publication gate, which checks that the profile of packages the
 publication would leave on the branch is coherent.
+
+
+### The repository row: one rendering, two commands
+
+`build` and `deps update` render a repository the same way, because they render it with the same code rather
+than with two implementations that agree today:
+
+| Piece | Where it lives | What it says |
+|---|---|---|
+| The pivot marker | `HotGraph.Solution.ToPivotPrefixRenderable` (`CKli.HotZone.Plugin`) | How the repository relates to the [pivots](#the-roadmap-computing-what-to-build). |
+| The name | `Repo.ToNameRenderable` (`CKli.Core`) | The `DisplayPath`, linked to the working folder, preceded by `✱` when the repository is dirty. |
+
+The marker has nine cases, all exactly **3 columns wide** - so a column of them aligns with no table layout
+involved - and it is displayed only when `HotGraph.HasPivots` is true. When it is false every repository is
+(or is not) a pivot, so the three flags are all false and the whole column is dropped rather than marking
+every row: that is why `--all` (where every repository is a pivot) shows no marker at all.
+
+| Marker | Meaning |
+|---|---|
+| `⊙` | A pivot, with nothing of the graph on either side of it. |
+| `→⊙` | A pivot that has pivots upstream (it produces for them). |
+| `⊙→` | A pivot that has pivots downstream (they consume from it). |
+| `→⊙→` | A pivot with pivots on both sides. |
+| `·` / `→·` / `·→` / `→·→` | The same four, for a repository that is **not** a pivot but participates. |
+| *(blank)* | Neither a pivot nor related to one. |
+
+The name's colour is the shared `Repo.ToNameRenderable( screen, willBeWritten )` convention, not a per command
+choice: **green means the command is going to write to this repository** - built, for a roadmap; updated, for
+`deps update`, which only ever lists repositories it will write to. Gray is a repository that is only shown for
+context, and a dirty repository takes the red of the same pair. (`deps update` refuses a World with any dirty
+repository up front, so its `✱` branch is correct but unreachable.)
 
 ### Building the roadmap: `RoadmapExecutor`
 

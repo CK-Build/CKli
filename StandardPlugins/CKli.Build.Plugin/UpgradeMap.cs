@@ -205,11 +205,10 @@ public sealed partial class UpgradeMap
     /// </summary>
     public sealed class RepoUpgrades
     {
-        internal RepoUpgrades( HotGraph.Solution solution, ImmutableArray<Upgrade> upgrades, bool isPivot, bool needsBranch )
+        internal RepoUpgrades( HotGraph.Solution solution, ImmutableArray<Upgrade> upgrades, bool needsBranch )
         {
             Solution = solution;
             Upgrades = upgrades;
-            IsPivot = isPivot;
             NeedsBranch = needsBranch;
         }
 
@@ -227,11 +226,6 @@ public sealed partial class UpgradeMap
         /// Gets the upgrades, ordered by package identifier. Never empty.
         /// </summary>
         public ImmutableArray<Upgrade> Upgrades { get; }
-
-        /// <summary>
-        /// Gets whether this repository is one of the <see cref="HotGraph.Pivots"/>.
-        /// </summary>
-        public bool IsPivot { get; }
 
         /// <summary>
         /// Gets whether the analyzed branch doesn't exist in this repository: applying the upgrades would
@@ -358,7 +352,6 @@ public sealed partial class UpgradeMap
                 if( upgrades == null ) continue;
                 result.Add( new RepoUpgrades( s,
                                               upgrades.ToImmutableArray(),
-                                              s.IsPivot || !graph.HasPivots,
                                               needsBranch: !s.CanBeDevSolution ) );
             }
             return new UpgradeMap( graph, options, result.DrainToImmutable(), resolver.GetTargets() );

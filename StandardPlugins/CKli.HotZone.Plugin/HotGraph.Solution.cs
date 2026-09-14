@@ -193,6 +193,64 @@ public sealed partial class HotGraph
         }
 
         /// <summary>
+        /// The style of the <see cref="ToPivotPrefixRenderable(ScreenType, int)"/> marker.
+        /// </summary>
+        public static readonly TextStyle PivotStyle = new TextStyle( ConsoleColor.Black, ConsoleColor.DarkYellow );
+
+        /// <summary>
+        /// Returns the marker that tells how this solution relates to the <see cref="HotGraph.Pivots"/>: "⊙" when
+        /// it is one of them, "·" when it is not, with a "→" on the left when it has a pivot downstream and one on
+        /// the right when it has a pivot upstream.
+        /// <para>
+        /// Every case is exactly 3 columns wide, so a column of these aligns with no table layout involved.
+        /// </para>
+        /// <para>
+        /// This is only meaningful when <see cref="HotGraph.HasPivots"/> is true: when it is false every solution
+        /// is (or is not) a pivot, so <see cref="IsPivot"/>, <see cref="IsPivotUpstream"/> and
+        /// <see cref="IsPivotDownstream"/> are all false and this renders the blank marker. Callers display the
+        /// column only when the graph has pivots - the "ckli build" roadmap and "ckli deps update" both do.
+        /// </para>
+        /// </summary>
+        /// <param name="screen">The screen type.</param>
+        /// <param name="marginLeft">The left margin size to add.</param>
+        /// <returns>The renderable.</returns>
+        public IRenderable ToPivotPrefixRenderable( ScreenType screen, int marginLeft )
+        {
+            if( _isPivot )
+            {
+                if( _isPivotDownstream )
+                {
+                    if( _isPivotUpstream )
+                    {
+                        return screen.Text( "→⊙→" ).Box( PivotStyle, marginLeft: marginLeft );
+                    }
+                    return screen.Text( "⊙→" ).Box( PivotStyle, marginLeft: marginLeft, paddingLeft: 1 );
+                }
+                else if( _isPivotUpstream )
+                {
+                    return screen.Text( "→⊙" ).Box( PivotStyle, marginLeft: marginLeft, paddingRight: 1 );
+                }
+                return screen.Text( "⊙" ).Box( PivotStyle, marginLeft: marginLeft, paddingLeft: 1, paddingRight: 1 );
+            }
+            else if( _isPivotDownstream )
+            {
+                if( _isPivotUpstream )
+                {
+                    return screen.Text( "→·→" ).Box( PivotStyle, marginLeft: marginLeft );
+                }
+                else
+                {
+                    return screen.Text( "·→" ).Box( PivotStyle, marginLeft: marginLeft, paddingLeft: 1 );
+                }
+            }
+            else if( _isPivotUpstream )
+            {
+                return screen.Text( "→·" ).Box( PivotStyle, marginLeft: marginLeft, paddingRight: 1 );
+            }
+            return screen.EmptyString.Box( PivotStyle, marginLeft: marginLeft, marginRight: 3 );
+        }
+
+        /// <summary>
         /// This drives the <see cref="HotGraph.OrderedSolutions"/> list.
         /// </summary>
         int IComparable<Solution>.CompareTo( Solution? other )

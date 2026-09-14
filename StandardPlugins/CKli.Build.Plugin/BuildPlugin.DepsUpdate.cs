@@ -268,10 +268,19 @@ public sealed partial class BuildPlugin
             lines.Add( TakeLine( screen, b ) );
             foreach( var r in map.Upgrades )
             {
-                b.Append( "- " ).Append( r.Repo.DisplayPath );
-                if( r.IsPivot ) b.Append( " (pivot)" );
-                if( r.NeedsBranch ) b.Append( $" [the '{map.Graph.BranchName}' branch would be created]" );
-                lines.Add( TakeLine( screen, b ) );
+                // The same row as a build roadmap's: the pivot marker (only when the graph has pivots, exactly
+                // as the roadmap decides it) then the repository name, its dirty marker and its link. Every
+                // repository listed here is one this command writes to, hence willBeWritten.
+                IRenderable row = r.Repo.ToNameRenderable( screen, willBeWritten: true );
+                if( map.Graph.HasPivots )
+                {
+                    row = r.Solution.ToPivotPrefixRenderable( screen, marginLeft: 0 ).AddRight( row );
+                }
+                if( r.NeedsBranch )
+                {
+                    row = row.AddRight( screen.Text( $"[the '{map.Graph.BranchName}' branch would be created]" ).Box( marginLeft: 1 ) );
+                }
+                lines.Add( row );
                 foreach( var u in r.Upgrades )
                 {
                     b.Append( u.IsDowngrade ? "▼ " : "▲ " )
