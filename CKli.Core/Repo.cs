@@ -135,7 +135,7 @@ public sealed class Repo
     {
         // The style is carried by the outer box, so it covers the dirty marker and the 2 columns that stand
         // for it when the repository is clean - not only the name.
-        IRenderable r = screenType.Text( DisplayPath ).HyperLink( new Uri( WorkingFolder ) );
+        IRenderable r = ToLinkedNameRenderable( screenType, TextStyle.None );
         r = GitStatus.IsDirty
                 ? r.Box( paddingRight: 1 ).AddLeft( screenType.Text( "✱" ).Box( paddingRight: 1 ) )
                 : r.Box( paddingLeft: 2, paddingRight: 1 );
@@ -143,25 +143,49 @@ public sealed class Repo
     }
 
     /// <summary>
-    /// Returns the <see cref="ToNameRenderable(ScreenType, TextStyle)"/> in the style that the commands writing
-    /// to a set of repositories share: green is "this one is going to be written", and that convention lives
-    /// here rather than in each of them.
+    /// Returns the bare <see cref="DisplayPath"/> with its link to <see cref="WorkingFolder"/>: no dirty marker
+    /// and no alignment gutter, so that it can appear inside a sentence or in a comma separated list.
+    /// <para>
+    /// This is the inner half of <see cref="ToNameRenderable(ScreenType, TextStyle)"/>: a display that lists
+    /// repositories inline uses this one rather than a third rendering of a repository name.
+    /// </para>
     /// </summary>
     /// <param name="screenType">The screen type.</param>
+    /// <param name="style">The style of the name.</param>
+    /// <returns>The renderable.</returns>
+    public IRenderable ToLinkedNameRenderable( ScreenType screenType, TextStyle style )
+    {
+        return screenType.Text( DisplayPath, style ).HyperLink( new Uri( WorkingFolder ) );
+    }
+
+    /// <summary>
+    /// Gets the style that the commands writing to a set of repositories share: green is "this one is going to
+    /// be written". This convention lives here rather than in each of them.
+    /// </summary>
     /// <param name="willBeWritten">
     /// True when the command about to run will write to this repository - the "ckli build" roadmap reads it as
     /// "this will be built" and "ckli deps update" as "this will be updated". The name is then green, or red
-    /// when this repository is dirty. False renders it gray (dark red when dirty).
+    /// when this repository is dirty. False gives gray (dark red when dirty).
     /// </param>
+    /// <returns>The style.</returns>
+    public TextStyle GetNameStyle( bool willBeWritten )
+    {
+        bool dirty = GitStatus.IsDirty;
+        return new TextStyle( willBeWritten
+                                ? (dirty ? ConsoleColor.Red : ConsoleColor.Green)
+                                : (dirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGray),
+                              ConsoleColor.Black );
+    }
+
+    /// <summary>
+    /// Returns the <see cref="ToNameRenderable(ScreenType, TextStyle)"/> in the <see cref="GetNameStyle(bool)"/>.
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="willBeWritten">See <see cref="GetNameStyle(bool)"/>.</param>
     /// <returns>The renderable.</returns>
     public IRenderable ToNameRenderable( ScreenType screenType, bool willBeWritten )
     {
-        bool dirty = GitStatus.IsDirty;
-        return ToNameRenderable( screenType,
-                                 new TextStyle( willBeWritten
-                                                    ? (dirty ? ConsoleColor.Red : ConsoleColor.Green)
-                                                    : (dirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGray),
-                                                ConsoleColor.Black ) );
+        return ToNameRenderable( screenType, GetNameStyle( willBeWritten ) );
     }
 
     /// <summary>

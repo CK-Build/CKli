@@ -616,7 +616,7 @@ Unlike every other command described above, this one comes from a **plugin** (th
 they are documented with it in
 [`CKli.Build.Plugin`'s README](StandardPlugins/CKli.Build.Plugin/README.md#deps-update-aligning-the-external-dependencies).
 
-### `deps update --branch <name> --all --narrow --no-fetch --ci --with-nuget --prerelease --stable --allow-downgrade --dry-run`
+### `deps update --branch <name> --all --narrow --no-fetch --ci --with-nuget --prerelease --stable --allow-downgrade --by-repo --dry-run`
 
 Aligns the **external** package dependencies of a World: the packages its repositories consume but don't
 produce. A target version comes from the published profiles of the World `<Reference>`s - and those references
@@ -638,6 +638,11 @@ yet gets it created, at the commit its branch model says it must start from.
 
 Use `--dry-run` to see the report without writing anything. Downgrades are reported apart and require
 `--allow-downgrade` to be applied.
+
+The report is grouped by package: one row per package with the version it moves to, then the repositories on
+each version it moves from, which is what answers "where is this package used, and what moves". `--by-repo`
+gives the other orientation - one row per repository and the upgrades it receives. The flag changes the display
+only, never what is computed or written.
 
 ## Plugin commands (info, create, add, remove, enable)
 
