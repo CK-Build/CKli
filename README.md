@@ -619,11 +619,15 @@ they are documented with it in
 ### `deps update --branch <name> --all --narrow --no-fetch --ci --with-nuget --prerelease --stable --allow-downgrade --dry-run`
 
 Aligns the **external** package dependencies of a World: the packages its repositories consume but don't
-produce. A target version comes from a `<VersionTag><Packages>` pin (which means "never touch this") or from
-the published profiles of the World `<Reference>`s - and those references are the **only** source unless
-`--with-nuget` is specified, which lets the greatest version the World's NuGet feeds offer answer the
-identifiers no reference anchors. No feed is ever queried without that flag (`--prerelease` and `--stable`,
-which only filter what a feed offers, then require it).
+produce. A target version comes from the published profiles of the World `<Reference>`s - and those references
+are the **only** source unless `--with-nuget` is specified, which lets the greatest version the World's NuGet
+feeds offer answer the identifiers no reference anchors. No feed is ever queried without that flag
+(`--prerelease` and `--stable`, which only filter what a feed offers, then require it).
+
+The `<VersionTag><Packages>` configuration declares a **version bound** per package identifier: it caps what a
+source may propose (a version outside the bound is refused and reported as held back) and it is an invariant to
+restore (a repository outside the bound is brought back to the bound's base version, even when no source offers
+anything). A `[Lock]`ed bound is the "never move this" pin.
 
 It updates the pivot repositories, the upstreams that need it, and by default the downstreams of everything it
 updates (`--narrow` keeps it to the upstreams): that is what a `ckli build` afterwards would rebuild anyway.
