@@ -100,6 +100,42 @@ public sealed class PluginConfiguration
         return true;
     }
 
+    /// <summary>
+    /// Sets or removes (when <paramref name="value"/> is null) an attribute of this configuration.
+    /// <para>
+    /// This is the primitive that a primary plugin uses to handle the "ckli plugin set" and "ckli plugin unset" commands.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="name">The attribute name.</param>
+    /// <param name="value">The attribute value. Null removes the attribute.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool SetAttribute( IActivityMonitor monitor, XName name, string? value )
+    {
+        return Edit( monitor, ( m, e ) => e.SetAttributeValue( name, value ) );
+    }
+
+    /// <summary>
+    /// Sets or removes (when <paramref name="value"/> is null) a boolean attribute of this configuration.
+    /// The <paramref name="value"/> must be the Xml "true" or "false" (nothing else is accepted).
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="name">The attribute name.</param>
+    /// <param name="value">The "true" or "false" value. Null removes the attribute.</param>
+    /// <returns>True on success, false if the value is invalid or on error.</returns>
+    public bool SetBooleanAttribute( IActivityMonitor monitor, XName name, string? value )
+    {
+        if( value != null && value != "true" && value != "false" )
+        {
+            monitor.Error( $"""
+                Invalid value '{value}' for the boolean attribute '{name}' of the '{_context.PluginInfo.PluginName}' plugin.
+                It must be the Xml "true" or "false".
+                """ );
+            return false;
+        }
+        return SetAttribute( monitor, name, value );
+    }
+
     internal void ClearRepoConfiguration()
     {
         Throw.DebugAssert( _repo != null && !IsEmptyConfiguration );

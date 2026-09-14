@@ -72,7 +72,7 @@ public static class CKliCommands
             how they are compiled into the "{WorldName}-Plugins" solution.
             """,
             summary: "Manages the plugins of the current World.",
-            helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#plugin-commands-info-create-add-remove-enable" );
+            helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#plugin-commands-info-set-unset-create-add-remove-enable" );
         Add( cmds, new CKliPluginAdd() );
         Add( cmds, new CKliPluginCompile() );
         Add( cmds, new CKliPluginCreate() );
@@ -80,6 +80,8 @@ public static class CKliCommands
         Add( cmds, new CKliPluginEnable() );
         Add( cmds, new CKliPluginInfo() );
         Add( cmds, new CKliPluginRemove() );
+        Add( cmds, new CKliPluginSet() );
+        Add( cmds, new CKliPluginUnset() );
 
         Add( cmds, new CKliPull() );
         Add( cmds, new CKliPush() );

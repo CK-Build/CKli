@@ -379,6 +379,42 @@ this configuration: a `PluginConfiguration` exposes plugin's `XElement`  and wra
 
 An optional per-`Repo` configuration is also handled. The `PrimaryPluginContext` also offers a `GetConfigurationFor(repo)` / `HasConfigurationFor(repo)`.
 
+### Plugin attributes (`ckli plugin set` / `ckli plugin unset`)
+
+An attribute of the plugin's global configuration element can be set from the command line rather than by editing the World
+definition file. Both ends of this are **manual** — CKli has no schema of what a plugin's configuration accepts:
+
+- The supported attributes are the ones the plugin describes in the message it publishes on the `WorldEvents.PluginInfo`
+  event: that is what `ckli plugin info` displays.
+- Writing one is the plugin's own `OnPluginSetAsync( monitor, pluginInfo, attributeName, attributeValue )` override
+  (`PrimaryPluginBase` and `PrimaryRepoPlugin<T>` both offer it, it defaults to "not handled").
+
+The command submits the attribute name to each primary plugin until one answers a non null result: `true` (handled),
+`false` (error). `null` means "not mine" and the submission continues, so the `Plugin.Attribute` long form
+(`VersionTag.RemoveUselessFakeTag`) is needed only to disambiguate a name that more than one plugin supports — when it is
+used, the plugin receives its own `PluginInfo` instead of a null one and knows it was explicitly targeted.
+
+An override writes through `PrimaryPluginContext.Configuration`, typically with `SetBooleanAttribute` (which rejects
+anything but the XML `true` and `false`) or `SetAttribute`; a null `attributeValue` — the `plugin unset` command — removes
+the attribute, so the plugin's default applies again:
+
+```csharp
+protected override Task<bool?> OnPluginSetAsync( IActivityMonitor monitor,
+                                                 PluginInfo? pluginInfo,
+                                                 string attributeName,
+                                                 string? attributeValue )
+{
+    bool? result = null;
+    if( attributeName.Equals( XNames.RemoveUselessFakeTag.LocalName, StringComparison.OrdinalIgnoreCase ) )
+    {
+        result = PrimaryPluginContext.Configuration.SetBooleanAttribute( monitor, XNames.RemoveUselessFakeTag, attributeValue );
+    }
+    return Task.FromResult( result );
+}
+```
+
+The `StackRepository.Close` that ends the command saves and commits the modified definition file.
+
 ## Plugin discovery and loading
 
 The [`PluginMachinery`](Plugin/Impl/PluginMachinery.cs) orchestrates:

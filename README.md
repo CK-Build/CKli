@@ -644,7 +644,7 @@ each version it moves from, which is what answers "where is this package used, a
 gives the other orientation - one row per repository and the upgrades it receives. The flag changes the display
 only, never what is computed or written.
 
-## Plugin commands (info, create, add, remove, enable)
+## Plugin commands (info, set, unset, create, add, remove, enable)
 
 The core commands of CKli handles Stack, World and Repo (Git repositories).
 The Repo can contain anything. To handle tasks specific to a technology (.NET, Node, Ruby, etc.)
@@ -659,6 +659,51 @@ Provides information on installed plugins, their state, Xml configuration elemen
 that can be produced by the plugin itself.
 
 `--skip-pull-stack` doesn't update the Stack repository first.
+
+### `plugin set <name> <value>`
+
+Configures a plugin attribute — an attribute of a `<Plugins>` child element of the World definition file —
+without editing the XML by hand:
+
+```
+ckli plugin set RemoveUselessFakeTag true
+```
+```xml
+<MyWorld>
+
+  <Plugins>
+    <VersionTag RemoveUselessFakeTag="true" />
+  </Plugins>
+
+  <!-- Folders and Repositories... -->
+</MyWorld>
+```
+
+The attribute name can be prefixed by the plugin short name (`VersionTag.RemoveUselessFakeTag`). This long
+form is required only when more than one plugin supports the same attribute name: the identifier is submitted
+to each primary plugin until one of them handles it.
+
+Boolean attributes take the XML `true` or `false` and nothing else (`True`, `1` or `yes` are errors).
+
+Both sides of this are deliberately **manual**, and it is up to each plugin to implement them:
+- the supported attributes are the ones a plugin describes in the message it publishes on the `PluginInfo`
+  event — this is what `plugin info` displays;
+- writing them is the plugin's `OnPluginSetAsync` override.
+
+The 3 Standard Plugins that currently support attributes are
+[`BranchModel`](StandardPlugins/CKli.BranchModel.Plugin/README.md#configuration-xml) (`AutoFixUselessBranch`),
+[`VersionTag`](StandardPlugins/CKli.VersionTag.Plugin/README.md#configuration) (`AutoFixRemovableTag`,
+`RemoveUselessFakeTag`) and
+[`Publish`](StandardPlugins/CKli.Publish.Plugin/README.md#configuration) (`KeepLocalReleaseAfterPublish`).
+
+As usual, this modification will be "published" when `push` (typically with `--stack-only`) is executed.
+
+### `plugin unset <name>`
+
+Removes the attribute set by `plugin set`: the plugin's own default value applies again. This is not the same
+as setting the default value explicitly — the attribute is gone from the definition file.
+
+The `name` accepts the same short and `Plugin.Attribute` long forms.
 
 ### `plugin compile --mode <None|Debug|Release> --skip-pull-stack`
 

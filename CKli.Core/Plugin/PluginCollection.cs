@@ -47,6 +47,21 @@ public abstract class PluginCollection
     /// </summary>
     public virtual bool HasLoadError => false;
 
+    /// <summary>
+    /// Gets the primary plugins in their instantiation order.
+    /// This is a snapshot: no reference to this collection is kept by the result.
+    /// </summary>
+    internal List<IPrimaryPlugin> GetPrimaryPlugins()
+    {
+        Throw.DebugAssert( "DisposeDisposablePlugins has not been called.", _instantiated != null );
+        var result = new List<IPrimaryPlugin>();
+        foreach( var o in _instantiated )
+        {
+            if( o is IPrimaryPlugin p ) result.Add( p );
+        }
+        return result;
+    }
+
     internal T? FindPlugin<T>() where T : PluginBase
     {
         Throw.DebugAssert( "DisposeDisposablePlugins has not been called.", _instantiated != null );

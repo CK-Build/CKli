@@ -19,6 +19,10 @@ public sealed class PluginInfoEventArgs : WorldEventArgs
 
     /// <summary>
     /// Adds a message to the plugin information.
+    /// <para>
+    /// A plugin can call this more than once (a plugin that supports more than one attribute typically
+    /// describes each of them): the messages are stacked, they don't replace each other.
+    /// </para>
     /// </summary>
     /// <param name="source">The plugin that emitted the message.</param>
     /// <param name="message">A renderable message.</param>
@@ -35,6 +39,6 @@ public sealed class PluginInfoEventArgs : WorldEventArgs
                 """ );
             return;
         }
-        p.Message = message;
+        p.Message = p.Message == null ? message : p.Message.AddBelow( message );
     }
 }
