@@ -204,7 +204,46 @@ to do, and it is the only step that could move a tip away from what the report d
 | `with-nuget` | Let the World's NuGet feeds answer the identifiers no World Reference anchors. Without it no feed is queried and the References are the only source. |
 | `prerelease` / `stable` | Override the stable/not filter of the feeds. Mutually exclusive, and both require `--with-nuget`. |
 | `allowDowngrade` | Apply the updates that move a version **down**. A World Reference may legitimately pin lower than what this World references - alignment is the point - but without this flag a map containing a downgrade reports and writes nothing. |
+| `--by-repo` | Group the report by repository instead of by package. Display only - it changes nothing about what is computed or written. |
 | `--dry-run,-d` | Only display the upgrades. |
+
+#### The report: by package, or `--by-repo`
+
+The report answers "where is this package used, and what moves": one row per package with the version it moves
+**to** and where that target comes from, then one row per version it moves **from** with the repositories that
+are on it, greatest version first so the most behind come last.
+
+```
+Dependency upgrades of branch 'stable':
+CK.CanaryPackage → 1.0.0  (NuGet)
+    ▲ 0.9.0  X-Middle, X-Sample
+    ▲ 0.8.0  X-Core
+3 upgrade(s) of 1 package(s) in 3 repositories.
+```
+
+Four things this view does deliberately:
+
+- **The arrow sits on the version group, not on the package.** A package has one target version but several
+  source versions, and one of them can be above the target while another is below it - a single arrow on the
+  package row would be wrong for one of them.
+- **The origin is stated once.** `(NuGet)`, the anchoring reference or the configured bound is named once per
+  package rather than on every row, so the full text fits.
+- **The version column is as wide as the widest version of the whole report**, not of its own package, so the
+  repository lists form one straight column down the report. A `TextBlock` trims its content, so that padding
+  is a right margin and never trailing spaces.
+- **No pivot marker, and the names are inline.** The grouping is about packages, not about where a repository
+  sits in the graph. Each name keeps its link to the working folder (`Repo.ToLinkedNameRenderable`, the inner
+  half of the shared [repository row](#the-repository-row-one-rendering-two-commands)), and the branch creation
+  note - a property of a repository, not of a package - is said once at the end instead of under every package
+  that repository appears in.
+
+That a package has exactly **one** target version is what makes this grouping lossless: `Target.GetUpgrade`
+answers either the resolved `Version` or the configured bound's `Base`, and both are package scoped.
+
+`--by-repo` gives the other orientation - one row per repository, the build roadmap's row with its pivot marker,
+then the upgrades it receives below it. It is the view to reach for when the question is "what happens to this
+repository" rather than "where does this package move".
+
 
 ### The `Roadmap`: computing what to build
 

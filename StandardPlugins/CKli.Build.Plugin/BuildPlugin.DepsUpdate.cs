@@ -20,6 +20,7 @@ public sealed partial class BuildPlugin
     const string _dDepsPrerelease = "Consider the prerelease versions of the feeds even on the root branch. Requires --with-nuget.";
     const string _dDepsStable = "Consider only the stable versions of the feeds. Requires --with-nuget.";
     const string _dDepsAllowDowngrade = "Apply the updates that move a version down (a Reference or a <Packages> bound may sit lower than what this World references).";
+    const string _dDepsByRepo = "Group the report by repository instead of by package: each repository and the upgrades it receives, with its pivot marker.";
 
     /// <summary>
     /// Analyzes the external dependencies of a World and reports the upgrades that would align them.
@@ -35,6 +36,7 @@ public sealed partial class BuildPlugin
     /// <param name="prerelease">True to consider the prereleases of the feeds.</param>
     /// <param name="stable">True to consider only the stable versions of the feeds.</param>
     /// <param name="allowDowngrade">True to apply the updates that move a version down.</param>
+    /// <param name="byRepo">True to group the report by repository instead of by package.</param>
     /// <param name="dryRun">True to only display the upgrades.</param>
     /// <returns>True on success, false on error.</returns>
     [Description( """
@@ -67,6 +69,9 @@ public sealed partial class BuildPlugin
                                              bool stable = false,
                                              [Description( _dDepsAllowDowngrade )]
                                              bool allowDowngrade = false,
+                                             [Description( _dDepsByRepo )]
+                                             [OptionName( "--by-repo" )]
+                                             bool byRepo = false,
                                              [Description( "Only display the upgrades." )]
                                              [OptionName( _oDryRun )]
                                              bool dryRun = false )
@@ -121,7 +126,7 @@ public sealed partial class BuildPlugin
                                   .ConfigureAwait( false );
         if( map == null ) return false;
 
-        DisplayUpgrades( monitor, context, map );
+        DisplayUpgrades( monitor, context, map, byRepo );
         return dryRun || Apply( monitor, context, map, branchName, allowDowngrade );
     }
 
@@ -243,7 +248,7 @@ public sealed partial class BuildPlugin
         return true;
     }
 
-    static void DisplayUpgrades( IActivityMonitor monitor, CKliEnv context, UpgradeMap map )
+    static void DisplayUpgrades( IActivityMonitor monitor, CKliEnv context, UpgradeMap map, bool byRepo )
     {
         var screen = context.Screen.ScreenType;
         // A multi line TextBlock trims each of its lines (a raw string literal carries its own indentation),
@@ -263,44 +268,40 @@ public sealed partial class BuildPlugin
         else
         {
             b.Append( "Dependency upgrades of branch '" ).Append( map.Graph.BranchName ).Append( "'" );
+            if( byRepo ) b.Append( " by repository" );
             if( map.AnalysisOptions.Narrow ) b.Append( " (--narrow: upstreams only)" );
             b.Append( ':' );
             lines.Add( TakeLine( screen, b ) );
-            foreach( var r in map.Upgrades )
+            int packageCount;
+            if( byRepo )
             {
-                // The same row as a build roadmap's: the pivot marker (only when the graph has pivots, exactly
-                // as the roadmap decides it) then the repository name, its dirty marker and its link. Every
-                // repository listed here is one this command writes to, hence willBeWritten.
-                IRenderable row = r.Repo.ToNameRenderable( screen, willBeWritten: true );
-                if( map.Graph.HasPivots )
-                {
-                    row = r.Solution.ToPivotPrefixRenderable( screen, marginLeft: 0 ).AddRight( row );
-                }
-                if( r.NeedsBranch )
-                {
-                    row = row.AddRight( screen.Text( $"[the '{map.Graph.BranchName}' branch would be created]" ).Box( marginLeft: 1 ) );
-                }
-                lines.Add( row );
-                foreach( var u in r.Upgrades )
-                {
-                    b.Append( u.IsDowngrade ? "▼ " : "▲ " )
-                     .Append( u.Current.PackageId )
-                     .Append( ' ' )
-                     .Append( u.Current.Version )
-                     .Append( " → " )
-                     .Append( u.Target );
-                    var t = map.Targets.FirstOrDefault( x => x.PackageId.Equals( u.Current.PackageId, StringComparison.OrdinalIgnoreCase ) );
-                    if( t?.Origin != null ) b.Append( "  (" ).Append( t.Origin ).Append( ')' );
-                    lines.Add( TakeLine( screen, b ).Box( marginLeft: 4 ) );
-                }
+                packageCount = RenderByRepository( screen, map, lines, b );
             }
-            b.Append( map.UpgradeCount ).Append( " upgrade(s) in " ).Append( map.Upgrades.Length ).Append( " repositories" );
+            else
+            {
+                packageCount = RenderByPackage( screen, map, lines, b );
+            }
+            b.Append( map.UpgradeCount ).Append( " upgrade(s) " );
+            if( !byRepo ) b.Append( "of " ).Append( packageCount ).Append( " package(s) " );
+            b.Append( "in " ).Append( map.Upgrades.Length ).Append( " repositories" );
             if( map.DowngradeCount > 0 )
             {
                 b.Append( ", including " ).Append( map.DowngradeCount ).Append( " downgrade(s) (▼)" );
             }
             b.Append( '.' );
             lines.Add( TakeLine( screen, b ) );
+            // By package, the branch creation is said once at the end: it is a property of the repository, so
+            // repeating it under every package that repository appears in would say nothing more.
+            if( !byRepo )
+            {
+                var needBranch = map.Upgrades.Where( r => r.NeedsBranch ).ToList();
+                if( needBranch.Count > 0 )
+                {
+                    IRenderable note = screen.Text( $"The '{map.Graph.BranchName}' branch would be created in: " );
+                    lines.Add( AppendRepositoryList( screen, note, needBranch.Select( r => r.Repo ) )
+                                .AddRight( screen.Text( "." ) ) );
+                }
+            }
         }
         var blocked = map.Targets.Where( t => t.State is UpgradeMap.TargetState.Conflict ).ToList();
         if( blocked.Count > 0 )
@@ -335,6 +336,115 @@ public sealed partial class BuildPlugin
             b.Clear();
             return line;
         }
+    }
+
+    // One row per repository - the build roadmap's row - then its upgrades below it.
+    // Returns the number of distinct packages, for the summary line.
+    static int RenderByRepository( ScreenType screen, UpgradeMap map, List<IRenderable> lines, System.Text.StringBuilder b )
+    {
+        var packages = new HashSet<string>( StringComparer.OrdinalIgnoreCase );
+        foreach( var r in map.Upgrades )
+        {
+            // The same row as a build roadmap's: the pivot marker (only when the graph has pivots, exactly
+            // as the roadmap decides it) then the repository name, its dirty marker and its link. Every
+            // repository listed here is one this command writes to, hence willBeWritten.
+            IRenderable row = r.Repo.ToNameRenderable( screen, willBeWritten: true );
+            if( map.Graph.HasPivots )
+            {
+                row = r.Solution.ToPivotPrefixRenderable( screen, marginLeft: 0 ).AddRight( row );
+            }
+            if( r.NeedsBranch )
+            {
+                row = row.AddRight( screen.Text( $"[the '{map.Graph.BranchName}' branch would be created]" ).Box( marginLeft: 1 ) );
+            }
+            lines.Add( row );
+            foreach( var u in r.Upgrades )
+            {
+                packages.Add( u.Current.PackageId );
+                b.Append( u.IsDowngrade ? "▼ " : "▲ " )
+                 .Append( u.Current.PackageId )
+                 .Append( ' ' )
+                 .Append( u.Current.Version )
+                 .Append( " → " )
+                 .Append( u.Target );
+                var t = map.Targets.FirstOrDefault( x => x.PackageId.Equals( u.Current.PackageId, StringComparison.OrdinalIgnoreCase ) );
+                if( t?.Origin != null ) b.Append( "  (" ).Append( t.Origin ).Append( ')' );
+                lines.Add( TakeLine( screen, b ).Box( marginLeft: 4 ) );
+            }
+        }
+        return packages.Count;
+
+        static TextBlock TakeLine( ScreenType screen, System.Text.StringBuilder b )
+        {
+            var line = screen.Text( b.ToString() );
+            b.Clear();
+            return line;
+        }
+    }
+
+    // One row per package - the version it moves to and where that comes from - then one row per version it
+    // moves from, with the repositories that are on it.
+    // Returns the number of distinct packages, for the summary line.
+    static int RenderByPackage( ScreenType screen, UpgradeMap map, List<IRenderable> lines, System.Text.StringBuilder b )
+    {
+        // A package identifier has exactly one target version: Target.GetUpgrade answers either the resolved
+        // Version or the configured bound's Base, and both are package scoped. So this grouping loses nothing,
+        // and the origin - which the by repository report repeats on every row - is said once here.
+        var byPackage = map.Upgrades.SelectMany( r => r.Upgrades.Select( u => (r.Repo, Upgrade: u) ) )
+                                    .GroupBy( x => x.Upgrade.Current.PackageId, StringComparer.OrdinalIgnoreCase )
+                                    .OrderBy( g => g.Key, StringComparer.OrdinalIgnoreCase )
+                                    .ToList();
+        // The version column is as wide as the widest version of the WHOLE report, so the repository lists
+        // form one straight column down it instead of one per package.
+        int versionLen = map.Upgrades.SelectMany( r => r.Upgrades )
+                                     .Max( u => u.Current.Version.ToString().Length );
+        foreach( var g in byPackage )
+        {
+            var target = g.First().Upgrade.Target;
+            Throw.DebugAssert( "A package identifier has exactly one target version.",
+                               g.All( x => x.Upgrade.Target == target ) );
+            b.Append( g.Key ).Append( " → " ).Append( target );
+            var t = map.Targets.FirstOrDefault( x => x.PackageId.Equals( g.Key, StringComparison.OrdinalIgnoreCase ) );
+            if( t?.Origin != null ) b.Append( "  (" ).Append( t.Origin ).Append( ')' );
+            lines.Add( TakeLine( screen, b ) );
+
+            // Greatest version first, so the most behind repositories come last.
+            var byVersion = g.GroupBy( x => x.Upgrade.Current.Version )
+                             .OrderByDescending( v => v.Key )
+                             .ToList();
+            // A TextBlock trims its content, so the padding is a right margin and never trailing spaces.
+            foreach( var v in byVersion )
+            {
+                var sVersion = v.Key.ToString();
+                b.Append( target < v.Key ? "▼ " : "▲ " ).Append( sVersion );
+                IRenderable row = TakeLine( screen, b ).Box( marginRight: 2 + versionLen - sVersion.Length );
+                // Inline names: no pivot marker and no dirty gutter here - the grouping is about packages, not
+                // about where a repository sits in the graph - but each name keeps its link.
+                lines.Add( AppendRepositoryList( screen, row, v.Select( x => x.Repo ) ).Box( marginLeft: 4 ) );
+            }
+        }
+        return byPackage.Count;
+
+        static TextBlock TakeLine( ScreenType screen, System.Text.StringBuilder b )
+        {
+            var line = screen.Text( b.ToString() );
+            b.Clear();
+            return line;
+        }
+    }
+
+    // Appends a comma separated list of linked repository names to a renderable.
+    static IRenderable AppendRepositoryList( ScreenType screen, IRenderable head, IEnumerable<Repo> repos )
+    {
+        bool first = true;
+        foreach( var repo in repos )
+        {
+            // A TextBlock trims its content: the separator's space is a margin, not a trailing character.
+            if( !first ) head = head.AddRight( screen.Text( "," ).Box( marginRight: 1 ) );
+            head = head.AddRight( repo.ToLinkedNameRenderable( screen, repo.GetNameStyle( willBeWritten: true ) ) );
+            first = false;
+        }
+        return head;
     }
 
     // Same resolution as the build commands: the pivots' "dev/" stripped current branch, or --branch.
