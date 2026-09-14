@@ -26,23 +26,31 @@ public sealed partial class UpgradeMap
                                                                                 World world,
                                                                                 BranchName branchName,
                                                                                 Options options,
+                                                                                bool hasBounds,
                                                                                 CancellationToken cancellation )
     {
         var anchors = new Dictionary<string, ReferenceAnchor>( StringComparer.OrdinalIgnoreCase );
         var references = world.DefinitionFile.References;
         if( references.Count == 0 )
         {
-            // Without --with-nuget the References are the only source, so a World that has none can have no
-            // target at all: this is a dead end, not a detail.
+            // Without --with-nuget the References are the only source of target versions, so a World that has
+            // none can only be updated by its configured bounds: this is a dead end, not a detail.
             if( options.UseFeeds )
             {
                 monitor.Info( "This World has no <Reference>: the feeds are the only source of target versions." );
             }
-            else
+            else if( hasBounds )
             {
                 monitor.Warn( """
                     This World has no <Reference> and --with-nuget is not specified: nothing can anchor a target
-                    version, so there is nothing to update.
+                    version, so only the <VersionTag><Packages> bounds can drive an update.
+                    """ );
+            }
+            else
+            {
+                monitor.Warn( """
+                    This World has no <Reference>, no <VersionTag><Packages> bound and --with-nuget is not
+                    specified: nothing can anchor a target version, so there is nothing to update.
                     """ );
             }
             return anchors;

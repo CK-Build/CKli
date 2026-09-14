@@ -16,10 +16,12 @@ namespace CKli.Build.Plugin;
 /// The external package upgrades of a World: for each package identifier its repositories consume from the
 /// outside, the version they should all be at, and the upgrades that follow for each repository.
 /// <para>
-/// A target comes from one of three sources, in this order: a <c>&lt;VersionTag&gt;&lt;Packages&gt;</c> pin
-/// (which is an authoritative exception and therefore has no target and prunes the closure), the World
-/// References' published profiles, and - only when <see cref="Options.UseFeeds"/> is set - the World's
-/// configured NuGet feeds. See <see cref="TryGetTargetAsync"/>.
+/// A target comes from one of two sources, in this order: the World References' published profiles, and -
+/// only when <see cref="Options.UseFeeds"/> is set - the World's configured NuGet feeds. The
+/// <c>&lt;VersionTag&gt;&lt;Packages&gt;</c> configuration is not a source but a constraint: the
+/// <see cref="SVersionBound"/> it declares for a package identifier bounds what a source may propose, and
+/// a dependency that is outside of its bound is brought back to the bound's <see cref="SVersionBound.Base"/>
+/// even when no source offers anything. See the <see cref="TargetState"/>.
 /// </para>
 /// <para>
 /// The repositories that participate start with the <see cref="HotGraph.Pivots"/> and grow: an upstream that
@@ -66,15 +68,24 @@ public sealed partial class UpgradeMap
     {
         /// <summary>
         /// No source knows this identifier: no World Reference anchors it and, when <see cref="Options.UseFeeds"/>
-        /// is set, no feed has it. There is no target.
+        /// is set, no feed has it. There is no target and no bound constrains it: it is left alone.
         /// </summary>
         Unknown,
 
         /// <summary>
-        /// The identifier is pinned by the World's <c>&lt;VersionTag&gt;&lt;Packages&gt;</c> configuration.
-        /// There is no target: a pin is an authoritative exception and it prunes the closure.
+        /// The World's <c>&lt;VersionTag&gt;&lt;Packages&gt;</c> configuration is all that applies: no source
+        /// offers a target and a <see cref="Target.Bound"/> is configured. There is no target version, but a
+        /// repository that references this identifier outside of its bound is still brought back to the bound's
+        /// <see cref="SVersionBound.Base"/>.
         /// </summary>
-        Pinned,
+        Bound,
+
+        /// <summary>
+        /// A source offers a version that the configured <see cref="Target.Bound"/> refuses: the World
+        /// deliberately holds this identifier below what the outside publishes. There is no target version,
+        /// but the bound still applies as for <see cref="Bound"/>.
+        /// </summary>
+        OutOfBound,
 
         /// <summary>
         /// Two World References disagree on the identifier. There is no target: this blocks that package,
@@ -88,7 +99,8 @@ public sealed partial class UpgradeMap
         Reference,
 
         /// <summary>
-        /// No reference anchors the identifier: the greatest version the World's feeds offer is the target.
+        /// No reference anchors the identifier: the greatest version the World's feeds offer - among the ones
+        /// the configured <see cref="Target.Bound"/> accepts - is the target.
         /// Only reachable when <see cref="Options.UseFeeds"/> is set.
         /// </summary>
         Feed
@@ -99,12 +111,14 @@ public sealed partial class UpgradeMap
     /// </summary>
     public sealed class Target
     {
-        internal Target( string packageId, SVersion? version, TargetState state, string? origin )
+        internal Target( string packageId, SVersion? version, TargetState state, string? origin, SVersionBound? bound )
         {
+            Throw.DebugAssert( "A target version is always in its bound.", version == null || bound == null || bound.Value.Satisfy( version ) );
             PackageId = packageId;
             Version = version;
             State = state;
             Origin = origin;
+            Bound = bound;
         }
 
         /// <summary>
@@ -129,9 +143,39 @@ public sealed partial class UpgradeMap
         public string? Origin { get; }
 
         /// <summary>
+        /// Gets the <see cref="SVersionBound"/> that the World's <c>&lt;VersionTag&gt;&lt;Packages&gt;</c>
+        /// configuration declares for this identifier. Null when it declares none.
+        /// <para>
+        /// When this and <see cref="Version"/> are both not null, the target version necessarily satisfies this bound.
+        /// </para>
+        /// </summary>
+        public SVersionBound? Bound { get; }
+
+        /// <summary>
         /// Gets whether this identifier has a target version.
         /// </summary>
         public bool HasTarget => Version != null;
+
+        /// <summary>
+        /// Gets the version a repository that currently references <paramref name="current"/> must move to.
+        /// Null when it must be left alone.
+        /// <para>
+        /// The configured <see cref="Bound"/> is an invariant of the World: a version outside of it is brought
+        /// back to its <see cref="SVersionBound.Base"/> even when no source offers a target.
+        /// </para>
+        /// </summary>
+        /// <param name="current">The version the repository currently references.</param>
+        /// <returns>The version to reference or null when there is nothing to do.</returns>
+        public SVersion? GetUpgrade( SVersion current )
+        {
+            if( Bound is SVersionBound bound && !bound.Satisfy( current ) )
+            {
+                // Version, when there is one, is in the bound: it is a better target than the bound's floor.
+                var t = Version ?? bound.Base;
+                return t != current ? t : null;
+            }
+            return Version != null && Version != current ? Version : null;
+        }
 
         /// <inheritdoc />
         public override string ToString() => HasTarget
@@ -253,7 +297,7 @@ public sealed partial class UpgradeMap
     /// <param name="context">The command context (its secrets store reaches the references and the feeds).</param>
     /// <param name="world">The World.</param>
     /// <param name="graph">The hot graph of the branch to analyze.</param>
-    /// <param name="versionTag">The version tag plugin: its <c>&lt;Packages&gt;</c> configuration holds the pins.</param>
+    /// <param name="versionTag">The version tag plugin: its <c>&lt;Packages&gt;</c> configuration holds the bounds.</param>
     /// <param name="artifactHandler">
     /// The artifact handler plugin: its configured feeds are the last source. Only solicited when
     /// <see cref="Options.UseFeeds"/> is set.
@@ -274,9 +318,9 @@ public sealed partial class UpgradeMap
         Throw.CheckNotNullArgument( options );
         using( monitor.OpenInfo( $"Computing the dependency upgrades of branch '{graph.BranchName}'." ) )
         {
-            var pins = versionTag.GetPackagesConfiguration( monitor );
-            if( pins == null ) return null;
-            var references = await ReadReferencesAsync( monitor, context, world, graph.BranchName, options, cancellation )
+            var bounds = versionTag.GetPackagesConfiguration( monitor );
+            if( bounds == null ) return null;
+            var references = await ReadReferencesAsync( monitor, context, world, graph.BranchName, options, bounds.Count > 0, cancellation )
                                         .ConfigureAwait( false );
             if( references == null ) return null;
             // Without --with-nuget nothing is asked to any feed, so the feeds are not even read from the
@@ -285,7 +329,7 @@ public sealed partial class UpgradeMap
             var feeds = ImmutableArray<NuGetFeed>.Empty;
             if( options.UseFeeds && !artifactHandler.GetConfiguredNuGetFeeds( monitor, out feeds ) ) return null;
 
-            var resolver = new TargetResolver( monitor, context, pins, references, feeds, options );
+            var resolver = new TargetResolver( monitor, context, bounds, references, feeds, options );
             // The upgrades of every solution of the graph: the targets are memoized, so computing them for a
             // solution that ends up out of the participants costs only its own identifiers.
             var perSolution = new List<Upgrade>?[graph.Solutions.Count];
@@ -295,8 +339,9 @@ public sealed partial class UpgradeMap
                 foreach( var p in s.ExternalDependencies )
                 {
                     var t = await resolver.TryGetTargetAsync( p.PackageId, cancellation ).ConfigureAwait( false );
-                    if( t.Version == null || t.Version == p.Version ) continue;
-                    (upgrades ??= new List<Upgrade>()).Add( new Upgrade( p, t.Version ) );
+                    var v = t.GetUpgrade( p.Version );
+                    if( v == null ) continue;
+                    (upgrades ??= new List<Upgrade>()).Add( new Upgrade( p, v ) );
                 }
                 if( upgrades != null )
                 {

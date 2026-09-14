@@ -176,7 +176,7 @@ mapping produce a warning, not an error. The method's doc comment explains the m
 only operates on one project at a time and silently no-ops when a package isn't found — unusable for a batched,
 multi-repository update.
 
-### Package mappings: `IPackageMapping`, `PackageMapper`, `BrutalPackageMapper`
+### Package mappings: `IPackageMapping`, `PackageMapper`, `BrutalPackageMapper`, `BoundPackageMapper`
 
 ```csharp
 public interface IPackageMapping
@@ -198,6 +198,11 @@ implementations are provided:
 - **`BrutalPackageMapper.Create(mappings)`** — wraps a plain `IReadOnlyDictionary<string, SVersion>` (package id →
   target version; must use `StringComparer.OrdinalIgnoreCase`, checked at construction) and ignores the *current*
   version entirely: any known package id is always mapped to its target version.
+- **`BoundPackageMapper.Create(bounds)`** — wraps a `IReadOnlyDictionary<string, SVersionBound>` (package id → the
+  range of versions that is accepted; same comparer requirement) and maps only what is *outside* its bound, to that
+  bound's `Base`. A version that satisfies its bound is left alone. A `[Lock]`ed bound accepts its base version
+  only, so it behaves exactly like a `BrutalPackageMapper` on that version. This is what backs the World's
+  [`<VersionTag><Packages>`](../CKli.VersionTag.Plugin/README.md#configuration) configuration.
 
 ## Key types at a glance
 
@@ -209,7 +214,7 @@ implementations are provided:
 | `MutableSolution` | Working-folder-only solution used to rewrite package versions in place; handles `.sln` → `.slnx` migration and renaming. |
 | `CommonSolution` | Internal shared walker: resolves `.slnx` `<Project>` entries and `Directory.*.props` files. |
 | `INormalizedFileProvider` / `TreeFolder` / `CheckedOutFileProvider` / `GitFileInfo` / `FileInfoExtensions` | Uniform read-only file access over either a Git `Tree` or the physical working folder. |
-| `IPackageMapping` / `PackageMappingExtensions` / `PackageMapper` / `BrutalPackageMapper` | Package-id + version → target-version mapping abstraction used for update detection and application. |
+| `IPackageMapping` / `PackageMappingExtensions` / `PackageMapper` / `BrutalPackageMapper` / `BoundPackageMapper` | Package-id + version → target-version mapping abstraction used for update detection and application. |
 
 ## Configuration
 

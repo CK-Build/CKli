@@ -26,7 +26,7 @@ public sealed partial class UpgradeMap
     {
         readonly IActivityMonitor _monitor;
         readonly CKliEnv _context;
-        readonly IReadOnlyDictionary<string, SVersion> _pins;
+        readonly IReadOnlyDictionary<string, SVersionBound> _bounds;
         readonly IReadOnlyDictionary<string, ReferenceAnchor> _references;
         readonly ImmutableArray<NuGetFeed> _feeds;
         readonly Options _options;
@@ -35,14 +35,14 @@ public sealed partial class UpgradeMap
 
         public TargetResolver( IActivityMonitor monitor,
                                CKliEnv context,
-                               IReadOnlyDictionary<string, SVersion> pins,
+                               IReadOnlyDictionary<string, SVersionBound> bounds,
                                IReadOnlyDictionary<string, ReferenceAnchor> references,
                                ImmutableArray<NuGetFeed> feeds,
                                Options options )
         {
             _monitor = monitor;
             _context = context;
-            _pins = pins;
+            _bounds = bounds;
             _references = references;
             _feeds = feeds;
             _options = options;
@@ -64,44 +64,67 @@ public sealed partial class UpgradeMap
 
         async ValueTask<Target> ResolveAsync( string packageId, CancellationToken cancellation )
         {
-            // 1 - A pin is an authoritative exception: no target at all. It also prunes the closure, since a
-            //     pinned identifier can never promote an upstream.
-            if( _pins.TryGetValue( packageId, out var pinned ) )
-            {
-                _monitor.Trace( $"'{packageId}' is pinned to '{pinned}' by the World configuration: not upgraded." );
-                return new Target( packageId, null, TargetState.Pinned, $"pinned to {pinned}" );
-            }
-            // 2 - A World Reference anchors it: that version is the target, because it is why the reference
+            // The World configuration doesn't propose a version, it constrains the ones the sources propose:
+            // a target outside of this bound is refused below, and a repository that references this identifier
+            // outside of it is brought back to the bound's Base (see Target.GetUpgrade).
+            SVersionBound? bound = _bounds.TryGetValue( packageId, out var b ) ? b : null;
+            // 1 - A World Reference anchors it: that version is the target, because it is why the reference
             //     exists. Two references disagreeing blocks that package, not the command.
             if( _references.TryGetValue( packageId, out var anchor ) )
             {
                 if( anchor.Version == null )
                 {
                     _monitor.Warn( $"World References disagree on '{packageId}' ({anchor.Origin}): it is not upgraded." );
-                    return new Target( packageId, null, TargetState.Conflict, anchor.Origin );
+                    return new Target( packageId, null, TargetState.Conflict, anchor.Origin, bound );
                 }
-                return new Target( packageId, anchor.Version, TargetState.Reference, anchor.Origin );
+                if( bound != null && !bound.Value.Satisfy( anchor.Version ) )
+                {
+                    _monitor.Info( $"'{packageId}' is anchored to '{anchor.Version}' ({anchor.Origin}) but the World configuration bounds it to '{bound}': not upgraded." );
+                    return new Target( packageId, null, TargetState.OutOfBound, $"{anchor.Version} ({anchor.Origin}) is not in the configured bound {bound}", bound );
+                }
+                return new Target( packageId, anchor.Version, TargetState.Reference, anchor.Origin, bound );
             }
-            // 3 - Nothing anchors it: the greatest version the World's feeds offer - but only when
+            // 2 - Nothing anchors it: the greatest version the World's feeds offer - but only when
             //     --with-nuget has been specified. The References are the default source: an identifier
             //     none of them carries is simply left alone rather than aligned on whatever a feed happens
             //     to publish today.
             if( !_options.UseFeeds )
             {
                 _monitor.Trace( $"No World Reference anchors '{packageId}': not upgraded (--with-nuget is not specified)." );
-                return new Target( packageId, null, TargetState.Unknown, "no World Reference anchors it (--with-nuget is not specified)" );
+                return bound != null
+                        ? new Target( packageId, null, TargetState.Bound, $"the configured bound {bound} (no World Reference anchors it and --with-nuget is not specified)", bound )
+                        : new Target( packageId, null, TargetState.Unknown, "no World Reference anchors it (--with-nuget is not specified)", null );
             }
-            var (version, origin) = await GetGreatestFeedVersionAsync( packageId, cancellation ).ConfigureAwait( false );
-            return version == null
-                    ? new Target( packageId, null, TargetState.Unknown, "no reference and no feed knows it" )
-                    : new Target( packageId, version, TargetState.Feed, origin );
+            // A feed version that the configured bound refuses is not a candidate: this is what makes a
+            // "1.0.0[LockMajor]" bound resolve to the greatest 1.x instead of blocking on the greatest 2.x.
+            var feed = await GetGreatestFeedVersionAsync( packageId, bound, cancellation ).ConfigureAwait( false );
+            if( feed.Version != null ) return new Target( packageId, feed.Version, TargetState.Feed, feed.Origin, bound );
+            // The feeds published something and the bound is the only reason none of it is a candidate: this
+            // is a deliberate hold, not an unknown identifier, and the report says so.
+            if( feed.Refused != null )
+            {
+                Throw.DebugAssert( bound != null );
+                _monitor.Info( $"The greatest version of '{packageId}' the feeds offer is '{feed.Refused}' ({feed.RefusedOrigin}) but the World configuration bounds it to '{bound}': not upgraded." );
+                return new Target( packageId, null, TargetState.OutOfBound, $"{feed.Refused} ({feed.RefusedOrigin}) is not in the configured bound {bound}", bound );
+            }
+            return bound != null
+                    ? new Target( packageId, null, TargetState.Bound, $"the configured bound {bound} (no reference and no feed knows it)", bound )
+                    : new Target( packageId, null, TargetState.Unknown, "no reference and no feed knows it", null );
         }
 
-        async ValueTask<(SVersion? Version, string? Origin)> GetGreatestFeedVersionAsync( string packageId, CancellationToken cancellation )
+        // Refused is the greatest version the bound - and only the bound - rejected: when Version is null and
+        // Refused is not, the feeds know this package but the World holds it below what they offer.
+        readonly record struct FeedVersion( SVersion? Version, string? Origin, SVersion? Refused, string? RefusedOrigin );
+
+        async ValueTask<FeedVersion> GetGreatestFeedVersionAsync( string packageId,
+                                                                  SVersionBound? bound,
+                                                                  CancellationToken cancellation )
         {
             _clients ??= new NuGetFeedClient?[_feeds.Length];
             SVersion? best = null;
             string? origin = null;
+            SVersion? refused = null;
+            string? refusedOrigin = null;
             for( int i = 0; i < _feeds.Length; ++i )
             {
                 var client = _clients[i] ??= _feeds[i].CreateReadClient( _monitor, _context.SecretsStore );
@@ -115,6 +138,15 @@ public sealed partial class UpgradeMap
                     // version is never a target: our own CI notion lives in the References, not in a feed.
                     if( v.IsCI ) continue;
                     if( _options.StableOnly && !v.IsStable ) continue;
+                    if( bound != null && !bound.Value.Satisfy( v ) )
+                    {
+                        if( refused == null || v > refused )
+                        {
+                            refused = v;
+                            refusedOrigin = _feeds[i].Name;
+                        }
+                        continue;
+                    }
                     if( best == null || v > best )
                     {
                         best = v;
@@ -122,7 +154,7 @@ public sealed partial class UpgradeMap
                     }
                 }
             }
-            return (best, origin);
+            return new FeedVersion( best, origin, refused, refusedOrigin );
         }
     }
 }

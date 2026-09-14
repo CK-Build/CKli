@@ -109,8 +109,12 @@ public sealed partial class HotGraph
 
         /// <summary>
         /// Gets the version mapping of the configured Worlds packages from the <see cref="VersionTag.Plugin.VersionTagPlugin.GetPackagesConfiguration(IActivityMonitor)"/>.
+        /// <para>
+        /// The configuration carries a <see cref="SVersionBound"/> per package: a referenced version that is in
+        /// its bound is left alone, one that is not is mapped to the bound's <see cref="SVersionBound.Base"/>.
+        /// </para>
         /// </summary>
-        public IPackageMapping WorldConfiguredMapping => _worldConfiguredMapping ??= BrutalPackageMapper.Create( _graph._externalPackages );
+        public IPackageMapping WorldConfiguredMapping => _worldConfiguredMapping ??= BoundPackageMapper.Create( _graph._externalPackages );
 
         /// <summary>
         /// Gets the version mapping that resolves <see cref="Discrepancies"/> by mapping to the greatest referenced version.

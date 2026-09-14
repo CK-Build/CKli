@@ -131,15 +131,29 @@ used to inject a fake builder in tests, and it returns the previous function so 
 `UpgradeMap*.cs`) does the other half: it aligns what the World *consumes* from the outside.
 
 For each package identifier the graph consumes externally
-(`HotGraph.Solution.ExternalDependencies`), `UpgradeMap` resolves one target version from three sources, in
+(`HotGraph.Solution.ExternalDependencies`), `UpgradeMap` resolves one target version from two sources, in
 this order - and memoizes it, because the identifier set grows while reaching a reference or a feed is the
 expensive part:
 
 | Source | Rule |
 |---|---|
-| A `<VersionTag><Packages>` pin | **No target at all.** A pin is an authoritative exception, and it prunes the closure: a pinned identifier can never promote an upstream. |
 | The World References' published profiles | A profile's `ProducedPackages` are the first candidates - they are why the reference exists - and win inside a profile, then its `DirectDependencies`, then its regular `TransitiveDependencies`. Two references disagreeing **blocks that package**, not the command. An `AmbiguousDependency` nobody anchors is warned about: with `--with-nuget` the feed will answer instead (and may disagree with that very reference), without it the identifier simply has no target. |
 | The World's configured NuGet feeds, **only with `--with-nuget`** | The greatest version they offer. |
+
+**The `<VersionTag><Packages>` configuration is not a source, it is a constraint.** It declares a
+[`SVersionBound`](../CKli.VersionTag.Plugin/README.md#configuration) per package identifier - the range of versions
+this World accepts for it - and that bound is applied on both ends of the resolution:
+
+- It **caps what a source may propose**: a reference or a feed version outside the bound is refused
+  (`TargetState.OutOfBound`, reported apart as "held back by the World `<Packages>` configuration" - a deliberate
+  hold is worth seeing, not worth hiding). A feed lookup filters its candidates on the bound first, so
+  `3.2.1[LockMajor]` tracks the greatest `3.x` and ignores a published `4.0.0` instead of blocking on it.
+- It is an **invariant to restore**: a repository that references the identifier *outside* its bound is brought
+  back to the bound's base version, even when no source offers anything at all (`TargetState.Bound`). This is
+  what makes a bound a way to *drive* an update and not only to block one.
+
+A `[Lock]`ed bound is the old pin: the only accepted version is the base one, so nothing can ever move the
+identifier above it - and every repository below it is brought up to it.
 
 **The World References are the default source and the feeds are opt-in.** Without `--with-nuget` no feed is
 queried at all - not even read from the `<ArtifactHandler>` configuration, since `GetConfiguredNuGetFeeds`

@@ -19,7 +19,7 @@ public sealed partial class BuildPlugin
     const string _dDepsWithNuGet = "Let the World's NuGet feeds answer the package identifiers no World Reference anchors. Without this, no feed is ever queried.";
     const string _dDepsPrerelease = "Consider the prerelease versions of the feeds even on the root branch. Requires --with-nuget.";
     const string _dDepsStable = "Consider only the stable versions of the feeds. Requires --with-nuget.";
-    const string _dDepsAllowDowngrade = "Apply the updates that move a version down (a Reference may pin lower than what this World references).";
+    const string _dDepsAllowDowngrade = "Apply the updates that move a version down (a Reference or a <Packages> bound may sit lower than what this World references).";
 
     /// <summary>
     /// Analyzes the external dependencies of a World and reports the upgrades that would align them.
@@ -134,8 +134,8 @@ public sealed partial class BuildPlugin
         {
             monitor.Error( $"""
                 {map.DowngradeCount} of these {map.UpgradeCount} updates move a version DOWN (▼ above). A World Reference
-                may legitimately pin lower than what this World references - alignment is the point - but this is not
-                applied unless --allow-downgrade is specified.
+                or a <Packages> bound may legitimately sit lower than what this World references - alignment is the
+                point - but this is not applied unless --allow-downgrade is specified.
                 """ );
             return false;
         }
@@ -246,55 +246,72 @@ public sealed partial class BuildPlugin
     static void DisplayUpgrades( IActivityMonitor monitor, CKliEnv context, UpgradeMap map )
     {
         var screen = context.Screen.ScreenType;
-        if( map.IsEmpty )
-        {
-            context.Screen.Display( screen.Text( $"""
-                Nothing to update on branch '{map.Graph.BranchName}': the {map.Graph.Solutions.Count} repositories of this
-                World already reference the {map.Targets.Count( t => t.HasTarget )} resolved external package(s) in their target version.
-                """ ) );
-            return;
-        }
         // A multi line TextBlock trims each of its lines (a raw string literal carries its own indentation),
         // so this report cannot be one text: each line is its own renderable and the indented ones carry
         // their indentation as a left margin.
         var lines = new List<IRenderable>();
         var b = new System.Text.StringBuilder();
-        b.Append( "Dependency upgrades of branch '" ).Append( map.Graph.BranchName ).Append( "'" );
-        if( map.AnalysisOptions.Narrow ) b.Append( " (--narrow: upstreams only)" );
-        b.Append( ':' );
-        lines.Add( TakeLine( screen, b ) );
-        foreach( var r in map.Upgrades )
+        if( map.IsEmpty )
         {
-            b.Append( "- " ).Append( r.Repo.DisplayPath );
-            if( r.IsPivot ) b.Append( " (pivot)" );
-            if( r.NeedsBranch ) b.Append( $" [the '{map.Graph.BranchName}' branch would be created]" );
+            // The blocked and held sections below still apply: "nothing to update" is most often exactly when
+            // a package is being held back, and that is the moment it is worth saying.
+            lines.Add( screen.Text( $"""
+                Nothing to update on branch '{map.Graph.BranchName}': the {map.Graph.Solutions.Count} repositories of this
+                World already reference the {map.Targets.Count( t => t.HasTarget )} resolved external package(s) in their target version.
+                """ ) );
+        }
+        else
+        {
+            b.Append( "Dependency upgrades of branch '" ).Append( map.Graph.BranchName ).Append( "'" );
+            if( map.AnalysisOptions.Narrow ) b.Append( " (--narrow: upstreams only)" );
+            b.Append( ':' );
             lines.Add( TakeLine( screen, b ) );
-            foreach( var u in r.Upgrades )
+            foreach( var r in map.Upgrades )
             {
-                b.Append( u.IsDowngrade ? "▼ " : "▲ " )
-                 .Append( u.Current.PackageId )
-                 .Append( ' ' )
-                 .Append( u.Current.Version )
-                 .Append( " → " )
-                 .Append( u.Target );
-                var t = map.Targets.FirstOrDefault( x => x.PackageId.Equals( u.Current.PackageId, StringComparison.OrdinalIgnoreCase ) );
-                if( t?.Origin != null ) b.Append( "  (" ).Append( t.Origin ).Append( ')' );
-                lines.Add( TakeLine( screen, b ).Box( marginLeft: 4 ) );
+                b.Append( "- " ).Append( r.Repo.DisplayPath );
+                if( r.IsPivot ) b.Append( " (pivot)" );
+                if( r.NeedsBranch ) b.Append( $" [the '{map.Graph.BranchName}' branch would be created]" );
+                lines.Add( TakeLine( screen, b ) );
+                foreach( var u in r.Upgrades )
+                {
+                    b.Append( u.IsDowngrade ? "▼ " : "▲ " )
+                     .Append( u.Current.PackageId )
+                     .Append( ' ' )
+                     .Append( u.Current.Version )
+                     .Append( " → " )
+                     .Append( u.Target );
+                    var t = map.Targets.FirstOrDefault( x => x.PackageId.Equals( u.Current.PackageId, StringComparison.OrdinalIgnoreCase ) );
+                    if( t?.Origin != null ) b.Append( "  (" ).Append( t.Origin ).Append( ')' );
+                    lines.Add( TakeLine( screen, b ).Box( marginLeft: 4 ) );
+                }
             }
+            b.Append( map.UpgradeCount ).Append( " upgrade(s) in " ).Append( map.Upgrades.Length ).Append( " repositories" );
+            if( map.DowngradeCount > 0 )
+            {
+                b.Append( ", including " ).Append( map.DowngradeCount ).Append( " downgrade(s) (▼)" );
+            }
+            b.Append( '.' );
+            lines.Add( TakeLine( screen, b ) );
         }
-        b.Append( map.UpgradeCount ).Append( " upgrade(s) in " ).Append( map.Upgrades.Length ).Append( " repositories" );
-        if( map.DowngradeCount > 0 )
-        {
-            b.Append( ", including " ).Append( map.DowngradeCount ).Append( " downgrade(s) (▼)" );
-        }
-        b.Append( '.' );
-        lines.Add( TakeLine( screen, b ) );
         var blocked = map.Targets.Where( t => t.State is UpgradeMap.TargetState.Conflict ).ToList();
         if( blocked.Count > 0 )
         {
             b.Append( blocked.Count ).Append( " package(s) are blocked by disagreeing World References:" );
             lines.Add( TakeLine( screen, b ) );
             foreach( var t in blocked )
+            {
+                b.Append( t.PackageId ).Append( ": " ).Append( t.Origin );
+                lines.Add( TakeLine( screen, b ).Box( marginLeft: 4 ) );
+            }
+        }
+        // A held package is not a problem to fix: the World configuration says so on purpose. It is reported
+        // because the alternative is a silent gap between what the outside publishes and what this World uses.
+        var held = map.Targets.Where( t => t.State is UpgradeMap.TargetState.OutOfBound ).ToList();
+        if( held.Count > 0 )
+        {
+            b.Append( held.Count ).Append( " package(s) are held back by the World <Packages> configuration:" );
+            lines.Add( TakeLine( screen, b ) );
+            foreach( var t in held )
             {
                 b.Append( t.PackageId ).Append( ": " ).Append( t.Origin );
                 lines.Add( TakeLine( screen, b ).Box( marginLeft: 4 ) );

@@ -63,7 +63,8 @@ Global, on the `<VersionTag>` element under the World's `<Plugins>`:
 ```xml
 <VersionTag AutoFixRemovableTag="false" RemoveUselessFakeTag="false">
   <Packages>
-    <Package Name="SomeExternalPackage" Version="3.2.1" />
+    <Package Name="SomeExternalPackage" Version="3.2.1[LockMajor]" />
+    <Package Name="AnotherExternalPackage" Version="1.0.4[Lock]" />
   </Packages>
 </VersionTag>
 ```
@@ -72,7 +73,31 @@ Global, on the `<VersionTag>` element under the World's `<Plugins>`:
 |---|---|
 | `AutoFixRemovableTag` (bool, default `false`) | If true, tags identified as safely removable (superseded, duplicated, resolved by a `+invalid`, ...) are deleted locally as soon as they are discovered, instead of only being reported as an issue. |
 | `RemoveUselessFakeTag` (bool, default `false`) | If true, a `+fake` tag whose real version has since been published is deleted locally instead of kept around. |
-| `<Packages><Package Name="..." Version="..."/></Packages>` | World-wide declared versions for packages that are consumed but not produced by any repo in the Stack (external dependencies). Exposed via `GetPackagesConfiguration`. |
+| `<Packages><Package Name="..." Version="..."/></Packages>` | World-wide declared **version bounds** for packages that are consumed but not produced by any repo in the Stack (external dependencies). Exposed via `GetPackagesConfiguration`. |
+
+The `Version` is a [`SVersionBound`](https://github.com/CK-Build/CK-SVersion), not a single version: it is the
+range of versions this World accepts for that package. It is parsed by `SVersionBound.TryParse`, so it is a base
+version optionally followed by its restrictions between brackets:
+
+| `Version` | Accepts |
+|---|---|
+| `3.2.1` | Any version `>= 3.2.1`, CI versions excluded. This is a **floor**, not a pin. |
+| `3.2.1[Lock]` | `3.2.1` and nothing else: a true pin. |
+| `3.2.1[LockMajor]` | Any `3.x` at or above `3.2.1`. |
+| `3.2.1[LockMinor,Stable]` | Any stable `3.2.x` at or above `3.2.1`. |
+| `3.2.1[AllowCI]` | `>= 3.2.1`, CI versions included. |
+
+A bound that excludes its own base version is a configuration error, and so is a duplicated `Name`.
+
+This bound is an **invariant of the World**, and the two consumers enforce it the same way: a referenced version
+that is in its bound is left alone, one that is not is brought back to the bound's base version.
+
+- `ckli build` (through `HotGraph.PackageUpdater.WorldConfiguredMapping`) rewrites the out-of-bound references of
+  the solutions it builds.
+- [`ckli deps update`](../CKli.Build.Plugin/README.md#deps-update-aligning-the-external-dependencies) does the same,
+  and the bound also caps what it may propose: a World Reference or a feed that offers a version outside the bound
+  is refused, and with `--with-nuget` the greatest version *inside* the bound is the target (so `3.2.1[LockMajor]`
+  tracks the latest `3.x` and ignores a published `4.0.0`).
 
 Per-repo, under that repo's plugin configuration element:
 

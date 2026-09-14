@@ -29,7 +29,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     readonly bool _autoFixRemovableTag;
     readonly bool _removeUselessFakeTag;
     ReleaseDatabase? _releaseDatabase;
-    Dictionary<string, SVersion>? _externalPackages;
+    Dictionary<string, SVersionBound>? _externalPackages;
 
     /// <summary>
     /// Initializes a new <see cref="VersionTagPlugin"/>.
@@ -111,28 +111,63 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     }
 
     /// <summary>
-    /// Gets The World's configured packages versions from this
+    /// Gets The World's configured packages version bounds from this
     /// <code>
     /// &lt;Packages&gt;
     ///     &lt;Package Name = "..." Version="..." /&gt;
     ///  &lt;/Packages&gt;
     /// </code>
     /// VersionTag plugin configuration content.
+    /// <para>
+    /// The <c>Version</c> is a <see cref="SVersionBound"/>, not a single version: it is the range of versions
+    /// the World accepts for that package. A bare "3.2.1" is the floor ">= 3.2.1, no CI version", "3.2.1[Lock]"
+    /// is the exact 3.2.1 (a true pin) and "3.2.1[LockMajor]" accepts any 3.x. Every external dependency of the
+    /// World must be in its bound: "ckli deps update" brings the ones that are not back to the <see cref="SVersionBound.Base"/>
+    /// and never moves one out of its bound.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <returns>The World's configured packages versions.</returns>
-    public IReadOnlyDictionary<string, SVersion>? GetPackagesConfiguration( IActivityMonitor monitor )
+    /// <returns>The World's configured packages bounds or null on configuration error.</returns>
+    public IReadOnlyDictionary<string, SVersionBound>? GetPackagesConfiguration( IActivityMonitor monitor )
     {
-        try
+        if( _externalPackages != null ) return _externalPackages;
+        var result = new Dictionary<string, SVersionBound>( StringComparer.OrdinalIgnoreCase );
+        bool success = true;
+        foreach( var e in PrimaryPluginContext.Configuration.XElement.Elements( "Packages" ).Elements( "Package" ) )
         {
-            return _externalPackages ??= PrimaryPluginContext.Configuration.XElement
-                                                    .Elements( "Packages" )
-                                                    .Elements( "Package" )
-                                                    .ToDictionary( e => (string)e.Attribute( XNames.Name )!,
-                                                                   e => SVersion.Parse( (string)e.Attribute( XNames.Version )! ),
-                                                                   StringComparer.OrdinalIgnoreCase );
+            var name = (string?)e.Attribute( XNames.Name );
+            if( string.IsNullOrWhiteSpace( name ) )
+            {
+                monitor.Error( $"Missing or empty Name attribute on {e}." );
+                success = false;
+                continue;
+            }
+            var version = (string?)e.Attribute( XNames.Version );
+            if( !SVersionBound.TryParse( version, out var bound ) )
+            {
+                monitor.Error( $"""
+                    Unable to parse the Version attribute of {e} as a version bound.
+                    Expecting a base version optionally followed by its restrictions: "3.2.1", "3.2.1[Lock]",
+                    "3.2.1[LockMajor]", "3.2.1[LockMinor,Stable]" or "3.2.1[AllowCI]".
+                    """ );
+                success = false;
+                continue;
+            }
+            // A bound that rejects its own base accepts nothing that anyone can name: it would silently
+            // block every version of the package instead of constraining them.
+            if( !bound.Satisfy( bound.Base ) )
+            {
+                monitor.Error( $"Invalid Version attribute of {e}: the bound '{bound}' excludes its own base version '{bound.Base}'." );
+                success = false;
+                continue;
+            }
+            if( !result.TryAdd( name, bound ) )
+            {
+                monitor.Error( $"Duplicate <Package Name=\"{name}\" /> in the <Packages> element (already bound to '{result[name]}')." );
+                success = false;
+            }
         }
-        catch( Exception ex )
+        if( !success )
         {
             monitor.Error( $"""
                 Unable to read <Packages> element from <VersionTag> configuration.
@@ -142,9 +177,10 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 </Packages>
                 Configuration is:
                 {PrimaryPluginContext.Configuration.XElement}
-                """, ex );
+                """ );
             return null;
         }
+        return _externalPackages = result;
     }
 
 
