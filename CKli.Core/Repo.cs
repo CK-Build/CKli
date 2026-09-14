@@ -119,6 +119,52 @@ public sealed class Repo
     }
 
     /// <summary>
+    /// Returns the <see cref="DisplayPath"/> (with its link to <see cref="WorkingFolder"/>) preceded by the "✱"
+    /// marker when this repository <see cref="GitRepository.SimpleStatusInfo.IsDirty">is dirty</see> - and by the 2 columns wide
+    /// blank that stands for it when it is not, so that a column of repository names aligns either way.
+    /// <para>
+    /// This is the single rendering of a repository name. <see cref="ToRenderable(ScreenType, string?, bool, bool)"/>
+    /// builds on it, and so do the "ckli build" roadmap and "ckli deps update" through the
+    /// <see cref="ToNameRenderable(ScreenType, bool)"/> overload below: they cannot drift apart.
+    /// </para>
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="style">The style of the name and of the dirty marker.</param>
+    /// <returns>The renderable.</returns>
+    public IRenderable ToNameRenderable( ScreenType screenType, TextStyle style )
+    {
+        // The style is carried by the outer box, so it covers the dirty marker and the 2 columns that stand
+        // for it when the repository is clean - not only the name.
+        IRenderable r = screenType.Text( DisplayPath ).HyperLink( new Uri( WorkingFolder ) );
+        r = GitStatus.IsDirty
+                ? r.Box( paddingRight: 1 ).AddLeft( screenType.Text( "✱" ).Box( paddingRight: 1 ) )
+                : r.Box( paddingLeft: 2, paddingRight: 1 );
+        return r.Box( style: style );
+    }
+
+    /// <summary>
+    /// Returns the <see cref="ToNameRenderable(ScreenType, TextStyle)"/> in the style that the commands writing
+    /// to a set of repositories share: green is "this one is going to be written", and that convention lives
+    /// here rather than in each of them.
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="willBeWritten">
+    /// True when the command about to run will write to this repository - the "ckli build" roadmap reads it as
+    /// "this will be built" and "ckli deps update" as "this will be updated". The name is then green, or red
+    /// when this repository is dirty. False renders it gray (dark red when dirty).
+    /// </param>
+    /// <returns>The renderable.</returns>
+    public IRenderable ToNameRenderable( ScreenType screenType, bool willBeWritten )
+    {
+        bool dirty = GitStatus.IsDirty;
+        return ToNameRenderable( screenType,
+                                 new TextStyle( willBeWritten
+                                                    ? (dirty ? ConsoleColor.Red : ConsoleColor.Green)
+                                                    : (dirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGray),
+                                                ConsoleColor.Black ) );
+    }
+
+    /// <summary>
     /// Returns the <see cref="DisplayPath"/> (with its link to <see cref="WorkingFolder"/>) as a <see cref="ContentBox"/>
     /// or a <see cref="HorizontalContent"/> with it and:
     /// <list type="number">
@@ -154,15 +200,11 @@ public sealed class Repo
     public IRenderable ToRenderable( ScreenType screenType, string? branchName = null, bool withRemoteDiffCount = false, bool withOriginUrl = false )
     {
         var status = GitStatus;
-        var folderStyle = new TextStyle( status.IsDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen, ConsoleColor.Black );
 
         // First Box.
-        IRenderable folder = screenType.Text( DisplayPath ).HyperLink( new Uri( WorkingFolder ) );
-        folder = status.IsDirty
-                    ? folder.Box( paddingRight: 1 ).AddLeft( screenType.Text( "✱" ).Box( paddingRight: 1 ) )
-                    : folder.Box( paddingLeft: 2, paddingRight: 1 );
-        folder = folder.Box( style: folderStyle );
-
+        IRenderable folder = ToNameRenderable( screenType,
+                                               new TextStyle( status.IsDirty ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen,
+                                                              ConsoleColor.Black ) );
         if( branchName != null )
         {
             folder = folder.AddRight( screenType.Text( $"⎇ {branchName}" ).Box( marginRight: 1 ) );
