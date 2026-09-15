@@ -37,6 +37,16 @@ public abstract class RenderableVisitor
     }
 
     /// <summary>
+    /// Visits a <see cref="FlowContent"/> by calling <see cref="FlowContent.ApplyTransform(System.Func{IRenderable, IRenderable?})"/>.
+    /// </summary>
+    /// <param name="f">The flow content to visit.</param>
+    /// <returns>The visit result.</returns>
+    public virtual IRenderable Visit( FlowContent f )
+    {
+        return f.ApplyTransform( r => r.Accept( this ) );
+    }
+
+    /// <summary>
     /// Visits a <see cref="TableLayout"/> by visiting its <see cref="TableLayout.Rows"/>.
     /// </summary>
     /// <param name="t">The table layout to visit.</param>

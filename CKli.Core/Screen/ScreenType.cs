@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
 namespace CKli.Core;
@@ -116,6 +117,15 @@ public sealed class ScreenType
                             ConsoleColor foreColor,
                             ConsoleColor backColor = ConsoleColor.Black,
                             TextEffect effect = TextEffect.Ignore ) => TextBlock.FromText( this, text, foreColor, backColor, effect );
+
+    /// <summary>
+    /// Creates a <see cref="FlowContent"/>: an inline list of any length that breaks into as many lines
+    /// as the width it is given requires. See <see cref="FlowContent"/> for how its cells must be grouped.
+    /// </summary>
+    /// <param name="hangingIndent">Left margin of the lines below the first one. See <see cref="FlowContent.HangingIndent"/>.</param>
+    /// <param name="cells">The content.</param>
+    /// <returns>The renderable.</returns>
+    public FlowContent Flow( int hangingIndent, params ImmutableArray<IRenderable> cells ) => new FlowContent( this, hangingIndent, cells );
 
     /// <summary>
     /// Creates a renderable log.
