@@ -112,7 +112,7 @@ public sealed partial class UpgradeMap
                     ? new Target( packageId, null, TargetState.Bound, $"{BoundName( bound.Value, packageId, boundOrigin )} (no reference and no feed knows it)", bound )
                     : new Target( packageId, null, TargetState.Unknown, "no reference and no feed knows it", null );
 
-            // How the report names a bound. A bound that a "Prefix*" pattern carries is named with the pattern:
+            // How the report names a bound. A bound that a wildcard name carries is named with that name:
             // its reach is exactly what the package identifier alone doesn't show, and a package the World holds
             // back is meant to be read, not only counted.
             static string BoundName( SVersionBound bound, string packageId, string? origin )

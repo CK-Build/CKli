@@ -20,7 +20,7 @@ namespace CKli.Build.Plugin;
 /// only when <see cref="Options.UseFeeds"/> is set - the World's configured NuGet feeds. The
 /// <c>&lt;VersionTag&gt;&lt;Packages&gt;</c> configuration is not a source but a constraint: the
 /// <see cref="SVersionBound"/> that the first matching <see cref="PackageBounds.Rule"/> declares for a package
-/// identifier - by name or through a <c>"Prefix*"</c> pattern - bounds what a source may propose, and
+/// identifier - by name or through a name holding <c>'*'</c> wildcards - bounds what a source may propose, and
 /// a dependency that is outside of its bound is brought back to the bound's <see cref="SVersionBound.Base"/>
 /// even when no source offers anything. See the <see cref="TargetState"/>.
 /// </para>

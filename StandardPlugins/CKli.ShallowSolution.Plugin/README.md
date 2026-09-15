@@ -203,8 +203,9 @@ implementations are provided:
   left alone. A `[Lock]`ed bound accepts its base version only, so it behaves exactly like a `BrutalPackageMapper` on
   that version. This is what backs the World's
   [`<VersionTag><Packages>`](../CKli.VersionTag.Plugin/README.md#configuration) configuration.
-- **`PackageBounds`** — the bounds themselves: an **ordered** `ImmutableArray<Rule>`, each rule an exact package
-  identifier or a `"Prefix*"` pattern covering a whole family. `TryGet(packageId, out bound, out origin)` returns the
+- **`PackageBounds`** — the bounds themselves: an **ordered** `ImmutableArray<Rule>`, each rule a package name in
+  which every `*` matches any sequence of characters (a name without one is an exact identifier).
+  `TryGet(packageId, out bound, out origin)` returns the
   bound of the **first rule that matches** - the declaration order is the priority, nothing is ranked by specificity -
   and `origin` is that rule's `Name`, so a report can say *which* rule holds a package back. Matching is
   `OrdinalIgnoreCase`. The scan is linear by construction: no exact-name index could be consulted first without
@@ -216,7 +217,7 @@ implementations are provided:
 
 | Type | Role |
 |---|---|
-| `PackageBounds` | The World's `<VersionTag><Packages>` version bounds: an ordered list of exact identifiers and `"Prefix*"` family patterns, resolved first-match-wins. |
+| `PackageBounds` | The World's `<VersionTag><Packages>` version bounds: an ordered list of names with `*` wildcards, resolved first-match-wins. |
 | `ShallowSolutionPlugin` | `PrimaryPluginBase` entry point; reads solutions from commits/branches (cached per `Tree.Sha`), dispatches to `MutableSolution` for updates. |
 | `GitSolutionContent` / `GitSolutionContent.Project` | Read-only projects + consumed packages, independent of any `Repo`/`Branch`. |
 | `GitSolution` | `GitSolutionContent` bound to the `Repo`/`Branch` it was read from. |

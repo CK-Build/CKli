@@ -74,7 +74,7 @@ Global, on the `<VersionTag>` element under the World's `<Plugins>`:
 |---|---|
 | `AutoFixRemovableTag` (bool, default `false`) | If true, tags identified as safely removable (superseded, duplicated, resolved by a `+invalid`, ...) are deleted locally as soon as they are discovered, instead of only being reported as an issue. |
 | `RemoveUselessFakeTag` (bool, default `false`) | If true, a `+fake` tag whose real version has since been published is deleted locally instead of kept around. |
-| `<Packages><Package Name="..." Version="..."/></Packages>` | World-wide declared **version bounds** for packages that are consumed but not produced by any repo in the Stack (external dependencies). The `Name` is an exact package identifier or a `"Prefix*"` pattern that covers a family. Exposed via `GetPackagesConfiguration` as a `PackageBounds`. |
+| `<Packages><Package Name="..." Version="..."/></Packages>` | World-wide declared **version bounds** for packages that are consumed but not produced by any repo in the Stack (external dependencies). The `Name` is an exact package identifier, or one with `*` wildcards that covers a family. Exposed via `GetPackagesConfiguration` as a `PackageBounds`. |
 
 The two booleans are *plugin attributes*: `ckli plugin info` describes their current value and
 [`ckli plugin set RemoveUselessFakeTag true`](../../README.md#plugin-set-name-value)
@@ -95,10 +95,19 @@ version optionally followed by its restrictions between brackets:
 
 A bound that excludes its own base version is a configuration error, and so is a duplicated `Name`.
 
-The `Name` is an exact package identifier or a **`"Prefix*"` pattern** that bounds every identifier starting
-with that prefix. This is what a *framework coupled* family needs: `Microsoft.AspNetCore.*` packages only ship
-assets for their own .NET generation, so on a `net8.0` World they must all stay on `8.x` - one line instead of
-one per identifier, and one that already covers the member the family gains next week.
+In the `Name`, **each `*` stands for any sequence of characters**, possibly empty. That covers a family in one
+line instead of one per identifier - and covers the member the family gains next week:
+
+| `Name` | Matches |
+|---|---|
+| `Microsoft.AspNetCore.*` | A **prefix** family: `Microsoft.AspNetCore.Http`, `Microsoft.AspNetCore.Authentication.OpenIdConnect`... This is what a *framework coupled* family needs - those packages only ship assets for their own .NET generation, so on a `net8.0` World they must all stay on `8.x`. |
+| `*.Abstractions` | A **suffix** family: `CK.Core.Abstractions`, `Microsoft.Extensions.Configuration.Abstractions`... |
+| `CK.*.Engine` | A **role** family whatever sits in the middle: `CK.IO.Engine`, `CK.DB.Zone.Engine`... A `*` crosses the dots - it is any sequence of characters, not one segment. |
+| `CK.Core` | Exactly that identifier, and nothing else. |
+
+Both ends matter: `CK.*.Engine` does **not** match `CK.IO.Engine.Tests`, because the last literal is anchored at
+the end of the identifier - and `Microsoft.AspNetCore.*` does not match `Microsoft.AspNetCore`, because the `.` is
+part of the literal. A `*` matches an empty sequence, so `CK.*.Engine` does match `CK..Engine`.
 
 ```xml
 <Packages>
@@ -122,6 +131,7 @@ pattern:
 | **Coarse after fine** | `Microsoft.AspNetCore.*` then `Microsoft.*` means "the ASP.NET Core family, then everything else Microsoft". Written the other way round, `Microsoft.*` answers first and the finer line is dead. |
 | **Matching is case insensitive** | Like package identifiers everywhere else. |
 | **A duplicated `Name` is an error** | Not a priority: the second one could never match anything. |
+| **A `Name` needs one literal character** | A name made only of `*` is refused: a bound carries a base version, so it applies to a family and not to every external package of the World. Two consecutive `*` are refused too - always a typo, since one already matches any sequence. |
 | **An unreachable `<Package>` is a warning** | A rule declared after one that already covers it can never answer - a family written before its own exception is the usual way to get there. The configuration still means something coherent (the family bound applies), so the command warns and runs. |
 
 ```
@@ -132,16 +142,12 @@ declared before the family it excepts.
 
 Order over specificity is a deliberate choice, and not NuGet's
 ([`packageSourceMapping`](https://learn.microsoft.com/en-us/nuget/consume-packages/package-source-mapping) ranks
-its patterns by prefix length). A specificity ranking has no canonical answer as soon as patterns can overlap in
-more than one way - for `X.IO.Thing` matched by both `X.*.Thing` and `X.IO.*`, "longest literal prefix" and "most
-literal characters" pick *different* winners - so any richer matching would have to invent one, document it, and
-have you carry it in your head. First-match-wins needs none of that: a new kind of `Name` can be added later and
-its priority is already defined by where you write it.
-
-A `Name` may end with **a single `*`**, and nothing else may contain one: `Microsoft.*.Http` and `Microsoft.**`
-are configuration errors rather than literal names, because they read as patterns to everyone and would silently
-match nothing. A lone `*` is refused too - a bound carries a base version, so it applies to a family, not to
-every external package of the World.
+its patterns by prefix length). **It is what makes a `*` usable anywhere in a `Name`**: a specificity ranking has
+no canonical answer as soon as patterns overlap in more than one way - for `X.IO.Thing` matched by both
+`X.*.Thing` and `X.IO.*`, "longest literal prefix" and "most literal characters" pick *different* winners - so
+ranking would have forced the wildcards to stay in the one place where length is a total order. First-match-wins
+needs none of that, and a new kind of `Name` can be added later with its priority already defined by where you
+write it.
 
 A matched bound then applies **exactly as if the identifier had been named**: a rule decides what a bound
 covers, never what it does. Mind that the "bring an out-of-bound reference back to the base version" half of a

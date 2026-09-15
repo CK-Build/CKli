@@ -142,8 +142,8 @@ expensive part:
 
 **The `<VersionTag><Packages>` configuration is not a source, it is a constraint.** It declares a
 [`SVersionBound`](../CKli.VersionTag.Plugin/README.md#configuration) per package identifier - by name or through a
-`"Prefix*"` pattern that covers a whole family - the range of versions this World accepts for it, and that bound
-is applied on both ends of the resolution:
+name holding `*` wildcards that covers a whole family - the range of versions this World accepts for it, and that
+bound is applied on both ends of the resolution:
 
 - It **caps what a source may propose**: a reference or a feed version outside the bound is refused
   (`TargetState.OutOfBound`, reported apart as "held back by the World `<Packages>` configuration" - a deliberate

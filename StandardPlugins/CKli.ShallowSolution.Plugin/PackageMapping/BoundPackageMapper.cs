@@ -14,7 +14,7 @@ namespace CKli.ShallowSolution.Plugin;
 public static class BoundPackageMapper
 {
     /// <summary>
-    /// Creates a mapper on the World's <see cref="PackageBounds"/>. A bound that a <c>"Prefix*"</c>
+    /// Creates a mapper on the World's <see cref="PackageBounds"/>. A bound that a wildcard
     /// <see cref="PackageBounds.Rule"/> carries maps exactly as one declared for the identifier itself: a rule
     /// decides what a bound covers, not what it does.
     /// </summary>

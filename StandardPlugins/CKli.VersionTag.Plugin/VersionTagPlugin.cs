@@ -180,13 +180,15 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     /// and never moves one out of its bound.
     /// </para>
     /// <para>
-    /// The <c>Name</c> is an exact package identifier or a <c>"Prefix*"</c> pattern that covers a whole family
-    /// ("Microsoft.AspNetCore.*"), which is what a framework coupled family needs: one line instead of one per
-    /// identifier. <b>The first <c>&lt;Package&gt;</c> that matches wins</b> (see <see cref="PackageBounds"/>),
-    /// so the declaration order is the priority and an exception is declared before the family it excepts.
-    /// A <c>'*'</c> that is not the last character, or that is the only one, is a configuration error: the
-    /// first would silently become a package identifier nobody publishes and the second would bound every
-    /// external package of the World to one base version.
+    /// In the <c>Name</c>, each <c>'*'</c> stands for any sequence of characters: "Microsoft.AspNetCore.*"
+    /// covers a prefix family, "*.Abstractions" a suffix one and "CK.*.Engine" everything in between - one
+    /// line instead of one per identifier, which is what a family that must move together needs. A name
+    /// without any <c>'*'</c> is one exact identifier. <b>The first <c>&lt;Package&gt;</c> that matches
+    /// wins</b> (see <see cref="PackageBounds"/>), so the declaration order is the priority and an exception
+    /// is declared before the family it excepts. A name made only of <c>'*'</c> is a configuration error - a
+    /// bound carries a base version, so it applies to a family and not to every external package of the
+    /// World - and so are two consecutive <c>'*'</c>, which are always a typo since one already matches
+    /// anything.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -207,24 +209,19 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 success = false;
                 continue;
             }
-            // A Name may end with a single '*': it then bounds the family of every identifier that starts with
-            // its prefix. Any other '*' is refused rather than taken literally - "Microsoft.*.Http" reads as a
-            // pattern to everyone and would silently match nothing.
-            int star = name.IndexOf( '*' );
-            if( star >= 0 )
+            // Each '*' of a Name matches any sequence of characters: the name bounds the whole family it
+            // describes. Two refusals only - see the Rule constructor, which enforces the same two.
+            if( name.Contains( "**", StringComparison.Ordinal ) )
             {
-                if( star != name.Length - 1 )
-                {
-                    monitor.Error( $"Invalid Name attribute of {e}: a '*' is only allowed as the last character of the name (\"Microsoft.AspNetCore.*\")." );
-                    success = false;
-                    continue;
-                }
-                if( star == 0 )
-                {
-                    monitor.Error( $"Invalid Name attribute of {e}: \"*\" alone is not a valid pattern. A bound carries a base version: it applies to a package family, not to every external package of the World." );
-                    success = false;
-                    continue;
-                }
+                monitor.Error( $"Invalid Name attribute of {e}: two consecutive '*' are always a typo, one already matches any sequence of characters." );
+                success = false;
+                continue;
+            }
+            if( name.Trim( '*' ).Length == 0 )
+            {
+                monitor.Error( $"Invalid Name attribute of {e}: a name made only of '*' is not a valid pattern. A bound carries a base version: it applies to a package family, not to every external package of the World." );
+                success = false;
+                continue;
             }
             var version = (string?)e.Attribute( XNames.Version );
             if( !SVersionBound.TryParse( version, out var bound ) )
