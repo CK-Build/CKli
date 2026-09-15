@@ -185,7 +185,8 @@ public sealed partial class NuGetFeedClient : IDisposable
             }
             else
             {
-                var resource = await _sourceRepository.GetResourceAsync<FindPackageByIdResource>( cancellationToken );
+                var resource = await _sourceRepository.GetResourceAsync<FindPackageByIdResource>( cancellationToken ).ConfigureAwait( false );
+                Throw.CheckState( "The NuGet FindPackageByIdResource resource must exist.", resource != null );
                 var nugetVersions = await resource.GetAllVersionsAsync( packageId, _cacheContext, new LoggerAdapter( logger ), cancellationToken );
                 foreach( var nv in nugetVersions )
                 {
@@ -238,7 +239,8 @@ public sealed partial class NuGetFeedClient : IDisposable
             }
             else
             {
-                var resource = await _sourceRepository.GetResourceAsync<PackageUpdateResource>( cancellationToken );
+                var resource = await _sourceRepository.GetResourceAsync<PackageUpdateResource>( cancellationToken ).ConfigureAwait( false );
+                Throw.CheckState( "The NuGet PackageUpdateResource resource must exist.", resource != null );
                 await resource.Delete( packageId,
                                        version.ToString(),
                                        _ => _apiKey,
@@ -349,7 +351,8 @@ public sealed partial class NuGetFeedClient : IDisposable
             }
             else
             {
-                var resource = await _sourceRepository.GetResourceAsync<PackageUpdateResource>( cancellationToken );
+                var resource = await _sourceRepository.GetResourceAsync<PackageUpdateResource>( cancellationToken ).ConfigureAwait( false );
+                Throw.CheckState( "The NuGet PackageUpdateResource resource must exist.", resource != null );
                 await resource.Push( paths,
                                      symbolSource: string.Empty, // no Symbol source.
                                      timeoutInSecond: paths.Count * _perPackagePushTimeoutSecond,
