@@ -4,6 +4,7 @@ using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -297,9 +298,12 @@ public sealed partial class BuildPlugin
                 var needBranch = map.Upgrades.Where( r => r.NeedsBranch ).ToList();
                 if( needBranch.Count > 0 )
                 {
-                    IRenderable note = screen.Text( $"The '{map.Graph.BranchName}' branch would be created in: " );
-                    lines.Add( AppendRepositoryList( screen, note, needBranch.Select( r => r.Repo ) )
-                                .AddRight( screen.Text( "." ) ) );
+                    // A TextBlock trims its content: the space before the list is a margin, not a trailing
+                    // character. The final '.' is carried by the last name so that it cannot be left alone
+                    // on a line of its own.
+                    IRenderable note = screen.Text( $"The '{map.Graph.BranchName}' branch would be created in:" )
+                                             .Box( marginRight: 1 );
+                    lines.Add( CreateRepositoryList( screen, note, needBranch.Select( r => r.Repo ), tail: "." ) );
                 }
             }
         }
@@ -417,10 +421,10 @@ public sealed partial class BuildPlugin
             {
                 var sVersion = v.Key.ToString();
                 b.Append( target < v.Key ? "▼ " : "▲ " ).Append( sVersion );
-                IRenderable row = TakeLine( screen, b ).Box( marginRight: 2 + versionLen - sVersion.Length );
+                IRenderable head = TakeLine( screen, b ).Box( marginRight: 2 + versionLen - sVersion.Length );
                 // Inline names: no pivot marker and no dirty gutter here - the grouping is about packages, not
                 // about where a repository sits in the graph - but each name keeps its link.
-                lines.Add( AppendRepositoryList( screen, row, v.Select( x => x.Repo ) ).Box( marginLeft: 4 ) );
+                lines.Add( CreateRepositoryList( screen, head, v.Select( x => x.Repo ) ).Box( marginLeft: 4 ) );
             }
         }
         return byPackage.Count;
@@ -433,18 +437,30 @@ public sealed partial class BuildPlugin
         }
     }
 
-    // Appends a comma separated list of linked repository names to a renderable.
-    static IRenderable AppendRepositoryList( ScreenType screen, IRenderable head, IEnumerable<Repo> repos )
+    // Builds the head followed by a comma separated list of linked repository names.
+    // The list is a FlowContent and NOT a HorizontalContent: a row of N names is a row of N columns that
+    // share the screen width, so past ~12 repositories nothing fits and every name is wrapped inside the
+    // 10 columns of TextBlock.MinimalWidth. A flow breaks into lines instead, the continuation ones
+    // indented under the head.
+    static FlowContent CreateRepositoryList( ScreenType screen, IRenderable head, IEnumerable<Repo> repos, string? tail = null )
     {
-        bool first = true;
+        var cells = ImmutableArray.CreateBuilder<IRenderable>();
+        cells.Add( head );
+        // The separator belongs to the name it follows: the two are one cell, so a line break can never
+        // land between a name and its comma. (A TextBlock trims its content: the separator's space is a
+        // margin, not a trailing character.)
+        IRenderable? pending = null;
         foreach( var repo in repos )
         {
-            // A TextBlock trims its content: the separator's space is a margin, not a trailing character.
-            if( !first ) head = head.AddRight( screen.Text( "," ).Box( marginRight: 1 ) );
-            head = head.AddRight( repo.ToLinkedNameRenderable( screen, repo.GetNameStyle( willBeWritten: true ) ) );
-            first = false;
+            if( pending != null ) cells.Add( pending.AddRight( screen.Text( "," ).Box( marginRight: 1 ) ) );
+            pending = repo.ToLinkedNameRenderable( screen, repo.GetNameStyle( willBeWritten: true ) );
         }
-        return head;
+        if( pending != null )
+        {
+            if( tail != null ) pending = pending.AddRight( screen.Text( tail ) );
+            cells.Add( pending );
+        }
+        return screen.Flow( head.Width, cells.DrainToImmutable() );
     }
 
     // Same resolution as the build commands: the pivots' "dev/" stripped current branch, or --branch.

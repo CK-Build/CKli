@@ -236,6 +236,11 @@ Four things this view does deliberately:
   half of the shared [repository row](#the-repository-row-one-rendering-two-commands)), and the branch creation
   note - a property of a repository, not of a package - is said once at the end instead of under every package
   that repository appears in.
+- **The list of names is a `FlowContent`, not a row of cells.** A package that 60 repositories reference breaks
+  into as many lines as the screen needs, each continuation line indented under the version column. It cannot be
+  a `HorizontalContent`: those cells are columns sharing the width, so such a row does not fit any screen and
+  every name ends up wrapped inside 10 columns (see `CKli.Core`'s README). Each name carries the comma that
+  follows it as one cell, so a line never opens with a separator.
 
 That a package has exactly **one** target version is what makes this grouping lossless: `Target.GetUpgrade`
 answers either the resolved `Version` or the configured bound's `Base`, and both are package scoped.
