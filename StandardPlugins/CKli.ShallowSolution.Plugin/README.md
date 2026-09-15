@@ -198,16 +198,25 @@ implementations are provided:
 - **`BrutalPackageMapper.Create(mappings)`** — wraps a plain `IReadOnlyDictionary<string, SVersion>` (package id →
   target version; must use `StringComparer.OrdinalIgnoreCase`, checked at construction) and ignores the *current*
   version entirely: any known package id is always mapped to its target version.
-- **`BoundPackageMapper.Create(bounds)`** — wraps a `IReadOnlyDictionary<string, SVersionBound>` (package id → the
-  range of versions that is accepted; same comparer requirement) and maps only what is *outside* its bound, to that
-  bound's `Base`. A version that satisfies its bound is left alone. A `[Lock]`ed bound accepts its base version
-  only, so it behaves exactly like a `BrutalPackageMapper` on that version. This is what backs the World's
+- **`BoundPackageMapper.Create(bounds)`** — wraps a `PackageBounds` (package id → the range of versions that is
+  accepted) and maps only what is *outside* its bound, to that bound's `Base`. A version that satisfies its bound is
+  left alone. A `[Lock]`ed bound accepts its base version only, so it behaves exactly like a `BrutalPackageMapper` on
+  that version. This is what backs the World's
   [`<VersionTag><Packages>`](../CKli.VersionTag.Plugin/README.md#configuration) configuration.
+- **`PackageBounds`** — the bounds themselves: an **ordered** `ImmutableArray<Rule>`, each rule an exact package
+  identifier or a `"Prefix*"` pattern covering a whole family. `TryGet(packageId, out bound, out origin)` returns the
+  bound of the **first rule that matches** - the declaration order is the priority, nothing is ranked by specificity -
+  and `origin` is that rule's `Name`, so a report can say *which* rule holds a package back. Matching is
+  `OrdinalIgnoreCase`. The scan is linear by construction: no exact-name index could be consulted first without
+  changing the answer. `Rule.Covers(other)` tells whether a rule matches everything another one matches, which is
+  how an unreachable rule - one declared after a rule that covers it - is detected and warned about.
+  `PackageBounds.Empty` is a shared no-op instance.
 
 ## Key types at a glance
 
 | Type | Role |
 |---|---|
+| `PackageBounds` | The World's `<VersionTag><Packages>` version bounds: an ordered list of exact identifiers and `"Prefix*"` family patterns, resolved first-match-wins. |
 | `ShallowSolutionPlugin` | `PrimaryPluginBase` entry point; reads solutions from commits/branches (cached per `Tree.Sha`), dispatches to `MutableSolution` for updates. |
 | `GitSolutionContent` / `GitSolutionContent.Project` | Read-only projects + consumed packages, independent of any `Repo`/`Branch`. |
 | `GitSolution` | `GitSolutionContent` bound to the `Repo`/`Branch` it was read from. |

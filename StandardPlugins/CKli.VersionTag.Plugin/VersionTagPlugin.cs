@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
+using CKli.ShallowSolution.Plugin;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
@@ -30,7 +31,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     readonly bool _autoFixRemovableTag;
     readonly bool _removeUselessFakeTag;
     ReleaseDatabase? _releaseDatabase;
-    Dictionary<string, SVersionBound>? _externalPackages;
+    PackageBounds? _externalPackages;
 
     /// <summary>
     /// Initializes a new <see cref="VersionTagPlugin"/>.
@@ -167,6 +168,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     /// <code>
     /// &lt;Packages&gt;
     ///     &lt;Package Name = "..." Version="..." /&gt;
+    ///     &lt;Package Name = "Prefix.*" Version="..." /&gt;
     ///  &lt;/Packages&gt;
     /// </code>
     /// VersionTag plugin configuration content.
@@ -177,13 +179,24 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     /// World must be in its bound: "ckli deps update" brings the ones that are not back to the <see cref="SVersionBound.Base"/>
     /// and never moves one out of its bound.
     /// </para>
+    /// <para>
+    /// The <c>Name</c> is an exact package identifier or a <c>"Prefix*"</c> pattern that covers a whole family
+    /// ("Microsoft.AspNetCore.*"), which is what a framework coupled family needs: one line instead of one per
+    /// identifier. <b>The first <c>&lt;Package&gt;</c> that matches wins</b> (see <see cref="PackageBounds"/>),
+    /// so the declaration order is the priority and an exception is declared before the family it excepts.
+    /// A <c>'*'</c> that is not the last character, or that is the only one, is a configuration error: the
+    /// first would silently become a package identifier nobody publishes and the second would bound every
+    /// external package of the World to one base version.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <returns>The World's configured packages bounds or null on configuration error.</returns>
-    public IReadOnlyDictionary<string, SVersionBound>? GetPackagesConfiguration( IActivityMonitor monitor )
+    public PackageBounds? GetPackagesConfiguration( IActivityMonitor monitor )
     {
         if( _externalPackages != null ) return _externalPackages;
-        var result = new Dictionary<string, SVersionBound>( StringComparer.OrdinalIgnoreCase );
+        // The rules are kept in document order: that order is their priority (first match wins).
+        var rules = new List<(string Name, SVersionBound Bound)>();
+        var names = new HashSet<string>( StringComparer.OrdinalIgnoreCase );
         bool success = true;
         foreach( var e in PrimaryPluginContext.Configuration.XElement.Elements( "Packages" ).Elements( "Package" ) )
         {
@@ -193,6 +206,25 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 monitor.Error( $"Missing or empty Name attribute on {e}." );
                 success = false;
                 continue;
+            }
+            // A Name may end with a single '*': it then bounds the family of every identifier that starts with
+            // its prefix. Any other '*' is refused rather than taken literally - "Microsoft.*.Http" reads as a
+            // pattern to everyone and would silently match nothing.
+            int star = name.IndexOf( '*' );
+            if( star >= 0 )
+            {
+                if( star != name.Length - 1 )
+                {
+                    monitor.Error( $"Invalid Name attribute of {e}: a '*' is only allowed as the last character of the name (\"Microsoft.AspNetCore.*\")." );
+                    success = false;
+                    continue;
+                }
+                if( star == 0 )
+                {
+                    monitor.Error( $"Invalid Name attribute of {e}: \"*\" alone is not a valid pattern. A bound carries a base version: it applies to a package family, not to every external package of the World." );
+                    success = false;
+                    continue;
+                }
             }
             var version = (string?)e.Attribute( XNames.Version );
             if( !SVersionBound.TryParse( version, out var bound ) )
@@ -213,11 +245,14 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 success = false;
                 continue;
             }
-            if( !result.TryAdd( name, bound ) )
+            // The second of two identical names could never match anything: this is a mistake, not a priority.
+            if( !names.Add( name ) )
             {
-                monitor.Error( $"Duplicate <Package Name=\"{name}\" /> in the <Packages> element (already bound to '{result[name]}')." );
+                monitor.Error( $"Duplicate <Package Name=\"{name}\" /> in the <Packages> element." );
                 success = false;
+                continue;
             }
+            rules.Add( (name, bound) );
         }
         if( !success )
         {
@@ -226,13 +261,33 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                 Expecting:
                 <Packages>
                     <Package Name="..." Version="..." />
+                    <Package Name="Prefix.*" Version="..." />
                 </Packages>
                 Configuration is:
                 {PrimaryPluginContext.Configuration.XElement}
                 """ );
             return null;
         }
-        return _externalPackages = result;
+        var bounds = new PackageBounds( rules );
+        // The order being the priority, a rule declared after one that covers it can never match. That is
+        // always a mistake - most often a family declared before its own exception - but not a fatal one:
+        // the configuration still says something coherent, so this is a warning and the command goes on.
+        for( int i = 1; i < bounds.Rules.Length; ++i )
+        {
+            for( int j = 0; j < i; ++j )
+            {
+                if( bounds.Rules[j].Covers( bounds.Rules[i] ) )
+                {
+                    monitor.Warn( $"""
+                        <Package Name=\"{bounds.Rules[i].Name}\" /> can never match: <Package Name=\"{bounds.Rules[j].Name}\" /> is
+                        declared before it and already covers it. The first <Package> that matches wins, so an
+                        exception must be declared before the family it excepts.
+                        """ );
+                    break;
+                }
+            }
+        }
+        return _externalPackages = bounds;
     }
 
 

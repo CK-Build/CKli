@@ -19,7 +19,8 @@ namespace CKli.Build.Plugin;
 /// A target comes from one of two sources, in this order: the World References' published profiles, and -
 /// only when <see cref="Options.UseFeeds"/> is set - the World's configured NuGet feeds. The
 /// <c>&lt;VersionTag&gt;&lt;Packages&gt;</c> configuration is not a source but a constraint: the
-/// <see cref="SVersionBound"/> it declares for a package identifier bounds what a source may propose, and
+/// <see cref="SVersionBound"/> that the first matching <see cref="PackageBounds.Rule"/> declares for a package
+/// identifier - by name or through a <c>"Prefix*"</c> pattern - bounds what a source may propose, and
 /// a dependency that is outside of its bound is brought back to the bound's <see cref="SVersionBound.Base"/>
 /// even when no source offers anything. See the <see cref="TargetState"/>.
 /// </para>
@@ -144,7 +145,8 @@ public sealed partial class UpgradeMap
 
         /// <summary>
         /// Gets the <see cref="SVersionBound"/> that the World's <c>&lt;VersionTag&gt;&lt;Packages&gt;</c>
-        /// configuration declares for this identifier. Null when it declares none.
+        /// configuration declares for this identifier, be it by name or through a pattern. Null when it
+        /// declares none - the <see cref="Origin"/> says which name carries it.
         /// <para>
         /// When this and <see cref="Version"/> are both not null, the target version necessarily satisfies this bound.
         /// </para>
@@ -314,7 +316,7 @@ public sealed partial class UpgradeMap
         {
             var bounds = versionTag.GetPackagesConfiguration( monitor );
             if( bounds == null ) return null;
-            var references = await ReadReferencesAsync( monitor, context, world, graph.BranchName, options, bounds.Count > 0, cancellation )
+            var references = await ReadReferencesAsync( monitor, context, world, graph.BranchName, options, !bounds.IsEmpty, cancellation )
                                         .ConfigureAwait( false );
             if( references == null ) return null;
             // Without --with-nuget nothing is asked to any feed, so the feeds are not even read from the

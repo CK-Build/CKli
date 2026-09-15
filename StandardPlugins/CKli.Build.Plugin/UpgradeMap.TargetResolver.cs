@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
+using CKli.ShallowSolution.Plugin;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -26,7 +27,7 @@ public sealed partial class UpgradeMap
     {
         readonly IActivityMonitor _monitor;
         readonly CKliEnv _context;
-        readonly IReadOnlyDictionary<string, SVersionBound> _bounds;
+        readonly PackageBounds _bounds;
         readonly IReadOnlyDictionary<string, ReferenceAnchor> _references;
         readonly ImmutableArray<NuGetFeed> _feeds;
         readonly Options _options;
@@ -35,7 +36,7 @@ public sealed partial class UpgradeMap
 
         public TargetResolver( IActivityMonitor monitor,
                                CKliEnv context,
-                               IReadOnlyDictionary<string, SVersionBound> bounds,
+                               PackageBounds bounds,
                                IReadOnlyDictionary<string, ReferenceAnchor> references,
                                ImmutableArray<NuGetFeed> feeds,
                                Options options )
@@ -67,7 +68,7 @@ public sealed partial class UpgradeMap
             // The World configuration doesn't propose a version, it constrains the ones the sources propose:
             // a target outside of this bound is refused below, and a repository that references this identifier
             // outside of it is brought back to the bound's Base (see Target.GetUpgrade).
-            SVersionBound? bound = _bounds.TryGetValue( packageId, out var b ) ? b : null;
+            SVersionBound? bound = _bounds.TryGet( packageId, out var b, out var boundOrigin ) ? b : null;
             // 1 - A World Reference anchors it: that version is the target, because it is why the reference
             //     exists. Two references disagreeing blocks that package, not the command.
             if( _references.TryGetValue( packageId, out var anchor ) )
@@ -79,8 +80,8 @@ public sealed partial class UpgradeMap
                 }
                 if( bound != null && !bound.Value.Satisfy( anchor.Version ) )
                 {
-                    _monitor.Info( $"'{packageId}' is anchored to '{anchor.Version}' ({anchor.Origin}) but the World configuration bounds it to '{bound}': not upgraded." );
-                    return new Target( packageId, null, TargetState.OutOfBound, $"{anchor.Version} ({anchor.Origin}) is not in the configured bound {bound}", bound );
+                    _monitor.Info( $"'{packageId}' is anchored to '{anchor.Version}' ({anchor.Origin}) but {BoundName( bound.Value, packageId, boundOrigin )} refuses it: not upgraded." );
+                    return new Target( packageId, null, TargetState.OutOfBound, $"{anchor.Version} ({anchor.Origin}) is not in {BoundName( bound.Value, packageId, boundOrigin )}", bound );
                 }
                 return new Target( packageId, anchor.Version, TargetState.Reference, anchor.Origin, bound );
             }
@@ -92,7 +93,7 @@ public sealed partial class UpgradeMap
             {
                 _monitor.Trace( $"No World Reference anchors '{packageId}': not upgraded (--with-nuget is not specified)." );
                 return bound != null
-                        ? new Target( packageId, null, TargetState.Bound, $"the configured bound {bound} (no World Reference anchors it and --with-nuget is not specified)", bound )
+                        ? new Target( packageId, null, TargetState.Bound, $"{BoundName( bound.Value, packageId, boundOrigin )} (no World Reference anchors it and --with-nuget is not specified)", bound )
                         : new Target( packageId, null, TargetState.Unknown, "no World Reference anchors it (--with-nuget is not specified)", null );
             }
             // A feed version that the configured bound refuses is not a candidate: this is what makes a
@@ -104,12 +105,22 @@ public sealed partial class UpgradeMap
             if( feed.Refused != null )
             {
                 Throw.DebugAssert( bound != null );
-                _monitor.Info( $"The greatest version of '{packageId}' the feeds offer is '{feed.Refused}' ({feed.RefusedOrigin}) but the World configuration bounds it to '{bound}': not upgraded." );
-                return new Target( packageId, null, TargetState.OutOfBound, $"{feed.Refused} ({feed.RefusedOrigin}) is not in the configured bound {bound}", bound );
+                _monitor.Info( $"The greatest version of '{packageId}' the feeds offer is '{feed.Refused}' ({feed.RefusedOrigin}) but {BoundName( bound.Value, packageId, boundOrigin )} refuses it: not upgraded." );
+                return new Target( packageId, null, TargetState.OutOfBound, $"{feed.Refused} ({feed.RefusedOrigin}) is not in {BoundName( bound.Value, packageId, boundOrigin )}", bound );
             }
             return bound != null
-                    ? new Target( packageId, null, TargetState.Bound, $"the configured bound {bound} (no reference and no feed knows it)", bound )
+                    ? new Target( packageId, null, TargetState.Bound, $"{BoundName( bound.Value, packageId, boundOrigin )} (no reference and no feed knows it)", bound )
                     : new Target( packageId, null, TargetState.Unknown, "no reference and no feed knows it", null );
+
+            // How the report names a bound. A bound that a "Prefix*" pattern carries is named with the pattern:
+            // its reach is exactly what the package identifier alone doesn't show, and a package the World holds
+            // back is meant to be read, not only counted.
+            static string BoundName( SVersionBound bound, string packageId, string? origin )
+            {
+                return origin == null || origin == packageId
+                        ? $"the configured bound {bound}"
+                        : $"the configured bound {bound} of <Package Name=\"{origin}\" />";
+            }
         }
 
         // Refused is the greatest version the bound - and only the bound - rejected: when Version is null and

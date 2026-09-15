@@ -1,8 +1,4 @@
 using CK.Core;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Text;
 
 namespace CKli.ShallowSolution.Plugin;
 
@@ -18,47 +14,35 @@ namespace CKli.ShallowSolution.Plugin;
 public static class BoundPackageMapper
 {
     /// <summary>
-    /// Creates a mapper from a package identifier to version bound dictionary.
-    /// <para>
-    /// The dictionary MUST use the <see cref="StringComparer.OrdinalIgnoreCase"/> comparer otherwise an <see cref="ArgumentException"/>
-    /// is thrown.
-    /// </para>
+    /// Creates a mapper on the World's <see cref="PackageBounds"/>. A bound that a <c>"Prefix*"</c>
+    /// <see cref="PackageBounds.Rule"/> carries maps exactly as one declared for the identifier itself: a rule
+    /// decides what a bound covers, not what it does.
     /// </summary>
-    /// <param name="bounds">The package to version bound dictionary. When null, <see cref="PackageMapper.Empty"/> is returned.</param>
+    /// <param name="bounds">The package bounds. When null, <see cref="PackageMapper.Empty"/> is returned.</param>
     /// <returns>A bound mapping.</returns>
-    public static IPackageMapping Create( IReadOnlyDictionary<string, SVersionBound>? bounds )
+    public static IPackageMapping Create( PackageBounds? bounds )
     {
-        Throw.CheckArgument( bounds is not Dictionary<string, SVersionBound> d || d.Comparer == StringComparer.OrdinalIgnoreCase );
-        Throw.CheckArgument( bounds is not ConcurrentDictionary<string, SVersionBound> c || c.Comparer == StringComparer.OrdinalIgnoreCase );
-        return bounds != null ? new FromDictionary( bounds ) : PackageMapper.Empty;
+        return bounds != null ? new FromBounds( bounds ) : PackageMapper.Empty;
     }
 
-    sealed class FromDictionary : IPackageMapping
+    sealed class FromBounds : IPackageMapping
     {
-        readonly IReadOnlyDictionary<string, SVersionBound> _bounds;
+        readonly PackageBounds _bounds;
 
-        public FromDictionary( IReadOnlyDictionary<string, SVersionBound> bounds ) => _bounds = bounds;
+        public FromBounds( PackageBounds bounds ) => _bounds = bounds;
 
-        public bool IsEmpty => _bounds.Count == 0;
+        public bool IsEmpty => _bounds.IsEmpty;
 
-        public bool HasMapping( string packageId ) => _bounds.ContainsKey( packageId );
+        public bool HasMapping( string packageId ) => _bounds.TryGet( packageId, out _, out _ );
 
         public SVersion? GetMappedVersion( string packageId, SVersion from )
         {
-            return _bounds.TryGetValue( packageId, out var bound ) && !bound.Satisfy( from )
+            return _bounds.TryGet( packageId, out var bound, out _ ) && !bound.Satisfy( from )
                     ? bound.Base
                     : null;
         }
 
-        public override string ToString()
-        {
-            var b = new StringBuilder();
-            foreach( var (p, bound) in _bounds )
-            {
-                b.Append( p ).Append( " ∈ " ).Append( bound.ToString() ).AppendLine();
-            }
-            return b.ToString();
-        }
+        public override string ToString() => _bounds.ToString();
     }
 
 }

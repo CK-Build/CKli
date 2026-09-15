@@ -29,7 +29,7 @@ public sealed partial class HotGraph
     readonly BranchName _branchName;
     readonly IReadOnlyList<Repo> _allRepos;
     readonly IReadOnlyList<Repo> _pivots;
-    readonly IReadOnlyDictionary<string, SVersionBound> _externalPackages;
+    readonly PackageBounds _externalPackages;
     readonly ShallowSolutionPlugin _shallowSolution;
     readonly DevSolutionCollection _devSolutions;
     // Following fields are mutable, reset by OnSolutionChange.
@@ -62,7 +62,7 @@ public sealed partial class HotGraph
                        IReadOnlyList<Repo> allRepos,
                        IReadOnlyList<Repo> pivots,
                        ShallowSolutionPlugin shallowSolution,
-                       IReadOnlyDictionary<string, SVersionBound> externalPackages )
+                       PackageBounds externalPackages )
     {
         Throw.DebugAssert( allRepos.Count != pivots.Count || pivots == allRepos );
         Throw.DebugAssert( pivots.Select( p => p.Index ).IsSortedStrict() );

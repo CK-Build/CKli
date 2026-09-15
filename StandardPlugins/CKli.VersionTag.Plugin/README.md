@@ -65,6 +65,7 @@ Global, on the `<VersionTag>` element under the World's `<Plugins>`:
   <Packages>
     <Package Name="SomeExternalPackage" Version="3.2.1[LockMajor]" />
     <Package Name="AnotherExternalPackage" Version="1.0.4[Lock]" />
+    <Package Name="Microsoft.AspNetCore.*" Version="8.0.0[LockMajor]" />
   </Packages>
 </VersionTag>
 ```
@@ -73,7 +74,7 @@ Global, on the `<VersionTag>` element under the World's `<Plugins>`:
 |---|---|
 | `AutoFixRemovableTag` (bool, default `false`) | If true, tags identified as safely removable (superseded, duplicated, resolved by a `+invalid`, ...) are deleted locally as soon as they are discovered, instead of only being reported as an issue. |
 | `RemoveUselessFakeTag` (bool, default `false`) | If true, a `+fake` tag whose real version has since been published is deleted locally instead of kept around. |
-| `<Packages><Package Name="..." Version="..."/></Packages>` | World-wide declared **version bounds** for packages that are consumed but not produced by any repo in the Stack (external dependencies). Exposed via `GetPackagesConfiguration`. |
+| `<Packages><Package Name="..." Version="..."/></Packages>` | World-wide declared **version bounds** for packages that are consumed but not produced by any repo in the Stack (external dependencies). The `Name` is an exact package identifier or a `"Prefix*"` pattern that covers a family. Exposed via `GetPackagesConfiguration` as a `PackageBounds`. |
 
 The two booleans are *plugin attributes*: `ckli plugin info` describes their current value and
 [`ckli plugin set RemoveUselessFakeTag true`](../../README.md#plugin-set-name-value)
@@ -93,6 +94,60 @@ version optionally followed by its restrictions between brackets:
 | `3.2.1[AllowCI]` | `>= 3.2.1`, CI versions included. |
 
 A bound that excludes its own base version is a configuration error, and so is a duplicated `Name`.
+
+The `Name` is an exact package identifier or a **`"Prefix*"` pattern** that bounds every identifier starting
+with that prefix. This is what a *framework coupled* family needs: `Microsoft.AspNetCore.*` packages only ship
+assets for their own .NET generation, so on a `net8.0` World they must all stay on `8.x` - one line instead of
+one per identifier, and one that already covers the member the family gains next week.
+
+```xml
+<Packages>
+  <!-- The exception comes FIRST: it is reached only if nothing above it matched. -->
+  <Package Name="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.0.30[Lock]" />
+  <!-- ...and the rest of the ASP.NET Core family stays on 8.x. -->
+  <Package Name="Microsoft.AspNetCore.*" Version="8.0.0[LockMajor]" />
+</Packages>
+```
+
+### The first `<Package>` that matches wins
+
+**The declaration order is the priority order**, exactly like the routes of a web router: `deps update` walks
+the `<Package>` elements from top to bottom and stops at the first `Name` that matches the identifier it is
+resolving. Nothing else is taken into account - not how specific a `Name` looks, not whether it is exact or a
+pattern:
+
+| | |
+|---|---|
+| **Order decides, and only order** | `Microsoft.AspNetCore.Http` before `Microsoft.AspNetCore.*` is that family's exception; the *same* line written after the family would never match, because the family already answered. |
+| **Coarse after fine** | `Microsoft.AspNetCore.*` then `Microsoft.*` means "the ASP.NET Core family, then everything else Microsoft". Written the other way round, `Microsoft.*` answers first and the finer line is dead. |
+| **Matching is case insensitive** | Like package identifiers everywhere else. |
+| **A duplicated `Name` is an error** | Not a priority: the second one could never match anything. |
+| **An unreachable `<Package>` is a warning** | A rule declared after one that already covers it can never answer - a family written before its own exception is the usual way to get there. The configuration still means something coherent (the family bound applies), so the command warns and runs. |
+
+```
+<Package Name="Microsoft.AspNetCore.Http" /> can never match: <Package Name="Microsoft.AspNetCore.*" /> is
+declared before it and already covers it. The first <Package> that matches wins, so an exception must be
+declared before the family it excepts.
+```
+
+Order over specificity is a deliberate choice, and not NuGet's
+([`packageSourceMapping`](https://learn.microsoft.com/en-us/nuget/consume-packages/package-source-mapping) ranks
+its patterns by prefix length). A specificity ranking has no canonical answer as soon as patterns can overlap in
+more than one way - for `X.IO.Thing` matched by both `X.*.Thing` and `X.IO.*`, "longest literal prefix" and "most
+literal characters" pick *different* winners - so any richer matching would have to invent one, document it, and
+have you carry it in your head. First-match-wins needs none of that: a new kind of `Name` can be added later and
+its priority is already defined by where you write it.
+
+A `Name` may end with **a single `*`**, and nothing else may contain one: `Microsoft.*.Http` and `Microsoft.**`
+are configuration errors rather than literal names, because they read as patterns to everyone and would silently
+match nothing. A lone `*` is refused too - a bound carries a base version, so it applies to a family, not to
+every external package of the World.
+
+A matched bound then applies **exactly as if the identifier had been named**: a rule decides what a bound
+covers, never what it does. Mind that the "bring an out-of-bound reference back to the base version" half of a
+bound applies family-wide too, so a pattern broader than the family it means drives real edits - where an
+exact `Name` that matches nothing is simply inert. `ckli deps update --dry-run` reports which rule holds or
+moves which identifier: that report is the place to check a pattern's reach before applying it.
 
 This bound is an **invariant of the World**, and the two consumers enforce it the same way: a referenced version
 that is in its bound is left alone, one that is not is brought back to the bound's base version.

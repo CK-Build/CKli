@@ -627,7 +627,10 @@ feeds offer answer the identifiers no reference anchors. No feed is ever queried
 The `<VersionTag><Packages>` configuration declares a **version bound** per package identifier: it caps what a
 source may propose (a version outside the bound is refused and reported as held back) and it is an invariant to
 restore (a repository outside the bound is brought back to the bound's base version, even when no source offers
-anything). A `[Lock]`ed bound is the "never move this" pin.
+anything). A `[Lock]`ed bound is the "never move this" pin. A `Name` may be a `"Prefix*"` pattern
+(`Microsoft.AspNetCore.*`) that bounds a whole *framework coupled* family in one line. The **first `<Package>`
+that matches wins** - the declaration order is the priority, like the routes of a web router, so an exception is
+declared before the family it excepts - and the report says which `Name` holds which package back.
 
 It updates the pivot repositories, the upstreams that need it, and by default the downstreams of everything it
 updates (`--narrow` keeps it to the upstreams): that is what a `ckli build` afterwards would rebuild anyway.

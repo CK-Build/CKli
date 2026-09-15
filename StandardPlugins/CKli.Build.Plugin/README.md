@@ -141,8 +141,9 @@ expensive part:
 | The World's configured NuGet feeds, **only with `--with-nuget`** | The greatest version they offer. |
 
 **The `<VersionTag><Packages>` configuration is not a source, it is a constraint.** It declares a
-[`SVersionBound`](../CKli.VersionTag.Plugin/README.md#configuration) per package identifier - the range of versions
-this World accepts for it - and that bound is applied on both ends of the resolution:
+[`SVersionBound`](../CKli.VersionTag.Plugin/README.md#configuration) per package identifier - by name or through a
+`"Prefix*"` pattern that covers a whole family - the range of versions this World accepts for it, and that bound
+is applied on both ends of the resolution:
 
 - It **caps what a source may propose**: a reference or a feed version outside the bound is refused
   (`TargetState.OutOfBound`, reported apart as "held back by the World `<Packages>` configuration" - a deliberate
@@ -154,6 +155,12 @@ this World accepts for it - and that bound is applied on both ends of the resolu
 
 A `[Lock]`ed bound is the old pin: the only accepted version is the base one, so nothing can ever move the
 identifier above it - and every repository below it is brought up to it.
+
+The bound that applies to an identifier is the one of **the first `<Package>` that matches it** - the declaration
+order is the priority, like the routes of a web router - and it is reported **with the `Name` that carries it**
+("is not in the configured bound 8.0.0[LockMajor] of `<Package Name="Microsoft.AspNetCore.*" />`"): the reach of a
+pattern is exactly what the package identifier alone doesn't show, and `--dry-run` is where it is meant to be
+checked.
 
 **The World References are the default source and the feeds are opt-in.** Without `--with-nuget` no feed is
 queried at all - not even read from the `<ArtifactHandler>` configuration, since `GetConfiguredNuGetFeeds`
