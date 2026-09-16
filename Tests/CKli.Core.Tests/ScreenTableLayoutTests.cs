@@ -113,7 +113,7 @@ public class ScreenTableLayoutTests
         {
             var s = h.SetWidth( 40 );
             DebugRenderer.Render( s ).ShouldBe( """
-                  0123456789    0123456789   0123456789 ⮐
+                  0123456789   0123456789   0123456789  ⮐
 
                 """ );
         }

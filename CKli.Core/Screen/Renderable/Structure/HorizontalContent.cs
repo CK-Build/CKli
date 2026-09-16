@@ -90,15 +90,50 @@ public sealed class HorizontalContent : IRenderable
         {
             return ApplyTransform( r => r.SetWidth( r.NominalWidth, false ) );
         }
-        double ratio = (double)width / _nominalWidth;
         var widths = new int[_cells.Length];
         int sum = 0;
-        for( int i = 0; i < _cells.Length; i++ )
+        if( width < _nominalWidth )
         {
-            var c = _cells[i];
-            int w = Math.Max( (int)Math.Round( (ratio * c.NominalWidth) + 0.5, MidpointRounding.ToZero ), c.MinWidth );
-            widths[i] = w;
-            sum += w;
+            // Narrowing: start from the nominal widths and take the missing columns from the widest cell
+            // that can still give one. A proportional share shrinks every cell instead, including a short
+            // label that its long neighbor could perfectly well have absorbed for - and since a text only
+            // wraps at a white space, squeezing a label below its longest word cuts that word in two
+            // ("KeepLocalReleaseAfterPu"/"blish") rather than wrapping it.
+            int missing = _nominalWidth - width;
+            for( int i = 0; i < _cells.Length; i++ )
+            {
+                widths[i] = _cells[i].NominalWidth;
+            }
+            while( missing > 0 )
+            {
+                int iMax = -1, wMax = 0;
+                for( int i = 0; i < _cells.Length; i++ )
+                {
+                    // ">=" so that, all things being equal, the rightmost cell gives the column: the
+                    // leftmost ones are the most likely to be labels.
+                    if( widths[i] > _cells[i].MinWidth && widths[i] >= wMax )
+                    {
+                        wMax = widths[i];
+                        iMax = i;
+                    }
+                }
+                // Every cell is at its MinWidth: the rest of the overflow cannot be absorbed.
+                if( iMax < 0 ) break;
+                --widths[iMax];
+                --missing;
+            }
+            for( int i = 0; i < _cells.Length; i++ ) sum += widths[i];
+        }
+        else
+        {
+            double ratio = (double)width / _nominalWidth;
+            for( int i = 0; i < _cells.Length; i++ )
+            {
+                var c = _cells[i];
+                int w = Math.Max( (int)Math.Round( (ratio * c.NominalWidth) + 0.5, MidpointRounding.ToZero ), c.MinWidth );
+                widths[i] = w;
+                sum += w;
+            }
         }
         delta = width - sum;
         if( delta > 0 )
