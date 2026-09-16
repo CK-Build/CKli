@@ -16,6 +16,7 @@ public sealed partial class BuildPlugin
     const string _dDepsAll = "Consider all the Repos, not only the current repositories.";
     const string _dDepsNarrow = "Keep the update to the current repositories and their upstreams: don't bring the downstreams of an updated repository in.";
     const string _dDepsNoFetch = "Don't fetch the repositories first. The analysis is then only as fresh as the last fetch.";
+    const string _dDepsMaxDop = "Limits the parallelism when fetching the repositories. Unbounded by default.";
     const string _dDepsCI = "Consider the CI published profiles of the World References.";
     const string _dDepsWithNuGet = "Let the World's NuGet feeds answer the package identifiers no World Reference anchors. Without this, no feed is ever queried.";
     const string _dDepsPrerelease = "Consider the prerelease versions of the feeds even on the root branch. Requires --with-nuget.";
@@ -32,6 +33,7 @@ public sealed partial class BuildPlugin
     /// <param name="all">True to consider all the Repos.</param>
     /// <param name="narrow">True to exclude the downstreams of an updated repository.</param>
     /// <param name="noFetch">True to skip the fetch.</param>
+    /// <param name="maxDop">Maximal degree of parallelism of the fetch. Null or 0 is unbounded.</param>
     /// <param name="ci">True to consider the CI published profiles of the References.</param>
     /// <param name="withNuGet">True to let the feeds answer the identifiers no World Reference anchors.</param>
     /// <param name="prerelease">True to consider the prereleases of the feeds.</param>
@@ -53,6 +55,8 @@ public sealed partial class BuildPlugin
                                              [Description( _dBranch )]
                                              [OptionName( _oBranch )]
                                              string? branch = null,
+                                             [Description( _dDepsMaxDop )]
+                                             string? maxDop = null,
                                              [Description( _dDepsAll )]
                                              bool all = false,
                                              [Description( _dDepsNarrow )]
@@ -88,6 +92,18 @@ public sealed partial class BuildPlugin
             monitor.Error( $"--{(stable ? "stable" : "prerelease")} only filters the versions the NuGet feeds offer: --with-nuget must be specified." );
             return false;
         }
+        // Same as for --stable/--prerelease above: --max-dop only bounds the fetch, so accepting it
+        // together with --no-fetch would silently do nothing.
+        if( noFetch && maxDop != null )
+        {
+            monitor.Error( "--max-dop only bounds the fetch: it cannot be used with --no-fetch." );
+            return false;
+        }
+        // Same semantics as "ckli fetch": the default 0 is unbounded, an explicit value is at least 1.
+        if( !ParseInteger( monitor, "--max-dop", maxDop, out int vMaxDop, defaultValue: 0, minValue: 1 ) )
+        {
+            return false;
+        }
         var cancellation = PrimaryPluginContext.Cancellation;
         // The World must be coherent before anything is computed: no repository dirty (a commit would sweep
         // uncommitted work in), no version tag issue and no branch model issue. This is refused, never healed.
@@ -105,7 +121,7 @@ public sealed partial class BuildPlugin
         // asks every feed for the versions it offers). Being stale about our own repositories while being
         // fresh about the outside world makes no sense, and it is what makes the divergence check below mean
         // anything.
-        if( !noFetch && !FetchAll( monitor, allRepos, cancellation ) )
+        if( !noFetch && !await FetchAllAsync( monitor, allRepos, vMaxDop, cancellation ).ConfigureAwait( false ) )
         {
             return false;
         }
@@ -205,17 +221,23 @@ public sealed partial class BuildPlugin
         return b.ToString();
     }
 
-    // A fetch updates the remote tracking references only: no branch moves and no content changes.
-    bool FetchAll( IActivityMonitor monitor, IReadOnlyList<Repo> repos, CancellationToken cancellation )
+    // A fetch updates the remote tracking references only: no branch moves and no content changes, so the
+    // repositories are independent. This is "ckli fetch" applied to the World: same pool, same --max-dop
+    // (0 is unbounded), same SoftStop - the first failure aborts this command anyway, since an analysis
+    // that doesn't know a remote's state cannot describe what an update would write.
+    static async Task<bool> FetchAllAsync( IActivityMonitor monitor,
+                                           IReadOnlyList<Repo> repos,
+                                           int maxDop,
+                                           CancellationToken cancellation )
     {
-        using( monitor.OpenInfo( $"Fetching {repos.Count} repositories." ) )
+        using( monitor.OpenInfo( $"Fetching {repos.Count} repositories ({(maxDop <= 0 ? "parallel" : $"--max-dop {maxDop}")})." ) )
         {
-            bool success = true;
-            foreach( var repo in repos )
-            {
-                success &= repo.GitRepository.FetchRemoteBranches( monitor, withTags: false, cancellation: cancellation );
-            }
-            return success;
+            var pool = new ActivityMonitorAsyncPool( maxDop <= 0 ? int.MaxValue : maxDop );
+            return await pool.ParallelAsync( repos,
+                                             ( monitor, repo, cancellation ) => repo.GitRepository.FetchRemoteBranches( monitor, withTags: false, cancellation: cancellation ),
+                                             ParallelErrorBehavior.SoftStop,
+                                             cancellation )
+                             .ConfigureAwait( false );
         }
     }
 

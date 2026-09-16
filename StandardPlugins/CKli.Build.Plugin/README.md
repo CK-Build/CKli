@@ -214,6 +214,13 @@ tracked remote ("run `ckli pull` first"). The fetch is what makes that check mea
 online by design (it reads the References over http, and with `--with-nuget` queries every feed), so being
 stale about our own repositories would be incoherent.
 
+That fetch is `ckli fetch` applied to the whole World and it is parallelized the same way: an
+`ActivityMonitorAsyncPool` bounded by `--max-dop` (unbounded by default), with
+`ParallelErrorBehavior.SoftStop` - a repository is independent of the others here (a fetch moves remote
+tracking references only, no branch and no file), and the first failure aborts the command anyway. Note that
+this is *not* the whole online cost of the command: reading the World References' published profiles and
+querying the feeds are still serial.
+
 **What applying does**, per participant, upstreams first and all of it repo-local: `EnsureExists` - which
 creates a missing branch at `HotBranch.GetStartCommit`, *the very commit whose content was analyzed* - then
 `EnsureDevBranch`, a checkout of the `dev/` branch, `MutableSolution.UpdatePackages` with an **exact**
@@ -228,6 +235,7 @@ to do, and it is the only step that could move a tip away from what the report d
 | `all` | Consider all the Repos as pivots. |
 | `narrow` | Keep the update to the pivots and their upstreams: don't bring the downstreams of an updated repository in. |
 | `noFetch` | Don't fetch first. The analysis is then only as fresh as the last fetch - and the divergence refusal cannot fire. |
+| `--max-dop <n>` (positional `maxDop`) | Limits the parallelism of the fetch. Unbounded by default, exactly as for `ckli fetch`. Refused with `--no-fetch`: it would silently do nothing. |
 | `ci` | Consider the **CI published profiles** of the World References. Note that this is not the `--ci` of the build commands: nothing is built here, and the graph is always computed with `isCIBuild: false`. A published folder holds at most one alive CI profile per branch and it is newer than every non-CI publication of that branch, so the one that is there simply applies - there is no "is it superseded" question to answer. |
 | `with-nuget` | Let the World's NuGet feeds answer the identifiers no World Reference anchors. Without it no feed is queried and the References are the only source. |
 | `prerelease` / `stable` | Override the stable/not filter of the feeds. Mutually exclusive, and both require `--with-nuget`. |
