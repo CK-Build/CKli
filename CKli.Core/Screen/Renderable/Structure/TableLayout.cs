@@ -71,9 +71,62 @@ public partial class TableLayout : IRenderable
             nominalWidth += n;
             width += w;
         }
+        AddSingleCellRowWidths( rows, ref minWidth, ref nominalWidth, ref width );
         var finalCols = cols.ToArray();
         rows = ApplyHOrV( rows, finalCols, width, boxCells: true );
         return new TableLayout( rows, finalCols, columns, minWidth, nominalWidth, width );
+    }
+
+    /// <summary>
+    /// A row is split into cells only when it is a <see cref="HorizontalContent"/> (see ApplyHOrV): any other
+    /// row is a single cell that takes the whole line. Such a row belongs to no column, so the columns alone
+    /// would settle the table's widths and the row would simply be wrapped into whatever they need. This
+    /// raises the 3 widths to what the widest single cell row needs.
+    /// <para>
+    /// The table can then be wider than its columns. ColDef.ToWidth doesn't fill the columns up to such a
+    /// width: they keep their own.
+    /// </para>
+    /// </summary>
+    static void AddSingleCellRowWidths( IRenderable rows, ref int minWidth, ref int nominalWidth, ref int width )
+    {
+        if( rows is VerticalContent v )
+        {
+            foreach( var cell in v.Cells ) OneRow( cell, ref minWidth, ref nominalWidth, ref width );
+        }
+        else
+        {
+            OneRow( rows, ref minWidth, ref nominalWidth, ref width );
+        }
+
+        static void OneRow( IRenderable row, ref int minWidth, ref int nominalWidth, ref int width )
+        {
+            // ApplyHOrV lays a Collapsable's content out at (table width - 2): the marker's 2 columns
+            // are not available to the row itself, so it needs them on top of its own width.
+            if( row is Collapsable c )
+            {
+                if( c.Content is VerticalContent v )
+                {
+                    foreach( var cell in v.Cells ) OneCell( cell, 2, ref minWidth, ref nominalWidth, ref width );
+                }
+                else
+                {
+                    OneCell( c.Content, 2, ref minWidth, ref nominalWidth, ref width );
+                }
+            }
+            else
+            {
+                OneCell( row, 0, ref minWidth, ref nominalWidth, ref width );
+            }
+
+            static void OneCell( IRenderable cell, int marker, ref int minWidth, ref int nominalWidth, ref int width )
+            {
+                // A HorizontalContent is split into cells: it is the columns' business.
+                if( cell is HorizontalContent h && h.Cells.Length > 0 ) return;
+                if( minWidth < cell.MinWidth + marker ) minWidth = cell.MinWidth + marker;
+                if( nominalWidth < cell.NominalWidth + marker ) nominalWidth = cell.NominalWidth + marker;
+                if( width < cell.Width + marker ) width = cell.Width + marker;
+            }
+        }
     }
 
     static bool DiscoverColumnsV( VerticalContent v, List<ColDef> columns )
@@ -233,7 +286,10 @@ public partial class TableLayout : IRenderable
         {
             cols = ColDef.ToWidth( _cols, _nominalWidth, width );
         }
-        var rows = ApplyHOrV( _rows, cols, _minWidth, boxCells: false );
+        // "width", not "_minWidth": this is what ApplyHOrV gives to a row that spans all the columns
+        // (a row that is not a HorizontalContent), and such a row spans the table as it is now, not as
+        // narrow as the table could ever be. Create passes its settled width here.
+        var rows = ApplyHOrV( _rows, cols, width, boxCells: false );
         return new TableLayout( rows, cols, _columns, _minWidth, _nominalWidth, width );
     }
 }

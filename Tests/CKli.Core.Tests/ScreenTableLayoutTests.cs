@@ -253,25 +253,26 @@ public class ScreenTableLayoutTests
                     """ );
         all = all.SetWidth( all.Width - 2 );
         DebugRenderer.Render( all ).ShouldBe( """
-                    * Some-Repo      master  https://github.com/org/Some-Repo     ⮐
-                      Some-other-    develop https://github.com/org/Some-other-   ⮐
-                      Repo                   Repo                                 ⮐
+                    * Some-Repo       master  https://github.com/org/Some-Repo    ⮐
+                      Some-other-Repo develop https://github.com/org/Some-other-  ⮐
+                                              Repo                                ⮐
 
                     """ );
 
         all = all.SetWidth( all.Width - 3 );
         DebugRenderer.Render( all ).ShouldBe( """
-                    * Some-Repo     master  https://github.com/org/Some-Repo   ⮐
-                      Some-other-   develop https://github.com/org/Some-other- ⮐
-                      Repo                  Repo                               ⮐
+                    * Some-Repo       master  https://github.com/org/Some-Repo ⮐
+                      Some-other-Repo develop https://github.com/org/Some-     ⮐
+                                              other-Repo                       ⮐
 
                     """ );
 
         all = all.SetWidth( all.Width - 2 );
         DebugRenderer.Render( all ).ShouldBe( """
-                    * Some-Repo     master  https://github.com/org/Some-Repo ⮐
-                      Some-other-   develop https://github.com/org/Some-     ⮐
-                      Repo                  other-Repo                       ⮐
+                    * Some-Repo       master  https://github.com/org/Some-   ⮐
+                                              Repo                           ⮐
+                      Some-other-Repo develop https://github.com/org/Some-   ⮐
+                                              other-Repo                     ⮐
 
                     """ );
 
@@ -365,7 +366,7 @@ public class ScreenTableLayoutTests
             │                            like       
             │                            all        
             │                            arguments.   
-            │   Options:                           
+            │   Options:                            
             │    --options, -o           [Multiple] 
             │                            This       
             │                            description
@@ -384,9 +385,9 @@ public class ScreenTableLayoutTests
             │                            and        
             │                            on multiple
             │                            lines.     
-            │   Flags:                             
+            │   Flags:                              
             │    --flag1, -f1            Flag n°1.  
-            │    --flag2, -f2            Flag n°2.
+            │    --flag2, -f2            Flag n°2.  
             """ );
     }
 

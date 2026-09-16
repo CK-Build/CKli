@@ -63,6 +63,11 @@ public partial class TableLayout
             if( addCollapsableWidth ) w += 2;
             if( _maxInitialWidth < w ) _maxInitialWidth = w;
             w = r.NominalWidth;
+            // The nominal width needs the collapsable marker just like the 2 above: HideCollapsableWidth
+            // takes those 2 columns back before the cells are laid out, so a nominal that doesn't carry
+            // them leaves the widest cell 2 columns short and wraps it ("ArtifactHandl"/"er").
+            // The constructor adds them to the 3 widths; this only aligns Add with it.
+            if( addCollapsableWidth ) w += 2;
             if( _maxNominalWidth < w ) _maxNominalWidth = w;
         }
 
@@ -134,18 +139,55 @@ public partial class TableLayout
             {
                 cols[i] = defs[i].Clone();
             }
-            double ratio = (double)width / nominalWidth;
             int sum = 0;
-            for( int i = 0; i < cols.Length; i++ )
+            if( width < nominalWidth )
             {
-                var c = cols[i];
-                int w = Math.Max( (int)Math.Round( (ratio * c._nominalWidth) + 0.5, MidpointRounding.ToZero ), c._minW );
-                if( c._maxW != 0 && w > c._maxW ) w = c._maxW;
-                c._width = w;
-                sum += w;
+                // Narrowing: start from the nominal widths and take the missing columns from the widest
+                // column that can still give one. A proportional share shrinks every column instead,
+                // including a short one that its long neighbor could perfectly well have absorbed for -
+                // and since a text only wraps at a white space, squeezing a column below its longest word
+                // cuts that word in two ("ArtifactHandl"/"er") rather than wrapping it.
+                // This is the same policy as HorizontalContent.SetWidth.
+                foreach( var c in cols )
+                {
+                    c._width = c._maxW != 0 && c._nominalWidth > c._maxW ? c._maxW : c._nominalWidth;
+                    sum += c._width;
+                }
+                int missing = sum - width;
+                while( missing > 0 )
+                {
+                    ColDef? widest = null;
+                    foreach( var c in cols )
+                    {
+                        // ">=" so that, all things being equal, the rightmost column gives the column:
+                        // the leftmost ones are the most likely to be labels.
+                        if( c._width > c._minW && (widest == null || c._width >= widest._width) ) widest = c;
+                    }
+                    // Every column is at its minimal width: the rest of the overflow cannot be absorbed.
+                    if( widest == null ) break;
+                    --widest._width;
+                    --missing;
+                    --sum;
+                }
+            }
+            else
+            {
+                double ratio = (double)width / nominalWidth;
+                for( int i = 0; i < cols.Length; i++ )
+                {
+                    var c = cols[i];
+                    int w = Math.Max( (int)Math.Round( (ratio * c._nominalWidth) + 0.5, MidpointRounding.ToZero ), c._minW );
+                    if( c._maxW != 0 && w > c._maxW ) w = c._maxW;
+                    c._width = w;
+                    sum += w;
+                }
             }
             int delta = width - sum;
-            if( delta > 0 )
+            // The columns are filled up to the width only when the table is at least as wide as they
+            // nominally need. A table can be wider than its columns because a row that is a single cell
+            // asked for it (see TableLayout.Create): stretching the columns to cover that row's width
+            // would spread the columns of every other row for nothing.
+            if( delta > 0 && width >= nominalWidth )
             {
                 do
                 {
