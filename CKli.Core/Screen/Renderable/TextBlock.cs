@@ -223,8 +223,16 @@ public abstract class TextBlock : IRenderable
                 }
                 else
                 {
-                    newLen = line.Slice( 1, width ).LastIndexOfAny( _cutChars ) + 1;
-                    if( newLen == 0 ) newLen = width;
+                    // Of the cut chars, only the space is cut BEFORE (it is then trimmed away): the others
+                    // trail the word they belong to, so the break goes after them. Cutting before a '.'
+                    // orphans it on the next line ("publication" / ".") and a hyphenated word must split
+                    // as "well-"/"known", never "well"/"-known".
+                    // The search stops at width-1 because a trailing cut char kept on this line needs one
+                    // more column than its own index.
+                    int iCut = line.Slice( 0, width ).LastIndexOfAny( _cutChars );
+                    newLen = iCut <= 0
+                                ? width
+                                : (line[iCut] == ' ' ? iCut : iCut + 1);
                 }
                 rangeCollector.Add( (start, newLen) );
                 if( w < newLen ) w = newLen;

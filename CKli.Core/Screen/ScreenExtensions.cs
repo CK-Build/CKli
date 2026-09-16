@@ -244,8 +244,7 @@ public static class ScreenExtensions
                                            .AddRight( s.Text( i.Configuration?.ToString() ).Collapsable() )
                                            .AddBelow( i.Message != null
                                                         ? s.Text( "Message:", ConsoleColor.DarkYellow )
-                                                           .AddBelow( i.Message.Box( paddingLeft: 3, foreColor: ConsoleColor.Yellow )
-                                                           .Box() )
+                                                           .AddBelow( i.Message.Box( paddingLeft: 3, foreColor: ConsoleColor.Yellow ) )
                                                         : null ) ) )
                 );
         }

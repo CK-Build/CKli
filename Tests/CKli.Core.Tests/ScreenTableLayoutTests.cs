@@ -247,31 +247,31 @@ public class ScreenTableLayoutTests
         all = all.SetWidth( all.Width - 1 );
         DebugRenderer.Render( all ).ShouldBe( """
                     * Some-Repo       master  https://github.com/org/Some-Repo      ⮐
-                      Some-other-Repo develop https://github.com/org/Some-other     ⮐
-                                              -Repo                                 ⮐
+                      Some-other-Repo develop https://github.com/org/Some-other-    ⮐
+                                              Repo                                  ⮐
 
                     """ );
         all = all.SetWidth( all.Width - 2 );
         DebugRenderer.Render( all ).ShouldBe( """
                     * Some-Repo      master  https://github.com/org/Some-Repo     ⮐
-                      Some-other     develop https://github.com/org/Some-other    ⮐
-                      -Repo                  -Repo                                ⮐
+                      Some-other-    develop https://github.com/org/Some-other-   ⮐
+                      Repo                   Repo                                 ⮐
 
                     """ );
 
         all = all.SetWidth( all.Width - 3 );
         DebugRenderer.Render( all ).ShouldBe( """
                     * Some-Repo     master  https://github.com/org/Some-Repo   ⮐
-                      Some-other    develop https://github.com/org/Some-other  ⮐
-                      -Repo                 -Repo                              ⮐
+                      Some-other-   develop https://github.com/org/Some-other- ⮐
+                      Repo                  Repo                               ⮐
 
                     """ );
 
         all = all.SetWidth( all.Width - 2 );
         DebugRenderer.Render( all ).ShouldBe( """
                     * Some-Repo     master  https://github.com/org/Some-Repo ⮐
-                      Some-other    develop https://github.com/org/Some      ⮐
-                      -Repo                 -other-Repo                      ⮐
+                      Some-other-   develop https://github.com/org/Some-     ⮐
+                      Repo                  other-Repo                       ⮐
 
                     """ );
 
