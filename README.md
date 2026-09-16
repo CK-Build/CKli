@@ -687,18 +687,21 @@ The attribute name can be prefixed by the plugin short name (`VersionTag.RemoveU
 form is required only when more than one plugin supports the same attribute name: the identifier is submitted
 to each primary plugin until one of them handles it.
 
-Boolean attributes take the XML `true` or `false` and nothing else (`True`, `1` or `yes` are errors).
+Most of these attributes are booleans: they take the XML `true` or `false` and nothing else (`True`, `1` or `yes`
+are errors). A plugin may support another kind of value and validate it itself — `Build`'s `DeleteBeforeBuild`
+takes a `;` separated list of paths and refuses an entry that escapes the repository's working folder.
 
 Both sides of this are deliberately **manual**, and it is up to each plugin to implement them:
 - the supported attributes are the ones a plugin describes in the message it publishes on the `PluginInfo`
   event — this is what `plugin info` displays;
 - writing them is the plugin's `OnPluginSetAsync` override.
 
-The 3 Standard Plugins that currently support attributes are
+The 4 Standard Plugins that currently support attributes are
 [`BranchModel`](StandardPlugins/CKli.BranchModel.Plugin/README.md#configuration-xml) (`AutoFixUselessBranch`),
 [`VersionTag`](StandardPlugins/CKli.VersionTag.Plugin/README.md#configuration) (`AutoFixRemovableTag`,
-`RemoveUselessFakeTag`) and
-[`Publish`](StandardPlugins/CKli.Publish.Plugin/README.md#configuration) (`KeepLocalReleaseAfterPublish`).
+`RemoveUselessFakeTag`),
+[`Publish`](StandardPlugins/CKli.Publish.Plugin/README.md#configuration) (`KeepLocalReleaseAfterPublish`) and
+[`Build`](StandardPlugins/CKli.Build.Plugin/README.md#configuration) (`DeleteBeforeBuild`).
 
 As usual, this modification will be "published" when `push` (typically with `--stack-only`) is executed.
 
