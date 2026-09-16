@@ -545,6 +545,13 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return null;
         }
+        // The working folder must not carry what a previous build generated: this is a property of the build
+        // itself, not of the BuilderFunction that happens to be installed, so it is done here rather than in
+        // RepoBuilder.BuildAsync (which a test harness replaces wholesale).
+        if( !_repoBuilder.DeleteBeforeBuild( monitor, versionInfo.Repo ) )
+        {
+            return null;
+        }
         return await _builderFunction( monitor, context, versionInfo, buildCommit, runTest.Value, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
     }
 

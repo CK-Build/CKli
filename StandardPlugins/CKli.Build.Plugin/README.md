@@ -69,8 +69,13 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
 `BuildPlugin.cs` (the `build`/`publish`/`*build`/`*publish` commands and the core build call), `BuildPlugin.Fix.cs`
 (`fix build`/`fix publish`), `BuildPlugin.Rebuild.cs` (`maintenance rebuild ...`), `BuildPlugin.Issues.cs` (the
 `World.Events.Issue` handler), and `BuildPlugin.RoadmapExecutor.cs` (the parallel build engine, a private nested class).
-It has **no XML configuration** of its own in the World definition file; all its behavior is driven by command
-parameters and by the plugins it depends on.
+Its behavior is driven by command parameters and by the plugins it depends on. The `<Build>` element of the World
+definition file carries one optional attribute, read by `RepositoryBuilderPlugin` (which shares that element: both
+types live in `CKli.Build.Plugin`):
+
+| Attribute | Default | What it does |
+|---|---|---|
+| `DeleteBeforeBuild` | *(empty)* | `;` separated list of git ignored files and folders that are deleted from a repository's working folder before it is built. See [Core build](#core-build-corebuildasync--repobuilder). |
 
 It subscribes to one lifecycle event:
 
@@ -388,8 +393,30 @@ been computed and is not a dry-run:
 3. Unless `forceRebuild`, checks whether the target version's tag already exists with all its artifacts locally
    available (`ArtifactHandlerPlugin.HasAllArtifacts`) - if so and tests don't need to (re)run, the build is skipped and
    a `BuildResult` with `SkippedBuild: true` is returned immediately ("Useless build ... skipped").
-4. Obtains a `CommitBuildInfo` (`VersionTagInfo.TryGetCommitBuildInfo`) and calls the injected `BuilderFunction`
+4. Obtains a `CommitBuildInfo` (`VersionTagInfo.TryGetCommitBuildInfo`).
+5. Calls `RepositoryBuilderPlugin.DeleteBeforeBuild` (see below), then the injected `BuilderFunction`
    (`RealBuildAsync` by default).
+
+#### `DeleteBeforeBuild`: not reusing what a previous build generated
+
+A repository can hold generated code that is compiled with it - `$StObjGen/G0.cs` at the root of every project using
+the CKomposable code generation, for instance - produced either by a previous run of its own tests or by the build of
+another project of the same solution. It is git ignored, so a fresh CI clone never has it, but a developer machine
+does, and nothing else removes it: the hard reset done after a build uses `deleteIgnored: false` on purpose (see
+`GitRepository.ResetHard`, whose doc explains the cost of enumerating ignored entries such as a `node_modules`).
+
+`<Build DeleteBeforeBuild="$StObjGen" />` names what must go. Entries follow the `.gitignore` rule - no `/` matches at
+any depth, a `/` anchors the entry at the working folder, and the name part accepts the `*` and `?` wildcards - and a
+single entry covers both files and folders. Folders are deleted rather than emptied: that is exactly what a fresh clone
+looks like, and the post-build reset removes empty folders anyway.
+
+**Only git ignored content can be deleted.** A build must produce the artifacts of the commit that it tags, so deleting
+tracked content would build something else - and the hard reset afterwards would restore the file and hide it. An entry
+matching non ignored content fails the build with an error naming it.
+
+This runs in `CoreBuildAsync` rather than in `RepoBuilder.BuildAsync` because it is a property of the build itself, not
+of the `BuilderFunction` that happens to be installed: `CKli.Build.Plugin.Testing` replaces that function wholesale, so
+a hook inside `RepoBuilder` would never run under the fake harness (nor under a specialized `RepoBuilder`).
 
 `RealBuildAsync` checks out the build commit (detached HEAD) if the working tree isn't already on it, calls
 `RepoBuilder.BuildAsync`, and restores the original branch afterward - regardless of success.
