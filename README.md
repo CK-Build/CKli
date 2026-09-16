@@ -616,7 +616,7 @@ Unlike every other command described above, this one comes from a **plugin** (th
 they are documented with it in
 [`CKli.Build.Plugin`'s README](StandardPlugins/CKli.Build.Plugin/README.md#deps-update-aligning-the-external-dependencies).
 
-### `deps update --branch <name> --all --narrow --no-fetch --ci --with-nuget --prerelease --stable --allow-downgrade --by-repo --dry-run`
+### `deps update --branch <name> --max-dop <n> --all --narrow --no-fetch --ci --with-nuget --prerelease --stable --allow-downgrade --by-repo --dry-run`
 
 Aligns the **external** package dependencies of a World: the packages its repositories consume but don't
 produce. A target version comes from the published profiles of the World `<Reference>`s - and those references
@@ -639,6 +639,12 @@ updates (`--narrow` keeps it to the upstreams): that is what a `ckli build` afte
 The World must be up to date and clean: the command fetches, then **refuses** to run when a branch is behind
 its remote rather than merging it for you - run `ckli pull` first. A repository that doesn't have the branch
 yet gets it created, at the commit its branch model says it must start from.
+
+That fetch is parallel, like [`fetch`](#fetch---all---with-tags---max-dop-n) and
+[`pull`](#pull---with-tags---all---continue-on-error---max-dop-n): `--max-dop <n>` limits the parallelism
+(unbounded by default). `--no-fetch` skips the fetch altogether - the analysis is then only as fresh as the
+last fetch, and the divergence refusal above cannot fire - so `--max-dop` is refused with it rather than
+silently doing nothing.
 
 Use `--dry-run` to see the report without writing anything. Downgrades are reported apart and require
 `--allow-downgrade` to be applied.
