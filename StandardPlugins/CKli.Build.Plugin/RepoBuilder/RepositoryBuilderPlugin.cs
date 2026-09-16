@@ -38,10 +38,46 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     {
         _artifactHandler = artifactHandler;
         _onCoreBuild = new PerfectEventSender<CoreBuildEventArgs>();
+        World.Events.PluginInfo += PluginInfoRequested;
         // <Build DeleteBeforeBuild="$StObjGen;*.g.cs" />: entries that a previous build produced and that
         // this one must produce again instead of reusing. CKli knows nothing about a World's code
         // generators, so this is empty by default.
-        _deleteBeforeBuild = ParseDeleteBeforeBuild( (string?)primaryContext.Configuration.XElement.Attribute( XNames.DeleteBeforeBuild ) );
+        _deleteBeforeBuild = SplitDeleteBeforeBuild( (string?)primaryContext.Configuration.XElement.Attribute( XNames.DeleteBeforeBuild ) );
+    }
+
+    void PluginInfoRequested( PluginInfoEventArgs e )
+    {
+        var s = e.ScreenType;
+        IRenderable message;
+        if( _deleteBeforeBuild.Length > 0 )
+        {
+            message = s.Text( nameof( XNames.DeleteBeforeBuild ), foreColor: ConsoleColor.Green )
+                       .AddRight( s.Text( $"""is "{_deleteBeforeBuild.Concatenate( ";" )}": these git ignored files and folders are deleted from a repository's working folder before it is built.""" )
+                                   .Box( marginLeft: 1 ) );
+        }
+        else
+        {
+            message = s.Text( nameof( XNames.DeleteBeforeBuild ), foreColor: ConsoleColor.DarkGray )
+                       .AddRight( s.Text( """is not set (the default): nothing is deleted before a build. Set it to the git ignored content that a previous build generates (such as "$StObjGen") so that it is produced again instead of being reused.""" )
+                                   .Box( marginLeft: 1 ) );
+        }
+        e.AddMessage( PrimaryPluginContext, message );
+    }
+
+    /// <inheritdoc />
+    protected override Task<bool?> OnPluginSetAsync( IActivityMonitor monitor,
+                                                     PluginInfo? pluginInfo,
+                                                     string attributeName,
+                                                     string? attributeValue )
+    {
+        bool? result = null;
+        if( attributeName.Equals( XNames.DeleteBeforeBuild.LocalName, StringComparison.OrdinalIgnoreCase ) )
+        {
+            // Refuse an invalid entry rather than persisting a configuration that fails every subsequent build.
+            result = CheckEntries( monitor, SplitDeleteBeforeBuild( attributeValue ) )
+                     && PrimaryPluginContext.Configuration.SetAttribute( monitor, XNames.DeleteBeforeBuild, attributeValue );
+        }
+        return Task.FromResult( result );
     }
 
     /// <summary>
@@ -69,10 +105,12 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     internal bool DeleteBeforeBuild( IActivityMonitor monitor, Repo repo )
     {
         if( _deleteBeforeBuild.Length == 0 ) return true;
+        using var _ = monitor.OpenTrace( $"Deleting the content configured by '{XNames.DeleteBeforeBuild}'." );
+        // "ckli plugin set" refuses an invalid entry, but the World definition file can be edited by hand.
+        if( !CheckEntries( monitor, _deleteBeforeBuild ) ) return false;
         var root = repo.WorkingFolder;
         var git = repo.GitRepository.Repository;
         bool success = true;
-        using var _ = monitor.OpenTrace( $"Deleting the content configured by '{XNames.DeleteBeforeBuild}'." );
         foreach( var e in _deleteBeforeBuild )
         {
             int iSep = e.LastIndexOf( '/' );
@@ -112,27 +150,37 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
         return success;
     }
 
-    // An entry must stay inside the working folder: it is a relative path and cannot climb out of it.
-    // Rooted and "..' entries are rejected here rather than at delete time so that a mistake in the World
-    // file is reported once, when the plugin is instantiated.
-    static ImmutableArray<string> ParseDeleteBeforeBuild( string? configuration )
+    // Splitting cannot fail: the constructor has no monitor, and a typo in the World definition file must not
+    // fail the plugin instantiation (that degrades the World to "working without plugins"). Validation is done
+    // where a monitor is available: "ckli plugin set" refuses an invalid value, and DeleteBeforeBuild fails the
+    // build of a World file that was edited by hand.
+    static ImmutableArray<string> SplitDeleteBeforeBuild( string? configuration )
     {
         if( string.IsNullOrWhiteSpace( configuration ) ) return ImmutableArray<string>.Empty;
         var b = ImmutableArray.CreateBuilder<string>();
         foreach( var raw in configuration.Split( ';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries ) )
         {
-            var e = new NormalizedPath( raw );
-            if( e.IsRooted || e.Parts.Contains( ".." ) )
-            {
-                Throw.ArgumentException( nameof( configuration ),
-                                         $"""
-                                          Invalid <Build {XNames.DeleteBeforeBuild}="..." /> entry '{raw}': an entry must be
-                                          relative to the repository's working folder and cannot contain '..'.
-                                          """ );
-            }
-            b.Add( e.Path );
+            b.Add( new NormalizedPath( raw ).Path );
         }
         return b.DrainToImmutable();
+    }
+
+    // An entry must stay inside the working folder: it is a relative path and cannot climb out of it.
+    static bool CheckEntries( IActivityMonitor monitor, ImmutableArray<string> entries )
+    {
+        bool valid = true;
+        foreach( var e in entries )
+        {
+            if( e.StartsWith( '/' ) || new NormalizedPath( e ).Parts.Contains( ".." ) )
+            {
+                monitor.Error( $"""
+                    Invalid '{XNames.DeleteBeforeBuild}' entry '{e}': an entry is relative to the repository's
+                    working folder and cannot be rooted nor contain '..'.
+                    """ );
+                valid = false;
+            }
+        }
+        return valid;
     }
 
     /// <summary>

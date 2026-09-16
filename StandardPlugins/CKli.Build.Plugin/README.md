@@ -69,13 +69,29 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
 `BuildPlugin.cs` (the `build`/`publish`/`*build`/`*publish` commands and the core build call), `BuildPlugin.Fix.cs`
 (`fix build`/`fix publish`), `BuildPlugin.Rebuild.cs` (`maintenance rebuild ...`), `BuildPlugin.Issues.cs` (the
 `World.Events.Issue` handler), and `BuildPlugin.RoadmapExecutor.cs` (the parallel build engine, a private nested class).
-Its behavior is driven by command parameters and by the plugins it depends on. The `<Build>` element of the World
-definition file carries one optional attribute, read by `RepositoryBuilderPlugin` (which shares that element: both
-types live in `CKli.Build.Plugin`):
+Its behavior is driven by command parameters and by the plugins it depends on, plus the one configuration attribute
+below.
+
+#### Configuration
+
+The `<Build>` element of the World definition file carries one optional attribute. It is read - and its
+`OnPluginSetAsync`/`PluginInfo` handling implemented - by `RepositoryBuilderPlugin`, which shares that element since
+both types live in `CKli.Build.Plugin`:
+
+```xml
+<Build DeleteBeforeBuild="$StObjGen" />
+```
 
 | Attribute | Default | What it does |
 |---|---|---|
-| `DeleteBeforeBuild` | *(empty)* | `;` separated list of git ignored files and folders that are deleted from a repository's working folder before it is built. See [Core build](#core-build-corebuildasync--repobuilder). |
+| `DeleteBeforeBuild` | *(empty)* | `;` separated list of git ignored files and folders that are deleted from a repository's working folder before it is built. See [`DeleteBeforeBuild`](#deletebeforebuild-not-reusing-what-a-previous-build-generated). |
+
+This is the only Standard Plugin attribute that is **not** a boolean. Like the others it is readable with
+[`ckli plugin info`](../../README.md#plugin-info) - which echoes the configured entries - and writable with
+[`ckli plugin set DeleteBeforeBuild "$StObjGen"`](../../README.md#plugin-set-name-value) or
+`ckli plugin unset DeleteBeforeBuild`, without editing the World definition file by hand. Entries are validated
+before being written, so an entry that escapes the working folder cannot be persisted into a configuration that
+would then fail every build.
 
 It subscribes to one lifecycle event:
 
