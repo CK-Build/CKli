@@ -225,28 +225,33 @@ public static class ScreenExtensions
         IRenderable display = s.Text( headerText );
         if( infos != null )
         {
-            // Layout:
-            // > ShortName       | <Xml>                
-            // |   TextStatus    |                      
-            // |   Version       |                      
+            // Layout: a 2 columns table, so that the ShortName and the Xml align across the plugins.
+            // > ShortName       | <Xml>
+            // |   TextStatus    |
+            // |   Version       |
             // | Message:
             // |    <Message>
+            //
+            // The "Message:" row takes the whole line. Nothing declares that: TableLayout splits a row
+            // into cells only when it is a HorizontalContent (see its ApplyHOrV), and this row is a
+            // VerticalContent - the "Message:" label above the message itself - so it is a single cell.
 
             display = display.AddBelow(
                 s.EmptyString,
-                infos.Select(
-                    i => new Collapsable( s.Text( i.ShortName )
-                                           .AddBelow(
-                                               s.Text( i.Status.GetTextStatus() ).Box( i.Status.GetStatusColor() )
-                                                .AddBelow( s.Text( i.Version?.Version?.ToString() ?? "<source>", TextEffect.Italic ) )
-                                                .Box( paddingLeft: 3 ) )
-                                           .Box( paddingRight: 3 )
-                                           .AddRight( s.Text( i.Configuration?.ToString() ).Collapsable() )
-                                           .AddBelow( i.Message != null
-                                                        ? s.Text( "Message:", ConsoleColor.DarkYellow )
-                                                           .AddBelow( i.Message.Box( paddingLeft: 3, foreColor: ConsoleColor.Yellow ) )
-                                                        : null ) ) )
-                );
+                s.Unit.AddBelow(
+                        infos.Select(
+                            i => new Collapsable( s.Text( i.ShortName )
+                                                   .AddBelow(
+                                                       s.Text( i.Status.GetTextStatus() ).Box( i.Status.GetStatusColor() )
+                                                        .AddBelow( s.Text( i.Version?.Version?.ToString() ?? "<source>", TextEffect.Italic ) )
+                                                        .Box( paddingLeft: 3 ) )
+                                                   .Box( paddingRight: 3 )
+                                                   .AddRight( s.Text( i.Configuration?.ToString() ).Collapsable() )
+                                                   .AddBelow( i.Message != null
+                                                                ? s.Text( "Message:", ConsoleColor.DarkYellow )
+                                                                   .AddBelow( i.Message.Box( paddingLeft: 3, foreColor: ConsoleColor.Yellow ) )
+                                                                : null ) ) ) )
+                      .TableLayout() );
         }
         screen.Display( display );
     }

@@ -39,9 +39,9 @@ public class PluginTests
                 1 loaded plugins, 1 configured plugins.
 
                 > MyFirstOne     > <MyFirstOne />
-                │    Available   │ 
-                │    <source>    │ 
-                │ Message:
+                │    Available                   
+                │    <source>                    
+                │ Message:                            
                 │    Message from 'MyFirstOne' plugin.
                 ❰✓❱
 
@@ -57,9 +57,9 @@ public class PluginTests
             1 loaded plugins, 1 configured plugins. (CompileMode: Debug)
 
             > MyFirstOne     > <MyFirstOne />
-            │    Available   │ 
-            │    <source>    │ 
-            │ Message:
+            │    Available                   
+            │    <source>                    
+            │ Message:                            
             │    Message from 'MyFirstOne' plugin.
             ❰✓❱
 
@@ -71,20 +71,21 @@ public class PluginTests
         display.Clear();
         // ckli plugin info
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "info" )).ShouldBeTrue();
-        // We don't have a ColSpan capability in TableLayout yet. Here the Message should be in a "cell" with ColSpan: 2.
+        // The Message row spans the 2 columns: TableLayout gives the whole width to a row
+        // that is not a HorizontalContent.
         display.ToString().ShouldBe( """
             2 loaded plugins, 2 configured plugins. (CompileMode: Debug)
 
-            > MyFirstOne     > <MyFirstOne />
-            │    Available   │ 
-            │    <source>    │ 
-            │ Message:
-            │    Message from 'MyFirstOne' plugin.
+            > MyFirstOne                > <MyFirstOne />             
+            │    Available                                           
+            │    <source>                                            
+            │ Message:                                               
+            │    Message from 'MyFirstOne' plugin.                   
             > MySecondOneWithLongName   > <MySecondOneWithLongName />
-            │    Available              │ 
-            │    <source>               │ 
-            │ Message:
-            │    Message from 'MySecondOneWithLongName' plugin.
+            │    Available                                           
+            │    <source>                                            
+            │ Message:                                               
+            │    Message from 'MySecondOneWithLongName' plugin.      
             ❰✓❱
 
             """ );
@@ -103,10 +104,10 @@ public class PluginTests
                 1 loaded plugins, 1 configured plugins. (CompileMode: Debug)
 
                 > MySecondOneWithLongName   > <MySecondOneWithLongName />
-                │    Available              │ 
-                │    <source>               │ 
-                │ Message:
-                │    Message from 'MySecondOneWithLongName' plugin.
+                │    Available                                           
+                │    <source>                                            
+                │ Message:                                               
+                │    Message from 'MySecondOneWithLongName' plugin.      
                 ❰✓❱
 
                 """ );
