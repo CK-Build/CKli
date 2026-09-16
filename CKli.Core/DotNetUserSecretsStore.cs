@@ -5,6 +5,7 @@ using System.IO;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace CKli.Core;
 
@@ -13,10 +14,17 @@ namespace CKli.Core;
 /// <para>
 /// Note that the Id is <see cref="CKliRootEnv.InstanceName"/> by default.
 /// </para>
+/// <para>
+/// This is thread safe: the store is read concurrently (a parallel fetch resolves the credentials of each
+/// repository it fetches).
+/// </para>
 /// </summary>
 public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
 {
     static string? _secretFilePath;
+    // Guards _secretFilePath and the lazily loaded document. Static because _secretFilePath is: the
+    // document itself is instance state but there is one store per process (a test may create another).
+    static readonly Lock _lock = new Lock();
 
     readonly string? _userSecretsId;
     // No Empty pattern. https://github.com/dotnet/runtime/issues/59303
@@ -49,22 +57,28 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
     {
         Throw.CheckNotNullArgument( keys );
         Throw.CheckArgument( keys.Any() && keys.All( k => !string.IsNullOrWhiteSpace( k ) ) );
-        var d = TryLoadDocument( monitor );
-        if( d != null )
+        // The load and the read are exclusive: TryLoadDocument sets _documentLoaded before it parses, so a
+        // concurrent reader would see a null document and conclude that the secret is not registered. It also
+        // disposes the document when reloading it, which must not happen under a reader.
+        lock( _lock )
         {
-            try
+            var d = TryLoadDocument( monitor );
+            if( d != null )
             {
-                foreach( var key in keys )
+                try
                 {
-                    if( d.RootElement.TryGetProperty( key, out var vE ) )
+                    foreach( var key in keys )
                     {
-                        return vE.GetString();
+                        if( d.RootElement.TryGetProperty( key, out var vE ) )
+                        {
+                            return vE.GetString();
+                        }
                     }
                 }
-            }
-            catch( Exception ex )
-            {
-                monitor.Error( "While reading user secrets store.", ex );
+                catch( Exception ex )
+                {
+                    monitor.Error( "While reading user secrets store.", ex );
+                }
             }
         }
         var failed = keys.Reverse().ToList();
@@ -88,8 +102,10 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
         return null;
     }
 
+    // The lock must be held: this reads and updates _secretFilePath and the cached document.
     JsonDocument? TryLoadDocument( IActivityMonitor monitor )
     {
+        Throw.DebugAssert( _lock.IsHeldByCurrentThread );
         _secretFilePath ??= PathHelper.GetSecretsPathFromSecretsId( _userSecretsId ?? CKliRootEnv.InstanceName );
         // A test harness registers and removes secrets while the process runs (a test that pushes must set
         // the FILESYSTEM_GIT one and clear it afterwards): the cached document must then be dropped or the

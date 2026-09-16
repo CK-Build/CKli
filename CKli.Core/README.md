@@ -256,6 +256,19 @@ character outside `A-Z0-9_` replaced by `_`: `https://github.com/CK-Build/CKli` 
 `GITHUB_CK_BUILD_READ_PAT`. A `file://` url is the exception: its key is the bare `FILESYSTEM_GIT` with no suffix
 (`IsPublic` is null, so read and write name the same key).
 
+Access keys are **interned in a process wide cache** keyed by `(ISecretsStore, PrefixPAT)` — the store is part of the
+key because a key caches the credentials it resolved from the store it was created with, so sharing by prefix alone
+would silently bind every later key of a prefix to the first caller's store.
+
+That cache, the credentials cached on a key, and `DotNetUserSecretsStore`'s parsed document are each **guarded by a
+lock**, because every parallel command resolves them concurrently: `ckli fetch`, `ckli pull`, the clone path and
+`ckli deps update` walk the World through an `ActivityMonitorAsyncPool`, and each repository's fetch reads its
+`AccessKey` and asks it for read credentials. Unsynchronized, one shared prefix — a World is usually one owner — meant
+every one of those threads racing on a single `Dictionary` entry. Everything the lock protects is resolved once per
+prefix and then cached, so the cost is a startup blip on an operation that is about to hit the network, and it is also
+what makes the store be asked once rather than once per concurrent repository (hence one `dotnet user-secrets set`
+message instead of one per repository).
+
 The [root README](../README.md#private--public-stack-and-repositories) documents this from the user's side.
 
 ### Pushing: `local/` and `building/` references never reach a remote

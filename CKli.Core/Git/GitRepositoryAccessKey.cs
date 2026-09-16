@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace CKli.Core;
 
@@ -20,6 +21,10 @@ namespace CKli.Core;
 /// Externally, this can only be obtained through the <see cref="GitRepositoryKey.AccessKey"/> and to support
 /// externally resolved access keys, the static <see cref="GitRepositoryKey.CreateAccessKey"/> method can be used.
 /// </para>
+/// <para>
+/// This is thread safe: a parallel fetch resolves the access key of each repository it fetches, so the shared
+/// cache below and the lazy fields that hang from it are reached concurrently.
+/// </para>
 /// </summary>
 sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
 {
@@ -35,29 +40,43 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
     string? _toString;
 
     static readonly Dictionary<(ISecretsStore Store, string Prefix), GitRepositoryAccessKey> _accessKeys = [];
+    // Guards _accessKeys and the lazy _readCreds, _writeCreds and _revertedAccessKey of its instances.
+    // One lock for all of them: everything it protects is resolved once per PrefixPAT and then cached, so
+    // the contention is a startup blip on an operation that is about to hit the network anyway. Keeping the
+    // credentials under it also means the secrets store - which logs how to register a secret it misses - is
+    // asked once instead of once per concurrent repository.
+    static readonly Lock _lock = new Lock();
 
     internal static GitRepositoryAccessKey GetFileSystemAccessKey( ISecretsStore secretsStore )
     {
-        if( !_accessKeys.TryGetValue( (secretsStore, GitRepositoryKey.FileSystemPrefixPAT), out var exists ) )
+        lock( _lock )
         {
-            exists = new GitRepositoryAccessKey( GitRepositoryKey.FileSystemPrefixPAT,
-                                                 secretsStore,
-                                                 isPublic: null,
-                                                 key => new GitHosting.Providers.FileSystemProvider( key ) );
-            _accessKeys.Add( (secretsStore, GitRepositoryKey.FileSystemPrefixPAT), exists );
+            if( !_accessKeys.TryGetValue( (secretsStore, GitRepositoryKey.FileSystemPrefixPAT), out var exists ) )
+            {
+                exists = new GitRepositoryAccessKey( GitRepositoryKey.FileSystemPrefixPAT,
+                                                     secretsStore,
+                                                     isPublic: null,
+                                                     key => new GitHosting.Providers.FileSystemProvider( key ) );
+                _accessKeys.Add( (secretsStore, GitRepositoryKey.FileSystemPrefixPAT), exists );
+            }
+            return exists;
         }
-        return exists;
     }
 
     internal static IGitRepositoryAccessKey Get( ISecretsStore secretsStore, Uri url, bool isPublic )
     {
         Throw.DebugAssert( GitRepositoryKey.GetRepositoryUrlError( url ) == null );
-        var p = FindOrCreate( secretsStore, url, firstIsPublic: isPublic );
-        return isPublic ? p.ToPublicAccessKey() : p.ToPrivateAccessKey();
+        lock( _lock )
+        {
+            var p = FindOrCreate( secretsStore, url, firstIsPublic: isPublic );
+            return isPublic ? p.ToPublicAccessKey() : p.ToPrivateAccessKey();
+        }
     }
 
+    // The lock must be held: this reads and updates _accessKeys.
     static GitRepositoryAccessKey FindOrCreate( ISecretsStore secretsStore, Uri url, bool firstIsPublic )
     {
+        Throw.DebugAssert( _lock.IsHeldByCurrentThread );
         // Exit early for file://.
         if( url.Scheme == Uri.UriSchemeFile )
         {
@@ -281,27 +300,33 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
             creds = null;
             return true;
         }
-        if( _readCreds == null )
+        lock( _lock )
         {
-            var pat = _secretsStore.TryGetRequiredSecret( monitor, WritePATKeyName, ReadPATKeyName );
-            _readCreds = pat != null
-                            ? new UsernamePasswordCredentials() { Username = "CKli", Password = pat }
-                            : null;
+            if( _readCreds == null )
+            {
+                var pat = _secretsStore.TryGetRequiredSecret( monitor, WritePATKeyName, ReadPATKeyName );
+                _readCreds = pat != null
+                                ? new UsernamePasswordCredentials() { Username = "CKli", Password = pat }
+                                : null;
+            }
+            creds = _readCreds;
         }
-        creds = _readCreds;
         return creds != null;
     }
 
     public bool GetWriteCredentials( IActivityMonitor monitor, [NotNullWhen( true )] out UsernamePasswordCredentials? creds )
     {
-        if( _writeCreds == null )
+        lock( _lock )
         {
-            var pat = _secretsStore.TryGetRequiredSecret( monitor, WritePATKeyName );
-            _writeCreds = pat != null
-                            ? new UsernamePasswordCredentials() { Username = "CKli", Password = pat }
-                            : null;
+            if( _writeCreds == null )
+            {
+                var pat = _secretsStore.TryGetRequiredSecret( monitor, WritePATKeyName );
+                _writeCreds = pat != null
+                                ? new UsernamePasswordCredentials() { Username = "CKli", Password = pat }
+                                : null;
+            }
+            creds = _writeCreds;
         }
-        creds = _writeCreds;
         return creds != null;
     }
 
@@ -309,7 +334,13 @@ sealed partial class GitRepositoryAccessKey : IGitRepositoryAccessKey
 
     public IGitRepositoryAccessKey ToPrivateAccessKey() => _isPublic is null or false ? this : GetRevertedAccessKey();
 
-    IGitRepositoryAccessKey GetRevertedAccessKey() => _revertedAccessKey ??= new RevertedKey( this );
+    IGitRepositoryAccessKey GetRevertedAccessKey()
+    {
+        lock( _lock )
+        {
+            return _revertedAccessKey ??= new RevertedKey( this );
+        }
+    }
 
     static string AccessKeyToString( string prefix, bool isPublic )
     {
