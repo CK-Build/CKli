@@ -47,16 +47,17 @@ sealed class ConsoleScreen : IScreen
 
     public void ScreenLog( LogLevel level, string message )
     {
-        if( level == LogLevel.Warn )
+        // Same 3 levels as ScreenType.CreateLog (used by the Ansi and String screens): a Info tagged with
+        // ScreenType.CKliScreenTag reaches here and must not be labeled as an error.
+        var head = level switch
         {
-            Console.Write( "Warning: " );
-        }
-        else
-        {
-            Console.Write( "Error: " );
-        }
+            > LogLevel.Warn => "Error: ",
+            LogLevel.Warn => "Warning: ",
+            _ => "Info: "
+        };
+        Console.Write( head );
         var b = new StringBuilder();
-        b.AppendMultiLine( "         ", message, prefixOnFirstLine: false );
+        b.AppendMultiLine( new string( ' ', head.Length ), message, prefixOnFirstLine: false );
         Console.Out.WriteLine( b.ToString() );
     }
 
