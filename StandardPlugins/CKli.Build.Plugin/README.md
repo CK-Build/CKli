@@ -109,7 +109,7 @@ All build-family commands share a common set of options (declared once as `const
 | `--branch,-b <name>` | Branch to consider. Defaults to the current HEAD (a `dev/` prefix is stripped); if multiple pivot Repos are selected and their checked-out branches differ, it must be specified explicitly. |
 | `--max-dop <n>` (positional `maxDop`) | Maximal degree of parallelism for the build. Defaults to 4. |
 | `--ci` | Build CI (`dev/` branch) versions instead of regular exploratory/prerelease/stable versions. |
-| `--ci.0` | Extends `--ci`: forces a `ci.0` version even when a regular version is already available on the commit. |
+| `--ci.0` | Extends `--ci`: forces a CI version even when a *published* regular version is already available on the commit. It is not needed to switch a pending `local/` release to CI - plain `--ci` rolls that one (see `RollingLocal` below). |
 | `skipTests` | Don't run tests even if they never ran locally on the commit (ignored - with a warning - for non-CI builds). |
 | `forceTests` | Run tests even if they already ran successfully on the commit. Mutually exclusive with `skipTests`. |
 | `--dry-run,-d` | Only compute and display the roadmap; no build/publish is performed (`OnRoadmapBuild` is still raised, with `Roadmap.DryRun == true`). |
@@ -307,7 +307,27 @@ For every `HotGraph.Solution` (ordered topologically, `OrderedSolutions`), a `Ro
 | `FakeVersion` / `DeprecatedVersion` | The last built version tag is a `+fake` or `+deprecated` marker - never "skippable". |
 | `DependencyUpdate` | A package reference must move to a version coming from `<VersionTag>` plugin configuration or from cross-repo discrepancy resolution ("C"/"D" updates - "U" updates from already-built upstream packages are, by themselves, skippable). |
 | `CodeChange` | The commit's own code changed since the last build (conventional-commit/version-tag driven). |
-| `CI0` | `--ci.0` is used, there is no other reason to build, and the last version is not yet a CI build on this commit - forces a `ci.0` rebuild. |
+| `CI0` | `--ci.0` is used, there is no other reason to build, and the last version is a *published* non-CI build with no `ci.0` yet on this commit - forces a `ci.0` rebuild, opening a new version line above the published one. |
+| `RollingLocal` | A CI build is asked for (plain `--ci` is enough), there is no other reason to build, and the last version is a non-CI build still pending as a `local/`/`building/` release - the CI version takes its place on the same commit. |
+
+`CI0` and `RollingLocal` are the two halves of "the commit already carries a version, build it in CI anyway", split
+on whether that version is published. Both are guarded by `buildReason == None`, so each can only ever be the *sole*
+reason to build.
+
+**Why `RollingLocal` needs no flag.** A pending `local/` release is unpublished by construction: nothing consumed it,
+so there is no version line to protect. `TagCommit.CanBearVersion` already sanctions exactly this - its "rolling local
+build" case (`IsBuildingOrLocal && Version.BranchName == version.BranchName`) lets the CI version take the commit, and
+`ApplyReleaseBuildTag` destroys the old one through `DestroyLocalReleases`. Before `RollingLocal` existed that
+permission was simply never exercised from `--ci`: no reason to build was ever produced, `--ci` answered *"There is
+nothing to build"* and returned true, and only `--ci.0` got there. A developer who ran a regular `ckli build` by
+mistake had no way to learn that. Destroying the pending release is a side effect the user did not name, so the
+roadmap `monitor.Warn`s it - only when `RollingLocal` is the sole reason, since superseding a `local/` release while
+building for any other reason is the ordinary rolling local build and needs no warning.
+
+A *published* version is the opposite case: it cannot be reclaimed, `--ci.0` opens `vX.Y.(Z+1)--ci.0` above it and
+leaves the published tag alone. When a plain `--ci` roadmap comes out empty and some commits are in that situation,
+the summary names the option: *"(Use '--ci.0' to build a CI version from the N repositories that already carry a
+released version.)"* (`BuildSolution.IsCIForceCandidate` feeds `RStats.ciForceCandidateCount`).
 
 When `MustBuildReason.None`, the build is skipped and the `BuildSolution.BuildInfo.TargetVersion` is simply the last
 built version (so downstream solutions still see a consistent version). Otherwise `BuildInfo.TargetVersion` is computed
@@ -320,7 +340,7 @@ null while that initialization runs).
 
 A solution can also be entirely **out of scope**: with `*build`/`*publish` pivots include upstream producers
 (`isPullBuild: true`); with plain `build`/`publish`, a non-pivot solution whose only reason to build would be a
-skippable one (`CodeChange`/`DependencyUpdate`("U")/`CI0`) is left un-built - this is the only place the "star" vs
+skippable one (`CodeChange`/`DependencyUpdate`("U")/`CI0`/`RollingLocal`) is left un-built - this is the only place the "star" vs
 non-star distinction actually changes the outcome (`canSkip` in `BuildSolution.Initialize`). Skipping therefore only
 ever happens in the non-star, has-pivots case: `*build`/`*publish` and a stack-root/`--all` roadmap (where no solution
 is a pivot) never skip anything.

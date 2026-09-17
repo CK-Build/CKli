@@ -150,6 +150,16 @@ public sealed partial class Roadmap
                 if( !canSkip )
                 {
                     UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, ref buildReason );
+                    // Destroying a pending release is a side effect the user did not name: say so. This can only
+                    // be reached when RollingLocal is the sole reason to build - when anything else triggers the
+                    // build, superseding the local release is the ordinary "rolling local build" and needs no warning.
+                    if( (buildReason & MustBuildReason.RollingLocal) != 0 )
+                    {
+                        monitor.Warn( $"""
+                            '{_solution}' has a pending local release '{_lastBuild.Tag.FriendlyName}' that no publication consumed.
+                            Building it in CI takes its place on the same commit: the pending release is destroyed.
+                            """ );
+                    }
                 }
                 if( buildReason == MustBuildReason.None )
                 {
@@ -300,14 +310,30 @@ public sealed partial class Roadmap
                 {
                     buildReason |= MustBuildReason.DependencyUpdate;
                 }
-                // We don't want the "CI0" to appear if any other reason exists (this is particularly true
-                // when any dependency update must be done because a new commit will be created and this will
-                // be a "regular" "ci.1" version.
+                // Neither "CI0" nor "RollingLocal" should appear if any other reason exists (this is
+                // particularly true when any dependency update must be done because a new commit will be
+                // created and this will be a "regular" "ci.1" version). Both are therefore guarded by
+                // "buildReason == None", which also means they can only ever be the SOLE reason to build.
+                //
+                // A pending "local/" (or "building/") release is unpublished: nothing consumed it, and
+                // TagCommit.CanBearVersion's "rolling local build" case already allows a CI version to take
+                // its place on the same commit (ApplyReleaseBuildTag destroys it). So a plain "--ci" rolls it
+                // - a developer who ran a regular build by mistake is not stuck with it.
+                if( buildReason == MustBuildReason.None
+                    && ciBuildMode != CIBuildMode.None
+                    && !lastBuild.TagCommit.Version.IsCI
+                    && lastBuild.TagCommit.IsBuildingOrLocal )
+                {
+                    buildReason |= MustBuildReason.RollingLocal;
+                }
+                // A PUBLISHED version cannot be reclaimed: a CI build on its commit opens a new version line
+                // above it, which is a decision - hence "--ci.0" and not "--ci".
                 if( buildReason == MustBuildReason.None
                     && ciBuildMode == CIBuildMode.CIForce
                     && !lastBuild.TagCommit.Version.IsCI
                     && lastBuild.TagCommit.CI0VersionTag == null )
                 {
+                    Throw.DebugAssert( "The local case is handled by RollingLocal above.", !lastBuild.TagCommit.IsBuildingOrLocal );
                     buildReason |= MustBuildReason.CI0;
                 }
             }
@@ -492,6 +518,20 @@ public sealed partial class Roadmap
         /// Gets the publishable status of this solution.
         /// </summary>
         public PublishableStatus PublishableStatus => _publishable;
+
+        /// <summary>
+        /// Gets whether this solution is not built but a "--ci.0" would build it: its last build is a PUBLISHED
+        /// non-CI version and no ci.0 has been produced from its commit yet.
+        /// <para>
+        /// A pending "local/" release is deliberately not a candidate: <see cref="MustBuildReason.RollingLocal"/>
+        /// means a plain "--ci" already builds it, so it never reaches an empty roadmap.
+        /// </para>
+        /// </summary>
+        internal bool IsCIForceCandidate => _buildInfo != null
+                                            && !_buildInfo.MustBuild
+                                            && !_lastBuild.TagCommit.Version.IsCI
+                                            && !_lastBuild.TagCommit.IsBuildingOrLocal
+                                            && _lastBuild.TagCommit.CI0VersionTag == null;
 
         internal IRenderable ToRenderable(  ref BuildIndexAndRankDisplayState head, ref RStats stats )
         {

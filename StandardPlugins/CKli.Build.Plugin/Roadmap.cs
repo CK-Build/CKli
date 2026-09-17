@@ -280,6 +280,7 @@ public sealed partial class Roadmap
                             bool isPublish,
                             PublishableStatus publishableStatus,
                             int directPublishCount,
+                            int ciForceCandidateCount,
                             IEnumerable<BuildSolution> buildingPending )
     {
         IRenderable? _uDepHead;
@@ -324,6 +325,15 @@ public sealed partial class Roadmap
                 if( _uDepHead != null )
                 {
                     r = r.AddBelow( _uDepHead.AddRight( screen.Text( $"{UDepUpdates} update{(UDepUpdates > 1 ? "s" : "")} from upstreams left pending in skipped repositories." ) ) );
+                }
+                // Nothing to build in "--ci" while some commits already carry a released non-CI version: without
+                // this the user has no way to learn that "--ci.0" is what builds a CI version from them.
+                if( ciForceCandidateCount > 0 )
+                {
+                    var what = ciForceCandidateCount > 1
+                                ? $"the {ciForceCandidateCount} repositories that already carry"
+                                : "the repository that already carries";
+                    r = r.AddBelow( screen.Text( $"(Use '--ci.0' to build a CI version from {what} a released version.)", TextEffect.Italic ) );
                 }
                 if( !isPullBuild && hasPivots )
                 {
@@ -399,6 +409,11 @@ public sealed partial class Roadmap
                                 _mustPublish,
                                 _publishable,
                                 _directPublishCount,
+                                // Only a plain "--ci" can be told about "--ci.0": in CIForce mode the user already
+                                // used it, and in non-CI mode a CI version is not what is being asked for.
+                                _ciBuildMode == CIBuildMode.CI
+                                    ? _orderedSolutions.Count( s => s.IsCIForceCandidate )
+                                    : 0,
                                 _buildSolutions.Where( s => s.PublishableStatus == PublishableStatus.BuildingPending ) );
         var renderables = ImmutableArray.CreateBuilder<IRenderable>( _orderedSolutions.Length );
 
