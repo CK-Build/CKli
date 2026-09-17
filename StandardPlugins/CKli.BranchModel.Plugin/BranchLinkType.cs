@@ -49,10 +49,16 @@ public enum BranchLinkType
 public static class BranchLinkTypeExtensions
 {
     /// <summary>
-    /// Gets the string associate to link type.
+    /// Gets the compact code that renders this link type in a branch tree.
+    /// <para>
+    /// This is a DISPLAY only form (<see cref="BranchNamespace.GetDisplayTree()"/> and
+    /// <see cref="BranchName.ToParentedString()"/> use it): the configuration and the commands both spell
+    /// the link type by its name (see <see cref="TryMatchLinkType(ref ReadOnlySpan{char}, out BranchLinkType)"/>),
+    /// so this never has to be typed nor parsed.
+    /// </para>
     /// </summary>
     /// <param name="linkType">This type.</param>
-    /// <returns>The string.</returns>
+    /// <returns>The code string.</returns>
     public static string ToCodeString( this BranchLinkType linkType ) => linkType switch
     {
         BranchLinkType.Full => "=>",
@@ -61,45 +67,6 @@ public static class BranchLinkTypeExtensions
         BranchLinkType.Manual => "|✋",
         _ => ""
     };
-
-    /// <summary>
-    /// Tries to match and forward the code for a <see cref="BranchLinkType"/>.
-    /// </summary>
-    /// <param name="h">This head.</param>
-    /// <param name="t">The matched type.</param>
-    /// <returns>True on success, false on error.</returns>
-    public static bool TryMatchLinkTypeCode( this ref ReadOnlySpan<char> h, out BranchLinkType t )
-    {
-        var savedH = h;
-        t = BranchLinkType.None;
-        if( h.TryMatch( '|' ) )
-        {
-            if( h.TryMatch('>') )
-            {
-                t = BranchLinkType.Release;
-                return true;
-            }
-            if( h.TryMatch( '✋' ) )
-            {
-                t = BranchLinkType.Manual;
-                return true;
-            }
-        }
-        else if( h.TryMatch( "=>" ) )
-        {
-            t = BranchLinkType.Full;
-            return true;
-        }
-        else if( h.TryMatch( "->" ) )
-        {
-            t = BranchLinkType.CI;
-            return true;
-        }
-        h = savedH;
-        return false;
-    }
-
-
 
     /// <summary>
     /// Calls <see cref="TryMatchLinkType(ref ReadOnlySpan{char}, out BranchLinkType)"/> and

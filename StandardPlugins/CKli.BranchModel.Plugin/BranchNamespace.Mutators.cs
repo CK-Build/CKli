@@ -12,7 +12,10 @@ public sealed partial class BranchNamespace
     /// <summary>
     /// Creates a new namespace with a new or updated branch name.
     /// </summary>
-    /// <param name="linkType">The link type.</param>
+    /// <param name="linkType">
+    /// The optional link type. Defaults to <see cref="BranchLinkType.CI"/> for a new branch.
+    /// When updating an existing branch, the current link type is unchanged when this is not specified.
+    /// </param>
     /// <param name="prerelease">
     /// The prerelease to consider.
     /// Must be between <see cref="CSVersionKind.Alpha"/> and <see cref="CSVersionKind.Zulu"/>.
@@ -24,6 +27,14 @@ public sealed partial class BranchNamespace
 
         var branchName = prerelease.ToBranchName();
         if( _ltsName != null ) branchName = _ltsName + '/' + branchName;
+
+        // BranchLinkType.None is "not specified": only the Root branch can have it, since a <Prerelease>
+        // element always writes a Link. Like AddOrUpdateExplo, an already opened branch keeps its link type
+        // and a new one defaults to CI.
+        if( linkType is BranchLinkType.None )
+        {
+            linkType = _byName.TryGetValue( branchName, out var exists ) ? exists.LinkType : BranchLinkType.CI;
+        }
 
         return Rebuild( _ltsName,
                         _root,
@@ -148,6 +159,9 @@ public sealed partial class BranchNamespace
         int mainLineCount = 1;
         foreach( var (type, kind, name) in mainLine )
         {
+            // Only the Root branch can have BranchLinkType.None: a <Prerelease> element always writes its
+            // Link attribute and None is not one of the 4 link type names.
+            Throw.CheckArgument( "A main line branch must have a link type.", type is not BranchLinkType.None );
             Throw.DebugAssert( ltsName == null
                                || name.StartsWith( ltsName )
                                   && name.Length > ltsName.Length + 1
@@ -193,7 +207,7 @@ public sealed partial class BranchNamespace
                 var parent = root.Name == parentName
                                 ? root
                                 : branches.Last( b => b.Name.CompareTo( parentName, StringComparison.Ordinal ) >= 0 );
-                roots.Add( ToXml( name, type, parent.Name ) );
+                roots.Add( ToXml( name, type, parent.Name, XNames.Explo ) );
             }
         }
         if( sub != null )
@@ -208,7 +222,7 @@ public sealed partial class BranchNamespace
                     var parent = Find( roots, candidate.P );
                     if( parent != null )
                     {
-                        parent.Add( ToXml( candidate.N, candidate.T, null ) );
+                        parent.Add( ToXml( candidate.N, candidate.T, null, XNames.Explo ) );
                         sub.RemoveAt( sub.Count - 1 );
                         atLeastOne = true;
                     }

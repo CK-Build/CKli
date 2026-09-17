@@ -57,12 +57,11 @@ public sealed partial class VersionTagPlugin
         var ns = _branchModel.BranchNamespace.CreateForLTS( e.LTSName );
         var branchModelConfig = e.LTSDefinition.Ensure( Core.XNames.Plugins )
                                                .Ensure( _branchModel.PluginInfo.GetXName() );
-        branchModelConfig.SetAttributeValue( BranchModel.Plugin.XNames.MainLine, ns.GetMainLine() );
-        // The cloned <Explo> elements name branches that this root-only main line no longer has: their
-        // Parent would not resolve and the new World would fail to load. GetExplo() is empty here: this
-        // removes the clone's elements, it doesn't replace them.
-        branchModelConfig.Elements( BranchModel.Plugin.XNames.Explo ).Remove();
-        branchModelConfig.Add( ns.GetExplo() );
+        // WriteConfiguration replaces the <Prerelease> AND <Explo> elements: the cloned ones name branches
+        // that this root-only namespace no longer has (an <Explo> Parent would not resolve and the new World
+        // would fail to load). Both sets are empty here, so this removes the clone's elements without
+        // replacing them, and any other attribute of the clone (AutoFixUselessBranch) is kept.
+        ns.WriteConfiguration( branchModelConfig );
     }
 
     /// <summary>

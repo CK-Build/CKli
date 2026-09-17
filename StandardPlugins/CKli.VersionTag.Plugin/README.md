@@ -257,11 +257,12 @@ The `dev/` check is a **tip-SHA comparison**, which is worth knowing when writin
 fake build harness never satisfies it, because the harness leaves the repositories' content — version tag included
 — on `dev/stable` with `stable` behind. An `LTSCreateTests` arrange therefore has to publish first.
 
-The new World's `<BranchModel>` keeps only its root branch (`BranchNamespace.CreateForLTS`): `MainLine` is written
-from `GetMainLine()` and the cloned `<Explo>` elements are replaced by `GetExplo()` (empty here). Both halves are
+The new World's `<BranchModel>` keeps only its root branch (`BranchNamespace.CreateForLTS`), written by a single
+`WriteConfiguration()` call: it sets `Root` and replaces the cloned `<Prerelease>` and `<Explo>` elements (both
+empty here), leaving `AutoFixUselessBranch` alone. Both halves are
 in the **configuration** form — without the `{LTSName}/` prefix — because `BranchNamespace` prepends that prefix
-itself when it reads back, and `ParseMainLine` rejects a name that does not match `^[a-z][0-9a-z_-]+`: an
-`@net8/stable` value makes the new World unloadable (`Invalid root branch name in BranchModel MainLine
+itself when it reads back, and the `Root` parser rejects a name that does not match `^[a-z][0-9a-z_-]+`: an
+`@net8/stable` value makes the new World unloadable (`Invalid Root branch name in BranchModel
 configuration`), and a leftover `<Explo>` is the same failure from the other side (its `Parent` no longer
 resolves). That form is `BranchName.ConfigurationName`, and it is what every BranchModel config writer uses —
 see `BranchModel/README.md`.

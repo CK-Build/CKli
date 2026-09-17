@@ -73,7 +73,7 @@ only for the root), a `LinkType` describing how it is kept in sync with its pare
 **`Name` is the actual git branch name; `ConfigurationName` is the same name without the
 `{LTSName}/` prefix, and it is the only one that may be written to the configuration.** They differ
 only in an LTS world, which is what makes getting it wrong easy and expensive: the `BranchNamespace`
-constructor *prepends* the prefix as it reads, and its `MainLine` parser requires
+constructor *prepends* the prefix as it reads, and its `Root` parser requires
 `^[a-z][0-9a-z_-]+`, so a prefixed `@net8/stable` written back is not merely re-prefixed — it is
 refused, and the world can no longer be loaded at all.
 
@@ -83,7 +83,7 @@ A **`BranchNamespace`** owns the whole tree for a World:
   World's `WorldName.LTSName` in an LTS world, e.g. `net8/stable`).
 - **`MainLineBranches`** — the root followed by the opened CSemVer pre-release branches
   (`alpha`..`zulu`), ordered from least to most stable, each with its own `LinkType`. This is what
-  the `MainLine` XML attribute encodes.
+  the `Root` XML attribute and the `<Prerelease>` elements encode.
 - **`ExploratoryBranches`** — `explo/name` branches, each anchored under a main-line branch or
   under another `explo/` branch (arbitrary nesting), configured as `<Explo>` child elements.
 
@@ -96,17 +96,25 @@ rather than mutating in place. `BranchModelPlugin` persists the result back to t
 
 ```xml
 <Plugins>
-  <BranchModel MainLine="stable |> beta -> rc" AutoFixUselessBranch="true">
+  <BranchModel Root="stable" AutoFixUselessBranch="true">
+    <Prerelease Name="beta" Link="Release" />
+    <Prerelease Name="rc" Link="CI" />
     <Explo Name="explo/spike-x" Parent="beta" Link="Manual" />
-    <Explo Name="explo/spike-x-sub" />  <!-- nested under explo/spike-x -->
+    <Explo Name="explo/spike-x-sub" Link="CI" />  <!-- nested under explo/spike-x -->
   </BranchModel>
 </Plugins>
 ```
 
-- **`MainLine`** (attribute, optional) — `"<root> <link> <prerelease> <link> <prerelease> ..."`.
-  Prereleases must be given in increasing CSemVer stability order and are conformant SVersion
-  prerelease names (`alpha`, `bravo`, ... `zulu`). Defaults to `"stable"` alone (only the root
-  branch open) when absent.
+- **`Root`** (attribute, optional) — the root branch name. Defaults to `"stable"` when absent. It is a
+  lowercase ASCII identifier (dash and underscore allowed) and cannot be a prerelease name nor `explo`.
+- **`<Prerelease Name="..." Link="...">`** — an opened prerelease branch. `Name` is a conformant
+  SVersion prerelease name (`alpha`, `bravo`, ... `zulu`). **Their order in the document is
+  irrelevant**: those names carry a total order, so the parent chain is a function of the names alone
+  and the parser sorts them (`AddOrUpdate` sorts the same way when it adds one). Only a *duplicate*
+  `Name` is an error — that is one branch with two link types. They are written back in decreasing
+  CSemVer stability order, which is the parent chain read top down. `Link` defaults to `CI`.
+  This is what separates them from `<Explo>`: an exploratory name carries no order, which is why that
+  element needs an explicit `Parent` (or XML nesting) and this one does not.
 - **`AutoFixUselessBranch`** (attribute, optional, default `true`) — when a branch's `dev/` exists
   but has nothing ahead of its base (a "useless" `dev/`), silently delete it instead of reporting
   it as an issue. This is a *plugin attribute*: `ckli plugin info` describes its current value and
@@ -124,11 +132,26 @@ rather than mutating in place. `BranchModelPlugin` persists the result back to t
   is required only on a *root* `<Explo>` (nested `<Explo>` elements inherit their XML parent).
   `Link` defaults to `CI`.
 
-`GetMainLine()` / `GetExplo()` serialize back to this same shape, using `BranchName.ConfigurationName`
-so the round trip holds in an LTS world too (`BranchNamespaceTests.lts_namespace_configuration_round_trips`
-pins it). `GetDisplayTree()` renders the whole tree indented for *display* and keeps the real branch
-names (`ckli issue` and friends use `ToParentedString()` for a single branch) — the two must not be
-confused: anything that ends up in a `<BranchModel>` element goes through the former.
+**`Link` is spelled by its name — `Manual`, `Release`, `CI` or `Full` — everywhere**: on a
+`<Prerelease>`, on an `<Explo>`, and as the `--link` option of `ckli branch open`. It is *always
+written back*, including the `CI` default: a World definition file states what is true instead of
+relying on a default its reader has to know. Reading stays tolerant, so a hand-written element that
+omits it is `CI`. `BranchLinkType.None` ("not specified") is the root branch's link type and nothing
+else: `AddOrUpdate` resolves it to the branch's current link type or to `CI` for a new branch, and
+`Rebuild` refuses it outright.
+
+The compact codes — `|✋` (Manual), `|>` (Release), `->` (CI), `=>` (Full) — are **display only**
+(`BranchLinkTypeExtensions.ToCodeString`). They are never stored and never parsed: `ckli branch list`
+and `ToParentedString()` are their only consumers. Three of the four contain a `>` that XML would
+escape, and the fourth is an emoji, which is why the configuration does not use them.
+
+`WriteConfiguration(XElement)` serializes back into this same shape — it sets `Root` and replaces the
+`<Prerelease>` and `<Explo>` elements, leaving any other attribute (`AutoFixUselessBranch`) untouched
+— using `BranchName.ConfigurationName` so the round trip holds in an LTS world too
+(`BranchNamespaceTests.lts_namespace_configuration_round_trips` pins it). `ToConfiguration()` is the
+same thing into a fresh element, and `ToString()` is that element. `GetDisplayTree()` renders the whole
+tree indented for *display* and keeps the real branch names — the two must not be confused: anything
+that ends up in a `<BranchModel>` element goes through the former.
 
 Reading is tolerant of both forms — an `<Explo>` `Name` or `Parent` may carry the `{LTSName}/` prefix
 or not — so an LTS world's hand-written configuration keeps working either way.
@@ -188,14 +211,18 @@ The relationship between a `GitBranch` and its `GitDevBranch` is captured by an 
 
 `BranchModelInfo.GetClosestExistingBranch` / `GetRequiredClosestExistingBranch` walk up `Parent`
 links to find the nearest branch that actually exists in Git — used whenever an operation needs
-"the branch to act on" but the exact target hasn't been created yet.
+"the branch to act on" but the exact target hasn't been created yet. **The walk starts at the
+given name**, so it answers that name itself when its branch exists: an operation that acts on an
+*existing* branch must pass its `Parent`. `GetStartCommit` passes the name (it runs only when the
+branch doesn't exist), `Synchronize` and `Close` pass the parent.
 
 ### Commands
 
 | `[CommandPath]` | Purpose |
 |---|---|
-| `branch open <branchName> [link] [parent]` | Opens (or updates the link type of) a pre-release or `explo/` branch: updates the `BranchNamespace`, then creates/synchronizes the corresponding `dev/` branch in every repo under the current path and checks it out. |
-| `branch close <branchName> [--discard]` | Retires a branch World-wide: integrates it into its closest parent (via `HotBranch.Close`) in every repo, then removes it from the namespace. Must be run at the World root; `--discard` skips the Git-side integration and only edits the namespace. |
+| `branch list` | Displays the opened branches of the World as an indented tree (`BranchNamespace.GetDisplayBranches`), each one prefixed by its link type's compact code, followed by the legend that maps each code to the name the configuration and `--link` use. World-global: it reports the `BranchNamespace`, not the Git branches of the repositories (that is `ckli issue`). |
+| `branch open <branchName> [--link] [--parent]` | Opens (or updates the link type of) a pre-release or `explo/` branch: updates the `BranchNamespace`, then creates/synchronizes the corresponding `dev/` branch in every repo under the current path and checks it out. `--link` (`Manual`/`Release`/`CI`/`Full`) defaults to `CI` for a new branch and leaves an already opened branch's link type unchanged. |
+| `branch close <branchName> [--discard]` | Retires a branch World-wide: integrates it into its closest *open parent* branch (via `HotBranch.Close`) in every repo, then removes it from the namespace. Must be run at the World root; `--discard` skips the Git-side integration and only edits the namespace. |
 | `branch switch <branch> [--create/-c] [--all]` | Checks out `branch` (or its `dev/` branch if it exists) in the current/all repos; `--create` first ensures the branch exists and synchronizes it. |
 | `branch sync <branch> [mode] [--all]` | Runs `HotBranch.Synchronize` for `branch` in the current/all repos, optionally overriding the configured `LinkType` with `mode` (`Release`/`CI`/`Full`). |
 | `commit <message> [--all]` | Commits any pending changes in the current/all repos (no-op if nothing changed). |

@@ -291,7 +291,11 @@ public sealed class HotBranch
     {
         Throw.CheckState( Exists && !BranchName.IsRoot );
         if( _link == null ) return true;
-        var closest = _info.GetRequiredClosestExistingBranch( monitor, _name );
+        // The closest branch must be searched from the PARENT: this branch exists (Exists is true), so
+        // searching from itself answers itself - the branch would be merged into itself and then deleted
+        // while it is the current HEAD.
+        Throw.DebugAssert( _name.Parent != null );
+        var closest = _info.GetRequiredClosestExistingBranch( monitor, _name.Parent );
         if( closest == null ) return false;
         Throw.DebugAssert( closest.Exists );
 

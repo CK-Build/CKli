@@ -25,7 +25,10 @@ public sealed partial class BranchModelPlugin
                             CKliEnv context,
                             [Description( "Branch name to open." )]
                             string branchName,
-                            [Description( "Specifies the link (Manual, Release, CI or Full) to the parent branch. Defaults to CI." )]
+                            [Description( """
+                                Specifies the link (Manual, Release, CI or Full) to the parent branch.
+                                Defaults to CI for a new branch: an already opened branch keeps its current link type.
+                                """ )]
                             string? link = null,
                             [Description( "Parent branch to consider instead of the currently checked out branch (applies only to 'explo/' branch)." )]
                             string? parent = null )
@@ -130,7 +133,7 @@ public sealed partial class BranchModelPlugin
                 || sMode.Length > 0
                 || (!allowManual && linkType is BranchLinkType.Manual) )
             {
-                monitor.Error( "Invalid mode. Must be Release, CI or Full." );
+                monitor.Error( $"Invalid link type '{link}'. Must be {(allowManual ? "Manual, Release, CI or Full." : "Release, CI or Full.")}" );
                 return false;
             }
         }

@@ -52,7 +52,8 @@ public sealed class BranchName : IEquatable<BranchName>
 
     /// <summary>
     /// Gets the <see cref="Name"/> without the "<see cref="WorldName.LTSName"/>/" prefix: this is the form that
-    /// the BranchModel configuration holds (the MainLine attribute and the &lt;Explo&gt; Name and Parent attributes).
+    /// the BranchModel configuration holds (the Root attribute and the &lt;Prerelease&gt;/&lt;Explo&gt; Name
+    /// and Parent attributes).
     /// <para>
     /// The prefix must not be written: <see cref="BranchNamespace"/> prepends it when it reads the configuration,
     /// and its parser rejects a name that starts with the '@' of a <see cref="WorldName.LTSName"/>. This is the

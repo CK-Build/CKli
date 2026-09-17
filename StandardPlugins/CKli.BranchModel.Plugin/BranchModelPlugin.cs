@@ -38,9 +38,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         World.Events.RepoAdded.Sync += OnRepoAdded;
         _shallowSolution = shallowSolution;
         var configElement = primaryContext.Configuration.XElement;
-        _namespace = new BranchNamespace( World.Name.LTSName,
-                                          configElement.Attribute( XNames.MainLine )?.Value,
-                                          configElement.Elements( XNames.Explo ) );
+        _namespace = new BranchNamespace( World.Name.LTSName, configElement );
         _autoFixUselessBranch = (bool?)configElement.Attribute( XNames.AutoFixUselessBranch ) ?? true;
     }
 
@@ -144,12 +142,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     /// <returns>True on success, false on error.</returns>
     bool SaveBranchNamespace( IActivityMonitor monitor, BranchNamespace ns )
     {
-        return PrimaryPluginContext.Configuration.Edit( monitor, ( monitor, e ) =>
-        {
-            e.SetAttributeValue( XNames.MainLine, ns.GetMainLine() );
-            e.Elements( XNames.Explo ).Remove();
-            e.Add( ns.GetExplo() );
-        } );
+        return PrimaryPluginContext.Configuration.Edit( monitor, ( monitor, e ) => ns.WriteConfiguration( e ) );
     }
 
     bool RaiseContentIssue( IActivityMonitor monitor, ContentIssueEventArgs e )

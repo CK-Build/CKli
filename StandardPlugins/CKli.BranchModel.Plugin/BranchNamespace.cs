@@ -33,18 +33,18 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
     /// </para>
     /// </summary>
     /// <param name="ltsName">Optional <see cref="WorldName.LTSName"/>.</param>
-    /// <param name="sMainLine">
-    /// Main branches line starts with the root branch name followed by the
-    /// opened <see cref="BranchLinkType"/><see cref="CSVersionKindExtensions.ToBranchName(CSVersionKind)"/>.
+    /// <param name="configuration">
+    /// The &lt;BranchModel&gt; configuration element (null or empty for the default namespace):
+    /// its Root attribute names the root branch, its &lt;Prerelease&gt; elements are the opened prerelease
+    /// branches (in any order: the <see cref="CSVersionKind"/> of their names is what orders them) and its
+    /// &lt;Explo&gt; elements the opened exploratory ones. This is what
+    /// <see cref="WriteConfiguration(XElement)"/> writes.
     /// </param>
-    /// <param name="exploratories">Opened exploratory branches.</param>
-    public BranchNamespace( string? ltsName,
-                            string? sMainLine,
-                            IEnumerable<XElement> exploratories )
+    public BranchNamespace( string? ltsName, XElement? configuration )
     {
         Create( ltsName,
-                ParseMainLine( sMainLine ),
-                exploratories,
+                ParseMainLine( configuration ),
+                configuration?.Elements( XNames.Explo ) ?? [],
                 out _branches,
                 out _mainLineCount,
                 out _byName );
@@ -88,65 +88,80 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
             branches = result.DrainToImmutable();
         }
 
-        static List<(string BranchName, CSVersionKind Kind, BranchLinkType Link)> ParseMainLine( string? configuration )
+        // The main line is the Root attribute followed by the <Prerelease> elements.
+        // Both the configuration and the commands spell a link type by its name: there is no code string
+        // ('->', '=>', ...) to type anywhere, those are display only.
+        static List<(string BranchName, CSVersionKind Kind, BranchLinkType Link)> ParseMainLine( XElement? configuration )
         {
             var result = new List<(string BranchName, CSVersionKind Kind, BranchLinkType Link)>();
-            ReadOnlySpan<char> h = configuration;
-            if( !h.SkipWhiteSpaces() || h.Length == 0 )
+            var sRoot = (string?)configuration?.Attribute( XNames.Root );
+            if( string.IsNullOrWhiteSpace( sRoot ) )
             {
                 result.Add( (_defaultRootName, CSVersionKind.Stable, BranchLinkType.None) );
-                return result;
             }
-            if( !MatchBranchSegment( ref h, out var name ) )
+            else
             {
-                throw new CKException( $"""
-                    Invalid root branch name in BranchModel MainLine configuration.
-                    Expected a lowercase ASCII identifier (which may contain dash '-' or underscore '_'), got:
-                    {h}
-                    """ );
-            }
-            if( CSVersionKindExtensions.TryParse( name, out var kind, StringComparison.Ordinal ) && kind != CSVersionKind.Stable )
-            {
-                throw new CKException( $"""
-                    Invalid root branch name in BranchModel MainLine configuration: '{name}' must not be one of the prerelease name nor 'explo'.
-                    It is typically 'stable' or 'main'.
-                    """ );
-            }
-            result.Add( (new string( name ), CSVersionKind.Stable, BranchLinkType.None) );
-
-            CSVersionKind prevKind = CSVersionKind.Stable;
-            while( h.SkipWhiteSpaces() && h.Length > 0 )
-            {
-                BranchLinkType linkType = BranchLinkType.CI;
-                if( !h.TryMatchLinkTypeCode( out linkType ) )
+                var h = sRoot.AsSpan();
+                if( !MatchBranchSegment( ref h, out var name ) || h.Length > 0 )
                 {
                     throw new CKException( $"""
-                        Unable to parse link type in BranchModel MainLine configuration.
-                        Expected '||' (None), '|' (Release), '->' (CI) or '=>' (Full), got:
-                        {h}
+                        Invalid Root branch name in BranchModel configuration.
+                        Expected a lowercase ASCII identifier (which may contain dash '-' or underscore '_'), got:
+                        {sRoot}
                         """ );
                 }
-                h.SkipWhiteSpaces();
+                if( CSVersionKindExtensions.TryParse( name, out var kind, StringComparison.Ordinal ) && kind != CSVersionKind.Stable )
+                {
+                    throw new CKException( $"""
+                        Invalid Root branch name in BranchModel configuration: '{name}' must not be one of the prerelease name nor 'explo'.
+                        It is typically 'stable' or 'main'.
+                        """ );
+                }
+                result.Add( (new string( name ), CSVersionKind.Stable, BranchLinkType.None) );
+            }
+            if( configuration == null ) return result;
+
+            // The <Prerelease> element order is IRRELEVANT: the CSemVer prerelease names carry a total order,
+            // so the parent chain is a function of the names alone and nothing is gained by demanding that the
+            // document agree with it. They are sorted here, exactly like AddOrUpdate sorts when it adds one
+            // (WriteConfiguration then writes them back in that order).
+            var prereleases = new List<(string BranchName, CSVersionKind Kind, BranchLinkType Link)>();
+            foreach( var e in configuration.Elements( XNames.Prerelease ) )
+            {
+                var sName = (string?)e.Attribute( XNames.Name );
+                var h = sName.AsSpan();
                 CSVersionKind csKind = CSVersionKind.None;
-                if( !CSVersionKindExtensions.TryMatch( ref h, ref csKind, StringComparison.Ordinal ) )
+                if( !CSVersionKindExtensions.TryMatch( ref h, ref csKind, StringComparison.Ordinal )
+                    || h.Length > 0
+                    || csKind is < CSVersionKind.Alpha or > CSVersionKind.Zulu )
                 {
                     throw new CKException( $"""
-                        Invalid BranchModel MainLine configuration.
+                        Invalid Prerelease Name attribute in BranchModel configuration.
                         Expected lowercase Conformant SVersion prerelease name ('alpha', 'bravo',... 'zulu'), got:
-                        {h}
+                        {sName}
                         """ );
                 }
-                if( prevKind <= csKind )
+                // A duplicate is the one thing the order cannot excuse: two elements with the same Name are
+                // one branch with two link types. (Without this the name would reach the byName dictionary
+                // twice and throw a bare ArgumentException.)
+                if( prereleases.Any( p => p.Kind == csKind ) )
                 {
                     throw new CKException( $"""
-                        Invalid prelease ordering in BranchModel MainLine configuration: '{prevKind.ToBranchName()}' must appear before '{csKind.ToBranchName()}'.
+                        Duplicate Prerelease Name="{csKind.ToBranchName()}" in BranchModel configuration.
                         """ );
                 }
-                prevKind = csKind;
-                result.Add( (csKind.ToBranchName(), csKind, linkType) );
+                // Link is optional (defaults to CI), like <Explo>. WriteConfiguration always writes it.
+                BranchLinkType linkType = BranchLinkType.CI;
+                var sLink = (string?)e.Attribute( XNames.Link );
+                if( !string.IsNullOrWhiteSpace( sLink ) )
+                {
+                    linkType = BranchLinkTypeExtensions.ParseLinkType( sLink );
+                }
+                prereleases.Add( (csKind.ToBranchName(), csKind, linkType) );
             }
+            prereleases.Sort( ( a, b ) => b.Kind.CompareTo( a.Kind ) );
+            result.AddRange( prereleases );
             return result;
-
         }
 
         _ltsName = ltsName;
@@ -402,31 +417,59 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
     }
 
     /// <summary>
-    /// Gets the branches that correspond to the <see cref="Root"/> and <see cref="CSVersionKind"/> prereleases as a string.
+    /// Gets the &lt;Prerelease ... &gt; elements of the <see cref="MainLineBranches"/> that follow the <see cref="Root"/>,
+    /// in decreasing <see cref="CSVersionKind"/> order (the constructor accepts any order: this one simply
+    /// matches the parent chain and reads well).
     /// <para>
-    /// This is the MainLine configuration: it uses <see cref="BranchName.ConfigurationName"/>, so the
-    /// "<see cref="WorldName.LTSName"/>/" prefix does not appear (this is what the constructor's parser expects).
+    /// Like <see cref="GetExplo()"/> this is configuration: the Name attribute uses
+    /// <see cref="BranchName.ConfigurationName"/>, without the "<see cref="WorldName.LTSName"/>/" prefix.
     /// Use <see cref="GetDisplayTree()"/> to display the actual branch names.
     /// </para>
     /// </summary>
-    /// <returns>The mainline.</returns>
-    public string GetMainLine() => _mainLineCount == 1 ? _root.ConfigurationName : GetMainLineBuilder().ToString();
-
-    StringBuilder GetMainLineBuilder()
+    /// <returns>The elements for the prerelease branches.</returns>
+    public IEnumerable<XElement> GetPrereleases()
     {
-        var sb = new StringBuilder( _root.ConfigurationName );
         for( int i = 1; i < _mainLineCount; i++ )
         {
             var b = _branches[i];
-            sb.Append( ' ' ).Append( b.LinkType.ToCodeString() ).Append( ' ' ).Append( b.ConfigurationName );
+            yield return ToXml( b.ConfigurationName, b.LinkType, null, XNames.Prerelease );
         }
-        return sb;
+    }
+
+    /// <summary>
+    /// Writes this namespace into a &lt;BranchModel&gt; <paramref name="configuration"/> element: sets its Root
+    /// attribute and replaces its &lt;Prerelease&gt; and &lt;Explo&gt; elements. Any other attribute or element
+    /// (<see cref="XNames.AutoFixUselessBranch"/>) is left untouched.
+    /// <para>
+    /// The constructor reads back exactly this: the configuration always round trips.
+    /// </para>
+    /// </summary>
+    /// <param name="configuration">The configuration element to update.</param>
+    public void WriteConfiguration( XElement configuration )
+    {
+        Throw.CheckNotNullArgument( configuration );
+        configuration.SetAttributeValue( XNames.Root, _root.ConfigurationName );
+        configuration.Elements( XNames.Prerelease ).Remove();
+        configuration.Elements( XNames.Explo ).Remove();
+        configuration.Add( GetPrereleases() );
+        configuration.Add( GetExplo() );
+    }
+
+    /// <summary>
+    /// Gets this namespace as a new &lt;BranchModel&gt; element. See <see cref="WriteConfiguration(XElement)"/>.
+    /// </summary>
+    /// <returns>The configuration element.</returns>
+    public XElement ToConfiguration()
+    {
+        var e = new XElement( XNames.BranchModel );
+        WriteConfiguration( e );
+        return e;
     }
 
     /// <summary>
     /// Gets the &lt;Explo ... &gt; elements if any.
     /// <para>
-    /// Like <see cref="GetMainLine()"/> this is configuration: the Name and Parent attributes use
+    /// Like <see cref="GetPrereleases()"/> this is configuration: the Name and Parent attributes use
     /// <see cref="BranchName.ConfigurationName"/>, without the "<see cref="WorldName.LTSName"/>/" prefix.
     /// </para>
     /// </summary>
@@ -446,25 +489,26 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
             int iParent = parent.Index - _mainLineCount;
             if( iParent >= 0 )
             {
-                e = ToXml( b.ConfigurationName, b.LinkType, null );
+                e = ToXml( b.ConfigurationName, b.LinkType, null, XNames.Explo );
                 exploNodes[iParent].Add( e );
             }
             else
             {
-                e = ToXml( b.ConfigurationName, b.LinkType, parent.ConfigurationName );
+                e = ToXml( b.ConfigurationName, b.LinkType, parent.ConfigurationName, XNames.Explo );
             }
             exploNodes[i] = e;
         }
         return exploNodes.Where( e => e.Attribute( XNames.Parent ) != null );
     }
 
-    static XElement ToXml( string name, BranchLinkType type, string? parentName )
+    // The Link attribute is ALWAYS written, even for the CI default: a World definition file states what is
+    // true instead of relying on a default the reader has to know. Reading it stays tolerant (absent = CI).
+    static XElement ToXml( string name, BranchLinkType type, string? parentName, XName elementName )
     {
-        return new XElement( XNames.Explo,
+        Throw.DebugAssert( type is not BranchLinkType.None );
+        return new XElement( elementName,
                                 new XAttribute( XNames.Name, name ),
-                                type != BranchLinkType.CI
-                                    ? new XAttribute( XNames.Link, type.ToString() )
-                                    : null,
+                                new XAttribute( XNames.Link, type.ToString() ),
                                 parentName != null
                                     ? new XAttribute( XNames.Parent, parentName )
                                     : null );
@@ -502,42 +546,66 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
     }
 
     /// <summary>
-    /// Gets the branches displayed in a tree.
+    /// Gets every branch in tree order with its depth: the <see cref="Root"/> comes first at depth 0 and each
+    /// branch is followed by its children. This is the order and the indentation of <see cref="GetDisplayTree()"/>
+    /// and of "ckli branch list".
+    /// <para>
+    /// This is DISPLAY: the actual <see cref="BranchName.Name"/> is what a caller shows, not the
+    /// <see cref="BranchName.ConfigurationName"/> the configuration uses.
+    /// </para>
     /// </summary>
-    /// <returns>The branches.</returns>
-    public string GetDisplayTree()
-    {
-        var sb = new StringBuilder( _root.Name );
-        AddChildren( sb, 2, _root, _branches );
-        return sb.ToString();
+    /// <returns>The branches and their depth.</returns>
+    public IEnumerable<(BranchName Branch, int Depth)> GetDisplayBranches() => Walk( _root, 0, _branches );
 
-        static void AddChildren( StringBuilder sb, int depth, BranchName parent, ImmutableArray<BranchName> branches )
+    static IEnumerable<(BranchName Branch, int Depth)> Walk( BranchName parent, int depth, ImmutableArray<BranchName> branches )
+    {
+        yield return (parent, depth);
+        for( int i = parent.Index + 1; i < branches.Length; i++ )
         {
-            foreach( var b in branches.AsSpan().Slice( parent.Index + 1 ) )
+            var b = branches[i];
+            if( b.Parent == parent )
             {
-                if( b.Parent == parent )
+                foreach( var child in Walk( b, depth + 1, branches ) )
                 {
-                    sb.Append( ' ', depth ).Append( b.LinkType.ToCodeString() ).Append( ' ' ).Append( b.Name );
-                    AddChildren( sb, depth + 2, b, branches );
+                    yield return child;
                 }
             }
         }
     }
 
     /// <summary>
-    /// Gets the <see cref="GetMainLine()"/> string followed by the <see cref="GetExplo()"/> elements.
+    /// Gets the branches displayed in a tree, one branch per line, each one prefixed by
+    /// its <see cref="BranchLinkTypeExtensions.ToCodeString(BranchLinkType)"/>.
+    /// <para>
+    /// This is the plain text form (logs and tests). A screen renders the same tree from
+    /// <see cref="GetDisplayBranches()"/>: a multi line TextBlock trims each of its lines, so the
+    /// indentation below cannot survive being handed to one.
+    /// </para>
     /// </summary>
-    /// <returns>The main line and exploratory branches.</returns>
-    public override string ToString()
+    /// <returns>The branches.</returns>
+    public string GetDisplayTree()
     {
-        if( _mainLineCount == _branches.Length ) return GetMainLine();
-        var sb = GetMainLineBuilder();
-        foreach( var e in GetExplo() )
+        var sb = new StringBuilder();
+        foreach( var (b, depth) in GetDisplayBranches() )
         {
-            sb.AppendLine().Append( e.ToString() );
+            if( sb.Length > 0 ) sb.AppendLine();
+            if( depth == 0 )
+            {
+                sb.Append( b.Name );
+            }
+            else
+            {
+                sb.Append( ' ', 2 * depth ).Append( b.LinkType.ToCodeString() ).Append( ' ' ).Append( b.Name );
+            }
         }
         return sb.ToString();
     }
+
+    /// <summary>
+    /// Gets the <see cref="ToConfiguration()"/> element as a string.
+    /// </summary>
+    /// <returns>The &lt;BranchModel&gt; configuration.</returns>
+    public override string ToString() => ToConfiguration().ToString();
 
 
     internal string GetNoPreviousRootBranchFoundMessage()
