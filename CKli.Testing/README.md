@@ -149,6 +149,29 @@ public sealed class ClonedFolder
 | `OpenRemotes(fullName)` | Resets `bare/<fullName>` from its zip and returns the matching `RemotesCollection`. |
 | `TouchAndCommit(folder, branchName, commitMessage?, fileContent?, fileName = "CKliTouchAndCommit.txt", authorAndCommitWhen?)` | Appends/creates a file and commits it — either on the current working-folder head (`branchName: null`), on the branch if it's already checked out, or directly as a new commit object on a non-checked-out branch (via `TreeDefinition`/`ObjectDatabase`, no checkout needed). Committer signature is always `"CKli.Testing" <none>`. |
 | `CKliCreateRemoteFolderFromCloned(builderMethodName, stackName, testStateName)` | Turns a finished `Cloned/<builderMethodName>` into a brand-new `Remotes/<stackName><testStateName>` fixture: strips all `origin` remotes, copies the Stack + every Repo's working folder as-is, then re-initializes the source cloned folder. Used to *author* new fixture states (see below); does **not** update `Remotes.zip` — that's done separately with `ZipRemotes.ps1` in the consuming test project. |
+| `CollectAllTexts()` | Returns a disposable `AllMonitorsTextCollector`: the text of **every** log entry that reaches the `GrandOutput`. See below. |
+
+#### Asserting on logs: `CollectTexts` vs `CollectAllTexts`
+
+`TestHelper.Monitor.CollectTexts(...)` / `CollectEntries(...)` are `IActivityMonitorClient`s registered on
+*that one monitor*. Anything logged elsewhere is invisible to them — most importantly a `ckli build`, whose
+roadmap builds up to `--max-dop` solutions each on its own monitor, and `ActivityMonitor.StaticLogger`, which
+belongs to no monitor at all. An assertion on such a message silently finds nothing.
+
+`helper.CollectAllTexts()` registers an `IGrandOutputHandler` instead. That sits *after* the dispatcher, so it
+receives every entry whatever emitted it. Reading its `Texts` first calls `DispatcherSink.SyncWait()`, because
+the GrandOutput is asynchronous and an assertion can otherwise run before the entry it is about has been
+handled — which is why the texts are a property rather than an `out` list.
+
+```csharp
+using( var logs = TestHelper.CollectAllTexts() )
+{
+    (await CKliCommands.ExecAsync( TestHelper.Monitor, world.WorldRoot, "build" )).ShouldBeFalse();
+    logs.Texts.ShouldContain( t => t.Contains( "..." ) );
+}
+```
+
+Keep `CollectTexts` for what the test's own monitor logs: it is cheaper and scoped.
 
 ## Usage
 
