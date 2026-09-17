@@ -288,21 +288,6 @@ public static partial class CKliTestHelperExtensions
     }
 
     /// <summary>
-    /// Collects the text of every log entry that reaches the <see cref="CK.Monitoring.GrandOutput"/>, whatever
-    /// monitor emitted it. Use this instead of <c>TestHelper.Monitor.CollectTexts(...)</c> whenever the entry to
-    /// assert is emitted by code that runs on another monitor: a roadmap builds up to <c>--max-dop</c> solutions,
-    /// each on its own monitor, and <see cref="ActivityMonitor.StaticLogger"/> belongs to no monitor at all.
-    /// </summary>
-    /// <param name="helper">This helper.</param>
-    /// <returns>The collector, that must be disposed.</returns>
-    public static AllMonitorsTextCollector CollectAllTexts( this IMonitorTestHelper helper )
-    {
-        var output = CK.Monitoring.GrandOutput.Default;
-        Throw.CheckState( "The GrandOutput.Default must be active.", output != null );
-        return new AllMonitorsTextCollector( output );
-    }
-
-    /// <summary>
     /// Must be called by tests to cleanup their respective "Cloned/&lt;test-name&gt;" where they can clone
     /// the stacks they want from the "Remotes" thanks to <see cref="RemotesFolder.CloneAsync(ClonedFolder, Action{IActivityMonitor, NormalizedPath, XElement}?, bool)"/>.
     /// </summary>
