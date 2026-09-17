@@ -80,7 +80,7 @@ public sealed partial class FakeBuildRepo
         }
         // The fake build function is static and installed globally: this is how it finds back the
         // declarations of the repository it builds. See CKliBuildPluginTestHelperExtensions.
-        CKliBuildPluginTestHelperExtensions.RegisterFakeBuildRepo( world.Stack.Remotes.GetUriFor( RepositoryName,
+        world.Stack.TestEnv.RegisterFakeBuildRepo( world.Stack.Remotes.GetUriFor( RepositoryName,
                                                                                                   mustExist: false ),
                                                                    this );
     }
@@ -89,6 +89,21 @@ public sealed partial class FakeBuildRepo
     /// Gets the initial version tag created with this repository. Null if none has been created.
     /// </summary>
     public SVersion? InitialVersion => _initialVersion;
+
+    /// <summary>
+    /// Gets or sets whether this repository's fake build must fail. Defaults to false.
+    /// <para>
+    /// The failure happens before anything is written (in particular before the "building/" version tag is
+    /// applied), like a build that does not compile. Since the roadmap is executed as a whole, failing one
+    /// repository also stops the "building/" tags of the ones that succeeded from being promoted to "local/"
+    /// ones: this is how a partially failed build is arranged.
+    /// </para>
+    /// <para>
+    /// This is settable back to false: a test can fail a build, observe the state it leaves behind, then build
+    /// again successfully.
+    /// </para>
+    /// </summary>
+    public bool FailBuild { get; set; }
 
     /// <summary>
     /// Gets the <see cref="InitialVersion"/> or throws if this repository has been created without one:

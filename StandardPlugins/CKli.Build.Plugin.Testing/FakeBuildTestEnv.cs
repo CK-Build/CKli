@@ -24,15 +24,16 @@ public sealed partial class FakeBuildTestEnv : IDisposable
     readonly GitFileProviderCache _fileProviderCache;
     int _disposed;
 
-    internal FakeBuildTestEnv( IMonitorTestHelper helper,
-                               NormalizedPath path,
-                               BuilderFunction previous )
+    internal FakeBuildTestEnv( IMonitorTestHelper helper, NormalizedPath path )
     {
         _helper = helper;
         _path = path;
-        _previous = previous;
         _fileProviderCache = new GitFileProviderCache();
-
+        // The BuildPlugin's builder function is static: this instance installs its own FakeBuildAsync and
+        // Dispose puts back whatever was there. Two live FakeBuildTestEnv would therefore fight over it -
+        // tests create one at a time (and dispose it) so this is safe, but it is why the fake build is an
+        // instance method: everything it reads (the FakeBuildRepo registry) belongs to the installed one.
+        _previous = BuildPlugin.SetBuilderFunction( FakeBuildAsync );
     }
 
     /// <summary>
