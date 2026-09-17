@@ -33,7 +33,5 @@ What can be declared:
 
 A fake build runs on the roadmap's own per-solution monitor (builds go up to `--max-dop`), so
 `TestHelper.Monitor.CollectTexts(...)` — an `IActivityMonitorClient` on one monitor — never sees what it logs.
-Use `TestHelper.CollectAllTexts()` (`CKli.Testing`): it registers an `IGrandOutputHandler`, which sits after
-the dispatcher and therefore catches every entry whatever emitted it, `ActivityMonitor.StaticLogger` included.
-Reading its `Texts` waits for the queued entries first (`DispatcherSink.SyncWait`) — the GrandOutput is
-asynchronous, so an assertion can otherwise run before the entry it is about has been handled.
+Use `GrandOutput.Default.CreateMemoryCollector(...)` and its `ExtractCurrentTexts()`, which collects from the
+dispatcher and waits for the queued entries first. See `CKli.Testing`"s README for the details.

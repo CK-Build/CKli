@@ -108,6 +108,22 @@ public sealed class CommitBuildInfo
                 monitor.Error( GetErrorMessage( contentInfo, vTag ) );
                 return (null, null);
             }
+            // The "building/" and "local/" prefixes are two STATES of one version tag, not two tags: a version
+            // is borne by a single commit. Tags.Add above moves its own name (allowOverwrite: true), but a state
+            // change renames the tag, so a same-version tag under the other prefix must be dropped here.
+            //
+            // Without this, a build that fails before BuildResult.CommitBuilding promotes "building/vX" to
+            // "local/vX" leaves the "building/vX" it just wrote BESIDE the "local/vX" it was rolling: one
+            // version on two commits, which no longer loads (the version to commit index cannot hold both).
+            // The surviving "building/vX" is the useful half - it says where a build was attempted and did not
+            // complete - and the next roadmap that reaches a build promotes it in place: RoadmapExecutor's
+            // promotion loop walks every OrderedSolutions entry, not only the ones it rebuilt.
+            //
+            // This removes the TAG only, never through DestroyLocalRelease: that one also purges the tag's
+            // produced packages from the local feed and the NuGet cache, and PublishToNuGetLocalFeed has just
+            // written this very version there. (It is also why the filter below is "v != _version".)
+            DropOtherStateTag( monitor, git, $"building/v{_version}", vTag );
+            DropOtherStateTag( monitor, git, $"local/v{_version}", vTag );
             // Destroys any other (previous!) building or local releases with the same branch name.
             // Note:
             //     |  First idea was to add these conditions:
@@ -127,6 +143,18 @@ public sealed class CommitBuildInfo
             // "bool StillApply( ... out World.Issue issue )". 
             monitor.Error( GetErrorMessage( contentInfo, vTag ), ex );
             return (null,null);
+        }
+
+        // Only the unpublished states are ever dropped: a published "v{version}" tag is never touched here.
+        static void DropOtherStateTag( IActivityMonitor monitor, Repository git, string otherName, string vTag )
+        {
+            if( otherName == vTag ) return;
+            var other = git.Tags[otherName];
+            if( other != null )
+            {
+                monitor.Info( $"Removing the superseded '{otherName}' tag: '{vTag}' is now the state of this version." );
+                git.Tags.Remove( other );
+            }
         }
 
         string GetErrorMessage( BuildContentInfo contentInfo, string vTag )

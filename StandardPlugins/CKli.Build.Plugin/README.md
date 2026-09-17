@@ -424,6 +424,18 @@ been computed and is not a dry-run:
 - On overall success, every built `Roadmap.BuildInfo.CommitBuilding()` promotes its `"building/"` version tag to
   `"local/"` (or, for un-built solutions, promotes an already-`"building/"` last-build tag the same way) - see
   `BuildResult.CommitBuilding()`.
+- **That promotion is all-or-nothing across the roadmap**, which is what makes an interrupted build recognizable:
+  when a later solution fails, the ones already built keep the `"building/vX"` they wrote. That tag is the useful
+  record - it says where a build was attempted and did not complete - and it is *one* tag, because
+  `CommitBuildInfo.ApplyReleaseBuildTag` drops the same-version tag under the other unpublished prefix as it
+  writes its own (`"building/"` and `"local/"` are two states of one tag, and a version is borne by a single
+  commit). It removes the **tag** only, never through `DestroyLocalRelease`, which would also purge the packages
+  `PublishToNuGetLocalFeed` has just written for that very version.
+- A later roadmap completes it in place: the promotion loop walks every `OrderedSolutions` entry, not only the
+  ones it rebuilt. `Roadmap.BuildAsync` does the same normalization on its **nothing-to-build** early return,
+  which does not reach the executor at all - otherwise a stranded `"building/"` tag would survive every
+  subsequent idle run while still being counted as publishable. `Plugins.Tests/PartialBuildFailureTests` pins
+  both paths.
 - Before returning, `Roadmap.BuildAsync` refuses to start at all if any involved Repo's working folder is dirty.
 
 ### Core build: `CoreBuildAsync` → `RepoBuilder`

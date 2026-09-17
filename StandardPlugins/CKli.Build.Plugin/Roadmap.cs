@@ -241,6 +241,33 @@ public sealed partial class Roadmap
         Throw.DebugAssert( _buildSuccess is null && !_dryRun );
         if( _buildSolutionCount == 0 )
         {
+            // Nothing to build is not nothing to do: a previous roadmap may have failed after
+            // ApplyReleaseBuildTag wrote a "building/vX" and before RoadmapExecutor promoted it. That tag is an
+            // unconfirmed state, and this early return is precisely what no later build would get past - the
+            // executor, hence its promotion loop, is never reached from here, so the tag would survive every
+            // subsequent "nothing to build" run while still being counted as publishable.
+            // BuildInfo.CommitBuilding() is exactly the normalization needed (it renames the tag of a solution
+            // it did not build) and every other solution is left alone by the IsBuilding() test below.
+            var interrupted = _orderedSolutions.Where( s => s.BuildInfo.TargetVersion.IsBuilding() ).ToArray();
+            if( interrupted.Length > 0 )
+            {
+                try
+                {
+                    foreach( var s in interrupted )
+                    {
+                        s.BuildInfo.CommitBuilding();
+                    }
+                }
+                catch( Exception ex )
+                {
+                    monitor.Error( "While committing 'building/' versions to 'local/' ones.", ex );
+                    _buildSuccess = false;
+                    return null;
+                }
+                var names = interrupted.Select( s => s.Repo.DisplayPath.Path ).Concatenate( "', '" );
+                monitor.Info( ScreenType.CKliScreenTag,
+                              $"Completed the interrupted build of '{names}': their 'building/' version tag is now a 'local/' one." );
+            }
             monitor.Info( ScreenType.CKliScreenTag, "No repositories need to be built." );
             _buildSuccess = true;
             return [];
