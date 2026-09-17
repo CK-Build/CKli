@@ -367,9 +367,13 @@ When applied to multiple Repos, a warning is emitted if the branch doesn't exist
 
 A branch in the `local/` or `building/` namespace cannot be pushed (see `ckli push`).
 
-### `push --stack-only --all --continue-on-error`
+### `push --stack-only --all --continue-on-error --max-dop <n>`
 Pushes the Stack repository and all Repo's local branches that track a remote branch.
 A pull is done before: it must be successful for the actual push to be done.
+
+The Repos are independent: they are pulled and then pushed in parallel and each of them is pushed by a
+single network operation (all its branches at once). `--max-dop <n>` limits the parallelism of both phases.
+The Stack repository itself is always pushed first and alone.
 
 Tags are not pushed: tags are pushed when artifacts are published and this is the job
 of dedicated plugins.

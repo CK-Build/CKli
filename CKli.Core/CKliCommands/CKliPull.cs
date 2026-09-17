@@ -75,17 +75,10 @@ sealed class CKliPull : Command
                             : world.GetAllDefinedRepo( monitor, context.CurrentDirectory );
                 if( repos == null ) return false;
 
-                using( monitor.OpenInfo( $"Pulling {repos.Count} repositories, {(withTags ? "updating" : "preserving")} local tags ({(maxDop <= 0 ? "parallel" : $"--max-dop {maxDop}")})." ) )
-                {
-                    var pool = new ActivityMonitorAsyncPool( maxDop <= 0 ? int.MaxValue : maxDop );
-                    bool success = await pool.ParallelAsync( repos,
-                                                             ( monitor, repo, cancellation ) => PullOne( monitor, repo, withTags, continueOnError, cancellation ),
-                                                             continueOnError ? ParallelErrorBehavior.Ignore : ParallelErrorBehavior.SoftStop,
-                                                             scopeAlive )
-                                             .ConfigureAwait( false );
-                    // Save a dirty World's DefinitionFile ony if no unhandled exception is thrown.
-                    return stack.Close( monitor ) && success;
-                }
+                bool success = await DoPullAsync( monitor, continueOnError, repos, withTags, maxDop, scopeAlive )
+                                        .ConfigureAwait( false );
+                // Save a dirty World's DefinitionFile ony if no unhandled exception is thrown.
+                return stack.Close( monitor ) && success;
             }
             finally
             {
@@ -95,27 +88,40 @@ sealed class CKliPull : Command
         }
     }
 
-    internal static bool DoPull( IActivityMonitor monitor,
-                                 bool continueOnError,
-                                 IReadOnlyList<Repo> repos,
-                                 bool withTags,
-                                 CancellationToken cancellation )
+    /// <summary>
+    /// The actual pull: this is "ckli pull" and the pull that "ckli push" always does before pushing.
+    /// <para>
+    /// Repositories are independent: they are pulled in parallel (bounded by <paramref name="maxDop"/> through
+    /// the <see cref="ActivityMonitorAsyncPool"/> that also gives each of them its own monitor).
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="continueOnError">
+    /// True to pull every repository regardless of the errors. By default, the first error prevents any new
+    /// repository from being pulled.
+    /// </param>
+    /// <param name="repos">The repositories to pull.</param>
+    /// <param name="withTags">True to let the remote tags replace the local ones.</param>
+    /// <param name="maxDop">Maximal degree of parallelism. 0 (or less) is unbounded.</param>
+    /// <param name="cancellation">The cancellation token.</param>
+    /// <returns>True on success, false on error.</returns>
+    internal static async Task<bool> DoPullAsync( IActivityMonitor monitor,
+                                                  bool continueOnError,
+                                                  IReadOnlyList<Repo> repos,
+                                                  bool withTags,
+                                                  int maxDop,
+                                                  CancellationToken cancellation )
     {
-        bool success = true;
-        using( monitor.OpenInfo( $"Fetching remote branches {(withTags ? "and tags " : "")}for {repos.Count} repositories." ) )
+        using( monitor.OpenInfo( $"Pulling {repos.Count} repositories, {(withTags ? "updating" : "preserving")} local tags ({(maxDop <= 0 ? "parallel" : $"--max-dop {maxDop}")})." ) )
         {
-            foreach( var repo in repos )
-            {
-                if( !PullOne( monitor, repo, withTags, continueOnError, cancellation ) )
-                {
-                    success = false;
-                    // Same behavior as the ParallelErrorBehavior.SoftStop used by "ckli pull":
-                    // on error, no new repository is considered unless --continue-on-error.
-                    if( !continueOnError ) break;
-                }
-            }
+            var pool = new ActivityMonitorAsyncPool( maxDop <= 0 ? int.MaxValue : maxDop );
+            // SoftStop: on error, the started repositories end but no new one is considered.
+            return await pool.ParallelAsync( repos,
+                                             ( monitor, repo, cancellation ) => PullOne( monitor, repo, withTags, continueOnError, cancellation ),
+                                             continueOnError ? ParallelErrorBehavior.Ignore : ParallelErrorBehavior.SoftStop,
+                                             cancellation )
+                             .ConfigureAwait( false );
         }
-        return success;
     }
 
     // Should this be the GitRepository.Pull method?
