@@ -84,10 +84,27 @@ public sealed class ScreenLogger : IActivityMonitorClient
         public ValueTask HandleAsync( IActivityMonitor monitor, InputLogEntry logEvent )
         {
             Throw.DebugAssert( (logEvent.MonitorId == _monitorId) == logEvent.MonitorId.Equals( _monitorId, StringComparison.Ordinal ) );
-            if( !ReferenceEquals( logEvent.MonitorId, _monitorId ) || !(logEvent.Tags & _processRunnerTag).IsEmpty )
+            bool fromBackgroundMonitor = !ReferenceEquals( logEvent.MonitorId, _monitorId );
+            if( fromBackgroundMonitor || !(logEvent.Tags & _processRunnerTag).IsEmpty )
             {
                 var t = logEvent.Text;
-                if( t != null ) _screen.OnParallelText( t );
+                if( t != null )
+                {
+                    _screen.OnParallelText( t );
+                    // OnParallelText is transient: the next parallel log overwrites it and the animation
+                    // erases it when it ends. A Warn or Error raised on a background monitor would then be
+                    // lost for the user: only the ScreenLog makes it persist, exactly like the OnLog above
+                    // does for this monitor. Without this, every error of a parallelized command ("ckli pull",
+                    // "ckli push", the roadmap builds) reached the log file and nothing else: the command
+                    // simply displayed "Failed".
+                    // The ProcessRunner's StdOut/StdErr are logged as Trace: they are below Warn and never
+                    // reach the screen this way.
+                    var level = logEvent.LogLevel & LogLevel.Mask;
+                    if( fromBackgroundMonitor && level >= LogLevel.Warn )
+                    {
+                        _screen.ScreenLog( level, t );
+                    }
+                }
             }
             return default;
         }
