@@ -316,6 +316,69 @@ public partial class GitRepositoryTests
         r.PushBranch( TestHelper.Monitor, b, autoCreateRemoteBranch: true ).ShouldBeTrue();
     }
 
+    // MergeRemoteBranches removes each tracked branch (and its remote) from its snapshot as its first pass
+    // visits it: leaving that pass early left the not yet visited ones behind, and the AROBAS second pass
+    // then considered them as untracked branches - the very thing it must not do. It re-associated an
+    // already tracking branch and merged it, after the operation was supposed to have stopped.
+    [Test]
+    public void MergeRemoteBranches_first_error_stops_the_AROBAS_pass()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var remotes = TestEnv.OpenRemotes( "One" );
+        var remoteUrl = remotes.GetUriFor( "OneRepo" );
+
+        var timPath = context.CurrentDirectory.AppendPart( "Tim" );
+        using var tim = GitRepository.Clone( TestHelper.Monitor,
+                                             new GitRepositoryKey( context.SecretsStore, remoteUrl, true ),
+                                             context.Committer,
+                                             timPath,
+                                             timPath.LastPart ).ShouldNotBeNull();
+
+        var bobPath = context.CurrentDirectory.AppendPart( "Bob" );
+        using var bob = GitRepository.Clone( TestHelper.Monitor,
+                                             new GitRepositoryKey( context.SecretsStore, remoteUrl, true ),
+                                             context.Committer,
+                                             bobPath,
+                                             bobPath.LastPart ).ShouldNotBeNull();
+
+        // References are enumerated in name order: "zz-test" is deliberately after "master" so that the
+        // dirty "master" (the checked out branch) is the one that fails, while "zz-test" is still unvisited.
+        var timZZ = tim.EnsureBranch( TestHelper.Monitor, "zz-test" ).ShouldNotBeNull();
+        tim.Checkout( TestHelper.Monitor, timZZ ).ShouldBeTrue();
+        File.WriteAllText( tim.WorkingFolder.AppendPart( "OnZZ.txt" ), "Hop!" );
+        tim.Commit( TestHelper.Monitor, "Tim's commit on 'zz-test'." ).ShouldBe( CommitResult.Committed );
+        tim.PushBranch( TestHelper.Monitor, tim.Repository.Branches["zz-test"], autoCreateRemoteBranch: true ).ShouldBeTrue();
+
+        // Bob gets a local, tracking "zz-test" branch.
+        bob.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
+        var bobZZ = bob.GetBranch( TestHelper.Monitor, "zz-test" ).ShouldNotBeNull();
+        bobZZ.IsTracking.ShouldBeTrue();
+        var bobZZTip = bobZZ.Tip.Sha;
+        bob.CurrentBranchName.ShouldBe( "master" );
+
+        // Both "master" and "zz-test" now have something to merge on Bob's side.
+        File.WriteAllText( tim.WorkingFolder.AppendPart( "OnZZAgain.txt" ), "Hop!" );
+        tim.Commit( TestHelper.Monitor, "Tim's second commit on 'zz-test'." ).ShouldBe( CommitResult.Committed );
+        tim.PushBranch( TestHelper.Monitor, tim.Repository.Branches["zz-test"], autoCreateRemoteBranch: false ).ShouldBeTrue();
+        tim.Checkout( TestHelper.Monitor, tim.Repository.Branches["master"] ).ShouldBeTrue();
+        File.WriteAllText( tim.WorkingFolder.AppendPart( "OnMaster.txt" ), "Hop!" );
+        tim.Commit( TestHelper.Monitor, "Tim's commit on 'master'." ).ShouldBe( CommitResult.Committed );
+        tim.PushBranch( TestHelper.Monitor, tim.Repository.Branches["master"], autoCreateRemoteBranch: false ).ShouldBeTrue();
+
+        bob.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
+        // Bob's checked out "master" is now dirty: merging it is an error.
+        File.WriteAllText( bob.WorkingFolder.AppendPart( "BobIsWorking.txt" ), "Hop!" );
+
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            bob.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeFalse();
+            logs.ShouldContain( t => t.Contains( "has uncommitted changes" ) );
+            logs.ShouldNotContain( t => t.Contains( "Creating local branch on remote" ),
+                                   "The AROBAS pass must not run: 'zz-test' is a tracking branch." );
+        }
+        bob.Repository.Branches["zz-test"].Tip.Sha.ShouldBe( bobZZTip, "'zz-test' has not been merged." );
+    }
+
     [Test]
     public void testing_bare_repository()
     {

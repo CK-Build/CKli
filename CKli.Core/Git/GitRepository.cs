@@ -751,7 +751,10 @@ public sealed partial class GitRepository : IDisposable
                 {
                     var refB = b;
                     success &= MergeTrackedBranch( monitor, ref refB );
-                    if( !success && !continueOnError ) break;
+                    // Leaving this loop early leaves the not yet visited tracked branches (and their remote)
+                    // in the snapshot: the second pass below would then consider them as untracked ones.
+                    // The first error stops the whole operation, so we must not fall into it.
+                    if( !success && !continueOnError ) return false;
                 }
             }
         }
