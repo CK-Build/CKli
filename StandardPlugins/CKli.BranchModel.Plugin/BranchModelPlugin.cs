@@ -110,7 +110,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         foreach( var r in e.Repos )
         {
             var info = Get( monitor, r );
-            info.CollectIssues( monitor, e.ScreenType, e.Add, forgetUselessBranches, out hasSevereIssue );
+            info.CollectIssues( monitor, e.ScreenType, e.Add, forgetUselessBranches, _autoFixUselessBranch, out hasSevereIssue );
         }
         if( !hasSevereIssue )
         {
@@ -196,9 +196,9 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="repo">The repository to consider.</param>
     /// <returns>The branch information for the repository.</returns>
-    protected override BranchModelInfo Create( IActivityMonitor monitor, Repo repo ) => Create( monitor, repo, _namespace, _autoFixUselessBranch );
+    protected override BranchModelInfo Create( IActivityMonitor monitor, Repo repo ) => CreateBranchModelInfo( monitor, repo, _namespace, _autoFixUselessBranch );
 
-    BranchModelInfo Create( IActivityMonitor monitor, Repo repo, BranchNamespace ns, bool autoFixUselessBranch )
+    BranchModelInfo CreateBranchModelInfo( IActivityMonitor monitor, Repo repo, BranchNamespace ns, bool autoFixUselessBranch )
     {
         bool isCKliIssueCommand = PrimaryPluginContext.Command is CKliIssue;
         bool isCKliRepoAddOrCreate = PrimaryPluginContext.Command is CKliRepoCreate or CKliRepoAdd;

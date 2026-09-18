@@ -658,7 +658,7 @@ sealed partial class World
     sealed class LayoutIssue : World.Issue
     {
         public LayoutIssue( string title, IRenderable body )
-            : base( title, body, null )
+            : base( title, body, null, implicitIssue: true )
         {
         }
 

@@ -894,7 +894,8 @@ public sealed partial class VersionTagInfo : RepoInfo
                                 version tags to the remote origin.
                                 """ ),
                                 Repo,
-                                _removableTags ) );
+                                _removableTags,
+                                _versionTagPlugin.AutoFixRemovableTag ) );
         }
         if( _badDeprecatedTags != null )
         {
@@ -907,7 +908,8 @@ public sealed partial class VersionTagInfo : RepoInfo
                                 This will be fixed by deleting them locally.
                                 """ ),
                                 Repo,
-                                [.. _badDeprecatedTags.Select( t => t.T )] ) );
+                                [.. _badDeprecatedTags.Select( t => t.T )],
+                                implicitIssue: false ) );
         }
         if( _hotZone != null && _hotZone.HotZoneIssue != null )
         {

@@ -16,8 +16,9 @@ public sealed partial class VersionTagInfo
         public RemovableVersionTagIssue( string title,
                                          IRenderable body,
                                          Repo repo,
-                                         IReadOnlyList<Tag> tagsToDelete )
-            : base( title, body, repo )
+                                         IReadOnlyList<Tag> tagsToDelete,
+                                         bool implicitIssue )
+            : base( title, body, repo, implicitIssue )
         {
             _tagsToDelete = tagsToDelete;
         }

@@ -103,7 +103,7 @@ public sealed partial class BranchModelPlugin
         // is driven by the new namespace.
         foreach( var repo in repos )
         {
-            var info = Create( monitor, repo, ns, _autoFixUselessBranch );
+            var info = CreateBranchModelInfo( monitor, repo, ns, _autoFixUselessBranch );
             if( info == null ) return false;
             if( info.HasIssue )
             {

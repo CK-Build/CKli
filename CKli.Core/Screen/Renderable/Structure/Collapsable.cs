@@ -88,21 +88,21 @@ public sealed class Collapsable : IRenderable
     }
 
     sealed class FirstLineRenderer( SegmentRenderer parent, int length, IRenderable content, int line, int actualHeight, TextStyle style )
-        : SegmentRenderer( parent, length, content, line, actualHeight )
+        : SegmentRenderer( parent, length, content, line, actualHeight, style )
     {
         protected override void Render()
         {
-            Target.Write( "> ", style );
+            Target.Write( "> ", FinalStyle );
             RenderContent();
         }
     }
 
     sealed class BodyLineRenderer( SegmentRenderer parent, int length, IRenderable content, int line, int actualHeight, TextStyle style )
-        : SegmentRenderer( parent, length, content, line, actualHeight )
+        : SegmentRenderer( parent, length, content, line, actualHeight, style )
     {
         protected override void Render()
         {
-            Target.Write( "│ ", style );
+            Target.Write( "│ ", FinalStyle );
             RenderContent();
         }
     }

@@ -33,6 +33,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
     ReleaseDatabase? _releaseDatabase;
     PackageBounds? _externalPackages;
 
+
     /// <summary>
     /// Initializes a new <see cref="VersionTagPlugin"/>.
     /// </summary>
@@ -53,6 +54,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         _autoFixRemovableTag = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.AutoFixRemovableTag ) ?? false;
         _removeUselessFakeTag = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.RemoveUselessFakeTag ) ?? false;
     }
+
+    internal bool AutoFixRemovableTag => _autoFixRemovableTag;
 
     void PluginInfoRequested( PluginInfoEventArgs e )
     {

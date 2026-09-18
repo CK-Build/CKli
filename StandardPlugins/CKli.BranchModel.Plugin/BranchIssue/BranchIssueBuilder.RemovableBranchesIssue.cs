@@ -15,13 +15,13 @@ sealed partial class BranchIssueBuilder
     {
         readonly List<(Branch Branch, object BaseOrName)> _removables;
 
-        RemovableBranchesIssue( IRenderable body, List<(Branch Branch, object BaseOrName)> removables, Repo repo )
-            : base( "Removable branches.", body, repo )
+        RemovableBranchesIssue( IRenderable body, List<(Branch Branch, object BaseOrName)> removables, Repo repo, bool implicitIssue )
+            : base( "Removable branches.", body, repo, implicitIssue )
         {
             _removables = removables;
         }
 
-        public static RemovableBranchesIssue Create( ScreenType screenType, Repo repo, List<(Branch Branch, object BaseOrName)> removables )
+        public static RemovableBranchesIssue Create( ScreenType screenType, Repo repo, List<(Branch Branch, object BaseOrName)> removables, bool autoFixUselessBranch )
         {
             var names = removables.Select( r => r.BaseOrName switch
                                                 {
@@ -34,7 +34,7 @@ sealed partial class BranchIssueBuilder
                                         {names}
                                         {(removables.Count > 1 ? "They" : "It")} can be deleted.
                                         """ );
-            return new RemovableBranchesIssue( body, removables, repo );
+            return new RemovableBranchesIssue( body, removables, repo, autoFixUselessBranch );
         }
 
         protected override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, CancellationToken cancellation )

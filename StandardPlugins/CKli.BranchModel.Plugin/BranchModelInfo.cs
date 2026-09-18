@@ -115,6 +115,7 @@ public sealed partial class BranchModelInfo : RepoInfo
                                  ScreenType screenType,
                                  Action<World.Issue> collector,
                                  bool forgetUselessBranches,
+                                 bool autoFixUselessBranch,
                                  out bool hasSevereIssues )
     {
         // If the "stable" branch doesn't exist, no need to continue.
@@ -126,7 +127,7 @@ public sealed partial class BranchModelInfo : RepoInfo
             hasSevereIssues = true;
             return;
         }
-        var issues = new BranchIssueBuilder( forgetUselessBranches );
+        var issues = new BranchIssueBuilder( forgetUselessBranches, autoFixUselessBranch );
         foreach( var b in _branches )
         {
             b.Collect( issues );

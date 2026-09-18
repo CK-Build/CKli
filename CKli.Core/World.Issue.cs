@@ -17,26 +17,62 @@ public sealed partial class World
         readonly string _title;
         readonly IRenderable _body;
         readonly Repo? _repo;
-        readonly bool _manualFix;
+        readonly Kind _kind;
 
-        Issue( string title, IRenderable body, Repo? repo, bool manualFix )
+        /// <summary>
+        /// Qualifies the type of the <see cref="Issue"/>.
+        /// </summary>
+        public enum Kind
+        {
+            /// <summary>
+            /// Non applicable.
+            /// </summary>
+            None,
+
+            /// <summary>
+            /// Implicit issue is automatically and implicitly fixed.
+            /// They appear in "ckli issue" only because no CKli execution run before and fixed them silently.
+            /// <para>
+            /// They appear in dark gray in the display.
+            /// </para>
+            /// </summary>
+            Implicit,
+
+            /// <summary>
+            /// The issue can be automatically fixed by using "ckli issue --fix".
+            /// </summary>
+            AutomaticFix,
+
+            /// <summary>
+            /// The issue must be fixed manually. "ckli issue --fix" cannot fix it.
+            /// <para>
+            /// A ✋ appears in the display.
+            /// </para>
+            /// </summary>
+            ManualFix
+        }
+
+        Issue( string title, IRenderable body, Repo? repo, Kind kind )
         {
             Throw.CheckNotNullOrWhiteSpaceArgument( title );
             Throw.CheckNotNullArgument( body );
+            Throw.CheckArgument( kind != Kind.None );
             _title = title;
             _body = body;
             _repo = repo;
-            _manualFix = manualFix;
+            _kind = kind;
         }
 
         /// <summary>
-        /// Initializes a new Issue.
+        /// Initializes a new <see cref="Kind.Implicit"/> or <see cref="Kind.AutomaticFix"/> Issue.
+        /// Use <see cref="CreateManual(string, IRenderable, Repo?)"/> for manual issues.
         /// </summary>
         /// <param name="title">The title.</param>
         /// <param name="body">The body. Can be <see cref="ScreenType.Unit"/>.</param>
         /// <param name="repo">The repository if this issue is related to a specific repository.</param>
-        protected Issue( string title, IRenderable body, Repo? repo )
-            : this( title, body, repo, false )
+        /// <param name="implicitIssue">True for a <see cref="Kind.Implicit"/> issue. Defaults to <see cref="Kind.AutomaticFix"/>.</param>
+        protected Issue( string title, IRenderable body, Repo? repo, bool implicitIssue = false )
+            : this( title, body, repo, implicitIssue ? Kind.Implicit : Kind.AutomaticFix )
         {
         }
 
@@ -59,7 +95,7 @@ public sealed partial class World
         /// Gets whether this issue cannot be fixed automatically (a ✋ appears).
         /// Use <see cref="CreateManual(string, IRenderable, Repo?)"/> to create such issues.
         /// </summary>
-        public bool ManualFix => _manualFix;
+        public Kind IssueKind => _kind;
 
         /// <summary>
         /// Executes the fix.
@@ -74,7 +110,7 @@ public sealed partial class World
         sealed class Manual : Issue
         {
             public Manual( string title, IRenderable body, Repo? repo )
-                : base( title, body, repo, true )
+                : base( title, body, repo, Kind.ManualFix )
             {
             }
 
@@ -93,14 +129,26 @@ public sealed partial class World
         /// <returns>An issue that must be manually fixed.</returns>
         public static Issue CreateManual( string title, IRenderable body, Repo? repo ) => new Manual( title, body, repo );
 
-        internal IRenderable ToRenderable( ScreenType screenType )
+        /// <summary>
+        /// Gets the display of this issue: the <see cref="Title"/> (prefixed by a marker that depends on
+        /// the <see cref="IssueKind"/>) above the <see cref="Body"/>, in a <see cref="Collapsable"/> that
+        /// is entirely dark gray for a <see cref="Kind.Implicit"/> issue.
+        /// </summary>
+        /// <param name="screenType">The screen type to use.</param>
+        /// <returns>The renderable display of this issue.</returns>
+        public IRenderable ToRenderable( ScreenType screenType )
         {
             var title = _title;
-            if( _manualFix ) title = "✋ " + title; 
+            if( _kind is Kind.Implicit )
+            {
+                title = "Ⓘ " + title;
+                return new Collapsable( screenType.Text( title ).AddBelow( _body ), new TextStyle( ConsoleColor.DarkGray ) );
+            }
+            if( _kind is Kind.ManualFix ) title = "✋ " + title;
+            else title = "⚙ " + title;
             return new Collapsable( screenType.Text( title ).AddBelow( _body ) );
         }
     }
-
 
     internal async Task<bool> HandleIssuesAsync( IActivityMonitor monitor,
                                                  CKliEnv context,
@@ -115,11 +163,12 @@ public sealed partial class World
         }
         else
         {
-            int autoFixCount = issues.Count( i => !i.ManualFix );
-            int manualFixCount = issues.Count - autoFixCount;
+            int manualFixCount = issues.Count( i => i.IssueKind == Issue.Kind.ManualFix );
+            // Implicit issues are fixed like the automatic ones: only their display differs.
+            int fixableCount = issues.Count - manualFixCount;
             if( manualFixCount > 0 )
             {
-                monitor.Warn( $"Found {issues.Count} issues that require a manual fix." );
+                monitor.Warn( $"Found {manualFixCount} issues that require a manual fix." );
             }
             if( displayIssues )
             {
@@ -139,11 +188,11 @@ public sealed partial class World
             {
                 // Applies always the same ordering.
                 var groupedIssues = issues.GroupBy( i => i.Repo ).OrderBy( g => g.Key?.Index ?? -1 );
-                if( autoFixCount > 0 )
+                if( fixableCount > 0 )
                 {
                     using( monitor.OpenInfo( manualFixCount > 0
-                                                ? $"Trying to fix {autoFixCount} issues ({manualFixCount} issues must be fixed manually)."
-                                                : $"Trying to fix {autoFixCount} issues." ) )
+                                                ? $"Trying to fix {fixableCount} issues ({manualFixCount} issues must be fixed manually)."
+                                                : $"Trying to fix {fixableCount} issues." ) )
                     {
                         foreach( var g in groupedIssues.Where( g => g.Any() ) )
                         {
@@ -153,15 +202,16 @@ public sealed partial class World
                                 {
                                     try
                                     {
-                                        if( !i.ManualFix )
+                                        // Executes Automatic and Implicit.
+                                        if( i.IssueKind is not Issue.Kind.ManualFix )
                                         {
                                             if( !await i.ExecuteAsync( monitor, context, this, cancellation ).ConfigureAwait( false ) )
                                             {
                                                 monitor.CloseGroup( $"Fixing '{i.Title}' failed." );
                                                 return false;
                                             }
+                                            monitor.Info( $"Fixed '{i.Title}'." );
                                         }
-                                        monitor.Info( $"Fixed '{i.Title}'." );
                                     }
                                     catch( OperationCanceledException ex ) when( ex.CancellationToken == cancellation )
                                     {

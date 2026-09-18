@@ -18,10 +18,12 @@ sealed partial class BranchIssueBuilder
     List<(Branch Ahead, Branch Base)>? _unrelated;
     bool _hasSevereIssues;
     readonly bool _forgetUselessBranches;
+    readonly bool _autoFixUselessBranch;
 
-    public BranchIssueBuilder( bool forgetUselessBranches )
+    public BranchIssueBuilder( bool forgetUselessBranches, bool autoFixUselessBranch )
     {
         _forgetUselessBranches = forgetUselessBranches;
+        _autoFixUselessBranch = autoFixUselessBranch;
     }
 
     public void OnMissingBaseBranch( Branch branch, string baseBranchName )
@@ -94,7 +96,7 @@ sealed partial class BranchIssueBuilder
         }
         if( _removables != null )
         {
-            collector( RemovableBranchesIssue.Create( screenType, repo, _removables ) );
+            collector( RemovableBranchesIssue.Create( screenType, repo, _removables, _autoFixUselessBranch ) );
         }
         if( _desynchronized != null )
         {
@@ -135,6 +137,5 @@ sealed partial class BranchIssueBuilder
                     .AppendLine();
             }
         }
-
     }
 }
