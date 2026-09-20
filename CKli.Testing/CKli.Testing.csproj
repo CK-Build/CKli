@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CK.Testing.NUnit" Version="15.0.4" />
+    <PackageReference Include="CK.Testing.NUnit" Version="15.0.5" />
   </ItemGroup>
 
   <ItemGroup>
