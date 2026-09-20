@@ -6,8 +6,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CK.PerfectEvent" Version="27.0.5" />
-    <PackageReference Include="CK.SVersion" Version="0.2.5" />
-    <PackageReference Include="CK.Packaging.Abstractions" Version="0.1.1" />
+    <PackageReference Include="CK.SVersion" Version="0.2.6" />
+    <PackageReference Include="CK.Packaging.Abstractions" Version="0.1.2" />
     <PackageReference Include="CK.CanaryPackage" Version="1.0.0" />
     <PackageReference Include="CK.Monitoring" Version="26.0.5" />
     <PackageReference Include="LibGit2Sharp" Version="0.32.0" />
