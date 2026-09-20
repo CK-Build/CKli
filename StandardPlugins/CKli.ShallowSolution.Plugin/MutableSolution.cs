@@ -162,8 +162,7 @@ public sealed class MutableSolution
                         monitor.Warn( $"""
                         Unhandled version in file '{path}':
                         {e}
-                        The package '{packageId}' version map is:
-                        {map.ToString()}.
+                        The package '{packageId}/v{from}' has no mapping.
                         """ );
                     }
                 }
