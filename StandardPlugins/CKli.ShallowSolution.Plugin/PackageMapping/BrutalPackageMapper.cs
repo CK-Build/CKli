@@ -36,7 +36,10 @@ public static class BrutalPackageMapper
 
         public bool IsEmpty => _mappings.Count == 0;
 
-        public bool HasMapping( string packageId ) => _mappings.ContainsKey( packageId );
+        // Brutal: an identifier this mapper holds is mapped whatever the version it is met at.
+        public PackageMappingType GetMappingType( string packageId ) => _mappings.ContainsKey( packageId )
+                                                                            ? PackageMappingType.Mapped
+                                                                            : PackageMappingType.None;
 
         public SVersion? GetMappedVersion( string packageId, SVersion from ) => _mappings.GetValueOrDefault( packageId );
 

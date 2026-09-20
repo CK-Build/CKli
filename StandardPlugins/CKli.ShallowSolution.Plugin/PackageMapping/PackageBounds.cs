@@ -26,8 +26,17 @@ namespace CKli.ShallowSolution.Plugin;
 /// A rule decides which identifiers a bound covers, never what a bound does: a matched bound applies exactly
 /// as if the identifier had been named.
 /// </para>
+/// <para>
+/// This is a <see cref="IPackageMapping"/> and as such, it maps a package identifier to the <see cref="SVersionBound"/> its
+/// versions must stay in: a version that doesn't <see cref="SVersionBound.Satisfy(in SVersion)"/> its bound is mapped to
+/// the bound's <see cref="SVersionBound.Base"/>, a version that satisfies it is left alone.
+/// </para>
+/// <para>
+/// A <see cref="SVersionLock.Lock"/>ed bound accepts its base version only: such a mapper behaves exactly
+/// like a <see cref="BrutalPackageMapper"/> on the base version.
+/// </para>
 /// </summary>
-public sealed class PackageBounds
+public sealed class PackageBounds : IPackageMapping
 {
     readonly ImmutableArray<Rule> _rules;
 
@@ -201,6 +210,32 @@ public sealed class PackageBounds
         bound = default;
         origin = null;
         return false;
+    }
+
+    /// <summary>
+    /// A covered package identifier is <see cref="PackageMappingType.KnownName"/> and never
+    /// <see cref="PackageMappingType.Mapped"/>: a bound has an opinion about the versions that are out of it
+    /// and about no other, so a version it leaves alone is not a version it failed to handle.
+    /// </summary>
+    /// <param name="packageId">The package identifier.</param>
+    /// <returns><see cref="PackageMappingType.KnownName"/> or <see cref="PackageMappingType.None"/>.</returns>
+    public PackageMappingType GetMappingType( string packageId ) => TryGet( packageId, out _, out _ )
+                                                                        ? PackageMappingType.KnownName
+                                                                        : PackageMappingType.None;
+
+    /// <summary>
+    /// Gets the version a reference must carry: the bound's <see cref="SVersionBound.Base"/> when
+    /// <paramref name="from"/> is out of the bound that applies to <paramref name="packageId"/>, null when it
+    /// satisfies it - and null as well when no rule covers the identifier at all.
+    /// </summary>
+    /// <param name="packageId">The package identifier.</param>
+    /// <param name="from">The referenced version.</param>
+    /// <returns>The version to use or null when there is nothing to change.</returns>
+    public SVersion? GetMappedVersion( string packageId, SVersion from )
+    {
+        return TryGet( packageId, out var bound, out _ ) && !bound.Satisfy( from )
+                ? bound.Base
+                : null;
     }
 
     /// <inheritdoc />

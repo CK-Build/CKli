@@ -170,40 +170,58 @@ Once loaded, `UpdatePackages(monitor, mapping, updated)` is the only mutation su
 and `Directory.(Build|Packages).props` file via `CommonSolution.LoadAllProjectFiles` (this time with
 `LoadOptions.PreserveWhitespace`, to keep diffs minimal), rewrites each `<PackageReference>`'s `VersionOverride`
 and/or `Version` attribute (and each `<PackageVersion>`'s `Version` attribute) using
-`IPackageMapping.TryGetMappedVersion`, and saves every touched document back with `XmlHelper.SafeSave`. Packages with
-no matching mapping are left untouched; packages that *are* mapped but whose current version isn't recognized by the
-mapping produce a warning, not an error. The method's doc comment explains the motivation: `dotnet package update`
+`IPackageMapping.TryGetMappedVersion`, and saves every touched document back with `XmlHelper.SafeSave`. Which
+identifiers it looks at, and which unmapped version it complains about, is decided by `IPackageMapping.GetMappingType`
+(see below): a `None` identifier is skipped without even reading its version, a `Mapped` one whose current version the
+mapping doesn't recognize produces a warning — not an error — and a `KnownName` one is left alone silently. The method's
+doc comment explains the motivation: `dotnet package update`
 only operates on one project at a time and silently no-ops when a package isn't found — unusable for a batched,
 multi-repository update.
 
-### Package mappings: `IPackageMapping`, `PackageMapper`, `BrutalPackageMapper`, `BoundPackageMapper`
+### Package mappings: `IPackageMapping`, `PackageMapper`, `BrutalPackageMapper`, `PackageBounds`
 
 ```csharp
 public interface IPackageMapping
 {
     bool IsEmpty { get; }
-    bool HasMapping( string packageId );
+    PackageMappingType GetMappingType( string packageId );
     SVersion? GetMappedVersion( string packageId, SVersion from );
 }
 ```
 
-`PackageMappingExtensions.TryGetMappedVersion` adapts `GetMappedVersion` to the usual `bool` + `out` pattern. Two
-implementations are provided:
+`PackageMappingExtensions.TryGetMappedVersion` adapts `GetMappedVersion` to the usual `bool` + `out` pattern.
 
-- **`PackageMapper`** — the precise mapper. Each `(packageId, fromVersion)` pair maps to an explicit `toVersion`
-  (`TryAdd`/`Add`; idempotent, conflicts on a differing target for the same `(id, from)`), so different current
-  versions of the same package can map differently, or not map at all. It implements
+`PackageMappingType` is what tells an *exact* mapping from a *relaxed* one, and it is answered **per identifier**
+because a null `GetMappedVersion` means two different things:
+
+| Value | The mapping… | A null `GetMappedVersion` is… |
+|---|---|---|
+| `None` | doesn't handle the identifier at all | normal — the reference's version is not even read |
+| `KnownName` | handles the identifier, but not necessarily every version of it | "this version is fine as it is" |
+| `Mapped` | handles the identifier and every version of it | a reference the update failed to reach — `MutableSolution` warns |
+
+The values are ordered from the weakest to the strongest, which a mapping that falls back from one mapping to
+another uses to combine them: `Roadmap.Mapping` takes the greater of the World bounds' and the discrepancies'
+answers, because `KnownName ?? Mapped` cannot answer null while `KnownName ?? None` can. Getting this wrong is not
+cosmetic — a relaxed mapping answering `Mapped` makes every build of a World that declares `<Packages>` bounds warn
+about each in-bound reference it correctly left alone.
+
+Three implementations are provided here (`CKli.Build.Plugin`'s `FixPackageMapper` and `Roadmap.Mapping`, and
+`CKli.HotZone.Plugin`'s `LastBuildVersionMapping`, are the others):
+
+- **`PackageMapper`** — the precise mapper, `Mapped`. Each `(packageId, fromVersion)` pair maps to an explicit
+  `toVersion` (`TryAdd`/`Add`; idempotent, conflicts on a differing target for the same `(id, from)`), so different
+  current versions of the same package can map differently, or not map at all. It implements
   `ICKVersionedBinarySerializable` (`[SerializationVersion(0)]`), so a computed mapping — e.g. one produced while
   walking a Build roadmap — can be persisted or transmitted. `PackageMapper.Empty` is a shared no-op instance.
-- **`BrutalPackageMapper.Create(mappings)`** — wraps a plain `IReadOnlyDictionary<string, SVersion>` (package id →
-  target version; must use `StringComparer.OrdinalIgnoreCase`, checked at construction) and ignores the *current*
-  version entirely: any known package id is always mapped to its target version.
-- **`BoundPackageMapper.Create(bounds)`** — wraps a `PackageBounds` (package id → the range of versions that is
-  accepted) and maps only what is *outside* its bound, to that bound's `Base`. A version that satisfies its bound is
-  left alone. A `[Lock]`ed bound accepts its base version only, so it behaves exactly like a `BrutalPackageMapper` on
-  that version. This is what backs the World's
-  [`<VersionTag><Packages>`](../CKli.VersionTag.Plugin/README.md#configuration) configuration.
-- **`PackageBounds`** — the bounds themselves: an **ordered** `ImmutableArray<Rule>`, each rule a package name in
+- **`BrutalPackageMapper.Create(mappings)`** — `Mapped`. Wraps a plain `IReadOnlyDictionary<string, SVersion>`
+  (package id → target version; must use `StringComparer.OrdinalIgnoreCase`, checked at construction) and ignores the
+  *current* version entirely: any known package id is always mapped to its target version.
+- **`PackageBounds`** — the World's bounds, and a `KnownName` mapping over them: it maps only what is *outside* its
+  bound, to that bound's `Base`, and a version that satisfies its bound is left alone. A `[Lock]`ed bound accepts its
+  base version only, so it behaves exactly like a `BrutalPackageMapper` on that version. This is what backs the
+  World's [`<VersionTag><Packages>`](../CKli.VersionTag.Plugin/README.md#configuration) configuration.
+  The bounds themselves are an **ordered** `ImmutableArray<Rule>`, each rule a package name in
   which every `*` matches any sequence of characters (a name without one is an exact identifier).
   `TryGet(packageId, out bound, out origin)` returns the
   bound of the **first rule that matches** - the declaration order is the priority, nothing is ranked by specificity -
@@ -217,14 +235,14 @@ implementations are provided:
 
 | Type | Role |
 |---|---|
-| `PackageBounds` | The World's `<VersionTag><Packages>` version bounds: an ordered list of names with `*` wildcards, resolved first-match-wins. |
+| `PackageBounds` | The World's `<VersionTag><Packages>` version bounds: an ordered list of names with `*` wildcards, resolved first-match-wins. Itself a `KnownName` `IPackageMapping` over them. |
 | `ShallowSolutionPlugin` | `PrimaryPluginBase` entry point; reads solutions from commits/branches (cached per `Tree.Sha`), dispatches to `MutableSolution` for updates. |
 | `GitSolutionContent` / `GitSolutionContent.Project` | Read-only projects + consumed packages, independent of any `Repo`/`Branch`. |
 | `GitSolution` | `GitSolutionContent` bound to the `Repo`/`Branch` it was read from. |
 | `MutableSolution` | Working-folder-only solution used to rewrite package versions in place; handles `.sln` → `.slnx` migration and renaming. |
 | `CommonSolution` | Internal shared walker: resolves `.slnx` `<Project>` entries and `Directory.*.props` files. |
 | `INormalizedFileProvider` / `TreeFolder` / `CheckedOutFileProvider` / `GitFileInfo` / `FileInfoExtensions` | Uniform read-only file access over either a Git `Tree` or the physical working folder. |
-| `IPackageMapping` / `PackageMappingExtensions` / `PackageMapper` / `BrutalPackageMapper` / `BoundPackageMapper` | Package-id + version → target-version mapping abstraction used for update detection and application. |
+| `IPackageMapping` / `PackageMappingType` / `PackageMappingExtensions` / `PackageMapper` / `BrutalPackageMapper` | Package-id + version → target-version mapping abstraction used for update detection and application. `PackageMappingType` says, per identifier, whether an unmapped version is "leave it alone" or an anomaly. |
 
 ## Configuration
 

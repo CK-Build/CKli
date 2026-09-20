@@ -25,7 +25,6 @@ public sealed partial class HotGraph
         IReadOnlyDictionary<string, IReadOnlyList<(Solution Solution, SVersion Version)>>? _discrepancies;
         IPackageMapping? _alreadyBuiltMappingInCI;
         IPackageMapping? _alreadyBuiltMappingInNonCI;
-        IPackageMapping? _worldConfiguredMapping;
         IPackageMapping? _discrepanciesMapping;
 
         internal PackageUpdater( HotGraph graph, ImmutableArray<SolutionVersionInfo> versions )
@@ -114,7 +113,7 @@ public sealed partial class HotGraph
         /// its bound is left alone, one that is not is mapped to the bound's <see cref="SVersionBound.Base"/>.
         /// </para>
         /// </summary>
-        public IPackageMapping WorldConfiguredMapping => _worldConfiguredMapping ??= BoundPackageMapper.Create( _graph._externalPackages );
+        public IPackageMapping WorldConfiguredMapping => _graph._externalPackages;
 
         /// <summary>
         /// Gets the version mapping that resolves <see cref="Discrepancies"/> by mapping to the greatest referenced version.
@@ -155,7 +154,15 @@ public sealed partial class HotGraph
                 return null;
             }
 
-            public bool HasMapping( string packageId ) => _p2s.ContainsKey( packageId );
+            // A solution whose last build must itself be rebuilt (a "+fake" or a deprecated version) has no
+            // version to offer: the identifier is known but nothing maps, and that is not an anomaly.
+            public PackageMappingType GetMappingType( string packageId )
+            {
+                if( !_p2s.TryGetValue( packageId, out var s ) ) return PackageMappingType.None;
+                return _versions[s.Repo.Index].GetLastBuild( _ciBuild ).VersionMustBuild
+                        ? PackageMappingType.KnownName
+                        : PackageMappingType.Mapped;
+            }
         }
 
     }

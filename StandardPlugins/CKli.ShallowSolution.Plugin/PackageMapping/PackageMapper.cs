@@ -24,7 +24,7 @@ public sealed class PackageMapper : IPackageMapping, ICKVersionedBinarySerializa
 
         public SVersion? GetMappedVersion( string packageId, SVersion from ) => null;
 
-        public bool HasMapping( string packageId ) => false;
+        public PackageMappingType GetMappingType( string packageId ) => PackageMappingType.None;
     }
 
     /// <summary>
@@ -117,8 +117,16 @@ public sealed class PackageMapper : IPackageMapping, ICKVersionedBinarySerializa
     /// </summary>
     public int Count => _count;
 
-    /// <inheritdoc />
-    public bool HasMapping( string packageId ) => _mapping.ContainsKey( packageId );
+    /// <summary>
+    /// A registered package identifier is <see cref="PackageMappingType.Mapped"/>: this mapper is the exact
+    /// one, the "from" versions it holds are the ones that are expected to be met and a reference at another
+    /// version is a reference this update failed to reach.
+    /// </summary>
+    /// <param name="packageId">The package identifier.</param>
+    /// <returns><see cref="PackageMappingType.Mapped"/> or <see cref="PackageMappingType.None"/>.</returns>
+    public PackageMappingType GetMappingType( string packageId ) => _mapping.ContainsKey( packageId )
+                                                                        ? PackageMappingType.Mapped
+                                                                        : PackageMappingType.None;
 
     /// <summary>
     /// Adds a (packageId,version) -&gt; version mapping. The (packageId,version) must not

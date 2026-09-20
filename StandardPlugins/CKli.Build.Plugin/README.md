@@ -358,7 +358,10 @@ recomputed until no new build requirement appears.
 
 `Roadmap.PackageMapping` (`Roadmap.Mapping`, `IPackageMapping`) is what the actual build uses to rewrite `.csproj`
 references: for packages produced inside the World it resolves to the roadmap's own target/last-built versions; for
-everything else it falls back to `HotGraph.PackageUpdater`'s World-configured and discrepancy mappings.
+everything else it falls back to `HotGraph.PackageUpdater`'s World-configured and discrepancy mappings. Its
+`GetMappingType` mirrors that same branching, and that is what keeps the build silent about the references it
+deliberately leaves alone — see
+[`PackageMappingType`](../CKli.ShallowSolution.Plugin/README.md#package-mappings-ipackagemapping-packagemapper-brutalpackagemapper-packagebounds).
 
 `Roadmap.PublishableStatus` / `BuildSolution.PublishableStatus` (`None` < `AlreadyPublished` < `PublishRequired` <
 `Build` < `IndirectPublishRequired` < `BuildingPending`, in that numeric/severity order) summarize, across all

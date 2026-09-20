@@ -98,12 +98,13 @@ public sealed class MutableSolution
                 foreach( var e in projectRoot.Descendants( XNames.PackageVersion ) )
                 {
                     var name = CommonSolution.GetIncludedName( monitor, path, e, LogLevel.Warn );
-                    if( name != null && mapping.HasMapping( name ) )
+                    if( name == null ) continue;
+                    // None: the mapping doesn't handle this identifier at all, reading its version is useless.
+                    var mappingType = mapping.GetMappingType( name );
+                    if( mappingType is PackageMappingType.None ) continue;
+                    if( !UpdateVersion( monitor, path, e, name, XNames.Version, "Version", mapping, mappingType, updated ) )
                     {
-                        if( !UpdateVersion( monitor, path, e, name, XNames.Version, "Version", mapping, updated ) )
-                        {
-                            return false;
-                        }
+                        return false;
                     }
                 }
             }
@@ -112,16 +113,16 @@ public sealed class MutableSolution
                 foreach( var e in projectRoot.Descendants( XNames.PackageReference ) )
                 {
                     var name = CommonSolution.GetIncludedName( monitor, path, e, LogLevel.Warn );
-                    if( name != null && mapping.HasMapping( name ) )
+                    if( name == null ) continue;
+                    var mappingType = mapping.GetMappingType( name );
+                    if( mappingType is PackageMappingType.None ) continue;
+                    if( !UpdateVersion( monitor, path, e, name, XNames.VersionOverride, null, mapping, mappingType, updated ) )
                     {
-                        if( !UpdateVersion( monitor, path, e, name, XNames.VersionOverride, null, mapping, updated ) )
-                        {
-                            return false;
-                        }
-                        if( !UpdateVersion( monitor, path, e, name, XNames.Version, null, mapping, updated ) )
-                        {
-                            return false;
-                        }
+                        return false;
+                    }
+                    if( !UpdateVersion( monitor, path, e, name, XNames.Version, null, mapping, mappingType, updated ) )
+                    {
+                        return false;
                     }
                 }
             }
@@ -134,6 +135,7 @@ public sealed class MutableSolution
                                        XName attributeName,
                                        string? attributeRequiredMessage,
                                        IPackageMapping map,
+                                       PackageMappingType mappingType,
                                        PackageMapper? updated )
             {
                if( !CommonSolution.ReadVersionAttribute( monitor,
@@ -157,13 +159,17 @@ public sealed class MutableSolution
                             updated?.TryAdd( packageId, from, to );
                         }
                     }
-                    else
+                    else if( mappingType is PackageMappingType.Mapped )
                     {
+                        // Only an exact mapping can say that a version it didn't map is a version it missed.
+                        // For a KnownName one - a package whose configured bound this version satisfies, a
+                        // solution whose last build must itself be rebuilt - a null is "leave it alone", and
+                        // warning here made every build of a World with <Packages> bounds noisy.
                         monitor.Warn( $"""
-                        Unhandled version in file '{path}':
-                        {e}
-                        The package '{packageId}/v{from}' has no mapping.
-                        """ );
+                            Unhandled version in file '{path}':
+                            {e}
+                            The package '{packageId}/v{from}' has no mapping.
+                            """ );
                     }
                 }
                 return true;

@@ -24,7 +24,9 @@ sealed class FixPackageMapper : IPackageMapping
 
     public bool IsEmpty => _mapper.IsEmpty;
 
-    public bool HasMapping( string packageId ) => _mapper.HasMapping( packageId );
+    // Exact, like the PackageMapper it relaxes: the versions to fix are known beforehand, so a reference met
+    // at another one (that the Patch - 1 fallback below doesn't catch either) is worth reporting.
+    public PackageMappingType GetMappingType( string packageId ) => _mapper.GetMappingType( packageId );
 
     public SVersion? GetMappedVersion( string packageId, SVersion from )
     {

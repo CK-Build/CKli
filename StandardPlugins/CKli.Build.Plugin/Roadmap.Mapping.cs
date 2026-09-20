@@ -45,9 +45,27 @@ public sealed partial class Roadmap
                     ?? _packageUpdater.DiscrepanciesMapping.GetMappedVersion( packageId, from );
         }
 
-        public bool HasMapping( string packageId ) => _packageUpdater.Graph.ProducedPackages.ContainsKey( packageId )
-                                                      || _packageUpdater.WorldConfiguredMapping.HasMapping( packageId )
-                                                      || _packageUpdater.DiscrepanciesMapping.HasMapping( packageId );
+        public PackageMappingType GetMappingType( string packageId )
+        {
+            // This mirrors the branching of GetMappedVersion above: a package this World produces is answered
+            // by the produced branch alone, it never falls back on the bounds nor on the discrepancies.
+            if( _packageUpdater.Graph.ProducedPackages.TryGetValue( packageId, out var localSolution ) )
+            {
+                var b = _orderedSolutions[localSolution.OrderedIndex];
+                // A solution that is being built maps every version of its packages to its target version. One
+                // that is skipped maps them to its last build, unless that build must itself be rebuilt (the
+                // skippable "+fake" case above): there is then no version to offer and nothing to warn about.
+                return b.MustBuild || !b.VersionInfo.GetLastBuild( _ciBuild ).VersionMustBuild
+                        ? PackageMappingType.Mapped
+                        : PackageMappingType.KnownName;
+            }
+            // Out of this World: GetMappedVersion falls back from the bounds to the discrepancies, so the
+            // stronger of the two answers decides. This is the one place the enum's order is used, and it
+            // holds only for a "??" chain: "KnownName ?? Mapped" cannot answer null, "KnownName ?? None" can.
+            var configured = _packageUpdater.WorldConfiguredMapping.GetMappingType( packageId );
+            var discrepancy = _packageUpdater.DiscrepanciesMapping.GetMappingType( packageId );
+            return configured > discrepancy ? configured : discrepancy;
+        }
     }
 
 }
