@@ -125,8 +125,6 @@ public class RepoBuilder : RepoInfo
 
         if( cancellation.IsCancellationRequested ) return null;
 
-        XmlHelper.SafeSave( configRoot, nugetConfigPath, SaveOptions.DisableFormatting );
-
         // We ResetHard the repository after the build.
         bool resetHardDone = false;
 
@@ -135,6 +133,7 @@ public class RepoBuilder : RepoInfo
 
         try
         {
+            XmlHelper.SafeSave( configRoot, nugetConfigPath, SaveOptions.DisableFormatting );
             var (success, result) = await _repositoryBuilder.RaiseOnCoreBuildAsync( monitor, context, buildInfo, outputPath, runTest, cancellation ).ConfigureAwait( false );
             if( !success || result != null )
             {
