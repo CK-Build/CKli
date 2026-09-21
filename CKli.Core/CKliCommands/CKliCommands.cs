@@ -103,7 +103,10 @@ public static class CKliCommands
         Add( cmds, new CKliUpdate() );
 
         NS( cmds, "world",
-            "The definition of the current World.",
+            """
+            The definition of the current World and the locks that the developers of its Stack share.
+            """,
+            summary: "The definition of the current World and the locks its Stack shares.",
             helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#world-commands-reference-list-set-remove" );
         NS( cmds, "world reference",
             """
@@ -115,6 +118,8 @@ public static class CKliCommands
         Add( cmds, new CKliWorldReferenceList() );
         Add( cmds, new CKliWorldReferenceRemove() );
         Add( cmds, new CKliWorldReferenceSet() );
+        Add( cmds, new CKliWorldLock() );
+        Add( cmds, new CKliWorldUnlock() );
 
         static void Add( Dictionary<string, CommandNamespaceItem> commands, Command c ) => commands.Add( c.CommandPath, c );
 

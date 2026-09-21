@@ -117,6 +117,61 @@ The file lists repositories, can organize them into folders and contains configu
 A Stack always has a **default World** (the current version). Long Term Support (LTS) Worlds can be derived from it (e.g. `CK-Build@net8`).
 World names follow the pattern `StackName[@ltsName]`.
 
+### `LockPrefix`: the reference namespace that locks the Stack
+
+A Stack is locked by a Git reference in the **Stack repository** — that is what lets developers of one Stack
+serialize an operation across all its repositories. The `LockPrefix` attribute of the root element states the
+prefix of those references:
+
+```xml
+<CK-Build LockPrefix="refs/notes/ckli-locks">
+```
+
+**The attribute is the discriminator: present means settled, absent means that nobody has asked for a lock
+yet.** There is no "absent therefore default" — the first client that needs a lock determines the prefix and
+**records** it, including when the winner is `StackRepository.DefaultLockPrefix` (`refs/ckli-locks`). So
+`StackRepository.GetLockPrefix` reads the recorded value (null when there is none) and
+`StackRepository.EnsureLockPrefix` is what taking a lock calls: it returns the recorded one, or determines it
+now. Nothing else has to be run for a new Stack, and no command exists to do it by hand.
+
+Determining it means asking the repository, for real. `LockPrefixCandidates` are tried in order and each one
+is *created and deleted* on the remote (`DistributedLock.ProbeNamespace`). The delete leg is not a formality:
+a host that accepts the creation and refuses the deletion would leak a lock on every release, so it
+disqualifies the prefix — and the reference the probe just leaked is reported for manual removal. The order is
+`refs/ckli-locks`, then `refs/notes/ckli-locks`, then `refs/heads/ckli-locks`: out of `refs/heads/` a lock is
+outside the default fetch ref spec, so neither it nor the commits it carries are replicated to every clone,
+where the `refs/heads/` fallback is fetched by everyone on every fetch *and* subject to the repository's
+branch protection rules — a rule forbidding a non-fast-forward update or a deletion would break the lock
+itself.
+
+**A recorded value is never re-probed and never second-guessed**, and before probing anything
+`EnsureLockPrefix` fetches and reads the definition file *as the remote has it*: a colleague may have settled
+it since this clone was last pulled, and their value wins. That read is a fetch plus a blob read rather than a
+pull — the value is only being consulted, and a pull would merge into a working folder that taking a lock has
+no business touching (an untracked file the incoming commit also carries is enough to fail the checkout).
+If two clients do settle it at the same moment, the loser's push is refused and it is told to pull and retry.
+
+Whatever the prefix, its last part is always `ckli-locks` (`StackRepository.LockSegmentName`), and
+`StackRepository.IsValidLockPrefix` enforces it. Every lock reference of every Stack therefore carries that
+one segment, which is what makes a client locking under *another* prefix detectable: one reference name
+segment to look for in the remote's advertised references, instead of a list of candidate prefixes to keep in
+sync.
+
+**Only the default World can carry the attribute.** It is a **Stack** level setting: every World of a Stack
+locks in the one Stack repository, so whether a reference name is accepted there is the same answer for all
+of them, and the prefix is read from the default World's file whatever the current World is. A copy on a LTS
+World could only diverge from the one that is used, so `WorldDefinitionFile.Create` refuses it — the world
+does not load — and `ckli lts create` strips it from the definition file it derives.
+`WorldDefinitionFile.SetLockPrefix` enforces the same rule when writing.
+
+An invalid value is refused the same way, by an exception that prevents the world from loading rather than a
+fallback to the default: the lock prefix is precisely what every client must agree on, so a Stack that states
+an unusable one must be fixed, not worked around by a client that then locks somewhere else than its
+colleagues do.
+
+The mutex itself is
+[`GitRepository.DistributedLock`](#gitrepositorydistributedlock-a-mutex-shared-by-the-developers-of-a-stack).
+
 ### `<Reference />`: the other Stacks a World uses
 
 A world definition can name the other Stacks it works with. The elements can be direct children of the root
@@ -289,6 +344,64 @@ included. This is guaranteed, not merely respected by convention:
 - The commands where the user names the reference reject it up front with an error rather than a silent skip:
   `ckli tag push` and `ckli branch push`. `ckli push` names nothing (it pushes whatever tracks a remote branch), so it
   warns and skips such a branch.
+
+### `GitRepository.DistributedLock`: a mutex shared by the developers of a Stack
+
+`StackRepository.GetLock( monitor, lockName, out var theLock )` gives a mutex backed by a Git reference of the
+Stack remote — `{LockPrefix}/{lockName}`. It is how an operation is serialized across developers rather than
+across the threads of one process.
+
+**The commit chain is the algorithm.** The reference points to a chain of lease commits, each one a child of
+the one it replaces, so acquiring, stealing an expired lease and renewing are all **fast-forward** updates —
+and a fast-forward is the only conditional update the Git protocol offers. libgit2 compares the tip advertised
+during the push's own negotiation with the commit being pushed, and the receiving end checks the old object id
+before moving the reference. Two clients cannot both win: the loser gets `NonFastForwardException`, which the
+lock reports as `AcquireResult.Held`.
+
+A lease commit unrelated to the current one could only be pushed with `+`, and force is precisely the *absence*
+of a condition — that is the whole reason for the chain, and the reason `Release` **deletes** the reference
+rather than resetting it (a deletion is what keeps the chain from growing forever).
+
+Four things that are not obvious:
+
+- **The remote is read through a fetch, never from the advertised object id alone.** A colleague's lease is a
+  commit this clone does not have: reading it, and building the child that replaces it, both need the object.
+  `TryRead` lists the references (one round trip, which also carries the prefix check below) and then fetches.
+- **A deletion is not conditional on our own commit** — it removes whatever the reference points to. `Release`
+  is safe because a lease that has expired does not delete at all, and a lease that has not expired cannot
+  legally have been stolen. A lease that lost the reference refuses to release and says who holds it.
+- **`ClockSkewAllowance` is load-bearing.** A lease expires on the writer's clock and is read on the stealer's,
+  and nothing in the protocol provides a shared time. An expired lease becomes stealable only once it has been
+  expired for that long. This mutex is only as good as the clocks of the machines using it.
+- **Expiry is not enforced.** Nothing here can interrupt a caller, so `Lease.IsExpired` must be tested before
+  any step that must not run concurrently, and `Lease.Token` is the fencing token if the protected resource can
+  honor one. `Lease` is `IDisposable` only to warn about a path that forgot to `Release` — disposing does not
+  release, because a release is a remote call that needs a monitor and can fail.
+
+**`OwnerId` identifies a developer, a machine and a clone** — `Name <email> on MACHINE (C:/Dev2/CKli)`, from the
+Stack repository's configured Git identity — and it is one string because it plays both roles: it is what a
+lease displays when it blocks somebody, and it is what ownership is compared on (ignoring case, since the clone
+path is in it and Windows does not distinguish two spellings of one folder).
+
+That identity is what makes the lock survive the process that took it. `ckli world lock` and `ckli world unlock`
+are two separate runs, so the lease cannot be an object — and is deliberately not a local file either: the
+remote reference is the state, and a later run recognizes its own lock by that id. Hence the two API shapes the
+commands use: `AcquireOrRenew` (renews a lease of this `OwnerId` where `TryAcquire` would report it held) and
+`Unlock` (releases by owner, needing no `Lease`). The clone is part of the id on purpose — two clones of one
+Stack, even one developer's, publish independently and are therefore two holders.
+
+`Push` deliberately bypasses `GitRepository.Push`: that method merges the `DeferredPushRefSpecs` into every
+push and clears them on success (which a lock, pushed repeatedly while a command prepares its own references,
+must not do) and reports every rejection as a plain failure, where a lock must tell a lost race from a remote
+that refuses the reference name. When a rejection comes back through `OnPushStatusError` rather than as a
+`NonFastForwardException`, the reference is re-read to tell the two apart: one that moved is a lost race, one
+that did not is a host that will never accept this prefix — which is what points the user at `LockPrefix`.
+
+Finally, every lock reference carries the `ckli-locks` segment whatever its prefix, and the listing checks for
+one that is *not* under this client's prefix. Mutual exclusion holds only while every client agrees on the
+prefix; two that disagree would both acquire and neither would see the other. That is an error, never a
+warning — it is the one place where the failure is visible at all. See
+[`LockPrefix`](#lockprefix-the-reference-namespace-that-locks-the-stack).
 
 ---
 

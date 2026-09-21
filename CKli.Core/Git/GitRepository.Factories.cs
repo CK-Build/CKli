@@ -308,6 +308,15 @@ public sealed partial class GitRepository
                 monitor.Log( errorLevel, $"Git folder '{gitFolderPath}' exists but is not a valid Repository. This must be fixed manually." );
                 return null;
             }
+            // libgit2 writes the pack file it receives into 'objects/pack' but doesn't create this folder when
+            // it is missing: any fetch that has objects to download then fails with a misleading error (depending
+            // on the transport: a missing OID for a reference, a closed socket or a temporary file that cannot be
+            // created). A repository is perfectly valid without this folder: when all its objects are loose, the
+            // folder is empty and empty folders don't survive a zip or a file copy.
+            // This must be done before opening the Repository: the local ('file://') transport captures the pack
+            // folder when the object database is initialized, creating it afterwards is too late.
+            Directory.CreateDirectory( gitFolderPath.Combine( "objects/pack" ) );
+
             Uri? originUrl = null;
             var r = new Repository( workingFolder );
             var origin = r.Network.Remotes.FirstOrDefault( rem => rem.Name == "origin" );

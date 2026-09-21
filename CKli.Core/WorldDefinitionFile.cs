@@ -94,6 +94,80 @@ public sealed class WorldDefinitionFile
     public XElement XmlRoot => _root;
 
     /// <summary>
+    /// Gets the optional LockPrefix attribute of the root element: the prefix of the Git references that lock
+    /// this world's Stack. Null when the attribute is absent (<see cref="StackRepository.DefaultLockPrefix"/>
+    /// is then used).
+    /// <para>
+    /// This is a <b>Stack</b> level setting that only the default World's definition file can carry: every
+    /// World of a Stack locks in the one Stack repository, so whether a reference name is accepted there is
+    /// the same answer for all of them. A copy on a LTS World could only diverge from the one that is used,
+    /// so <see cref="Create"/> refuses it and "ckli lts create" does not propagate it.
+    /// </para>
+    /// <para>
+    /// Use <see cref="StackRepository.GetLockPrefix(IActivityMonitor, out string)"/> to obtain the effective
+    /// prefix: it resolves the default World's value and the default whatever the current World is.
+    /// </para>
+    /// </summary>
+    public string? LockPrefix => _root.Attribute( XNames.LockPrefix )?.Value;
+
+    /// <summary>
+    /// Sets the LockPrefix attribute, saves this file and commits the change in the Stack repository.
+    /// Setting the value it already has does nothing.
+    /// <para>
+    /// The attribute is always written once the prefix has been determined - including when it is
+    /// <see cref="StackRepository.DefaultLockPrefix"/>. Its presence is what says "settled": there is no
+    /// way back to "not determined", because a client that re-determined it could pick another one and
+    /// then lock where no colleague is looking.
+    /// </para>
+    /// <para>
+    /// This is a Stack level setting, so it can only be set on the default World - the same rule that
+    /// <see cref="Create"/> enforces when reading.
+    /// </para>
+    /// <para>
+    /// The commit is local: the change reaches the other developers when the Stack is pushed, and until
+    /// then they do not know the prefix. Push it as part of the same operation.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="lockPrefix">
+    /// A <see cref="StackRepository.IsValidLockPrefix(string?)"/> prefix that the remote actually accepts:
+    /// see <see cref="StackRepository.EnsureLockPrefix"/>.
+    /// </param>
+    /// <returns>True on success, false on error.</returns>
+    public bool SetLockPrefix( IActivityMonitor monitor, string lockPrefix )
+    {
+        Throw.CheckNotNullArgument( lockPrefix );
+        if( !_world.IsDefaultWorld )
+        {
+            monitor.Error( $"""
+                Cannot set the LockPrefix on world '{_world.FullName}'.
+                Only the default World can carry it: every World of a Stack locks in the Stack repository,
+                so the lock prefix is a Stack level setting.
+                """ );
+            return false;
+        }
+        if( !StackRepository.IsValidLockPrefix( lockPrefix ) )
+        {
+            monitor.Error( $"""
+                Invalid LockPrefix "{lockPrefix}".
+                {StackRepository.InvalidLockPrefixMessage}
+                """ );
+            return false;
+        }
+        if( LockPrefix == lockPrefix )
+        {
+            monitor.Trace( $"LockPrefix of Stack '{_world.StackName}' is already '{lockPrefix}'." );
+            return true;
+        }
+        using( StartEdit() )
+        {
+            _root.SetAttributeValue( XNames.LockPrefix, lockPrefix );
+        }
+        return SaveFile( monitor )
+               && _world.Stack.Commit( monitor, $"Set the Stack lock prefix to '{lockPrefix}'." );
+    }
+
+    /// <summary>
     /// Gets the &lt;Plugins /&gt; element.
     /// Must not be mutated otherwise a <see cref="InvalidOperationException"/> is raised.
     /// <para>
@@ -644,6 +718,7 @@ public sealed class WorldDefinitionFile
 
     internal static WorldDefinitionFile Create( IActivityMonitor monitor, LocalWorldName world, XElement root )
     {
+        CheckLockPrefix( world, root );
         var plugins = root.Ensure( XNames.Plugins, addFirst: true );
         if( _repositoryUrlHook != null )
         {
@@ -653,6 +728,37 @@ public sealed class WorldDefinitionFile
             }
         }
         return new WorldDefinitionFile( world, root, plugins, ReadReferences( monitor, world, root ) );
+    }
+
+    /// <summary>
+    /// Validates the optional LockPrefix attribute: an invalid one throws and this prevents the world to be
+    /// loaded, like the &lt;Reference /&gt; attributes (see <see cref="ReadReferences"/>).
+    /// <para>
+    /// Failing here is the point: the lock prefix is what every client must agree on, so a Stack that states
+    /// an unusable one - or a LTS World that carries a second, divergeable copy of it - must be fixed rather
+    /// than silently fall back to the default while another client uses the stated one.
+    /// </para>
+    /// </summary>
+    static void CheckLockPrefix( LocalWorldName world, XElement root )
+    {
+        var lockPrefix = root.Attribute( XNames.LockPrefix )?.Value;
+        if( lockPrefix == null ) return;
+        if( !world.IsDefaultWorld )
+        {
+            Throw.CKException( $"""
+                Invalid LockPrefix="{lockPrefix}" attribute on world '{world.FullName}'.
+                Only the default World can carry it: every World of a Stack locks in the Stack repository, so
+                the lock prefix is a Stack level setting. Remove it from this file: the default World's one
+                applies to this World as well.
+                """ );
+        }
+        if( !StackRepository.IsValidLockPrefix( lockPrefix ) )
+        {
+            Throw.CKException( $"""
+                Invalid LockPrefix="{lockPrefix}" attribute on world '{world.FullName}'.
+                {StackRepository.InvalidLockPrefixMessage}
+                """ );
+        }
     }
 
     /// <summary>

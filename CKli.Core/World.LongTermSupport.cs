@@ -49,6 +49,10 @@ public sealed partial class World
         // Nothing reads the root element name (the world's LTS name comes from its file name): the
         // LTSName attribute is here to identify the world when reading the file.
         newDefinition.SetAttributeValue( XNames.LTSName, ltsName );
+        // The LockPrefix is a Stack level setting that only the default World carries: all the Worlds of a
+        // Stack lock in the Stack repository, so a copy here could only diverge from the one that is used.
+        // WorldDefinitionFile.Create refuses a LTS World that has one.
+        newDefinition.SetAttributeValue( XNames.LockPrefix, null );
         if( _events._createLTSEventSender.HasHandlers )
         {
             var e = new CreateLTSEventArgs( monitor, context, this, ltsName, newDefinition );
@@ -59,6 +63,7 @@ public sealed partial class World
             // Silently skip any (stupid) change.
             newDefinition.Name = _definitionFile.XmlRoot.Name;
             newDefinition.SetAttributeValue( XNames.LTSName, ltsName );
+            newDefinition.SetAttributeValue( XNames.LockPrefix, null );
         }
         XmlHelper.SafeSave( newDefFile, newFileDesc );
         return true;

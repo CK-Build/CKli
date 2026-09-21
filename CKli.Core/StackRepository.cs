@@ -56,6 +56,34 @@ public sealed partial class StackRepository : IDisposable
     /// </summary>
     public const string BranchName = "main";
 
+    /// <summary>
+    /// The last part of any <see cref="GetLockPrefix(IActivityMonitor, out string)"/>: every lock reference of
+    /// a Stack carries it, whatever the prefix that the Stack uses.
+    /// <para>
+    /// This is what makes a client that locks under another prefix detectable: a single reference name segment
+    /// to look for in the remote's advertised references, instead of a list of candidate prefixes to maintain.
+    /// </para>
+    /// </summary>
+    public const string LockSegmentName = "ckli-locks";
+
+    /// <summary>
+    /// The lock prefix that is used when the default World has no LockPrefix attribute.
+    /// <para>
+    /// It is out of the default fetch ref spec, so the lock references (and the commits they carry) are never
+    /// replicated to every clone. A Stack whose host refuses a push outside "refs/heads/" and "refs/tags/"
+    /// must state another prefix. See <see cref="WorldDefinitionFile.LockPrefix"/>.
+    /// </para>
+    /// </summary>
+    public const string DefaultLockPrefix = "refs/" + LockSegmentName;
+
+    /// <summary>
+    /// Describes <see cref="IsValidLockPrefix(string?)"/> for the user.
+    /// </summary>
+    public const string InvalidLockPrefixMessage = """
+        A lock prefix must be a valid Git reference name prefix that starts with "refs/" and whose last part
+        is "ckli-locks": "refs/ckli-locks" (the default), "refs/notes/ckli-locks" or "refs/heads/ckli-locks".
+        """;
+
     readonly GitRepository _git;
     readonly NormalizedPath _stackRoot;
     readonly CKliEnv _context;
@@ -156,6 +184,234 @@ public sealed partial class StackRepository : IDisposable
             _defaultWorldName ??= new LocalWorldName( this, null, _stackRoot, StackWorkingFolder.AppendPart( $"{StackName}.xml" ) );
             return _defaultWorldName;
         }
+    }
+
+    /// <summary>
+    /// Gets the recorded prefix of the Git references that lock this Stack, or null when it has not been
+    /// determined yet. Use <see cref="EnsureLockPrefix"/> to obtain a usable one.
+    /// <para>
+    /// A lock lives in the Stack repository, so whether its reference name is accepted is a property of that
+    /// repository alone - not of its hosting provider, and not of the World that takes the lock. That is why
+    /// this is read from the <see cref="DefaultWorldName"/>'s definition file whatever the current World is,
+    /// and why <see cref="WorldDefinitionFile.Create"/> refuses the attribute on a LTS World: two clients that
+    /// disagree on the prefix would both take "the" lock and neither would see the other.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="lockPrefix">The recorded prefix. Null when it has not been determined yet.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool GetLockPrefix( IActivityMonitor monitor, out string? lockPrefix )
+    {
+        // Deliberately not cached here: LoadDefinitionFile already caches the file, and a cache of the
+        // resolved value would go stale the moment the prefix is determined or pulled.
+        lockPrefix = null;
+        var def = DefaultWorldName.LoadDefinitionFile( monitor );
+        if( def == null )
+        {
+            monitor.Error( $"Unable to read the lock prefix of Stack '{StackName}': its default World definition file cannot be loaded." );
+            return false;
+        }
+        lockPrefix = def.LockPrefix;
+        return true;
+    }
+
+    /// <summary>
+    /// The lock prefixes that <see cref="EnsureLockPrefix"/> tries, in order of preference.
+    /// <para>
+    /// <see cref="DefaultLockPrefix"/> comes first because it is out of the default fetch ref spec: neither
+    /// the lock references nor the commits they carry reach every clone. "refs/notes/" is the same in that
+    /// respect and is tried next in case a host allows that one namespace and no other. "refs/heads/" is the
+    /// universal fallback and the worst: every clone fetches the lock and its chain on every fetch, and the
+    /// branch protection rules of the repository apply to the lock itself - a rule that forbids a non
+    /// fast-forward update or a deletion would break it.
+    /// </para>
+    /// </summary>
+    public static readonly ImmutableArray<string> LockPrefixCandidates =
+    [
+        DefaultLockPrefix,
+        "refs/notes/" + LockSegmentName,
+        "refs/heads/" + LockSegmentName
+    ];
+
+    /// <summary>
+    /// Gets the prefix of the Git references that lock this Stack, determining it first when the default
+    /// World does not record one yet. This is what taking a lock calls: the determination is transparent and
+    /// happens at most once in the life of a Stack.
+    /// <para>
+    /// Whether a reference name is accepted is a property of THIS repository - its host, its version, its
+    /// push rules and the permissions of whoever runs this - not of a hosting provider in general. So the
+    /// answer is obtained by asking the repository, trying the <see cref="LockPrefixCandidates"/> in order
+    /// for real (a reference is created and deleted), and is then RECORDED in the default World - including
+    /// when the first candidate wins. The attribute is the discriminator: present means settled, absent
+    /// means that nobody has asked yet.
+    /// </para>
+    /// <para>
+    /// Recording it is what makes the lock work at all: a client that picked its own prefix would take a
+    /// second lock that no colleague can see. So a value already recorded is never re-probed and never
+    /// second-guessed - it wins over anything this client would have chosen.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="lockPrefix">The prefix to use.</param>
+    /// <returns>True on success, false when no candidate works or on error.</returns>
+    public bool EnsureLockPrefix( IActivityMonitor monitor, [NotNullWhen( true )] out string? lockPrefix )
+    {
+        if( !GetLockPrefix( monitor, out lockPrefix ) ) return false;
+        if( lockPrefix != null ) return true;
+        using( monitor.OpenInfo( $"The lock prefix of Stack '{StackName}' is not determined yet." ) )
+        {
+            // A colleague may have settled it since this clone was last pulled. The recorded value always
+            // wins, so look on the remote before probing anything.
+            if( !TryReadRemoteLockPrefix( monitor, out lockPrefix ) ) return false;
+            if( lockPrefix != null )
+            {
+                monitor.CloseGroup( $"'{lockPrefix}' has already been determined by another client." );
+                return true;
+            }
+            foreach( var candidate in LockPrefixCandidates )
+            {
+                if( GitRepository.DistributedLock.ProbeNamespace( monitor, _git, candidate ) )
+                {
+                    lockPrefix = candidate;
+                    break;
+                }
+            }
+            if( lockPrefix == null )
+            {
+                monitor.Error( $"""
+                    The remote of '{GitDisplayPath}' accepted none of the lock reference namespaces:
+                    '{LockPrefixCandidates.Concatenate( "', '" )}'
+                    No lock can be taken on this Stack. The messages above give each refusal as the remote
+                    worded it: a repository that forbids a non fast-forward update or a deletion on every
+                    reference cannot host a lock at all.
+                    """ );
+                return false;
+            }
+            var def = DefaultWorldName.LoadDefinitionFile( monitor );
+            if( def == null || !def.SetLockPrefix( monitor, lockPrefix ) )
+            {
+                lockPrefix = null;
+                return false;
+            }
+            if( !PushChanges( monitor ) )
+            {
+                monitor.Error( $"""
+                    Unable to record the lock prefix of Stack '{StackName}' on its remote.
+                    Another client has very likely recorded its own at the same time: pull the Stack and try
+                    again - the recorded value is the one that wins, and this one must not be used before it
+                    has reached the other developers.
+                    """ );
+                lockPrefix = null;
+                return false;
+            }
+            monitor.CloseGroup( $"Lock prefix of Stack '{StackName}' is '{lockPrefix}'." );
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Fetches and reads the lock prefix from the default World definition file as the REMOTE has it.
+    /// <para>
+    /// This deliberately fetches and reads a blob instead of pulling: the value is only being consulted, and
+    /// a pull would merge into the working folder - where an untracked file that the incoming commit also
+    /// carries is enough to make the checkout fail. Taking a lock must not depend on the state of a working
+    /// folder it does not touch.
+    /// </para>
+    /// </summary>
+    bool TryReadRemoteLockPrefix( IActivityMonitor monitor, out string? lockPrefix )
+    {
+        lockPrefix = null;
+        if( !_git.FetchRemoteBranches( monitor, withTags: false ) ) return false;
+        var tracked = _git.Repository.Head.TrackedBranch;
+        if( tracked?.Tip == null )
+        {
+            monitor.Warn( $"No remote tracking branch for '{GitDisplayPath}': the lock prefix can only be read locally." );
+            return true;
+        }
+        var fileName = $"{StackName}.xml";
+        if( tracked.Tip[fileName]?.Target is not LibGit2Sharp.Blob blob )
+        {
+            monitor.Warn( $"'{fileName}' not found in '{tracked.CanonicalName}'." );
+            return true;
+        }
+        try
+        {
+            lockPrefix = XDocument.Parse( blob.GetContentText() ).Root?.Attribute( XNames.LockPrefix )?.Value;
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While reading '{fileName}' from '{tracked.CanonicalName}'.", ex );
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Gets whether a lock prefix is valid: a Git reference name prefix that starts with "refs/" and whose
+    /// last part is <see cref="LockSegmentName"/>. See <see cref="InvalidLockPrefixMessage"/>.
+    /// </summary>
+    /// <param name="prefix">The prefix to test.</param>
+    /// <returns>Prefix validity.</returns>
+    public static bool IsValidLockPrefix( string? prefix )
+    {
+        // "refs/ckli-locks" ends with "/ckli-locks", so this single test also accepts the default prefix.
+        return prefix != null
+               && prefix.StartsWith( "refs/", StringComparison.Ordinal )
+               && prefix.EndsWith( '/' + LockSegmentName, StringComparison.Ordinal )
+               // Let LibGit2Sharp answer for the reference name rules themselves (empty parts, "..",
+               // control and special characters, ".lock" suffix, etc.) on a lock name that this validates.
+               && LibGit2Sharp.Reference.IsValidName( prefix + "/probe" );
+    }
+
+    /// <summary>
+    /// Creates a <see cref="GitRepository.DistributedLock"/> on this Stack repository: a mutex that is
+    /// shared by every developer of this Stack.
+    /// <para>
+    /// The lock lives in the Stack repository whatever it protects, so a lock that must not serialize the
+    /// Worlds of the Stack with each other has to carry the World in its <paramref name="lockName"/>
+    /// (<c>$"{world.Name.FullName}-publish"</c>).
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="lockName">
+    /// The lock name. It must not contain a '/': a lock named "a" and a lock named "a/b" are a permanent
+    /// directory/file conflict on the remote, and nothing could then push either of them.
+    /// </param>
+    /// <param name="distributedLock">The lock.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool GetLock( IActivityMonitor monitor,
+                         string lockName,
+                         [NotNullWhen( true )] out GitRepository.DistributedLock? distributedLock )
+    {
+        Throw.CheckNotNullOrWhiteSpaceArgument( lockName );
+        distributedLock = null;
+        if( lockName.Contains( '/' ) )
+        {
+            monitor.Error( $"Invalid lock name '{lockName}': it must not contain a '/'." );
+            return false;
+        }
+        // Taking a lock is what determines the prefix the first time: nothing else has to be run for a new
+        // Stack, and nothing can take a lock under a prefix the remote has not been seen to accept.
+        if( !EnsureLockPrefix( monitor, out var prefix ) )
+        {
+            return false;
+        }
+        if( !LibGit2Sharp.Reference.IsValidName( $"{prefix}/{lockName}" ) )
+        {
+            monitor.Error( $"Invalid lock name '{lockName}': '{prefix}/{lockName}' is not a valid Git reference name." );
+            return false;
+        }
+        // The owner identity is both what a lease displays and what it is compared on, so it says who, on
+        // which machine, in which clone. The clone is part of it because "the same holder" has to mean the
+        // same thing across two runs of ckli - that is what lets "world unlock" release what "world lock"
+        // took in an earlier process - and because two clones of one Stack, even one developer's, publish
+        // independently and are therefore two holders. Comparison ignores case (see DistributedLock.IsOurs).
+        var author = _git.Author;
+        distributedLock = new GitRepository.DistributedLock( _git,
+                                                             prefix,
+                                                             lockName,
+                                                             $"{author.Name} <{author.Email}> on {Environment.MachineName} ({_stackRoot})" );
+        return true;
     }
 
     /// <summary>

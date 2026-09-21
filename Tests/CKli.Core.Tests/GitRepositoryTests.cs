@@ -45,6 +45,45 @@ public partial class GitRepositoryTests
 
 
     [Test]
+    public void fetch_works_when_the_objects_pack_folder_is_missing()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var remotes = TestEnv.OpenRemotes( "One" );
+        var remoteUrl = remotes.GetUriFor( "OneRepo" );
+
+        // An orphan repository has only loose objects: its '.git/objects/pack' folder is empty. Deleting it
+        // reproduces a repository that has been zipped or copied by a tool that skips empty folders: the
+        // repository is perfectly valid but libgit2 has nowhere to write the pack file that a fetch receives.
+        var repoPath = context.CurrentDirectory.AppendPart( "NoPackFolder" );
+        using( var init = GitRepository.InitOrphanRepository( TestHelper.Monitor,
+                                                              context.SecretsStore,
+                                                              repoPath,
+                                                              repoPath.LastPart,
+                                                              isPublic: true ) )
+        {
+            init.ShouldNotBeNull();
+        }
+        var packFolder = repoPath.Combine( ".git/objects/pack" );
+        Directory.EnumerateFileSystemEntries( packFolder ).ShouldBeEmpty( "Only loose objects here." );
+        Directory.Delete( packFolder );
+
+        using var git = GitRepository.Open( TestHelper.Monitor,
+                                            context.SecretsStore,
+                                            context.Committer,
+                                            repoPath,
+                                            repoPath.LastPart,
+                                            isPublic: true,
+                                            expectedOriginUrl: remoteUrl ).ShouldNotBeNull();
+        Directory.Exists( packFolder ).ShouldBeTrue( "Opening the working folder restored the folder that libgit2 requires." );
+
+        // Without the folder, this fetch fails: libgit2 reports the error it happens to have at hand
+        // (a missing OID for a reference, a closed socket...) instead of the missing folder.
+        git.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
+        git.Repository.Branches["origin/master"].ShouldNotBeNull();
+    }
+
+
+    [Test]
     public void fetch_merge_push_and_pull()
     {
         var context = TestEnv.EnsureCleanFolder();

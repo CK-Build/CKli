@@ -499,6 +499,12 @@ The pending-release rule is the one that bites in practice: a `local/` build is 
 up in the new LTS World while the code it came from stays in the default one. Publish it (or let a new build
 supersede it) first.
 
+One thing is deliberately **not** cloned: the `LockPrefix` attribute. It states the Git reference namespace
+that locks the Stack, and since every World of a Stack locks in the one Stack repository it is a Stack level
+setting that only the default World carries — a copy on the new World could only diverge from the one that is
+actually used. See
+[`LockPrefix`](CKli.Core/README.md#lockprefix-the-reference-namespace-that-locks-the-stack).
+
 Only the definition file is created. The new World's repositories and its plugin solution appear when it is
 first opened, which is what [`lts clone`](#lts-clone-ltsname) does.
 
@@ -557,6 +563,56 @@ flag that contradicts it is an error, and an existing reference that contradicts
 Removes a reference. The `<nameOrUrl>` is its url, the referenced repository name (`XXX-Stack`) or its stack
 name (`XXX`) — the url is required when a name matches more than one reference. Removing a reference that doesn't
 exist is not an error, and a `<References>` element that becomes empty is removed.
+
+## World lock commands (lock, unlock)
+
+A **lock is shared by every developer of the Stack**, not by the processes of one machine: it is a Git reference
+of the Stack remote, so taking it tells every other clone that this one is busy. It is what serializes an
+operation — a publication, typically — across a team.
+
+The two commands are two separate processes, and **nothing is stored locally between them**: the remote
+reference is the state, and the lock recognizes its own by the clone that took it. So `world unlock` releases
+what a `world lock` of any earlier run acquired, and a second `world lock` from the same clone renews rather
+than fails. A second clone of the same Stack — even the same developer's — is a *different* holder.
+
+The name is scoped to the current World (`publish` in the `One` World is `refs/ckli-locks/One-publish`), so two
+developers working on two Worlds of one Stack never wait for each other.
+
+The `refs/ckli-locks` part is the Stack's
+[`LockPrefix`](CKli.Core/README.md#lockprefix-the-reference-namespace-that-locks-the-stack), and **it settles
+itself**: the first lock ever taken on a Stack finds out which reference namespace its remote accepts — by
+creating and deleting one for real — and records the answer in the default World, which is then pushed. There
+is nothing to configure and no setup command to run. Every later lock, on every clone, uses that recorded
+value. A host that refuses `refs/ckli-locks` (some refuse anything outside `refs/heads/` and `refs/tags/`)
+gets a working fallback automatically; a host that refuses all of them is reported, with each refusal as the
+remote worded it.
+
+**A lease expires, and nothing enforces it.** A lock is held for the duration asked for and then frees itself,
+so a crashed client stops blocking the team; the flip side is that CKli cannot interrupt whatever the lock was
+protecting when the lease runs out. Ask for a duration that covers the work, renew before it ends, or accept
+that a colleague may take over. Expiry is decided by comparing the holder's clock to yours, with 30 seconds of
+allowance: the lock is only as good as the clocks of the machines using it.
+
+### `world lock <name> --duration <minutes>`
+Acquires the named lock of the current World, or renews it when this clone already holds it (whichever run took
+it). `--duration` defaults to 5 minutes and cannot exceed 60 — a lock a crashed client holds for longer than
+anybody will wait is not a lock. An operation that takes longer asks for its duration, or renews.
+
+A lock held by somebody else is an **error**: the command reports who holds it, since when, and when it frees
+itself if its holder does not renew it first. A lease that has been expired for longer than the clock allowance
+is taken over, with a warning naming the holder that lost it.
+
+```
+> ckli world lock publish --duration 30
+Locked 'refs/ckli-locks/One-publish' until 2026-09-21 16:42:07Z (30 minutes).
+```
+
+### `world unlock <name>`
+Releases the lock when this clone holds it. **This always succeeds**: a lock that is not held, or that already
+expired, leaves nothing to do and is not an error, and running it twice is harmless.
+
+A lock held by somebody else is left strictly alone — the command warns, names the holder and releases nothing.
+There is no way to force a colleague's lock off: wait for it to expire, or have its holder run `world unlock`.
 
 ## Tag commands (list, fetch, pull, push, delete) 
 
