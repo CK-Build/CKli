@@ -230,7 +230,7 @@ public sealed partial class Roadmap
             SVersion? targetVersion = _versionInfo.TagCommitTree.ComputeTargetVersion( monitor,
                                                                                        ref vChange,
                                                                                        _roadmap.Graph.BranchName,
-                                                                                       _roadmap._ciBuildMode != CIBuildMode.None,
+                                                                                       _roadmap._ciBuildMode != CIBuildMode.Release,
                                                                                        mustAddCommit,
                                                                                        allowLocal: false );
             if( targetVersion == null )
@@ -257,7 +257,7 @@ public sealed partial class Roadmap
                 targetVersion = _versionInfo.TagCommitTree.ComputeTargetVersion( monitor,
                                                                                  ref vChange,
                                                                                  _roadmap.Graph.BranchName,
-                                                                                 _roadmap._ciBuildMode != CIBuildMode.None,
+                                                                                 _roadmap._ciBuildMode != CIBuildMode.Release,
                                                                                  mustAddCommit,
                                                                                  allowLocal: false );
                 if( targetVersion == null )
@@ -317,10 +317,10 @@ public sealed partial class Roadmap
                 //
                 // A pending "local/" (or "building/") release is unpublished: nothing consumed it, and
                 // TagCommit.CanBearVersion's "rolling local build" case already allows a CI version to take
-                // its place on the same commit (ApplyReleaseBuildTag destroys it). So a plain "--ci" rolls it
-                // - a developer who ran a regular build by mistake is not stuck with it.
+                // its place on the same commit (ApplyReleaseBuildTag destroys it). So a plain CI build rolls
+                // it - a developer who ran a "--release" build by mistake is not stuck with it.
                 if( buildReason == MustBuildReason.None
-                    && ciBuildMode != CIBuildMode.None
+                    && ciBuildMode != CIBuildMode.Release
                     && !lastBuild.TagCommit.Version.IsCI
                     && lastBuild.TagCommit.IsBuildingOrLocal )
                 {
@@ -524,7 +524,7 @@ public sealed partial class Roadmap
         /// non-CI version and no ci.0 has been produced from its commit yet.
         /// <para>
         /// A pending "local/" release is deliberately not a candidate: <see cref="MustBuildReason.RollingLocal"/>
-        /// means a plain "--ci" already builds it, so it never reaches an empty roadmap.
+        /// means a plain CI build already builds it, so it never reaches an empty roadmap.
         /// </para>
         /// </summary>
         internal bool IsCIForceCandidate => _buildInfo != null

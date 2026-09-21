@@ -30,7 +30,7 @@ public enum BranchLinkType
 
     /// <summary>
     /// This is the default link ("->"): the "dev/" child branch is synchronized with the "dev/" parent branch but only on built commits
-    /// (a build or build --ci must be have been done on the parent branch to impact the child).
+    /// (a build - CI or "--release" - must be have been done on the parent branch to impact the child).
     /// <para>
     /// All versioned commits are merged into the "dev/" child branch. 
     /// </para>

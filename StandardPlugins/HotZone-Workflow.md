@@ -29,8 +29,9 @@ one of its commits corresponding to something CKli actually built and tagged, wh
 single, short-lived integration branch that continuously absorbs work until it's folded back into the
 trunk. Rather than long-lived feature branches drifting away from `stable` before an eventual, risky
 merge, there is exactly one place work accumulates per branch, reconciled with the trunk as part of the
-very build/publish operation that produces a release — a successful non-CI publish is precisely what
-deletes the now-empty remote `dev/stable`.
+very build/publish operation that produces a release — a successful `publish --release` is precisely
+what deletes the now-empty remote `dev/stable`. (`build`/`publish` are in CI by default: it takes
+`--release` to reach that integrating mode.)
 
 
 ## The commands `build` vs. `*build`: how far upstream one operation reaches

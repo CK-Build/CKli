@@ -167,7 +167,7 @@ writes into the new World: an LTS starts with no pre-release and no exploratory 
 | `None` | *(root only)* | Not applicable — the root branch has no parent. |
 | `Manual` | `\|✋` | No propagation at all; the `dev/` branch must be updated by hand. |
 | `Release` | `\|>` | The parent's **stable/pre-release tagged commits** are merged in — a build must have produced a *release* on the parent to reach this branch. |
-| `CI` | `->` | *(default)* The parent's **built commits** (including CI builds) are merged in — any build (`build`/`build --ci`) on the parent reaches this branch. |
+| `CI` | `->` | *(default)* The parent's **built commits** (including CI builds) are merged in — any build (`build` or `build --release`) on the parent reaches this branch. |
 | `Full` | `=>` | The parent's **`dev/` tip** is merged in directly, regardless of whether it was ever built. |
 
 `Release`/`CI` synchronization needs to know "what was last built on the parent" — this is exactly

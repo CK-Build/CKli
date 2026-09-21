@@ -4,7 +4,10 @@ CKli is a tool for <u>multi-repositories</u> stacks.
 It allows to automate actions (build, package upgrade, etc...), on <u>Worlds</u> (a group of repositories),
 and concentrates information in a single place.
 
-:warning: This is currently under development.
+> CKli is implemented in .Net but is not limited to .Net solutions and projects.
+>
+> The core commands can handle any git repositories regardless of their content.
+> Only the Standard Plugins (see below) are dedicated to .Net development. 
 
 ## Getting Started
 
@@ -99,7 +102,7 @@ ckli clone https://github.com/CK-Build/CKli-Stack
 ```
 
 A Stack contain at least one World: the default World that is the _current version of the Stack_.
-Long Time Support (LTS) Worlds can be created any time from a World (typically the default one).
+Long Time Support (LTS) Worlds can be created any time from the default World.
 
 The `<Plugins />` element above enables the 9 Standard Plugins. They are optional and each one is
 documented on its own:

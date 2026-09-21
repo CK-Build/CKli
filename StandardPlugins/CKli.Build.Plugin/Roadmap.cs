@@ -71,7 +71,7 @@ public sealed partial class Roadmap
             }
         }
         _orderedSolutions = ImmutableCollectionsMarshal.AsImmutableArray( buildSolutions );
-        _packageMapping = new Mapping( packageUpdater, _orderedSolutions, _ciBuildMode != CIBuildMode.None );
+        _packageMapping = new Mapping( packageUpdater, _orderedSolutions, _ciBuildMode != CIBuildMode.Release );
         _pivots = ImmutableCollectionsMarshal.AsImmutableArray( pivots );
         _buildSolutions = new BuildSolutionList( this );
     }
@@ -174,7 +174,7 @@ public sealed partial class Roadmap
     /// <summary>
     /// Gets whether this is a build on the "dev/" branch (produces CI packages).
     /// </summary>
-    public bool IsCIBuild => _ciBuildMode != CIBuildMode.None;
+    public bool IsCIBuild => _ciBuildMode != CIBuildMode.Release;
 
     /// <summary>
     /// Gets the package mapping.
@@ -353,7 +353,7 @@ public sealed partial class Roadmap
                 {
                     r = r.AddBelow( _uDepHead.AddRight( screen.Text( $"{UDepUpdates} update{(UDepUpdates > 1 ? "s" : "")} from upstreams left pending in skipped repositories." ) ) );
                 }
-                // Nothing to build in "--ci" while some commits already carry a released non-CI version: without
+                // Nothing to build in CI while some commits already carry a released non-CI version: without
                 // this the user has no way to learn that "--ci.0" is what builds a CI version from them.
                 if( ciForceCandidateCount > 0 )
                 {

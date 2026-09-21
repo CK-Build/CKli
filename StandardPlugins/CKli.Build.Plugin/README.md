@@ -108,9 +108,9 @@ All build-family commands share a common set of options (declared once as `const
 |---|---|
 | `--branch,-b <name>` | Branch to consider. Defaults to the current HEAD (a `dev/` prefix is stripped); if multiple pivot Repos are selected and their checked-out branches differ, it must be specified explicitly. |
 | `--max-dop <n>` (positional `maxDop`) | Maximal degree of parallelism for the build. Defaults to 4. |
-| `--ci` | Build CI (`dev/` branch) versions instead of regular exploratory/prerelease/stable versions. |
-| `--ci.0` | Extends `--ci`: forces a CI version even when a *published* regular version is already available on the commit. It is not needed to switch a pending `local/` release to CI - plain `--ci` rolls that one (see `RollingLocal` below). |
-| `skipTests` | Don't run tests even if they never ran locally on the commit (ignored - with a warning - for non-CI builds). |
+| `--release` | Build regular exploratory/prerelease/stable versions instead of CI (`dev/` branch) versions. **The build commands are in CI by default**: this flag is what asks for the integrating, releasing mode. |
+| `--ci.0` | Forces a CI version even when a *published* regular version is already available on the commit. It is not needed to switch a pending `local/` release to CI - a plain CI build rolls that one (see `RollingLocal` below). Exclusive with `--release`, which asks for the opposite. |
+| `skipTests` | Don't run tests even if they never ran locally on the commit (ignored - with a warning - for `--release` builds). |
 | `forceTests` | Run tests even if they already ran successfully on the commit. Mutually exclusive with `skipTests`. |
 | `--dry-run,-d` | Only compute and display the roadmap; no build/publish is performed (`OnRoadmapBuild` is still raised, with `Roadmap.DryRun == true`). |
 | `all` | Consider all Repos of the World as pivots, not only the ones reachable from the current directory. |
@@ -121,7 +121,7 @@ All build-family commands share a common set of options (declared once as `const
 | `publish` | `PublishAsync` | Same as `build`, and publishes the produced artifacts on success. |
 | `*build` | `StarBuildAsync` | "Upstream closure" build: also considers the *producers* of the current repositories (not just their consumers), propagating packages downstream, kept local. |
 | `*publish` | `StarPublishAsync` | Same as `*build`, and publishes on success. |
-| `fix build` | `FixBuildAsync` | Builds the current `FixWorkflow` into the local feed (see below). There is no `--ci`: a fix has no CI line. |
+| `fix build` | `FixBuildAsync` | Builds the current `FixWorkflow` into the local feed (see below). A fix has no CI line, so it is always a release build and takes no mode flag at all - the one place where the build family's CI default does not apply. |
 | `fix publish` | `FixPublishAsync` | Builds and publishes the current `FixWorkflow`; on success the workflow is finished. |
 | `maintenance rebuild old` | `RebuildOldAsync` | Walks each Repo's stable tags from the newest down, force-rebuilding until one succeeds; tags failing commits `+invalid` (unless `warnOnly`). |
 | `maintenance rebuild version` | `RebuildVersionAsync` | Force-rebuilds one specific version tag of the current repository (used to refresh a tag's recorded build content, e.g. to fix lightweight/unreadable tags). |
@@ -130,6 +130,12 @@ All build-family commands share a common set of options (declared once as `const
 `build`/`publish` and `*build`/`*publish` differ only in the `isPullBuild` flag passed down to roadmap computation
 (`*` commands include upstream producers as pivots); `publish`/`*publish` additionally set `mustPublish: true`. All four
 funnel into the same `DoCIAsync`/`DoNonCIAsync` → `ComputeAndDisplayRoadmap` → `DoRunAsync` pipeline described below.
+
+**All four are in CI by default**: `DoCIAsync` is what runs when no mode flag is given, and only `--release` selects
+`DoNonCIAsync`. That is deliberate - the release path is the irreversible one (it integrates `dev/` into the base
+branch, deletes the remote `dev/` and, for `publish`, creates the actual release), so it is the one that has to be
+asked for by name. `--release` and `--ci.0` are mutually exclusive and refused together
+(`BuildPlugin.CheckReleaseAndCIForce`).
 
 ### Events
 
@@ -236,7 +242,7 @@ to do, and it is the only step that could move a tip away from what the report d
 | `narrow` | Keep the update to the pivots and their upstreams: don't bring the downstreams of an updated repository in. |
 | `noFetch` | Don't fetch first. The analysis is then only as fresh as the last fetch - and the divergence refusal cannot fire. |
 | `--max-dop <n>` (positional `maxDop`) | Limits the parallelism of the fetch. Unbounded by default, exactly as for `ckli fetch`. Refused with `--no-fetch`: it would silently do nothing. |
-| `ci` | Consider the **CI published profiles** of the World References. Note that this is not the `--ci` of the build commands: nothing is built here, and the graph is always computed with `isCIBuild: false`. A published folder holds at most one alive CI profile per branch and it is newer than every non-CI publication of that branch, so the one that is there simply applies - there is no "is it superseded" question to answer. |
+| `ci` | Consider the **CI published profiles** of the World References. This is the only `--ci` left in the stack and it is unrelated to the build commands' mode (which is CI by default, `--release` for the other one): nothing is built here, and the graph is always computed with `isCIBuild: false`. A published folder holds at most one alive CI profile per branch and it is newer than every non-CI publication of that branch, so the one that is there simply applies - there is no "is it superseded" question to answer. |
 | `with-nuget` | Let the World's NuGet feeds answer the identifiers no World Reference anchors. Without it no feed is queried and the References are the only source. |
 | `prerelease` / `stable` | Override the stable/not filter of the feeds. Mutually exclusive, and both require `--with-nuget`. |
 | `allowDowngrade` | Apply the updates that move a version **down**. A World Reference may legitimately pin lower than what this World references - alignment is the point - but without this flag a map containing a downgrade reports and writes nothing. |
@@ -308,7 +314,7 @@ For every `HotGraph.Solution` (ordered topologically, `OrderedSolutions`), a `Ro
 | `DependencyUpdate` | A package reference must move to a version coming from `<VersionTag>` plugin configuration or from cross-repo discrepancy resolution ("C"/"D" updates - "U" updates from already-built upstream packages are, by themselves, skippable). |
 | `CodeChange` | The commit's own code changed since the last build (conventional-commit/version-tag driven). |
 | `CI0` | `--ci.0` is used, there is no other reason to build, and the last version is a *published* non-CI build with no `ci.0` yet on this commit - forces a `ci.0` rebuild, opening a new version line above the published one. |
-| `RollingLocal` | A CI build is asked for (plain `--ci` is enough), there is no other reason to build, and the last version is a non-CI build still pending as a `local/`/`building/` release - the CI version takes its place on the same commit. |
+| `RollingLocal` | A CI build is done (the default mode is enough), there is no other reason to build, and the last version is a release build still pending as a `local/`/`building/` release - the CI version takes its place on the same commit. |
 
 `CI0` and `RollingLocal` are the two halves of "the commit already carries a version, build it in CI anyway", split
 on whether that version is published. Both are guarded by `buildReason == None`, so each can only ever be the *sole*
@@ -318,14 +324,14 @@ reason to build.
 so there is no version line to protect. `TagCommit.CanBearVersion` already sanctions exactly this - its "rolling local
 build" case (`IsBuildingOrLocal && Version.BranchName == version.BranchName`) lets the CI version take the commit, and
 `ApplyReleaseBuildTag` destroys the old one through `DestroyLocalReleases`. Before `RollingLocal` existed that
-permission was simply never exercised from `--ci`: no reason to build was ever produced, `--ci` answered *"There is
-nothing to build"* and returned true, and only `--ci.0` got there. A developer who ran a regular `ckli build` by
-mistake had no way to learn that. Destroying the pending release is a side effect the user did not name, so the
+permission was simply never exercised from a plain CI build: no reason to build was ever produced, it answered
+*"There is nothing to build"* and returned true, and only `--ci.0` got there. A developer who ran a
+`ckli build --release` by mistake had no way to learn that. Destroying the pending release is a side effect the user did not name, so the
 roadmap `monitor.Warn`s it - only when `RollingLocal` is the sole reason, since superseding a `local/` release while
 building for any other reason is the ordinary rolling local build and needs no warning.
 
 A *published* version is the opposite case: it cannot be reclaimed, `--ci.0` opens `vX.Y.(Z+1)--ci.0` above it and
-leaves the published tag alone. When a plain `--ci` roadmap comes out empty and some commits are in that situation,
+leaves the published tag alone. When a plain CI roadmap comes out empty and some commits are in that situation,
 the summary names the option: *"(Use '--ci.0' to build a CI version from the N repositories that already carry a
 released version.)"* (`BuildSolution.IsCIForceCandidate` feeds `RStats.ciForceCandidateCount`).
 
@@ -512,8 +518,8 @@ roadmap executor, targets are built **sequentially**, in `workflow.Targets` orde
   references are updated using a **`FixPackageMapper`** (`IPackageMapping`) instead of the roadmap's `Mapping` - it
   tolerates being asked for a version one patch below what it has a mapping for, since a fix workflow patches an older
   release rather than the current head.
-- Extensive clash handling deals with a commit that already carries a CI or local version tag (from a previous `fix
-  build --ci`, for instance): destroying a still-local CI build so it can be superseded, or creating an empty commit to
+- Extensive clash handling deals with a commit that already carries a CI or local version tag (a leftover from the
+  removed CI fix build, for instance): destroying a still-local CI build so it can be superseded, or creating an empty commit to
   carry a new version over an already-published one - see the in-code comments in `BuildOneFixTargetAsync` for the full
   "aggressive / gentle / gentle synthesis" reasoning.
 - After a successful build, the produced package identifiers are compared against the version being fixed
@@ -538,7 +544,7 @@ roadmap executor, targets are built **sequentially**, in `workflow.Targets` orde
 
 | Type | Role |
 |---|---|
-| `CIBuildMode` (internal enum: `None`, `CI`, `CIForce`) | Distinguishes plain builds from `--ci` and `--ci.0` builds; threaded through `Roadmap`/`BuildSolution` decisions. |
+| `CIBuildMode` (internal enum: `Release`, `CI`, `CIForce`) | Distinguishes `--release` builds from the default CI ones and from `--ci.0`; threaded through `Roadmap`/`BuildSolution` decisions. `CI` is the default, so `Release` is the exceptional member. |
 | `PublishableStatus` | See above - ordered enum combined by taking the maximum across solutions. |
 | `BuilderFunction` (delegate) | The pluggable "actually build this repo" seam used by `CoreBuildAsync`/`SetBuilderFunction`. |
 | `FixPackageMapper` | Patch-tolerant `IPackageMapping` used only by the fix workflow. |

@@ -54,7 +54,7 @@ public sealed partial class Roadmap
         CI0 = 64,
 
         /// <summary>
-        /// There is no code change, a CI build is asked for (plain "--ci" is enough) and the last version
+        /// There is no code change, a CI build is done (the default mode is enough) and the last version
         /// is a non-CI build that is still a pending <c>local/</c> (or <c>building/</c>) release: the CI
         /// build takes its place on the same commit and the pending release is destroyed.
         /// <para>

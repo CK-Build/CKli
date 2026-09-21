@@ -196,7 +196,7 @@ public sealed partial class BuildPlugin
         // moved (the "rolling local build" feature).
         //
         // A CI version tag may nevertheless be found on the commit we are building. The fix workflow cannot
-        // produce one any more (there is no "fix build --ci"), so it can only be a leftover from before that
+        // produce one any more (there is no CI fix build), so it can only be a leftover from before that
         // mode was removed. A commit bears at most one version, so it must be handled rather than tripped
         // over:
         //  - A "building/" or "local/" CI build is unpublished: we destroy the release (its tag and artefacts).
@@ -349,7 +349,7 @@ public sealed partial class BuildPlugin
             {
                 return false;
             }
-            // The depth itself is no longer used (it fed the CI number of the removed "fix build --ci"),
+            // The depth itself is no longer used (it fed the CI number of the removed CI fix build),
             // but a negative answer is how an unrelated branch is detected.
             if( gitRepository.ComputeCommitDepth( monitor, toFix.Commit, branch.Tip ) < 0 )
             {

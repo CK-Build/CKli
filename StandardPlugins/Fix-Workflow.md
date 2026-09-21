@@ -25,8 +25,10 @@ to do the same thing.
 - `fix publish [--keep-branch] [--rebuild]` — builds and publishes; on success, closes the workflow.
 
 **There is no CI fix build.** `fix build` produces `local/` versions in the developer's own `$Local`
-feed and `fix publish` produces the real ones; nothing in between publishes an intermediate `--ci`
-version of a fix. Sharing work in progress is [`fix push`](#sharing-a-fix-in-progress)'s job instead.
+feed and `fix publish` produces the real ones; nothing in between publishes an intermediate CI
+version of a fix. So the fix commands take no mode flag at all — unlike `build`/`publish`, which are
+in CI by default and need `--release` for the releasing mode, a fix is always a release build.
+Sharing work in progress is [`fix push`](#sharing-a-fix-in-progress)'s job instead.
 
 ## How it works
 
