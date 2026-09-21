@@ -562,10 +562,11 @@ public Task<bool> StarPublishAsync( IActivityMonitor monitor,
                                 string? branch = null,
                                 [Description( "Maximal Degree of Parallelism. Defaults to 4." )]
                                 string? maxDop = null,
-                                [Description( "Consider CI builds (prerelease tags) as buildable versions." )]
-                                [OptionName( "--ci" )]
-                                bool ci = false,
-                                [Description( "Force a new CI build even if the last one already covers the current commit." )]
+                                [Description( "Build regular exploratory, prerelease or stable versions instead of CI versions." )]
+                                [OptionName( "--release" )]
+                                bool release = false,
+                                [Description( "Build a ci.0 version when a released version is already available on the commit." )]
+                                [OptionName( "--ci.0" )]
                                 bool ciForce = false,
                                 [Description( "Skip running tests altogether." )]
                                 bool skipTests = false,

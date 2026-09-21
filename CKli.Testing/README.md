@@ -207,7 +207,7 @@ public async Task local_fix_Async()
 `CKli.Testing` only provides the remote/clone/commit machinery; per-domain fixtures (feeds, PATs, sample project
 files) are the consuming project's responsibility.
 
-`CKliCommands.ExecAsync(monitor, context, "issue")`, `"build --ci --dry-run"`, `"publish"`, etc. are then run
+`CKliCommands.ExecAsync(monitor, context, "issue")`, `"build --dry-run"`, `"publish --release"`, etc. are then run
 against the cloned `CKliEnv`, and `(StringScreen)context.Screen` captures the rendered output for assertion (via
 `display.ToString().ShouldBe("""...""")`), following `CKli.Core`'s `IScreen`/`StringScreen` testing abstraction.
 
