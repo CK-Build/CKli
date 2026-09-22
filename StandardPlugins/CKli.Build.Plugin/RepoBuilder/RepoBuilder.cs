@@ -272,15 +272,35 @@ public class RepoBuilder : RepoInfo
                                                 string packOutputPath,
                                                 CancellationToken cancellation )
     {
-        return !cancellation.IsCancellationRequested
-               && DotNetBuild( monitor,
-                               buildInfo.Version,
-                               buildInfo.InformationalVersion,
-                               buildInfo.FileVersion,
-                               buildInfo.ReleaseConfiguration,
-                               cancellation )
-               && (!runTest || DotNetTest( monitor, buildInfo.ReleaseConfiguration, cancellation ))
-               && DotNetPack( monitor, buildInfo.Version, buildInfo.ReleaseConfiguration, packOutputPath, cancellation );
+        bool buildSuccess = true;
+        bool testSuccess = true;
+        bool packSuccess = true;
+        if( !cancellation.IsCancellationRequested
+            && (buildSuccess = DotNetBuild( monitor,
+                                            buildInfo.Version,
+                                            buildInfo.InformationalVersion,
+                                            buildInfo.FileVersion,
+                                            buildInfo.ReleaseConfiguration,
+                                            cancellation ))
+            && (!runTest || (testSuccess = DotNetTest( monitor, buildInfo.ReleaseConfiguration, cancellation )))
+            && (packSuccess = DotNetPack( monitor, buildInfo.Version, buildInfo.ReleaseConfiguration, packOutputPath, cancellation )) )
+        {
+            return true;
+        }
+        if( !buildSuccess )
+        {
+            monitor.Error( $"Dotnet build fails for '{buildInfo.Repo.DisplayPath}'." );
+        }
+        else if( !testSuccess )
+        {
+            monitor.Error( $"Dotnet test fails for '{buildInfo.Repo.DisplayPath}'." );
+        }
+        else if( !packSuccess )
+        {
+            monitor.Error( $"Dotnet pack fails for '{buildInfo.Repo.DisplayPath}'." );
+        }
+        // Cancellation has no error message.
+        return false;
     }
 
     /// <summary>

@@ -60,12 +60,12 @@ public sealed partial class FakeBuildTestEnv
     }
 
     BuildResult? FakeBuild( IActivityMonitor monitor,
-                                   CKliEnv context,
-                                   Commit buildCommit,
-                                   bool runTest,
-                                   RepoBuilder repoBuilder,
-                                   CommitBuildInfo buildInfo,
-                                   CancellationToken cancellation )
+                            CKliEnv context,
+                            Commit buildCommit,
+                            bool runTest,
+                            RepoBuilder repoBuilder,
+                            CommitBuildInfo buildInfo,
+                            CancellationToken cancellation )
     {
         var repo = buildInfo.Repo;
         using var gLog = monitor.OpenTrace( $"Fake build for '{buildInfo}'." );

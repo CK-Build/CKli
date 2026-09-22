@@ -138,14 +138,11 @@ public sealed partial class BuildPlugin
                     }
                     else
                     {
+                        // On a null BuildResult, the error message must have been emitted by the build itself (rather than a generic message here).
                         --remainingCount;
                         if( req.BuildResult != null )
                         {
                             monitor.Info( ScreenType.CKliScreenTag, $"Build '{req.Build.Solution.Repo.DisplayPath}' succeed." );
-                        }
-                        else
-                        {
-                            monitor.Error( req.Message );
                         }
                         if( waitingQueue != null && waitingQueue.TryDequeue( out var waiter ) )
                         {
@@ -181,7 +178,6 @@ public sealed partial class BuildPlugin
             readonly TaskCompletionSource<IActivityMonitor> _initialize;
             readonly ChannelWriter<object> _writer;
             readonly Roadmap.BuildInfo _build;
-            string _message;
             BuildResult? _buildResult;
 
             public MonitorRequest( ChannelWriter<object> writer, Roadmap.BuildInfo build )
@@ -189,7 +185,6 @@ public sealed partial class BuildPlugin
                 _initialize = new TaskCompletionSource<IActivityMonitor>( TaskCreationOptions.RunContinuationsAsynchronously );
                 _writer = writer;
                 _build = build;
-                _message = $"Building roadmap n°{build.Solution.BuildNumber}/{build.Solution.Roadmap.SolutionBuildCount}: '{build.Solution.Repo.DisplayPath}'.";
                 _writer.TryWrite( this );
             }
 
@@ -204,23 +199,17 @@ public sealed partial class BuildPlugin
             public IActivityMonitor? Acquired => _initialize.Task.Status != TaskStatus.RanToCompletion ? null : _initialize.Task.Result;
 #pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
 
-            public string Message => _message;
-
             public BuildResult? BuildResult => _buildResult;
 
             public void SetMonitor( IActivityMonitor monitor, IActivityMonitor available )
             {
-                monitor.Info( _message );
+                monitor.Info( $"Building roadmap n°{_build.Solution.BuildNumber}/{_build.Solution.Roadmap.SolutionBuildCount}: '{_build.Solution.Repo.DisplayPath}'." );
                 _initialize.SetResult( available );
             }
 
             public void Release( BuildResult? result )
             {
                 _buildResult = result;
-                if( result == null )
-                {
-                    _message = $"Failed to build '{_build.Solution.Repo.DisplayPath}'.";
-                }
                 _writer.TryWrite( this );
             }
         }
@@ -286,8 +275,8 @@ public sealed partial class BuildPlugin
             // it MUST answer the same here or the version tag will not land on the commit it claims.
             if( !canAmend
                 && build.Solution.VersionInfo.VersionTagInfo.RequiresNewCommit( git.Repository.Head.Tip,
-                                                                               build.TargetVersion,
-                                                                               out var error ) )
+                                                                                build.TargetVersion,
+                                                                                out var error ) )
             {
                 monitor.Info( $"""
                     Creating an empty commit to avoid error:
