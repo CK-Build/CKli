@@ -325,7 +325,7 @@ public sealed partial class GitRepository
             // This skips LibGit2Sharp's UserCancelledException.
             if( !cancellation.IsCancellationRequested )
             {
-                monitor.Error( "Error while pulling remote tags. This requires a manual fix.", ex );
+                monitor.Error( $"Error while pulling remote tags in '{_displayPath}'. This requires a manual fix.", ex );
             }
             return false;
         }

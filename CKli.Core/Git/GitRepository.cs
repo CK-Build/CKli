@@ -416,7 +416,7 @@ public sealed partial class GitRepository : IDisposable
                 // This skips LibGit2Sharp's UserCancelledException.
                 if( !cancellation.IsCancellationRequested )
                 {
-                    monitor.Error( "Error while fetching. This requires a manual fix.", ex );
+                    monitor.Error( $"Error while fetching '{_displayPath}'. This requires a manual fix.", ex );
                 }
                 return false;
             }
