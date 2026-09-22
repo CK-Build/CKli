@@ -249,7 +249,7 @@ before such an edit is stale: the list is rebuilt. `SetReference` merges — a n
 no default value the empty string is what removes it — and it **refuses** a private
 reference from a public Stack: the invariant above is enforced by an exception at load time, so writing
 such a file would make it unloadable, and unfixable by `RemoveReference`. These are the two commands
-`ckli world reference set` and `ckli world reference remove` (see the [command reference](../README.md#world-commands-reference-list-set-remove)).
+`ckli world reference set` and `ckli world reference remove` (see the [command reference](CKliCommands/README.md#world-commands-reference-list-set-remove)).
 
 Once a Stack is cloned, `ckli clone` reads the references of its default world and, for each of them,
 clones the referenced Stack **next to** it (never inside it) or checks that it is already cloned somewhere
@@ -425,6 +425,95 @@ one that is *not* under this client's prefix. Mutual exclusion holds only while 
 prefix; two that disagree would both acquire and neither would see the other. That is an error, never a
 warning — it is the one place where the failure is visible at all. See
 [`LockPrefix`](#lockprefix-the-reference-namespace-that-locks-the-stack).
+
+---
+
+# Secrets, keys and PATs
+
+Nothing here is configured: a key **name** is computed from the remote url, the key **value** is read from
+a secret store at runtime, and CKli tells the user which one it wants when it is missing. This is
+`ISecretsStore` / `DotNetUserSecretsStore` and the `GitRepositoryKey` of [`Git/`](Git), and it is what
+decides whether a Stack can be cloned, pushed to, or published from — see
+[Private & Public stack and repositories](../README.md#private--public-stack-and-repositories) for the
+user facing summary.
+
+## The secrets are never in the definition file
+
+A World definition file only ever contains the **name of a key**, never a secret value. The value is
+resolved at runtime from a secret store, and the default store is
+[.NET user secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets) under the `CKli`
+identifier:
+
+```powershell
+dotnet user-secrets set GITHUB_CK_BUILD_WRITE_PAT <<your-token>> --id CKli
+```
+
+**You never have to work the key name out yourself.** When an operation needs a secret that is not
+registered, CKli stops and logs the exact command line to run, with the key it wants — and, when a
+stronger key would also do, the alternatives.
+
+The secret is used as the password of a `CKli` user name, so a Personal Access Token (PAT) is what a Git
+hosting provider expects here. NuGet feed API keys go in the same store, under the key each `<Feed>`
+element names: see
+[`CKli.ArtifactHandler.Plugin`'s README](../StandardPlugins/CKli.ArtifactHandler.Plugin/README.md#nuget-feed-configuration--nugetfeed--nugetfeedcredentials)
+(and note that a `<PublicReadCredentials>` is the exception: its two values are literals, not store keys).
+
+## How a key name is derived
+
+Key names are **computed from the remote url**, they are not configured. A common `{Prefix}` is derived
+first, then `_READ_PAT` and `_WRITE_PAT` are appended to it.
+
+For the known cloud providers, the prefix is a provider name followed by the **first path segment of the
+url** — the owner, organization or workspace:
+
+| Url | `{Prefix}` |
+|---|---|
+| `https://github.com/CK-Build/CKli` | `GITHUB_CK_BUILD` |
+| `https://gitlab.com/acme/some-repo` | `GITLAB_ACME` |
+| `https://dev.azure.com/Signature-OpenSource/...` | `AZUREDEVOPS_SIGNATURE_OPENSOURCE` |
+| `https://bitbucket.org/acme/some-repo` | `BITBUCKET_ACME` |
+
+Everything is uppercased and any character outside `A-Z`, `0-9` and `_` becomes `_` — which is why
+`CK-Build` gives `CK_BUILD`.
+
+For a self-hosted provider, the prefix is the **authority** of the url, uppercased and secured the same
+way: `https://gitlab.acme.com/team/x` gives `GITLAB_ACME_COM`.
+
+A key is enough for Git itself, but the commands that talk to the host's own API — creating a remote
+repository, archiving one, publishing a release — need a *hosting provider*, and CKli only has three:
+GitHub, GitLab and Gitea. They are selected by `github.com` and `gitlab.com`, or by a self-hosted
+authority that contains `github`, `gitlab` or `gitea`. Azure DevOps and Bitbucket urls get a key and
+nothing else, and so does any unrecognized authority.
+
+Two consequences worth knowing:
+
+- **A key covers an owner, not a repository.** One `GITHUB_CK_BUILD_WRITE_PAT` is enough for every
+  repository of the `CK-Build` organization, and a Stack whose repositories span two organizations needs
+  one key per organization.
+- **A `file://` remote is the exception.** Its key is the bare `FILESYSTEM_GIT`, with no `_READ_PAT` /
+  `_WRITE_PAT` suffix. Its value is never actually used, but it must exist for a push to be attempted —
+  registering it is the way to state that pushing to the local file system is intended.
+
+## Read and write keys
+
+`{Prefix}_WRITE_PAT` is the stronger of the two: a read first looks for it, then falls back to
+`{Prefix}_READ_PAT`. So registering the write key alone is enough for everything, and a read-only key is
+only useful to give someone clone access without push access.
+
+The write key must let CKli push. Beyond that, the commands that reach the hosting provider's API need
+more from it:
+
+- **creating a repository** — [`create`](CKliCommands/README.md#create-url---private---ignore-parent-stack),
+  [`repo create`](CKliCommands/README.md#repo-create-url---allow-lts) and
+  [`remote stack migrate`](CKliCommands/README.md#remote-stack-migrate-newurl). The first two also **delete** the repository
+  they just created when the rest of the operation fails, so the key must allow that too;
+- **archiving a repository** and **changing its default branch** —
+  [`remote stack migrate`](CKliCommands/README.md#remote-stack-migrate-newurl) and the publication;
+- **creating, uploading to and finalizing releases** — the `Publish` plugin.
+
+On GitHub, that maps to the `repo` scope of a classic token — plus `delete_repo` if you want the rollback
+above to work — or, for a fine-grained token, Contents (read/write) and Administration (read/write) on
+the organization.
 
 ---
 
