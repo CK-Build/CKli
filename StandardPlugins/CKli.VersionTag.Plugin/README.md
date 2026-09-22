@@ -169,8 +169,8 @@ Per-repo, under that repo's plugin configuration element:
 
 | Attribute | Meaning |
 |---|---|
-| `InfVersion` | Exclusive lower bound: tags `<= InfVersion` are ignored. Read/written via `XNames.InfVersion`; set by [`ckli lts create`](#worldeventscreatelts--cutting-the-version-range-of-a-new-lts) on the default World, and by `SetInfVersion` for a one-time .NET 8 migration path (which must be called before the repo's `VersionTagInfo` is created). |
-| `SupVersion` | Exclusive upper bound: tags `>= SupVersion` are ignored. Only meaningful in an LTS World — in the default World it is a warning and gets stripped automatically. Set by [`ckli lts create`](#worldeventscreatelts--cutting-the-version-range-of-a-new-lts) on the new LTS World. |
+| `InfVersion` | Exclusive lower bound: tags `<= InfVersion` are ignored. Read/written via `XNames.InfVersion`; set by [`ckli world lts create`](#worldeventscreatelts--cutting-the-version-range-of-a-new-lts) on the default World, and by `SetInfVersion` for a one-time .NET 8 migration path (which must be called before the repo's `VersionTagInfo` is created). |
+| `SupVersion` | Exclusive upper bound: tags `>= SupVersion` are ignored. Only meaningful in an LTS World — in the default World it is a warning and gets stripped automatically. Set by [`ckli world lts create`](#worldeventscreatelts--cutting-the-version-range-of-a-new-lts) on the new LTS World. |
 
 ### Commands
 
@@ -205,7 +205,7 @@ the `VersionTagInfo`) and lets it `CollectIssues` into the issue screen.
 
 ### `World.Events.CreateLTS` — cutting the version range of a new LTS
 
-`ckli lts create <@ltsName>` clones the default World's definition; this plugin's `Sync` handler
+`ckli world lts create <@ltsName>` clones the default World's definition; this plugin's `Sync` handler
 (`VersionTagPlugin.LongTermSupport.cs`) splits the version range of every repository between the two Worlds and
 strips the new World's branch model. `ComputeRepoLTSVersions` computes the plan and validates it; `LTSCreated`
 only applies it, so a refusal writes nothing at all.

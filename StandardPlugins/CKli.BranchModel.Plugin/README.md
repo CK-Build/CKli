@@ -157,7 +157,7 @@ Reading is tolerant of both forms — an `<Explo>` `Name` or `Parent` may carry 
 or not — so an LTS world's hand-written configuration keeps working either way.
 
 `BranchNamespace.CreateForLTS( ltsName )` returns a root-only namespace under a new LTS name. It is
-what [`ckli lts create`](../CKli.VersionTag.Plugin/README.md#worldeventscreatelts--cutting-the-version-range-of-a-new-lts)
+what [`ckli world lts create`](../CKli.VersionTag.Plugin/README.md#worldeventscreatelts--cutting-the-version-range-of-a-new-lts)
 writes into the new World: an LTS starts with no pre-release and no exploratory branch open.
 
 #### Link types: how a `dev/` child is kept in sync with its parent
