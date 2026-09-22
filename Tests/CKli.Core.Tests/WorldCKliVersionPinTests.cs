@@ -18,27 +18,24 @@ namespace CKli.Core.Tests;
 /// World that must impose a version therefore has to say so here - this is what "ckli world lts create" writes.
 /// </para>
 /// <para>
-/// <b>What this fixture cannot cover:</b> the refusal of a mismatched pin. <see cref="World.CKliVersion"/> is
-/// read from the assembly's InformationalVersion and a locally compiled CKli - which is what every test run
-/// uses - is <see cref="SVersion.ZeroVersion"/>, for which the check is deliberately skipped (a developer
-/// building CKli must be able to open any World). Only the syntax check and that escape hatch are reachable
-/// from here; the mismatch refusal is verified by hand.
+/// <b>The two modes.</b> <see cref="World.CKliVersion"/> is read from this assembly's InformationalVersion and
+/// both of its branches are live here. A plain "dotnet test" stamps no version, so it is
+/// <see cref="SVersion.ZeroVersion"/> and the pin is deliberately ignored (a developer building CKli must be
+/// able to open any World). But when CKli builds itself - "ckli publish" on this very Stack - the solution is
+/// built with the released version, the escape hatch closes and the mismatch refusal becomes reachable. No test
+/// here may assume one mode: each covers the branch that applies, through <see cref="LocallyCompiled"/>.
 /// </para>
 /// </summary>
 [TestFixture]
 public class WorldCKliVersionPinTests
 {
-    [Test]
-    public void a_test_run_always_uses_a_locally_compiled_CKli()
-    {
-        // This is the precondition of the 2 tests below: if it ever stops holding, they stop testing
-        // what they claim to and the mismatch refusal becomes reachable.
-        World.CKliVersion.Version.ShouldBe( SVersion.ZeroVersion );
-    }
+    // Which of the 2 modes above this run is in. This used to be an assumption of this fixture ("a test run
+    // always uses a locally compiled CKli") until CKli built itself and the 3 tests that relied on it failed.
+    static bool LocallyCompiled => World.CKliVersion.Version == SVersion.ZeroVersion;
 
     /// <summary>
-    /// The syntax is checked before the escape hatch below, so this one is reachable: a World that states an
-    /// unparsable version must be fixed rather than silently opened.
+    /// The syntax is checked before the escape hatch below, so this one is reachable in both modes: a World that
+    /// states an unparsable version must be fixed rather than silently opened.
     /// </summary>
     [Test]
     public async Task an_invalid_CKliVersion_prevents_the_world_to_be_loaded_Async()
@@ -57,12 +54,32 @@ public class WorldCKliVersionPinTests
     }
 
     /// <summary>
-    /// A locally compiled CKli ignores the pin: without this, a developer building CKli could not open any
-    /// pinned World at all. The World loads and its <see cref="WorldDefinitionFile.PinnedCKliVersion"/> is
-    /// the stated one (it is what the plugin solution would then be built against).
+    /// A pin that states the running version always opens. This is the nominal case of a LTS world and the only
+    /// assertion here that is the same in both modes: a locally compiled CKli takes the escape hatch below, a
+    /// released one finds the versions equal.
     /// </summary>
     [Test]
-    public async Task a_CKliVersion_pin_is_ignored_by_a_locally_compiled_CKli_Async()
+    public async Task a_matching_CKliVersion_pin_opens_the_world_Async()
+    {
+        var running = World.CKliVersion.Version.ShouldNotBeNull();
+        var context = await CloneOneAsync();
+        WriteLTSWorld( context, "@net8", ckliVersion: running.ToString() );
+
+        using var stack = OpenStack( context );
+        stack.WorldNames.Single( w => !w.IsDefaultWorld )
+             .LoadDefinitionFile( TestHelper.Monitor )
+             .ShouldNotBeNull()
+             .PinnedCKliVersion.ShouldBe( running );
+    }
+
+    /// <summary>
+    /// The LTS guard itself. A released CKli refuses a World pinned to another version. A locally compiled one
+    /// ignores the pin instead: without this escape hatch a developer building CKli could not open any pinned
+    /// World at all - the World then loads and its <see cref="WorldDefinitionFile.PinnedCKliVersion"/> is the
+    /// stated one (it is what the plugin solution would then be built against).
+    /// </summary>
+    [Test]
+    public async Task a_mismatched_CKliVersion_pin_is_refused_unless_CKli_is_locally_compiled_Async()
     {
         var context = await CloneOneAsync();
         WriteLTSWorld( context, "@net8", ckliVersion: "99.99.99" );
@@ -71,10 +88,19 @@ public class WorldCKliVersionPinTests
         {
             using var stack = OpenStack( context );
             var definitionFile = stack.WorldNames.Single( w => !w.IsDefaultWorld )
-                                      .LoadDefinitionFile( TestHelper.Monitor )
-                                      .ShouldNotBeNull();
-            definitionFile.PinnedCKliVersion.ShouldBe( SVersion.Parse( "99.99.99" ) );
-            logs.ShouldContain( l => l.Contains( "Using locally compiled CKli (version 0.0.0-0)" ) );
+                                      .LoadDefinitionFile( TestHelper.Monitor );
+            if( LocallyCompiled )
+            {
+                definitionFile.ShouldNotBeNull().PinnedCKliVersion.ShouldBe( SVersion.Parse( "99.99.99" ) );
+                logs.ShouldContain( l => l.Contains( "Using locally compiled CKli (version 0.0.0-0)" ) );
+            }
+            else
+            {
+                definitionFile.ShouldBeNull();
+                logs.ShouldContain( l => l.Contains( "This world is pinned to CKli version" )
+                                         && l.Contains( "99.99.99" )
+                                         && l.Contains( $"This CKli version is '{World.CKliVersion.Version}'" ) );
+            }
         }
     }
 
@@ -97,21 +123,32 @@ public class WorldCKliVersionPinTests
     /// <summary>
     /// "ckli world lts create" pins the World it creates - except when CKli is locally compiled: writing
     /// "0.0.0-0" would produce a World that nobody can open (no one can install that version) and that only a
-    /// manual edit could repair. A test run is always in that case, hence the warning rather than the pin.
+    /// manual edit could repair. Hence the warning rather than the pin in that mode.
     /// </summary>
     [Test]
-    public async Task world_lts_create_does_not_write_a_0_0_0_0_pin_Async()
+    public async Task world_lts_create_pins_the_new_world_unless_CKli_is_locally_compiled_Async()
     {
         var context = await CloneOneAsync();
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
             (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "world", "lts", "create", "@net8" )).ShouldBeTrue();
-            logs.ShouldContain( l => l.Contains( "is created" ) && l.Contains( "without its CKliVersion pin" ) );
+            if( LocallyCompiled )
+            {
+                logs.ShouldContain( l => l.Contains( "is created" ) && l.Contains( "without its CKliVersion pin" ) );
+            }
         }
         var ltsRoot = XDocument.Load( StackFolder( context ).AppendPart( "One@net8.xml" ) ).Root.ShouldNotBeNull();
         ltsRoot.Attribute( XNames.LTSName ).ShouldNotBeNull().Value.ShouldBe( "@net8" );
-        ltsRoot.Attribute( XNames.CKliVersion ).ShouldBeNull();
+        var pin = ltsRoot.Attribute( XNames.CKliVersion );
+        if( LocallyCompiled )
+        {
+            pin.ShouldBeNull();
+        }
+        else
+        {
+            SVersion.Parse( pin.ShouldNotBeNull().Value ).ShouldBe( World.CKliVersion.Version );
+        }
     }
 
     // The CallerMemberName is the calling test's name: without it every test here would share this
