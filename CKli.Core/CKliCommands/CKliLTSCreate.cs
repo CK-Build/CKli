@@ -11,7 +11,7 @@ sealed class CKliLTSCreate : Command
 {
     internal CKliLTSCreate()
         : base( null,
-                "lts create",
+                "world lts create",
                 "Creates a new Long-Term-Support World from the current default World.",
                 [("ltsName", $"The LTS name. {WorldDefinitionFile.InvalidLTSNameMessage}")],
                 [],

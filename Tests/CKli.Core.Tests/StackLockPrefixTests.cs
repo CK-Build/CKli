@@ -158,7 +158,7 @@ public class StackLockPrefixTests
     }
 
     /// <summary>
-    /// "ckli lts create" clones the default World's root element: the LockPrefix must not be propagated,
+    /// "ckli world lts create" clones the default World's root element: the LockPrefix must not be propagated,
     /// otherwise the new World would hold a copy that a later change of the Stack's prefix leaves behind.
     /// </summary>
     [Test]
@@ -167,7 +167,7 @@ public class StackLockPrefixTests
         var context = await CloneOneAsync();
         SetLockPrefix( context, "One.xml", "refs/notes/ckli-locks" );
 
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "lts", "create", "@net8" )).ShouldBeTrue();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "world", "lts", "create", "@net8" )).ShouldBeTrue();
 
         var ltsRoot = XDocument.Load( StackFolder( context ).AppendPart( "One@net8.xml" ) ).Root.ShouldNotBeNull();
         ltsRoot.Attribute( XNames.LTSName ).ShouldNotBeNull().Value.ShouldBe( "@net8" );
@@ -212,8 +212,8 @@ public class StackLockPrefixTests
     }
 
     /// <summary>
-    /// Sets the LockPrefix attribute of a world definition file and commits the Stack repository: "ckli lts
-    /// create" pulls the Stack, so the edit must not be left in the working folder.
+    /// Sets the LockPrefix attribute of a world definition file and commits the Stack repository: "ckli world
+    /// lts create" pulls the Stack, so the edit must not be left in the working folder.
     /// </summary>
     static void SetLockPrefix( CKliEnv context, string fileName, string lockPrefix )
     {

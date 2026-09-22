@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -1377,30 +1378,50 @@ public sealed partial class StackRepository : IDisposable
     internal const string CompiledPluginsIgnorePattern = "CKli.CompiledPlugins.cs";
 
     /// <summary>
-    /// Ensures that the Stack repository's .gitignore ignores the generated <c>CKli.CompiledPlugins.cs</c>.
+    /// Every generated file of a world's plugin solution that the Stack repository must ignore.
     /// <para>
-    /// This repairs the Stacks created before the pattern was fixed. It is called when a world is added to a
-    /// Stack, which is when the previous pattern (anchored on "/CKli-Plugins/") starts to be harmful.
+    /// <see cref="PluginMachinery.CKliVersionPropsFileName"/> carries the $(CKliVersion) property: it is
+    /// per developer (it is the CKli version each of them runs), so tracking it is exactly what used to
+    /// leave the Stack dirty and break the next "ckli pull".
+    /// </para>
+    /// </summary>
+    internal static readonly ImmutableArray<string> GeneratedFileIgnorePatterns =
+        [CompiledPluginsIgnorePattern, PluginMachinery.CKliVersionPropsFileName];
+
+    /// <summary>
+    /// Ensures that the Stack repository's .gitignore ignores every <see cref="GeneratedFileIgnorePatterns"/>.
+    /// <para>
+    /// This repairs the Stacks created before a pattern was added (or, for <c>CKli.CompiledPlugins.cs</c>,
+    /// before it was fixed). It is called when a world is added to a Stack - which is when the previous
+    /// pattern (anchored on "/CKli-Plugins/") starts to be harmful - and whenever the plugin machinery
+    /// writes the generated props file.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <returns>True on success, false on error.</returns>
-    internal bool EnsureCompiledPluginsIgnored( IActivityMonitor monitor )
+    internal bool EnsureGeneratedFilesIgnored( IActivityMonitor monitor )
     {
         var ignore = StackWorkingFolder.AppendPart( ".gitignore" );
         try
         {
-            var lines = File.Exists( ignore ) ? File.ReadAllLines( ignore ) : [];
-            if( lines.Any( l => l.AsSpan().Trim().SequenceEqual( CompiledPluginsIgnorePattern ) ) )
+            var lines = File.Exists( ignore ) ? new List<string>( File.ReadAllLines( ignore ) ) : new List<string>();
+            bool changed = false;
+            foreach( var pattern in GeneratedFileIgnorePatterns )
             {
-                return true;
+                if( lines.Any( l => l.AsSpan().Trim().SequenceEqual( pattern ) ) )
+                {
+                    continue;
+                }
+                monitor.Info( $"Adding '{pattern}' to '{ignore}'." );
+                // Inserts before a trailing "!.gitignore" negation if there is one: order matters for git.
+                var negation = lines.FindLastIndex( l => l.AsSpan().Trim().SequenceEqual( "!.gitignore" ) );
+                lines.Insert( negation < 0 ? lines.Count : negation, pattern );
+                changed = true;
             }
-            monitor.Info( $"Adding '{CompiledPluginsIgnorePattern}' to '{ignore}'." );
-            // Inserts before a trailing "!.gitignore" negation if there is one: order matters for git.
-            var negation = Array.FindLastIndex( lines, l => l.AsSpan().Trim().SequenceEqual( "!.gitignore" ) );
-            var updated = lines.ToImmutableArray()
-                               .Insert( negation < 0 ? lines.Length : negation, CompiledPluginsIgnorePattern );
-            File.WriteAllLines( ignore, updated );
+            if( changed )
+            {
+                File.WriteAllLines( ignore, lines );
+            }
             return true;
         }
         catch( Exception ex )
@@ -1423,7 +1444,7 @@ public sealed partial class StackRepository : IDisposable
                 Logs/
                 .vs/
                 .idea/
-                {CompiledPluginsIgnorePattern}
+                {string.Join( Environment.NewLine, GeneratedFileIgnorePatterns )}
                 !.gitignore
 
                 """ );

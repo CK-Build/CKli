@@ -5,7 +5,7 @@ using System.Xml.Linq;
 namespace CKli.Core;
 
 /// <summary>
-/// Raised by the "ckli lts create" command.
+/// Raised by the "ckli world lts create" command.
 /// If <see cref="SetFailed()"/> is called, the creation is aborted.
 /// </summary>
 public sealed class CreateLTSEventArgs : WorldEventArgs

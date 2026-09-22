@@ -33,11 +33,13 @@ public sealed partial class PluginMachinery
     NormalizedPath _ckliPluginsFolder;
     NormalizedPath _directoryBuildProps;
     NormalizedPath _directoryPackageProps;
+    NormalizedPath _ckliVersionProps;
     NormalizedPath _nugetConfigFile;
     NormalizedPath _ckliPluginsCSProj;
     NormalizedPath _ckliPluginsFile;
     NormalizedPath _ckliCompiledPluginsFile;
     NormalizedPath _pluginTestsCSProjFilePath;
+    NormalizedPath _pluginTestsDirectoryBuildProps;
     // The last created PluginCollectorContext. It is immutable: it is reused to reload the plugins
     // (see RecoverFromInstantiationError).
     PluginCollectorContext? _pluginContext;
@@ -49,8 +51,8 @@ public sealed partial class PluginMachinery
     // not a server for multiple Worlds.
     static WeakReference? _singleFactory;
 
-    // Caches whether "Directory.Packages.props" contains the <PackageVersion Include="CKli.Plugins.Core" Version="..." />
-    // that is World.CKliVersion.Version. This check is done only once.
+    // Caches the Roots whose "Directory.Packages.props" (and optional "Tests/Plugins.Tests") have been migrated
+    // to the $(CKliVersion) property. This one-time migration is attempted only once per process.
     static HashSet<string>? _versionChecked;
 
     static Action<IActivityMonitor, XDocument>? _nuGetConfigFileHook;
@@ -82,6 +84,34 @@ public sealed partial class PluginMachinery
 
     internal NormalizedPath DirectoryPackageProps => _directoryPackageProps.IsEmptyPath ? (_directoryPackageProps = Root.AppendPart( "Directory.Packages.props" )) : _directoryPackageProps;
 
+    /// <summary>
+    /// The generated, git ignored "CKli.Version.props" file: it carries the $(CKliVersion) property that
+    /// "Directory.Packages.props" and "Tests/Plugins.Tests/Plugins.Tests.csproj" reference.
+    /// <para>
+    /// This file is what keeps the CKli version out of the Stack repository: it is per developer, so 2
+    /// developers on 2 CKli versions no longer fight over a tracked file (which used to leave the Stack
+    /// dirty and break the next "ckli pull").
+    /// </para>
+    /// </summary>
+    internal NormalizedPath CKliVersionProps => _ckliVersionProps.IsEmptyPath ? (_ckliVersionProps = Root.AppendPart( CKliVersionPropsFileName )) : _ckliVersionProps;
+
+    /// <summary>
+    /// The CKli version the plugins of this world must be built against: the world's
+    /// <see cref="WorldDefinitionFile.PinnedCKliVersion"/> when it has one (a LTS world), the running
+    /// CKli's <see cref="World.CKliVersion"/> otherwise.
+    /// </summary>
+    internal SVersion EffectiveCKliVersion
+    {
+        get
+        {
+            var v = _definitionFile.PinnedCKliVersion ?? World.CKliVersion.Version;
+            // World.CKliVersion is read from this assembly's InformationalVersion: a malformed one
+            // would silently produce a Version="" in the generated props and an obscure NuGet error.
+            Throw.CheckState( "CKli's own assembly version must be valid.", v != null );
+            return v;
+        }
+    }
+
     internal NormalizedPath CKliPluginsFolder => _ckliPluginsFolder.IsEmptyPath ? (_ckliPluginsFolder = Root.AppendPart( CKliPluginsFolderName )) : _ckliPluginsFolder;
 
     internal NormalizedPath CKliPluginsCSProj => _ckliPluginsCSProj.IsEmptyPath ? (_ckliPluginsCSProj = CKliPluginsFolder.AppendPart( "CKli.Plugins.csproj" )) : _ckliPluginsCSProj;
@@ -91,6 +121,11 @@ public sealed partial class PluginMachinery
     internal NormalizedPath CKliCompiledPluginsFile => _ckliCompiledPluginsFile.IsEmptyPath ? (_ckliCompiledPluginsFile = CKliPluginsFolder.AppendPart( "CKli.CompiledPlugins.cs" )) : _ckliCompiledPluginsFile;
 
     internal NormalizedPath PluginTestsCSProjFilePath => _pluginTestsCSProjFilePath.IsEmptyPath ? (_pluginTestsCSProjFilePath = Root.Combine( "Tests/Plugins.Tests/Plugins.Tests.csproj" )) : _pluginTestsCSProjFilePath;
+
+    // MSBuild stops walking up at the first "Directory.Build.props" it finds and the Plugins.Tests project has
+    // its own (it works around https://github.com/dotnet/sdk/issues/45953), so the $(CKliVersion) defined beside
+    // the plugin solution does NOT reach it: this companion must import the generated file itself.
+    internal NormalizedPath PluginTestsDirectoryBuildProps => _pluginTestsDirectoryBuildProps.IsEmptyPath ? (_pluginTestsDirectoryBuildProps = Root.Combine( "Tests/Plugins.Tests/Directory.Build.props" )) : _pluginTestsDirectoryBuildProps;
 
     internal IPluginFactory PluginFactory => _pluginFactory;
 
@@ -134,6 +169,12 @@ public sealed partial class PluginMachinery
                 File.WriteAllText( CKliPluginsCSProj, DefaultCKliPluginsCSProj );
                 File.WriteAllText( CKliPluginsFile, DefaultCKliPluginsFile );
                 File.WriteAllText( NuGetConfigFile, DefaultNuGetConfigFile );
+                // The generated "CKli.Version.props" is what gives a value to the $(CKliVersion) that the
+                // "Directory.Packages.props" just written references: without it nothing restores.
+                if( !EnsureCKliVersionProps( monitor, out _ ) )
+                {
+                    return false;
+                }
                 if( _nuGetConfigFileHook != null )
                 {
                     Throw.CheckState( ApplyNuGetConfigFileHook( monitor, NuGetConfigFile ) );
@@ -143,19 +184,25 @@ public sealed partial class PluginMachinery
                 return LoadPluginFactory( monitor, preCompile: true, out toRecompile );
             }
         }
-        // Pre compile may be detected by CheckCKliPluginsCoreVersion if the plugins' package references
-        // to CKli.Plugins.Core and/or to the standard plugins (and may be also the CKli.Testing reference
-        // in CKli-Plugins/Tests/Plugins.Tests) have been updated.
-        bool preCompile = false;
+        // "CKli.Version.props" is the stamp of the CKli version the plugins were last built against: writing it
+        // is what asks for a recompilation. Nothing in the Stack repository moves here (the file is git ignored),
+        // which is the whole point: the plugins' package references to CKli.Plugins.Core, to the standard plugins
+        // and the CKli.Testing one in Tests/Plugins.Tests are all written as $(CKliVersion) and never rewritten.
+        if( !EnsureCKliVersionProps( monitor, out bool preCompile ) )
+        {
+            return false;
+        }
+        // One-time migration of the Stacks created before $(CKliVersion) existed.
         // When in CKli itself, the CKli-Plugins solution uses project instead of package references:
-        // there is no Directory.Package.props, no version to upgrade, so we skip this step.
+        // there is no Directory.Packages.props, no version to migrate, so we skip this step.
         if( _definitionFile.World.StackName != "CKli"
             && (_versionChecked == null || !_versionChecked.Contains( Root )) )
         {
-            if( !CheckCKliPluginsCoreVersion( monitor, out preCompile ) )
+            if( !MigrateToCKliVersionProperty( monitor, out bool migrated ) )
             {
                 return false;
             }
+            preCompile |= migrated;
             _versionChecked ??= new HashSet<string>();
             _versionChecked.Add( Root );
         }
@@ -336,96 +383,149 @@ public sealed partial class PluginMachinery
         }
     }
 
-    bool CheckCKliPluginsCoreVersion( IActivityMonitor monitor, out bool mustRecompile )
+    // Writes "CKli.Version.props" when the version it carries is not the EffectiveCKliVersion and asks for a
+    // recompilation in that case.
+    // That recompilation is not optional: the generated CKli.CompiledPlugins.cs bakes a signature that includes
+    // World.CKliVersion (PluginCollectorContext.ComputeSignature) and, in PluginCompileMode.None where no such
+    // signature exists, a stale dll built against another CKli.Plugins.Core would only fail later, at plugin
+    // instantiation (the MissingMethodException that RecoverFromInstantiationError has to catch).
+    bool EnsureCKliVersionProps( IActivityMonitor monitor, out bool mustRecompile )
     {
         mustRecompile = false;
         try
         {
-            // The DirectoryPackageProps is used by plugins (but not by the optional Plugins.Tests project).
+            var version = EffectiveCKliVersion;
+            var content = string.Format( CKliVersionPropsPattern, version );
+            if( File.Exists( CKliVersionProps ) && File.ReadAllText( CKliVersionProps ) == content )
+            {
+                return true;
+            }
+            monitor.Info( $"Setting CKliVersion to '{version}' in '{CKliVersionPropsFileName}'." );
+            File.WriteAllText( CKliVersionProps, content );
+            mustRecompile = true;
+            // This file is generated: the Stack's .gitignore must cover it. Doing it here also repairs the
+            // Stacks whose .gitignore predates it.
+            return _definitionFile.World.Stack.EnsureGeneratedFilesIgnored( monitor )
+                   && FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While writing '{CKliVersionProps}'.", ex );
+            return false;
+        }
+    }
+
+    // One-time migration of a plugin solution created before the $(CKliVersion) property existed: the literal
+    // versions of CKli.Plugins.Core and of the standard plugins in "Directory.Packages.props" - and the
+    // CKli.Testing one in "Tests/Plugins.Tests/Plugins.Tests.csproj" - become "$(CKliVersion)".
+    //
+    // After this, those 2 files stop moving. That is the point: they used to record which developer ran ckli
+    // last, so 2 developers on 2 CKli versions left the Stack dirty and broke the next "ckli pull".
+    //
+    // The versions of the OTHER plugin packages ("ckli plugin add CKli.Xxx.Plugin@1.2.3") are deliberately left
+    // as literals: those are genuine shared decisions that must stay tracked.
+    //
+    // For a LTS world, the literal version was also an implicit pin (this is what used to refuse a LTS world
+    // opened with another CKli). The migration is lossless: it transfers that pin to the world definition file's
+    // "CKliVersion" attribute, which LocalWorldName now checks.
+    bool MigrateToCKliVersionProperty( IActivityMonitor monitor, out bool migrated )
+    {
+        migrated = false;
+        try
+        {
             var d = XDocument.Load( DirectoryPackageProps, LoadOptions.PreserveWhitespace );
 
-            // Handles CKli.Plugins.Core that must exist and this world must not be a LTS.
-            if( !ReadPackageVersion( monitor, d, "CKli.Plugins.Core", mustExist: true, DirectoryPackageProps, out XElement? ckliPluginsCore, out SVersion? v ) )
+            // Handles CKli.Plugins.Core that must exist.
+            if( !ReadPackageVersion( monitor, d, "CKli.Plugins.Core", mustExist: true, DirectoryPackageProps, out XElement? ckliPluginsCore, out SVersion? literal ) )
             {
                 return false;
             }
-            Throw.DebugAssert( ckliPluginsCore != null && v != null );
+            Throw.DebugAssert( ckliPluginsCore != null );
 
-            var ckliVersion = World.CKliVersion.Version;
-            Throw.Assert( ckliVersion != null );
-            if( v != ckliVersion )
+            // Restores, on the world definition file, the pin that the literal version used to carry.
+            // "literal" is null when this solution has already been migrated (the attribute is "$(CKliVersion)"):
+            // there is then nothing to transfer.
+            if( literal != null && !_definitionFile.World.IsDefaultWorld && _definitionFile.PinnedCKliVersion == null )
             {
-                if( !_definitionFile.World.IsDefaultWorld )
+                var ckliVersion = World.CKliVersion.Version;
+                if( literal != ckliVersion )
                 {
+                    // Same refusal as before this migration existed: nothing is written, so re-running it with
+                    // the appropriate CKli completes the migration.
                     monitor.Error( $"""
                                    This world '{_definitionFile.World.FullName}' is a Long Term Support world.
-                                   It uses CKli in version '{v}'. This CKli version is '{ckliVersion}'.
+                                   It uses CKli in version '{literal}'. This CKli version is '{ckliVersion}'.
                                    Please use the appropriate CKli version.
                                    """ );
                     return false;
                 }
-                monitor.Info( $"""
-                              Updating 'Directory.Package.props' file:
-                              {ckliPluginsCore}
-                              To use Version="{ckliVersion}".
-                              """ );
-                ckliPluginsCore.SetAttributeValue( XNames.Version, ckliVersion );
-                mustRecompile = true;
+                _definitionFile.EnsurePinnedCKliVersion( monitor, literal );
             }
-            // Handles any standard plugins: their version is the same.
+
+            // The plugin solution's own "Directory.Build.props" must import the generated file BEFORE the
+            // versions below reference $(CKliVersion): a solution that predates the property has no import at
+            // all, and rewriting the versions without adding it would leave nothing able to restore.
+            if( !EnsureVersionPropsImport( monitor, DirectoryBuildProps, RootVersionPropsImport, null, ref migrated ) )
+            {
+                return false;
+            }
+
+            // Tracked apart from "migrated": only a change to this document may rewrite the file (SafeSave
+            // re-serializes it, so saving an untouched one would reformat it for nothing).
+            bool packagesChanged = SetToCKliVersionProperty( monitor, ckliPluginsCore, DirectoryPackageProps );
+            // Handles any standard plugin: their version is the CKli one.
             foreach( var name in PluginBase.StandardPluginNames )
             {
-                if( !UpdateStandardPluginVersion( monitor, ref mustRecompile, d, ckliVersion, name, DirectoryPackageProps ) )
+                if( !ReadPackageVersion( monitor, d, name, mustExist: false, DirectoryPackageProps, out XElement? standard, out _ ) )
                 {
                     return false;
                 }
+                if( standard != null )
+                {
+                    packagesChanged |= SetToCKliVersionProperty( monitor, standard, DirectoryPackageProps );
+                }
             }
-            if( mustRecompile )
+            if( packagesChanged )
             {
                 d.SafeSave( DirectoryPackageProps );
+                migrated = true;
             }
 
-            // Handling CKli.Testing version in 'Tests/Plugins.Tests/Plugins.Tests.csproj' if it exists.
-            // The Plugins.Tests project doesn't use the Central Package Version.
-            //
-            // We do this even if the version in the Directory.Package.props was okay and if CKli.Testing
-            // is not referenced by the test project, we just emit a warning.
-            //
+            // Handles the CKli.Testing reference in 'Tests/Plugins.Tests/Plugins.Tests.csproj' if it exists.
+            // The Plugins.Tests project doesn't use the Central Package Version: its PackageReference carries the
+            // version itself. And since it has its own Directory.Build.props, that companion must import the
+            // generated "CKli.Version.props" (see PluginTestsDirectoryBuildProps).
             if( File.Exists( PluginTestsCSProjFilePath ) )
             {
+                if( !EnsureVersionPropsImport( monitor,
+                                               PluginTestsDirectoryBuildProps,
+                                               PluginTestsVersionPropsImport,
+                                               DefaultPluginTestsDirectoryBuildProps,
+                                               ref migrated ) )
+                {
+                    return false;
+                }
                 var testsCSProj = XDocument.Load( PluginTestsCSProjFilePath, LoadOptions.PreserveWhitespace );
                 var ckliTesting = testsCSProj.Root?.Elements( XNames.ItemGroup )
                                              .Elements( XNames.PackageReference )
                                              .FirstOrDefault( e => e.Attribute( XNames.Include )?.Value == "CKli.Testing" );
                 if( ckliTesting == null )
                 {
-                    monitor.Warn( """
-                        Unable to find <PackageReference Include="CKli.Testing" Version="..." /> element in 'Tests/Plugins.Tests/Plugins.Tests.csproj'.
-                        Skipping CKli version update.
+                    // A Plugins.Tests that references CKli.Testing by project (this is what CKli's own stack does)
+                    // has no version to migrate.
+                    monitor.Trace( """
+                        No <PackageReference Include="CKli.Testing" Version="..." /> element in 'Tests/Plugins.Tests/Plugins.Tests.csproj'.
+                        Nothing to migrate there.
                         """ );
                 }
-                else
+                else if( SetToCKliVersionProperty( monitor, ckliTesting, PluginTestsCSProjFilePath ) )
                 {
-                    if( !SVersion.TryParse( ckliTesting.Attribute( XNames.Version )?.Value, out v ) )
-                    {
-                        monitor.Error( $"Invalid version in {ckliTesting} (in '{PluginTestsCSProjFilePath}'): {v.ErrorMessage}." );
-                        return false;
-                    }
-                    if( v != ckliVersion )
-                    {
-                        monitor.Info( $"""
-                          Updating 'Tests/Plugins.Tests/Plugins.Tests.csproj' file:
-                          {ckliTesting}
-                          To use Version="{ckliVersion}".
-                          """ );
-                        ckliTesting.SetAttributeValue( XNames.Version, ckliVersion );
-                        testsCSProj.SafeSave( PluginTestsCSProjFilePath );
-                        mustRecompile = true;
-                    }
+                    testsCSProj.SafeSave( PluginTestsCSProjFilePath );
+                    migrated = true;
                 }
             }
 
-            if( mustRecompile )
+            if( migrated )
             {
                 monitor.Trace( $"Deleting '{CKliCompiledPluginsFile.LastPart}'." );
                 if( !FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile ) )
@@ -437,18 +537,38 @@ public sealed partial class PluginMachinery
         }
         catch( Exception ex )
         {
-            monitor.Error( $"While checking CKli.Plugins.Core version in '{DirectoryPackageProps}'.", ex );
+            monitor.Error( $"While migrating '{DirectoryPackageProps}' to the $(CKliVersion) property.", ex );
             return false;
         }
 
-        static bool ReadPackageVersion( IActivityMonitor monitor, XDocument d, string name, bool mustExist, NormalizedPath directoryPackageProps, out XElement? ckliPluginsCore, out SVersion? v )
+        static bool SetToCKliVersionProperty( IActivityMonitor monitor, XElement e, NormalizedPath file )
         {
-            ckliPluginsCore = d.Root?.Elements( XNames.ItemGroup )
-                                         .Elements( XNames.PackageVersion )
-                                         .FirstOrDefault( e => e.Attribute( XNames.Include )?.Value == name );
-            if( ckliPluginsCore == null )
+            if( e.Attribute( XNames.Version )?.Value == CKliVersionPropertyRef ) return false;
+            monitor.Info( $"""
+                          Migrating '{file.LastPart}':
+                          {e}
+                          To use Version="{CKliVersionPropertyRef}".
+                          """ );
+            e.SetAttributeValue( XNames.Version, CKliVersionPropertyRef );
+            return true;
+        }
+
+        // "version" is null when the element is missing (only allowed when mustExist is false) or when it
+        // already carries the "$(CKliVersion)" property rather than a literal version.
+        static bool ReadPackageVersion( IActivityMonitor monitor,
+                                        XDocument d,
+                                        string name,
+                                        bool mustExist,
+                                        NormalizedPath directoryPackageProps,
+                                        out XElement? packageVersion,
+                                        out SVersion? version )
+        {
+            version = null;
+            packageVersion = d.Root?.Elements( XNames.ItemGroup )
+                                    .Elements( XNames.PackageVersion )
+                                    .FirstOrDefault( e => e.Attribute( XNames.Include )?.Value == name );
+            if( packageVersion == null )
             {
-                v = null;
                 if( mustExist )
                 {
                     monitor.Error( $"Unable to find <PackageVersion Include=\"{name}\" Version=\"...\" /> in '{directoryPackageProps}'." );
@@ -456,36 +576,79 @@ public sealed partial class PluginMachinery
                 }
                 return true;
             }
-            if( !SVersion.TryParse( ckliPluginsCore.Attribute( XNames.Version )?.Value, out v ) )
+            var v = packageVersion.Attribute( XNames.Version )?.Value;
+            if( v != CKliVersionPropertyRef )
             {
-                monitor.Error( $"Invalid version in {ckliPluginsCore} (in '{directoryPackageProps}'): {v.ErrorMessage}." );
-                return false;
+                if( !SVersion.TryParse( v, out var parsed ) )
+                {
+                    monitor.Error( $"Invalid version in {packageVersion} (in '{directoryPackageProps}'): {parsed.ErrorMessage}." );
+                    return false;
+                }
+                version = parsed;
             }
             return true;
         }
+    }
 
-        static bool UpdateStandardPluginVersion( IActivityMonitor monitor,
-                                                 ref bool mustRecompile,
-                                                 XDocument d,
-                                                 SVersion ckliVersion,
-                                                 string name,
-                                                 NormalizedPath directoryPackageProps )
+    // Ensures that a "Directory.Build.props" imports the generated "CKli.Version.props".
+    //
+    // This is the other half of the migration and it is NOT optional: rewriting the package versions to
+    // $(CKliVersion) in a solution whose "Directory.Build.props" predates the property would leave it
+    // undefined, and nothing would restore at all.
+    //
+    // There are 2 such files. The plugin solution's own one, and the Plugins.Tests companion - that project
+    // has its own (it works around https://github.com/dotnet/sdk/issues/45953) and MSBuild stops walking up at
+    // the first "Directory.Build.props" it finds, so the property defined beside the plugin solution does NOT
+    // reach it. Hence the 2 different relative paths in the imported lines.
+    //
+    // <paramref name="defaultContent"/> is null when the file must exist (the plugin solution's own one): a
+    // missing one is a broken solution, not something to recreate from a template.
+    bool EnsureVersionPropsImport( IActivityMonitor monitor,
+                                   NormalizedPath path,
+                                   string importLines,
+                                   string? defaultContent,
+                                   ref bool migrated )
+    {
+        try
         {
-            if( !ReadPackageVersion( monitor, d, name, mustExist: false, directoryPackageProps, out XElement? ckliStandard, out SVersion? v ) )
+            if( !File.Exists( path ) )
             {
+                if( defaultContent == null )
+                {
+                    monitor.Error( $"Missing '{path}'." );
+                    return false;
+                }
+                monitor.Info( $"Creating '{path}'." );
+                File.WriteAllText( path, defaultContent );
+                migrated = true;
+                return true;
+            }
+            var text = File.ReadAllText( path );
+            if( text.Contains( CKliVersionPropsFileName, StringComparison.Ordinal ) )
+            {
+                return true;
+            }
+            // Text insert on purpose: re-serializing this file through XElement would reformat all of it.
+            int start = text.IndexOf( "<Project", StringComparison.Ordinal );
+            int end = start < 0 ? -1 : text.IndexOf( '>', start );
+            if( end < 0 || text[end - 1] == '/' )
+            {
+                monitor.Error( $"""
+                    Unable to find the opening <Project> element in '{path}'.
+                    Please add these lines to it manually:
+                    {importLines}
+                    """ );
                 return false;
             }
-            if( ckliStandard != null && v != ckliVersion )
-            {
-                monitor.Info( $"""
-                              Updating 'Directory.Package.props' file:
-                              {ckliStandard}
-                              To use Version="{ckliVersion}".
-                              """ );
-                ckliStandard.SetAttributeValue( XNames.Version, ckliVersion );
-                mustRecompile = true;
-            }
+            monitor.Info( $"Importing '{CKliVersionPropsFileName}' from '{path}'." );
+            File.WriteAllText( path, text.Insert( end + 1, Environment.NewLine + importLines ) );
+            migrated = true;
             return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While updating '{path}'.", ex );
+            return false;
         }
     }
 
@@ -495,6 +658,9 @@ public sealed partial class PluginMachinery
         args.Append( CKliPluginsCSProj.LastPart );
         args.Append( " --tl:off --nologo" );
         args.Append( " -c " ).Append( _definitionFile.CompileMode == PluginCompileMode.Debug ? "Debug" : "Release" );
+        // Global property: it wins over the generated "CKli.Version.props", so CKli's own build never depends on
+        // that file being up to date. The IDE and "dotnet test" builds get the value from the file instead.
+        args.Append( " -p:CKliVersion=" ).Append( EffectiveCKliVersion );
         using var gLog = monitor.OpenTrace( $"""
             Compiling '{CKliPluginsCSProj.LastPart}'
             dotnet {args}.
@@ -809,13 +975,15 @@ public sealed partial class PluginMachinery
                                 
                 """;
 
-    static readonly string DefaultDirectoryPackageProps = $"""
+    // The version is the $(CKliVersion) property that the generated CKliVersionPropsFileName carries: this file
+    // is written once and never rewritten, so it doesn't record which developer ran ckli last.
+    const string DefaultDirectoryPackageProps = """
                 <Project>
                   <PropertyGroup>
                     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
                   </PropertyGroup>
                   <ItemGroup>
-                    <PackageVersion Include="CKli.Plugins.Core" Version="{World.CKliVersion.Version}" />
+                    <PackageVersion Include="CKli.Plugins.Core" Version="$(CKliVersion)" />
                   </ItemGroup>
                 </Project>
 
@@ -826,14 +994,79 @@ public sealed partial class PluginMachinery
     /// </summary>
     const string DefaultDirectoryBuildPropsPattern = """
                 <Project>
+                  <!-- Generated and git ignored: carries the $(CKliVersion) property for this developer's CKli. -->
+                  <Import Project="$(MSBuildThisFileDirectory)CKli.Version.props" Condition="Exists('$(MSBuildThisFileDirectory)CKli.Version.props')" />
                   <PropertyGroup>
                     <TargetFramework>net10.0</TargetFramework>
                     <ArtifactsPath>$(MSBuildThisFileDirectory)../$Local/{0}</ArtifactsPath>
                     <ArtifactsPivots>run</ArtifactsPivots>
                     <Nullable>enable</Nullable>
                   </PropertyGroup>
+                  <Target Name="_CKliVersionRequired" BeforeTargets="Restore;CollectPackageReferences" Condition="'$(CKliVersion)' == ''">
+                    <Error Text="CKliVersion is not set. Run any 'ckli' command in this Stack to generate CKli.Version.props." />
+                  </Target>
                 </Project>
-                
+
+                """;
+
+    /// <summary>
+    /// The name of the generated, git ignored file that carries the $(CKliVersion) property.
+    /// <see cref="StackRepository.GeneratedFileIgnorePatterns"/> ignores it.
+    /// </summary>
+    public const string CKliVersionPropsFileName = "CKli.Version.props";
+
+    /// <summary>
+    /// The MSBuild reference to the $(CKliVersion) property, as it is written in the "Version" attribute of
+    /// the CKli owned package references.
+    /// </summary>
+    internal const string CKliVersionPropertyRef = "$(CKliVersion)";
+
+    /// <summary>
+    /// Gets the "CKli.Version.props" content: the {0} placeholder is for the <see cref="EffectiveCKliVersion"/>.
+    /// </summary>
+    const string CKliVersionPropsPattern = """
+                <Project>
+                  <!--
+                    Generated by CKli and git ignored: this is YOUR CKli version, not the world's.
+                    A world that must impose one carries a CKliVersion attribute in its definition file
+                    (this is what "ckli world lts create" writes on the LTS world it creates).
+                  -->
+                  <PropertyGroup>
+                    <CKliVersion>{0}</CKliVersion>
+                  </PropertyGroup>
+                </Project>
+
+                """;
+
+    /// <summary>
+    /// Gets the content of the "Tests/Plugins.Tests/Directory.Build.props" companion when it must be created.
+    /// MSBuild stops walking up at the first "Directory.Build.props" it finds, so this project does NOT see
+    /// the one at the root of the plugin solution: it has to import the generated file itself.
+    /// </summary>
+    const string DefaultPluginTestsDirectoryBuildProps = """
+                <Project>
+                  <!--
+                  This props works around https://github.com/dotnet/sdk/issues/45953.
+                  -->
+                  <Import Project="$(MSBuildThisFileDirectory)../../CKli.Version.props" Condition="Exists('$(MSBuildThisFileDirectory)../../CKli.Version.props')" />
+                </Project>
+
+                """;
+
+    // The lines inserted into an already existing "Tests/Plugins.Tests/Directory.Build.props".
+    const string PluginTestsVersionPropsImport = """
+                  <Import Project="$(MSBuildThisFileDirectory)../../CKli.Version.props" Condition="Exists('$(MSBuildThisFileDirectory)../../CKli.Version.props')" />
+                """;
+
+    // The lines inserted into the plugin solution's "Directory.Build.props" when it predates $(CKliVersion).
+    // Without this, migrating "Directory.Packages.props" to $(CKliVersion) would leave the property undefined
+    // and nothing would restore at all.
+    const string RootVersionPropsImport = """
+                  <!-- Generated and git ignored: carries the $(CKliVersion) property for this developer's CKli. -->
+                  <Import Project="$(MSBuildThisFileDirectory)CKli.Version.props" Condition="Exists('$(MSBuildThisFileDirectory)CKli.Version.props')" />
+                  <Target Name="_CKliVersionRequired" BeforeTargets="Restore;CollectPackageReferences" Condition="'$(CKliVersion)' == ''">
+                    <Error Text="CKliVersion is not set. Run any 'ckli' command in this Stack to generate CKli.Version.props." />
+                  </Target>
                 """;
 
 #pragma warning restore IDE1006 // Naming Styles

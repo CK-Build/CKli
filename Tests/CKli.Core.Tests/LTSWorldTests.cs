@@ -13,7 +13,7 @@ namespace CKli.Core.Tests;
 /// A Stack has one default World and any number of Long Term Support Worlds, each one defined by a
 /// "StackName@ltsName.xml" file in the Stack repository and rooted in its own "@ltsName/" folder.
 /// <para>
-/// "ckli clone --lts-name" clones a Stack at one of its LTS worlds and "ckli lts clone" obtains one in
+/// "ckli clone --lts-name" clones a Stack at one of its LTS worlds and "ckli world lts clone" obtains one in
 /// an already cloned Stack.
 /// </para>
 /// </summary>
@@ -75,7 +75,7 @@ public class LTSWorldTests
         Directory.Exists( stackRoot.AppendPart( "@net8" ) ).ShouldBeFalse();
 
         var inStack = target.ChangeDirectory( stackRoot );
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, inStack, "lts", "clone", "@net8" )).ShouldBeTrue();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, inStack, "world", "lts", "clone", "@net8" )).ShouldBeTrue();
         Directory.Exists( stackRoot.Combine( "@net8/OneRepo" ) ).ShouldBeTrue();
         Directory.Exists( stackRoot.AppendPart( "OneRepo" ) ).ShouldBeTrue( "The default world is untouched." );
 
@@ -92,7 +92,7 @@ public class LTSWorldTests
         // Idempotent: nothing left to do.
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
-            (await CKliCommands.ExecAsync( TestHelper.Monitor, inStack, "lts", "clone", "@net8" )).ShouldBeTrue();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, inStack, "world", "lts", "clone", "@net8" )).ShouldBeTrue();
             logs.ShouldContain( l => l.Contains( "has no repository to clone" ) );
         }
     }
@@ -108,7 +108,7 @@ public class LTSWorldTests
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
-            (await CKliCommands.ExecAsync( TestHelper.Monitor, inStack, "lts", "clone", "@net8" )).ShouldBeFalse();
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, inStack, "world", "lts", "clone", "@net8" )).ShouldBeFalse();
             logs.ShouldContain( l => l.Contains( "Stack 'One' has no '@net8' Long Term Support world." ) );
         }
     }

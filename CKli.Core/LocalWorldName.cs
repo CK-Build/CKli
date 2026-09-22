@@ -128,6 +128,38 @@ public sealed class LocalWorldName : WorldName
                 }
             }
 
+            // Then the exact "CKliVersion" pin. This is the LTS guard: a LTS world is frozen on a CKli version
+            // and its plugins must not be built against another one.
+            // Before this attribute existed, the literal <PackageVersion Include="CKli.Plugins.Core" Version="..." />
+            // of the world's "Directory.Packages.props" carried this pin as a side effect. It doesn't anymore: that
+            // file now uses the $(CKliVersion) property so that it stops recording which developer ran ckli last.
+            // When this attribute is absent - the normal case for the default world - each developer keeps its own
+            // CKli version and nothing in the Stack repository records it.
+            string? pinCKliVersion = root.Attribute( XNames.CKliVersion )?.Value;
+            if( !string.IsNullOrWhiteSpace( pinCKliVersion ) )
+            {
+                var vPin = SVersion.ParseNoThrow( pinCKliVersion );
+                if( !vPin.IsValid )
+                {
+                    monitor.Error( $"""
+                    Invalid <{mustBeStackName} CKliVersion="{pinCKliVersion}" > attribute in world definition file. File: '{_xmlDescriptionFilePath}'.
+                    """ );
+                    return null;
+                }
+                if( ckliVersion == SVersion.ZeroVersion )
+                {
+                    monitor.Warn( $"Using locally compiled CKli (version 0.0.0-0): ignoring the CKliVersion=\"{pinCKliVersion}\" pin." );
+                }
+                else if( vPin != ckliVersion )
+                {
+                    monitor.Error( $"""
+                        This world is pinned to CKli version '{pinCKliVersion}'. This CKli version is '{ckliVersion}'.
+                        Please use the appropriate CKli version. File: '{_xmlDescriptionFilePath}'.
+                        """ );
+                    return null;
+                }
+            }
+
             string? ltsName = root.Attribute( "LTSName" )?.Value;
             if( !StringComparer.OrdinalIgnoreCase.Equals( mustBeStackName, StackName ) )
             {

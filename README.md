@@ -55,7 +55,7 @@ A few options are global: they belong to `ckli` itself rather than to a command,
 
 `ckli i` (or `ckli interactive`) starts an interactive loop where commands are typed one after the other
 without the `ckli` prefix. It accepts `--path` before or right after it. The commands that create or
-relocate something are rejected in interactive mode: `clone`, `create`, `lts clone`, `lts create`,
+relocate something are rejected in interactive mode: `clone`, `create`, `world lts clone`, `world lts create`,
 `remote stack migrate` and `update`.
 
 ## The basics: Stack-World-Repo
@@ -252,8 +252,8 @@ Clones a Stack and the repositories of one of its Worlds in the current director
 `--lts-name` is specified.
 
 `--lts-name <@ltsName>` clones the repositories of that Long Term Support World instead, in the Stack's own
-`@ltsName/` folder. The Stack must have that World (see [`lts create`](#lts-create-ltsname)); to obtain a
-second World of an already cloned Stack, use [`lts clone`](#lts-clone-ltsname).
+`@ltsName/` folder. The Stack must have that World (see [`world lts create`](#world-lts-create-ltsname)); to obtain a
+second World of an already cloned Stack, use [`world lts clone`](#world-lts-clone-ltsname).
 
 `--max-dop <n>` limits the parallelism when cloning the repositories.
 
@@ -281,9 +281,9 @@ than at its root), and the recursion then follows that World's own references. A
 such World is an error.
 
 A Stack is cloned only once, so when two references name the same Stack with two different Worlds, the second
-World is **added** to the clone rather than cloned again — exactly what `lts clone` does — and its own
+World is **added** to the clone rather than cloned again — exactly what `world lts clone` does — and its own
 references are then followed too. When the Stack was instead found already cloned somewhere else on this
-machine, that folder is left untouched and the `lts clone` command line to run there is reported.
+machine, that folder is left untouched and the `world lts clone` command line to run there is reported.
 
 `--with-ref-clone` clones every reference, including the `DefaultClone="false"` ones.
 
@@ -473,49 +473,6 @@ Examples:
 - `ckli exec git pull --tags --force` updates all the tags from the remotes, replacing the local ones (kind of `ckli tag pull *` that
    is not currently supported).
 
-## LTS World commands (create, clone)
-
-A Stack has one default World and any number of Long Term Support Worlds. A World is defined by a
-`{StackName}@{ltsName}.xml` file in the Stack repository and its repositories live in the Stack's own
-`@ltsName/` folder — so the Worlds of a Stack are siblings, not copies of it. A LTS name must be at
-least 3 characters starting with `@`, then only ASCII lowercase letters, digits, `-`, `_` and `.`.
-
-### `lts create <@ltsName>`
-Creates a new LTS World from the current default World. Must be run from the default World.
-
-The new World's definition file is a clone of the current one, and the plugins are given the opportunity to
-adjust it through the `WorldEvents.CreateLTS` event. The
-[VersionTag plugin](StandardPlugins/CKli.VersionTag.Plugin/README.md#worldeventscreatelts--cutting-the-version-range-of-a-new-lts)
-uses it to split the version range — the new World keeps the versions produced so far and the default World
-starts a new Major above them — and to reduce the new World's branch model to its root branch.
-
-The World must be **fully published** for this to be possible: no version or branch issue anywhere, every
-repository currently offering a published version (no `+fake`, no `+deprecated`), no pending `local/` or
-`building/` release left anywhere, and every `dev/` root branch integrated. Otherwise the command fails,
-listing every repository that is in the way, and nothing is written — neither the new definition file nor the
-`InfVersion` the current World would have received.
-
-The pending-release rule is the one that bites in practice: a `local/` build is below the cut, so it would end
-up in the new LTS World while the code it came from stays in the default one. Publish it (or let a new build
-supersede it) first.
-
-One thing is deliberately **not** cloned: the `LockPrefix` attribute. It states the Git reference namespace
-that locks the Stack, and since every World of a Stack locks in the one Stack repository it is a Stack level
-setting that only the default World carries — a copy on the new World could only diverge from the one that is
-actually used. See
-[`LockPrefix`](CKli.Core/README.md#lockprefix-the-reference-namespace-that-locks-the-stack).
-
-Only the definition file is created. The new World's repositories and its plugin solution appear when it is
-first opened, which is what [`lts clone`](#lts-clone-ltsname) does.
-
-### `lts clone <@ltsName>`
-Clones the repositories of an existing LTS World of the current Stack into its `@ltsName/` folder. Use this
-when the Stack is already cloned; `clone --lts-name` is the equivalent for a Stack that is not.
-
-Only the missing repositories are cloned, so running it again does nothing. Opening a World for the first
-time also generates its plugin solution inside the Stack repository, so the command commits the Stack: no
-`push` is needed for the World to exist locally, but a `push --stack-only` publishes that plugin solution.
-
 ## World commands (reference list, set, remove)
 
 These commands manage the `<Reference Url="..." />` elements of the current World's definition file: the other
@@ -542,7 +499,7 @@ an existing reference just makes sure it is there and leaves its attributes as t
 `--lts-name <@ltsName>` sets `LTSName="@net8"`: the Long Term Support World of the referenced Stack that this World
 uses. Unlike the 2 booleans below, this attribute has no default value — when it is absent, the referenced Stack's
 **default** World is the one that is used — so `--default-world` is what removes it. The 2 are mutually exclusive and
-the name must satisfy the same rule as `lts create`: at least 3 characters starting with `@`, then only ASCII
+the name must satisfy the same rule as `world lts create`: at least 3 characters starting with `@`, then only ASCII
 lowercase letters, digits, `-`, `_` and `.`.
 
 `clone` honors it: the repositories of that LTS World are the ones cloned, in the referenced Stack's
@@ -563,6 +520,56 @@ flag that contradicts it is an error, and an existing reference that contradicts
 Removes a reference. The `<nameOrUrl>` is its url, the referenced repository name (`XXX-Stack`) or its stack
 name (`XXX`) — the url is required when a name matches more than one reference. Removing a reference that doesn't
 exist is not an error, and a `<References>` element that becomes empty is removed.
+
+## World LTS commands (create, clone)
+
+A Stack has one default World and any number of Long Term Support Worlds. A World is defined by a
+`{StackName}@{ltsName}.xml` file in the Stack repository and its repositories live in the Stack's own
+`@ltsName/` folder — so the Worlds of a Stack are siblings, not copies of it. A LTS name must be at
+least 3 characters starting with `@`, then only ASCII lowercase letters, digits, `-`, `_` and `.`.
+
+### `world lts create <@ltsName>`
+Creates a new LTS World from the current default World. Must be run from the default World.
+
+The new World's definition file is a clone of the current one, and the plugins are given the opportunity to
+adjust it through the `WorldEvents.CreateLTS` event. The
+[VersionTag plugin](StandardPlugins/CKli.VersionTag.Plugin/README.md#worldeventscreatelts--cutting-the-version-range-of-a-new-lts)
+uses it to split the version range — the new World keeps the versions produced so far and the default World
+starts a new Major above them — and to reduce the new World's branch model to its root branch.
+
+The World must be **fully published** for this to be possible: no version or branch issue anywhere, every
+repository currently offering a published version (no `+fake`, no `+deprecated`), no pending `local/` or
+`building/` release left anywhere, and every `dev/` root branch integrated. Otherwise the command fails,
+listing every repository that is in the way, and nothing is written — neither the new definition file nor the
+`InfVersion` the current World would have received.
+
+The pending-release rule is the one that bites in practice: a `local/` build is below the cut, so it would end
+up in the new LTS World while the code it came from stays in the default one. Publish it (or let a new build
+supersede it) first.
+
+The new World is **pinned** to the CKli version that creates it: its root element receives a
+`CKliVersion="0.13.0"` attribute, and CKli then refuses to open that World with any other version, naming the
+one to install. This is the point of a LTS World — it is frozen, so its plugins must not be built against a
+CKli it has never seen. The default World carries no such attribute: there, each developer keeps its own CKli
+version. There is no flag to skip the pin; removing it is a manual edit of the definition file, like
+`MinCKliVersion`.
+
+One thing is deliberately **not** cloned: the `LockPrefix` attribute. It states the Git reference namespace
+that locks the Stack, and since every World of a Stack locks in the one Stack repository it is a Stack level
+setting that only the default World carries — a copy on the new World could only diverge from the one that is
+actually used. See
+[`LockPrefix`](CKli.Core/README.md#lockprefix-the-reference-namespace-that-locks-the-stack).
+
+Only the definition file is created. The new World's repositories and its plugin solution appear when it is
+first opened, which is what [`world lts clone`](#world-lts-clone-ltsname) does.
+
+### `world lts clone <@ltsName>`
+Clones the repositories of an existing LTS World of the current Stack into its `@ltsName/` folder. Use this
+when the Stack is already cloned; `clone --lts-name` is the equivalent for a Stack that is not.
+
+Only the missing repositories are cloned, so running it again does nothing. Opening a World for the first
+time also generates its plugin solution inside the Stack repository, so the command commits the Stack: no
+`push` is needed for the World to exist locally, but a `push --stack-only` publishes that plugin solution.
 
 ## World lock commands (lock, unlock)
 
@@ -725,6 +732,32 @@ external and optional plugins can be used.
 
 Plugins are written in .NET and distributed as NuGet packages or can be source code directly
 in the Stack repository.
+
+### The plugin solution and the CKli version
+
+A World's plugins live in a `{StackName}-Plugins{@ltsName}/` solution inside the Stack repository. CKli
+maintains it: `Directory.Build.props`, `Directory.Packages.props`, `nuget.config`, the `CKli.Plugins` project
+and, when there is one, the `CKli.Testing` reference of `Tests/Plugins.Tests`.
+
+`CKli.Plugins.Core` and every Standard Plugin package are referenced at `$(CKliVersion)` rather than at a
+literal version, and that property comes from a **generated, git ignored** `CKli.Version.props` sitting beside
+`Directory.Build.props`. So the CKli version each developer runs is *not* recorded in the Stack repository:
+two developers on two CKli versions no longer produce a conflicting change in a tracked file. (It used to be a
+literal version rewritten on every World open, which left the Stack dirty and made the next `pull` fail.)
+
+`CKli.Version.props` is written on every World open, and rewriting it is what triggers a recompilation of the
+plugins. `ckli` passes the value to its own builds explicitly; an IDE or a plain `dotnet build`/`dotnet test`
+reads the file. A build that finds no `$(CKliVersion)` at all — a fresh clone where no `ckli` command has run
+yet — fails with a message saying so rather than with an obscure NuGet error.
+
+The versions of any **other** plugin package (the ones `plugin add <packageId@version>` installs) stay literal
+in `Directory.Packages.props`: those are shared decisions and belong in the Stack repository.
+
+A World that must impose a CKli version carries a `CKliVersion` attribute on the root element of its definition
+file instead; CKli then refuses to open it with any other version and builds its plugins against the pinned one.
+[`world lts create`](#world-lts-create-ltsname) writes it on the LTS World it creates. A Stack created before
+this existed is migrated on its first open: the literal versions become `$(CKliVersion)` and a LTS World's
+implicit pin is transferred to the attribute, in one final commit per World.
 
 ### `plugin info --skip-pull-stack`
 

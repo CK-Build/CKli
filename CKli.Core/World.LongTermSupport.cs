@@ -17,7 +17,7 @@ public sealed partial class World
     /// </para>
     /// <para>
     /// The new world's plugin solution is not created here: the <see cref="PluginMachinery"/> generates it on the
-    /// first open of the new world (this is what "ckli lts clone" relies on).
+    /// first open of the new world (this is what "ckli world lts clone" relies on).
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
@@ -53,6 +53,23 @@ public sealed partial class World
         // Stack lock in the Stack repository, so a copy here could only diverge from the one that is used.
         // WorldDefinitionFile.Create refuses a LTS World that has one.
         newDefinition.SetAttributeValue( XNames.LockPrefix, null );
+        // A LTS World is frozen: it pins the CKli version it is created with, and LocalWorldName then refuses
+        // to open it with any other one. The default World carries no such attribute - each developer keeps its
+        // own CKli version - which is why this is set here rather than inherited from the cloned definition.
+        //
+        // A locally compiled CKli (version "0.0.0-0") must NOT write that pin: no one can install "0.0.0-0", so
+        // the world would be unopenable by every other developer and the pin could only be removed by hand.
+        var pin = CKliVersion.Version;
+        if( pin == SVersion.ZeroVersion )
+        {
+            monitor.Warn( $"""
+                Using locally compiled CKli (version 0.0.0-0): world '{_name.StackName}{ltsName}' is created
+                without its CKliVersion pin. A Long Term Support world should state the CKli version it is
+                frozen on: add the CKliVersion attribute to '{newFileDesc.LastPart}' manually.
+                """ );
+            pin = null;
+        }
+        newDefinition.SetAttributeValue( XNames.CKliVersion, pin );
         if( _events._createLTSEventSender.HasHandlers )
         {
             var e = new CreateLTSEventArgs( monitor, context, this, ltsName, newDefinition );
@@ -64,6 +81,7 @@ public sealed partial class World
             newDefinition.Name = _definitionFile.XmlRoot.Name;
             newDefinition.SetAttributeValue( XNames.LTSName, ltsName );
             newDefinition.SetAttributeValue( XNames.LockPrefix, null );
+            newDefinition.SetAttributeValue( XNames.CKliVersion, pin );
         }
         XmlHelper.SafeSave( newDefFile, newFileDesc );
         return true;

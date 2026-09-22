@@ -18,6 +18,7 @@ public static class XNames
     public static readonly XName DefaultClone = XNamespace.None + "DefaultClone";
     public static readonly XName Private = XNamespace.None + "Private";
     public static readonly XName LTSName = XNamespace.None + "LTSName";
+    public static readonly XName CKliVersion = XNamespace.None + "CKliVersion";
     public static readonly XName LockPrefix = XNamespace.None + "LockPrefix";
     public static readonly XName Folder = XNamespace.None + "Folder";
     public static readonly XName Name = XNamespace.None + "Name";

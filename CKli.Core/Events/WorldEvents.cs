@@ -71,7 +71,7 @@ public sealed class WorldEvents
     public PerfectEvent<RepoAddedEventArgs> RepoAdded => _repoAddedEventSender.PerfectEvent;
 
     /// <summary>
-    /// Raised by "ckli lts create" command.
+    /// Raised by "ckli world lts create" command.
     /// </summary>
     public PerfectEvent<CreateLTSEventArgs> CreateLTS => _createLTSEventSender.PerfectEvent;
 

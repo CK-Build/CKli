@@ -33,16 +33,6 @@ public static class CKliCommands
         Add( cmds, new CKliLayoutFix() );
         Add( cmds, new CKliLayoutXif() );
 
-        NS( cmds, "lts",
-            """
-            Long-Term-Support Worlds of the current Stack: a LTS World maintains a previous line of
-            the Stack (an older target framework for instance) beside its default World.
-            """,
-            summary: "Long-Term-Support Worlds of the current Stack.",
-            helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#lts-world-commands-create-clone" );
-        Add( cmds, new CKliLTSClone() );
-        Add( cmds, new CKliLTSCreate() );
-
         Add( cmds, new CKliLog() );
         Add( cmds, new CKliStatus() );
 
@@ -108,6 +98,15 @@ public static class CKliCommands
             """,
             summary: "The definition of the current World and the locks its Stack shares.",
             helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#world-commands-reference-list-set-remove" );
+        NS( cmds, "world lts",
+            """
+            Long-Term-Support Worlds of the current Stack: a LTS World maintains a previous line of
+            the Stack (an older target framework for instance) beside its default World.
+            """,
+            summary: "Long-Term-Support Worlds of the current Stack.",
+            helpUrl: "https://github.com/CK-Build/CKli/blob/stable/README.md#world-lts-commands-create-clone" );
+        Add( cmds, new CKliLTSClone() );
+        Add( cmds, new CKliLTSCreate() );
         NS( cmds, "world reference",
             """
             The <Reference /> elements of the current World: the other Stacks whose published

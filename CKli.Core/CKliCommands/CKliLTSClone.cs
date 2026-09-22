@@ -12,7 +12,7 @@ sealed class CKliLTSClone : Command
 {
     internal CKliLTSClone()
         : base( null,
-                "lts clone",
+                "world lts clone",
                 """
                 Clones the repositories of an existing Long-Term-Support World of the current Stack into
                 its own "@ltsName/" folder. Only the missing repositories are cloned: running this again
@@ -101,9 +101,10 @@ sealed class CKliLTSClone : Command
                 monitor.Error( $"While creating world folder '{worldName.WorldRoot}'.", ex );
                 return false;
             }
-            // Opening the world generates its CKli.CompiledPlugins.cs: the Stack's .gitignore must cover it
-            // before it exists (older Stacks have a pattern that only matched the default world of "CKli").
-            if( !stack.EnsureCompiledPluginsIgnored( monitor ) )
+            // Opening the world generates its CKli.CompiledPlugins.cs and its CKli.Version.props: the Stack's
+            // .gitignore must cover them before they exist (older Stacks have a pattern that only matched the
+            // default world of "CKli", and no pattern at all for the props file).
+            if( !stack.EnsureGeneratedFilesIgnored( monitor ) )
             {
                 return false;
             }

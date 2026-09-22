@@ -161,7 +161,7 @@ sync.
 locks in the one Stack repository, so whether a reference name is accepted there is the same answer for all
 of them, and the prefix is read from the default World's file whatever the current World is. A copy on a LTS
 World could only diverge from the one that is used, so `WorldDefinitionFile.Create` refuses it — the world
-does not load — and `ckli lts create` strips it from the definition file it derives.
+does not load — and `ckli world lts create` strips it from the definition file it derives.
 `WorldDefinitionFile.SetLockPrefix` enforces the same rule when writing.
 
 An invalid value is refused the same way, by an exception that prevents the world from loading rather than a
@@ -171,6 +171,28 @@ colleagues do.
 
 The mutex itself is
 [`GitRepository.DistributedLock`](#gitrepositorydistributedlock-a-mutex-shared-by-the-developers-of-a-stack).
+
+### `MinCKliVersion` and `CKliVersion`: the CKli versions a World accepts
+
+Two optional attributes of the root element, both read by `LocalWorldName.DoLoadDefinitionFile` **before
+anything else** - even before the root element name is validated - because a CKli that cannot handle this
+World must say so rather than fail later on something incomprehensible. Neither has an API: they are written
+by code or by hand.
+
+- `MinCKliVersion` is a **lower bound**. A CKli older than it refuses to open the World and says to run
+  `ckli update`. This is the guard for a definition file an older CKli could not even parse.
+- `CKliVersion` is an **exact pin**, exposed as `WorldDefinitionFile.PinnedCKliVersion`. A CKli that is not
+  that version refuses to open the World, and the plugin solution is built against the pinned version rather
+  than the running one (`PluginMachinery.EffectiveCKliVersion`).
+
+The pin is what keeps a **LTS World frozen**: it is written by `World.CreateLTSAsync` (`ckli world lts create`)
+and the default World deliberately carries none - there, each developer keeps its own CKli version, which is
+what [the plugin solution's `$(CKliVersion)`](#plugin-discovery-and-loading) makes possible.
+
+Both skip their check when the running CKli is `SVersion.ZeroVersion` (`0.0.0-0`, a locally compiled one):
+a developer building CKli must be able to open any World. For the same reason `CreateLTSAsync` refuses to
+*write* a `0.0.0-0` pin - nobody can install that version, so the World would be unopenable by everyone else
+and only a manual edit could repair it.
 
 ### `<Reference />`: the other Stacks a World uses
 
@@ -247,17 +269,17 @@ resolves it through `FindWorldName`; a referenced Stack that has no such world i
 whole clone. The recursion then reads the references of *that* world, not of the referenced Stack's default one.
 
 A Stack is still cloned **once**. When two references name the same Stack with two different worlds, the
-second world is *added* to that clone through the same `CKliLTSClone.AddWorld` that `ckli lts clone` uses, and
+second world is *added* to that clone through the same `CKliLTSClone.AddWorld` that `ckli world lts clone` uses, and
 its own references are followed too. `CKliClone.CloneState` is what makes this terminate: it keys the handled
 set on `(url, LTSName)` — not on the url alone — and remembers the `StackRoot` of the Stacks that this command
 cloned. A Stack found already cloned *elsewhere* on the machine is never touched: that folder is not this
-command's to modify, so the `lts clone` command line to run there is reported instead.
+command's to modify, so the `world lts clone` command line to run there is reported instead.
 
 ### Opening a world doesn't require its folder
 
 `World.Create` only parses the path and reads the xml definition file, so `StackRepository.OpenWorld` can open
 a world that has never been cloned — and `World.FixLayout` then clones its missing repositories. That is the
-whole of `ckli lts clone`: create the folder, open the world, fix the layout. Two consequences that are easy
+whole of `ckli world lts clone`: create the folder, open the world, fix the layout. Two consequences that are easy
 to miss:
 
 - **A world's physical layout excludes the other worlds' roots.** `ReadPhysicalLayout` skips them explicitly.
@@ -267,9 +289,10 @@ to miss:
 - **Opening a world writes into the Stack repository**: `PluginMachinery` creates its
   `{LTSName}/{StackName}-Plugins{LTSName}/` solution there, which is tracked content. `StackRepository.Close`
   only commits a dirty definition file, so whoever adds a world commits the Stack itself.
-  `StackRepository.CompiledPluginsIgnorePattern` is deliberately unanchored for the same reason: the previous
+  `StackRepository.GeneratedFileIgnorePatterns` are deliberately unanchored for the same reason: the previous
   `/CKli-Plugins/CKli.Plugins/CKli.CompiledPlugins.cs` matched only the default world of a Stack literally
-  named "CKli". `EnsureCompiledPluginsIgnored` repairs older Stacks when a world is added.
+  named "CKli". `EnsureGeneratedFilesIgnored` repairs older Stacks - it is called when a world is added and
+  whenever the plugin machinery writes the generated `CKli.Version.props`.
 
 The `World` type is the primary type of the CKli API and the most complex one because it handles the plugins life cycle (loading, compiling, unloading).
 
@@ -557,6 +580,40 @@ The [`PluginMachinery`](Plugin/Impl/PluginMachinery.cs) orchestrates:
 
 There's nothing simple here. An important part of the magics lies in the the **CKli.Loader** and the **CKli.Plugins.Core** assemblies and
 how they are used by the `<WorldName>-Plugins` solution.
+
+### `$(CKliVersion)`: the CKli version is not in the Stack repository
+
+`CKli.Plugins.Core` and the Standard Plugins are referenced at `$(CKliVersion)` in the solution's
+`Directory.Packages.props`, never at a literal version. The property comes from `CKli.Version.props`
+(`PluginMachinery.CKliVersionPropsFileName`), a **generated and git ignored** file written beside
+`Directory.Build.props` on every World open by `EnsureCKliVersionProps`.
+
+This is what lets two developers run two CKli versions on one Stack. The literal version it replaces was
+rewritten on every World open, so it recorded whoever ran `ckli` last: the Stack working folder was left
+dirty and the colleague's next `ckli pull` failed on a merge it could not perform.
+
+Consequences worth knowing:
+
+- **Writing that file is the recompilation trigger.** It is the stamp of the version the plugins were last
+  built against, so `EnsureCKliVersionProps` reports `mustRecompile` when it changes. That matters because
+  `PluginCollectorContext.ComputeSignature` hashes `World.CKliVersion`, so a stale generated
+  `CKli.CompiledPlugins.cs` is detected - but in `PluginCompileMode.None` there is no such signature and a
+  stale dll built against another `CKli.Plugins.Core` would only fail at plugin instantiation.
+- **`DoCompilePlugins` passes `-p:CKliVersion=` as a global property**, which wins over the file: CKli's own
+  builds never depend on it being up to date. An IDE or a plain `dotnet build`/`dotnet test` reads the file,
+  and a build that finds no value at all fails on an explicit `<Error>` rather than an obscure NuGet message.
+- **`Tests/Plugins.Tests` has its own `Directory.Build.props`** (it works around
+  [dotnet/sdk#45953](https://github.com/dotnet/sdk/issues/45953)) and MSBuild stops walking up at the first
+  one it finds, so the property defined beside the solution does **not** reach that project: its companion
+  imports the generated file itself, with its own relative path.
+- **Only the CKli owned references use the property.** The versions `ckli plugin add <packageId@version>`
+  installs stay literal in `Directory.Packages.props`: those are shared decisions and belong in the Stack.
+- **The migration is one-time and self-healing.** `MigrateToCKliVersionProperty` converts a solution created
+  before the property existed. It must add the `<Import>` to `Directory.Build.props` **and** rewrite the
+  versions - doing only the latter would leave `$(CKliVersion)` undefined and nothing would restore. For a
+  LTS World it also transfers the implicit pin the literal version used to carry to the definition file's
+  `CKliVersion` attribute, so the migration loses nothing. It is skipped for the `CKli` Stack itself, whose
+  plugin solution uses project references and has no `Directory.Packages.props`.
 
 # Commands
 

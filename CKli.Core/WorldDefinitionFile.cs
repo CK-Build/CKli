@@ -26,6 +26,8 @@ public sealed class WorldDefinitionFile
     List<World.RepoLayout>? _layout;
     Dictionary<XName, (XElement Config, bool IsDisabled)>? _pluginsConfiguration;
     PluginCompileMode? _compileMode;
+    SVersion? _pinnedCKliVersion;
+    bool _pinnedCKliVersionRead;
     bool _allowEdit;
     bool _isDirty;
 
@@ -87,11 +89,43 @@ public sealed class WorldDefinitionFile
     /// Gets the root element.
     /// Must not be mutated otherwise a <see cref="InvalidOperationException"/> is raised.
     /// <para>
-    /// This root carries the optional "MinCKliVersion" attribute. There is no API to change the "MinCKliVersion".
-    /// It must be done by code or manually.
+    /// This root carries the optional "MinCKliVersion" and "CKliVersion" attributes (see
+    /// <see cref="PinnedCKliVersion"/>). There is no API to change the "MinCKliVersion": it must be done by
+    /// code or manually.
     /// </para>
     /// </summary>
     public XElement XmlRoot => _root;
+
+    /// <summary>
+    /// Gets the CKli version this world is pinned to or null when it is not pinned.
+    /// <para>
+    /// This is the "CKliVersion" attribute of the <see cref="XmlRoot"/>. Its syntax and its equality with
+    /// <see cref="World.CKliVersion"/> have been validated by <see cref="LocalWorldName.LoadDefinitionFile(IActivityMonitor)"/>:
+    /// reaching here, a non null version is necessarily the running CKli's one (except when CKli is locally
+    /// compiled - version "0.0.0-0" - where the pin is ignored with a warning).
+    /// </para>
+    /// <para>
+    /// A pinned world builds its plugins against that version instead of the running CKli's one: this is what
+    /// keeps a LTS world frozen. When null, each developer uses its own CKli version and nothing in the Stack
+    /// repository records it. "ckli world lts create" pins the world it creates.
+    /// </para>
+    /// <para>
+    /// Like "MinCKliVersion", there is no API to change it: it must be done by code or manually.
+    /// </para>
+    /// </summary>
+    public SVersion? PinnedCKliVersion
+    {
+        get
+        {
+            if( !_pinnedCKliVersionRead )
+            {
+                _pinnedCKliVersionRead = true;
+                var a = _root.Attribute( XNames.CKliVersion )?.Value;
+                if( !string.IsNullOrWhiteSpace( a ) ) _pinnedCKliVersion = SVersion.Parse( a );
+            }
+            return _pinnedCKliVersion;
+        }
+    }
 
     /// <summary>
     /// Gets the optional LockPrefix attribute of the root element: the prefix of the Git references that lock
@@ -101,7 +135,7 @@ public sealed class WorldDefinitionFile
     /// This is a <b>Stack</b> level setting that only the default World's definition file can carry: every
     /// World of a Stack locks in the one Stack repository, so whether a reference name is accepted there is
     /// the same answer for all of them. A copy on a LTS World could only diverge from the one that is used,
-    /// so <see cref="Create"/> refuses it and "ckli lts create" does not propagate it.
+    /// so <see cref="Create"/> refuses it and "ckli world lts create" does not propagate it.
     /// </para>
     /// <para>
     /// Use <see cref="StackRepository.GetLockPrefix(IActivityMonitor, out string)"/> to obtain the effective
@@ -553,6 +587,29 @@ public sealed class WorldDefinitionFile
         {
             _plugins.SetAttributeValue( XNames.CompileMode, mode != PluginCompileMode.Release ? mode.ToString() : null );
             _compileMode = mode;
+        }
+    }
+
+    /// <summary>
+    /// Sets the "CKliVersion" attribute of the <see cref="XmlRoot"/>. This is called by the one-time migration
+    /// to the $(CKliVersion) property (it transfers the implicit pin that a LTS world's literal
+    /// &lt;PackageVersion Include="CKli.Plugins.Core" /&gt; used to carry) and by "ckli world lts create".
+    /// <para>
+    /// The caller has checked that <paramref name="version"/> is the running CKli's one: a pin that is not
+    /// satisfied would make every subsequent command fail to even load this file.
+    /// </para>
+    /// </summary>
+    internal void EnsurePinnedCKliVersion( IActivityMonitor monitor, SVersion version )
+    {
+        // "World" alone is the LocalWorldName property of this type: the CKli.Core.World class must be named.
+        Throw.DebugAssert( version == CKli.Core.World.CKliVersion.Version || CKli.Core.World.CKliVersion.Version == SVersion.ZeroVersion );
+        if( _pinnedCKliVersion == version ) return;
+        monitor.Info( $"Pinning world '{_world.FullName}' to CKli version '{version}'." );
+        using( StartEdit() )
+        {
+            _root.SetAttributeValue( XNames.CKliVersion, version.ToString() );
+            _pinnedCKliVersion = version;
+            _pinnedCKliVersionRead = true;
         }
     }
 

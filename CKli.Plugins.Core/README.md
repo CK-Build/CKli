@@ -36,8 +36,8 @@ That is deliberate:
 
 - **Plugin authors compile against a tiny, versioned surface**, not the whole host. `CKli.Plugins.Core` ships as a
   NuGet package (`GeneratePackageOnBuild`) whose version is kept in lockstep with the CKli tool version
-  (`PluginMachinery.CheckCKliPluginsCoreVersion` rewrites `Directory.Packages.props` whenever they drift, and bumps
-  it triggers a recompile).
+  (the solution references it at `$(CKliVersion)`, a property carried by the generated, git ignored
+  `CKli.Version.props` that `PluginMachinery.EnsureCKliVersionProps` writes; rewriting it triggers a recompile).
 - **It decouples "how plugins are discovered/wired" from "what a plugin can do".** The domain types
   (`World`, `Repo`, `PluginBase`, ...) live in CKli.Core; the discovery/collection *machinery* — attribute
   conventions, dependency-graph resolution, command adapter shape — lives here. A plugin project never needs to
