@@ -295,11 +295,18 @@ public sealed partial class GitRepository
         /// expired lease was stolen) cannot renew because its commit is no longer the remote's tip.
         /// </para>
         /// </summary>
-        internal bool Renew( IActivityMonitor monitor, Lease lease, TimeSpan leaseDuration )
+        /// <param name="lost">
+        /// True when the reference is no longer the one this lease built on: another client owns the lock and
+        /// nothing can be done about it. False when the renewal merely failed (network, credentials, a remote
+        /// that refused the write): the lease is untouched and still ours until it expires, so retrying is the
+        /// answer. This is the distinction <see cref="Lease.KeepAlive"/> is built on.
+        /// </param>
+        internal bool Renew( IActivityMonitor monitor, Lease lease, TimeSpan leaseDuration, out bool lost )
         {
             Throw.CheckOutOfRangeArgument( leaseDuration > TimeSpan.Zero && leaseDuration <= MaxLeaseDuration );
             Throw.DebugAssert( lease.Lock == this );
 
+            lost = false;
             var newInfo = LockInfo.Create( _ownerId, leaseDuration );
             if( !TryCreateLeaseCommit( monitor, lease.Token, newInfo, out var newToken ) )
             {
@@ -313,6 +320,7 @@ public sealed partial class GitRepository
                     monitor.Trace( $"Renewed lock '{_lockRef}' until {newInfo.ExpiresAt:u}." );
                     return true;
                 case PushResult.Lost:
+                    lost = true;
                     monitor.Warn( $"Lost the lock '{_lockRef}': it is now held by another client." );
                     return false;
                 default:
@@ -846,10 +854,18 @@ public sealed partial class GitRepository
         /// </summary>
         public sealed class Lease : IDisposable
         {
+            /// <summary>
+            /// How long <see cref="KeepAliveWhileAsync"/> waits before trying a renewal again when the previous
+            /// one failed for a reason that is not a lost race: short enough to have several attempts inside
+            /// the half of the lease that <see cref="KeepAlive"/> leaves, long enough not to hammer the remote.
+            /// </summary>
+            static readonly TimeSpan _renewRetryDelay = TimeSpan.FromSeconds( 15 );
+
             readonly DistributedLock _lock;
             ObjectId _token;
             LockInfo _info;
             bool _released;
+            bool _lost;
 
             internal Lease( DistributedLock l, ObjectId token, LockInfo info )
             {
@@ -859,6 +875,11 @@ public sealed partial class GitRepository
             }
 
             internal DistributedLock Lock => _lock;
+
+            /// <summary>
+            /// Gets the name of the Git reference this lease holds (see <see cref="DistributedLock.LockReference"/>).
+            /// </summary>
+            public string LockReference => _lock.LockReference;
 
             /// <summary>
             /// Gets the commit that currently holds this lease on the remote. It changes on every
@@ -873,11 +894,31 @@ public sealed partial class GitRepository
             public DateTimeOffset ExpiresAt => _info.ExpiresAt;
 
             /// <summary>
+            /// Gets the duration this lease was last taken or renewed for: it is what <see cref="KeepAlive"/>
+            /// and <see cref="KeepAliveWhileAsync"/> renew it for again, so a lease keeps the rhythm its holder
+            /// asked for without anybody having to carry the value along.
+            /// </summary>
+            public TimeSpan Duration => _info.ExpiresAt - _info.AcquiredAt;
+
+            /// <summary>
             /// Gets whether this lease is over. The caller MUST test this before any step that must not run
             /// concurrently: the lock stops protecting anything the moment the lease expires, and nothing
             /// here can interrupt a caller that keeps going.
             /// </summary>
             public bool IsExpired => _info.IsExpired( DateTimeOffset.UtcNow );
+
+            /// <summary>
+            /// Gets whether this lease no longer holds the lock: another client took the reference over, or the
+            /// lease expired before <see cref="KeepAlive"/> or <see cref="KeepAliveWhileAsync"/> could renew it.
+            /// <para>
+            /// This is sticky and it is the flag to test before an irreversible step: a lost lock is never
+            /// regained silently (regaining it would be a new lease, hence a moment during which somebody else
+            /// worked on what this one was protecting). It stays false while nothing has tried to renew - the
+            /// remote is only consulted by a renewal, which is why <see cref="IsExpired"/> remains the cheap
+            /// test that costs no round trip.
+            /// </para>
+            /// </summary>
+            public bool IsLost => _lost;
 
             /// <summary>
             /// Gets whether <see cref="Release"/> succeeded.
@@ -893,7 +934,112 @@ public sealed partial class GitRepository
             public bool Renew( IActivityMonitor monitor, TimeSpan leaseDuration )
             {
                 Throw.CheckState( !_released );
-                return _lock.Renew( monitor, this, leaseDuration );
+                return _lock.Renew( monitor, this, leaseDuration, out _ );
+            }
+
+            /// <summary>
+            /// When this lease is at least half over, renews it for another <see cref="Duration"/>; otherwise
+            /// does nothing. This is the call to place at the checkpoints of a long operation: it is a no-op
+            /// until it is not, so it can be called as often as the operation offers an opportunity.
+            /// <para>
+            /// The half is what makes a checkpoint miss survivable: a renewal has the second half of the lease
+            /// to succeed, and a failure that is not a lost race (a network blip) is simply retried at the next
+            /// checkpoint. Only a race actually lost - or a lease that expired before any renewal got through -
+            /// sets <see cref="IsLost"/>, and that is definitive.
+            /// </para>
+            /// </summary>
+            /// <param name="monitor">The monitor to use.</param>
+            /// <returns>
+            /// True while this lease still holds the lock, false once <see cref="IsLost"/> is true: the work
+            /// this lock protects is no longer protected and must not continue past an irreversible step.
+            /// </returns>
+            public bool KeepAlive( IActivityMonitor monitor )
+            {
+                Throw.CheckState( !_released );
+                if( _lost ) return false;
+                if( DateTimeOffset.UtcNow < RenewAt ) return true;
+                return DoKeepAlive( monitor );
+            }
+
+            /// <summary>
+            /// Awaits <paramref name="work"/>, renewing this lease while it runs. This is <see cref="KeepAlive"/>
+            /// for the steps that offer no checkpoint at all - a build that takes as long as it takes - so that
+            /// a lease never has to be sized on the longest step an operation may contain.
+            /// <para>
+            /// The renewal runs on its own <see cref="ActivityMonitor"/> for the duration of the wait, because
+            /// it is concurrent with <paramref name="work"/> and an <see cref="IActivityMonitor"/> is not thread
+            /// safe. That concurrency is also the contract: <paramref name="work"/> must not touch the Stack
+            /// repository, since a renewal writes a commit to it and pushes it.
+            /// </para>
+            /// <para>
+            /// Losing the lock does NOT interrupt <paramref name="work"/> - nothing here can - it stops the
+            /// renewals and sets <see cref="IsLost"/>, which is reported on <paramref name="monitor"/> once
+            /// <paramref name="work"/> is over and the caller is alone again.
+            /// </para>
+            /// </summary>
+            /// <typeparam name="T">The type of the awaited result.</typeparam>
+            /// <param name="monitor">The caller's monitor. Nothing is written to it before <paramref name="work"/> completes.</param>
+            /// <param name="work">The work to await.</param>
+            /// <returns>The result of <paramref name="work"/>.</returns>
+            public async Task<T> KeepAliveWhileAsync<T>( IActivityMonitor monitor, Task<T> work )
+            {
+                Throw.CheckNotNullArgument( work );
+                Throw.CheckState( !_released );
+                if( !work.IsCompleted && !_lost )
+                {
+                    var renewMonitor = new ActivityMonitor( $"Keeping the lease of '{_lock.LockReference}' alive." );
+                    try
+                    {
+                        while( !work.IsCompleted )
+                        {
+                            var wait = RenewAt - DateTimeOffset.UtcNow;
+                            if( wait <= TimeSpan.Zero )
+                            {
+                                if( DoKeepAlive( renewMonitor ) )
+                                {
+                                    wait = RenewAt - DateTimeOffset.UtcNow;
+                                }
+                                else
+                                {
+                                    if( _lost ) break;
+                                    // Not lost: the lease is still ours and the failure may well be transient.
+                                    // Retrying immediately would be a tight loop against the remote.
+                                    wait = _renewRetryDelay;
+                                }
+                            }
+                            await Task.WhenAny( work, Task.Delay( wait ) ).ConfigureAwait( false );
+                        }
+                    }
+                    finally
+                    {
+                        renewMonitor.MonitorEnd();
+                    }
+                    if( _lost )
+                    {
+                        monitor.Warn( $"""
+                            The lease of '{_lock.LockReference}' has been lost while working: another client
+                            holds the lock, or the lease expired on {_info.ExpiresAt:u} before a renewal got
+                            through. Whatever it was protecting has not been protected since.
+                            """ );
+                    }
+                }
+                return await work.ConfigureAwait( false );
+            }
+
+            /// <summary>
+            /// The instant from which <see cref="KeepAlive"/> renews: half of <see cref="Duration"/> before
+            /// <see cref="ExpiresAt"/>.
+            /// </summary>
+            DateTimeOffset RenewAt => _info.ExpiresAt - Duration / 2;
+
+            bool DoKeepAlive( IActivityMonitor monitor )
+            {
+                Throw.DebugAssert( !_lost );
+                if( _lock.Renew( monitor, this, Duration, out bool lost ) ) return true;
+                // A renewal that did not lose the race left the lease exactly where it was: it is still ours
+                // until it expires, and the next attempt may well get through. Only its expiration is final.
+                _lost = lost || _info.IsExpired( DateTimeOffset.UtcNow );
+                return false;
             }
 
             /// <summary>
@@ -924,7 +1070,9 @@ public sealed partial class GitRepository
             /// </summary>
             public void Dispose()
             {
-                if( !_released )
+                // A lost lease has nothing to release: warning about it would blame the caller for a lock that
+                // is somebody else's now (and IsLost has already been reported where it was discovered).
+                if( !_released && !_lost )
                 {
                     ActivityMonitor.StaticLogger.Warn( $"Lock '{_lock.LockReference}' lease has not been released. It expires on {ExpiresAt:u}." );
                 }

@@ -373,6 +373,15 @@ than fails. A second clone of the same Stack — even the same developer's — i
 The name is scoped to the current World (`publish` in the `One` World is `refs/ckli-locks/One-publish`), so two
 developers working on two Worlds of one Stack never wait for each other.
 
+**`publish` is taken automatically.** `ckli publish`, `ckli *publish` and `ckli fix publish` hold that very lock
+for the whole command and release it when they end, so publishing is already serialized across the Stack without
+anybody running these two commands (`ckli build` takes nothing — it publishes nothing). Their lease is 15 minutes
+and is renewed while they work, so a publication is never cut short by its own duration. What the two commands add
+is the ability to **reserve** the slot before starting (`ckli world lock publish --duration 30`, which a later
+`ckli publish` from the same clone renews rather than trips over) and to **free** one that a crashed run left
+behind (`ckli world unlock publish`, rather than waiting the lease out). See
+[The publication lock](../../StandardPlugins/CKli.Build.Plugin/README.md#the-publication-lock-one-publisher-at-a-time-per-world).
+
 The `refs/ckli-locks` part is the Stack's
 [`LockPrefix`](../README.md#lockprefix-the-reference-namespace-that-locks-the-stack), and **it settles
 itself**: the first lock ever taken on a Stack finds out which reference namespace its remote accepts — by

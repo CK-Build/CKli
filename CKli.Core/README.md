@@ -401,6 +401,37 @@ Four things that are not obvious:
   honor one. `Lease` is `IDisposable` only to warn about a path that forgot to `Release` — disposing does not
   release, because a release is a remote call that needs a monitor and can fail.
 
+#### Keeping a lease alive: `KeepAlive` and `KeepAliveWhileAsync`
+
+A lease is sized on **how long a crashed client may block the team**, never on how long the work takes: those are
+two different questions and only the first one has a good answer. An operation that outlives its lease renews it,
+and `Lease` carries the policy so that no caller has to hold the duration, the deadline or a timer of its own —
+`Duration` is what the lease was last taken or renewed for, and a renewal asks for that same duration again.
+
+- **`KeepAlive( monitor )` renews only once the lease is at least half over**, and is a no-op before that. It is
+  what a checkpoint calls, as often as the operation offers one, and it returns whether the lock is still held.
+- **`KeepAliveWhileAsync( monitor, work )` awaits work that offers no checkpoint at all** — a build that takes as
+  long as it takes. It renews while that work runs, which is what keeps the lease duration a property of the
+  team rather than of the longest step some operation happens to contain.
+
+**The half is the whole margin.** A renewal that fails for a reason that is *not* a lost race — a network blip, a
+remote briefly refusing the write — leaves the lease exactly where it was, so it is still ours and the second half
+of the lease is there to try again (at the next checkpoint, or after a short delay inside `KeepAliveWhileAsync`).
+Only a genuinely lost race, or a lease that expired before any renewal got through, sets `IsLost`.
+
+**`IsLost` is sticky and it is the flag to test before an irreversible step.** A lost lock is never regained
+silently: regaining it would be a *new* lease, hence a window during which somebody else worked on what this one
+was protecting. `IsExpired` stays the cheap, round-trip-free test; `IsLost` is what a renewal found out.
+
+Two properties of `KeepAliveWhileAsync` that are contracts, not implementation details:
+
+- **It renews on its own `ActivityMonitor`** for the duration of the wait, since it is concurrent with the awaited
+  work and an `IActivityMonitor` is not thread safe. The caller's monitor is written to only once that work is
+  over — which is where a lost lease is reported, when the caller is alone again.
+- **The awaited work must not touch the Stack repository**, because a renewal writes a commit to it and pushes it.
+  That is why it wraps the roadmap *build* (which works in the Repos) and never the publication phase (which
+  commits and pushes the Stack): there, checkpoints and `KeepAlive` are the answer.
+
 **`OwnerId` identifies a developer, a machine and a clone** — `Name <email> on MACHINE (C:/Dev2/CKli)`, from the
 Stack repository's configured Git identity — and it is one string because it plays both roles: it is what a
 lease displays when it blocks somebody, and it is what ownership is compared on (ignoring case, since the clone

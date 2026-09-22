@@ -261,6 +261,104 @@ public class DistributedLockTests
         l2.ShouldNotBeNull().Release( TestHelper.Monitor ).ShouldBeTrue();
     }
 
+    /// <summary>
+    /// A lease is sized on how long a crashed client may block the team, never on how long the work takes: an
+    /// operation that outlives it renews at its checkpoints. The half of the lease is the whole margin - before
+    /// it, a checkpoint costs nothing at all, which is what lets one be placed wherever the operation offers it.
+    /// </summary>
+    [Test]
+    public async Task KeepAlive_renews_only_once_the_lease_is_half_over_Async()
+    {
+        using var one = await ArrangeOneAsync();
+
+        one.Stack.GetLock( TestHelper.Monitor, "publish", out var theLock ).ShouldBeTrue();
+        theLock.TryAcquire( TestHelper.Monitor, TimeSpan.FromSeconds( 4 ), out var lease, out _ )
+               .ShouldBe( AcquireResult.Acquired );
+        lease.ShouldNotBeNull();
+        lease.Duration.ShouldBe( TimeSpan.FromSeconds( 4 ) );
+
+        var token = lease.Token;
+        var expiresAt = lease.ExpiresAt;
+        lease.KeepAlive( TestHelper.Monitor ).ShouldBeTrue();
+        lease.Token.ShouldBe( token, "Not half over yet: nothing has been pushed." );
+
+        await Task.Delay( 2100 );
+        lease.KeepAlive( TestHelper.Monitor ).ShouldBeTrue();
+        lease.Token.ShouldNotBe( token, "Half over: renewed, and each lease state is a new commit." );
+        lease.ExpiresAt.ShouldBeGreaterThan( expiresAt );
+        lease.Duration.ShouldBe( TimeSpan.FromSeconds( 4 ), "A renewal asks for the duration the lease already had." );
+        lease.IsLost.ShouldBeFalse();
+
+        lease.Release( TestHelper.Monitor ).ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// Losing the race is what IsLost is for, and it is definitive: regaining the lock would be a NEW lease,
+    /// hence a window during which somebody else worked on what this one was protecting.
+    /// </summary>
+    [Test]
+    public async Task KeepAlive_that_lost_the_lock_is_definitive_Async()
+    {
+        var (a, b) = await ArrangeTwoAsync();
+        using var disposeA = a;
+        using var disposeB = b;
+
+        a.Stack.GetLock( TestHelper.Monitor, "publish", out var aLock ).ShouldBeTrue();
+        aLock.TryAcquire( TestHelper.Monitor, TimeSpan.FromSeconds( 2 ), out var aLease, out _ )
+             .ShouldBe( AcquireResult.Acquired );
+        aLease.ShouldNotBeNull();
+        aLease.IsLost.ShouldBeFalse();
+
+        // Another client takes the reference over (only a force push can do that while the lease is alive).
+        ForcePushLockRef( b, "refs/ckli-locks/publish", HeadTip( b ) );
+
+        await Task.Delay( 1100 );
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            aLease.KeepAlive( TestHelper.Monitor ).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( "Lost the lock 'refs/ckli-locks/publish'" ) );
+        }
+        aLease.IsLost.ShouldBeTrue();
+
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            aLease.KeepAlive( TestHelper.Monitor ).ShouldBeFalse();
+            logs.ShouldBeEmpty( "Sticky: finding out again would cost a round trip and could not change the answer." );
+        }
+    }
+
+    /// <summary>
+    /// A step that offers no checkpoint at all - a build that takes as long as it takes - must not force the
+    /// lease to be sized on it.
+    /// </summary>
+    [Test]
+    public async Task KeepAliveWhileAsync_renews_while_the_work_runs_Async()
+    {
+        using var one = await ArrangeOneAsync();
+
+        one.Stack.GetLock( TestHelper.Monitor, "publish", out var theLock ).ShouldBeTrue();
+        theLock.TryAcquire( TestHelper.Monitor, TimeSpan.FromSeconds( 2 ), out var lease, out _ )
+               .ShouldBe( AcquireResult.Acquired );
+        lease.ShouldNotBeNull();
+        var token = lease.Token;
+        var expiresAt = lease.ExpiresAt;
+
+        (await lease.KeepAliveWhileAsync( TestHelper.Monitor, LongWorkAsync() )).ShouldBe( 3712 );
+
+        lease.IsLost.ShouldBeFalse();
+        lease.Token.ShouldNotBe( token );
+        lease.ExpiresAt.ShouldBeGreaterThan( expiresAt );
+        lease.IsExpired.ShouldBeFalse( "The work outlived the initial lease: it has been renewed on the way." );
+
+        lease.Release( TestHelper.Monitor ).ShouldBeTrue();
+
+        static async Task<int> LongWorkAsync()
+        {
+            await Task.Delay( 3000 );
+            return 3712;
+        }
+    }
+
     #region Helpers
 
     /// <summary>
