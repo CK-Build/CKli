@@ -118,7 +118,7 @@ rather than mutating in place. `BranchModelPlugin` persists the result back to t
 - **`AutoFixUselessBranch`** (attribute, optional, default `true`) — when a branch's `dev/` exists
   but has nothing ahead of its base (a "useless" `dev/`), silently delete it instead of reporting
   it as an issue. This is a *plugin attribute*: `ckli plugin info` describes its current value and
-  [`ckli plugin set AutoFixUselessBranch false`](../../README.md#plugin-set-name-value)
+  [`ckli plugin set AutoFixUselessBranch false`](../../CKli.Core/CKliCommands/README.md#plugin-set-name-value)
   (or `ckli plugin unset AutoFixUselessBranch`) writes it without editing this file by hand.
 - **`<Explo Name="..." Parent="..." Link="...">`** — an exploratory branch. `Name` must be
   `explo/<lowercase-id>` (the `explo/` prefix and the LTS prefix are inferred if omitted) and must

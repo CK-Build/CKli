@@ -77,7 +77,7 @@ Global, on the `<VersionTag>` element under the World's `<Plugins>`:
 | `<Packages><Package Name="..." Version="..."/></Packages>` | World-wide declared **version bounds** for packages that are consumed but not produced by any repo in the Stack (external dependencies). The `Name` is an exact package identifier, or one with `*` wildcards that covers a family. Exposed via `GetPackagesConfiguration` as a `PackageBounds`. |
 
 The two booleans are *plugin attributes*: `ckli plugin info` describes their current value and
-[`ckli plugin set RemoveUselessFakeTag true`](../../README.md#plugin-set-name-value)
+[`ckli plugin set RemoveUselessFakeTag true`](../../CKli.Core/CKliCommands/README.md#plugin-set-name-value)
 (or `ckli plugin unset RemoveUselessFakeTag`) writes them without editing this file by hand. The
 `<Packages>` element has no such support: it must be edited in the World definition file.
 

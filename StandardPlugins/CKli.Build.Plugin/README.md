@@ -87,8 +87,8 @@ both types live in `CKli.Build.Plugin`:
 | `DeleteBeforeBuild` | *(empty)* | `;` separated list of git ignored files and folders that are deleted from a repository's working folder before it is built. See [`DeleteBeforeBuild`](#deletebeforebuild-not-reusing-what-a-previous-build-generated). |
 
 This is the only Standard Plugin attribute that is **not** a boolean. Like the others it is readable with
-[`ckli plugin info`](../../README.md#plugin-info) - which echoes the configured entries - and writable with
-[`ckli plugin set DeleteBeforeBuild "$StObjGen"`](../../README.md#plugin-set-name-value) or
+[`ckli plugin info`](../../CKli.Core/CKliCommands/README.md#plugin-info---skip-pull-stack) - which echoes the configured entries - and writable with
+[`ckli plugin set DeleteBeforeBuild "$StObjGen"`](../../CKli.Core/CKliCommands/README.md#plugin-set-name-value) or
 `ckli plugin unset DeleteBeforeBuild`, without editing the World definition file by hand. Entries are validated
 before being written, so an entry that escapes the working folder cannot be persisted into a configuration that
 would then fail every build.

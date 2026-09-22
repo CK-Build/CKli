@@ -495,7 +495,7 @@ null (having said why) when it cannot.
 | `KeepLocalReleaseAfterPublish` | `false` | When true, `BasePublisher` skips the final `DestroyLocalRelease`, so the packages a build produced stay in the `$Local` NuGet feed after they have been published. Useful to keep experimenting with the produced artifacts, and for a test that needs a published version to remain locally available. It is **not** enabled by default for tests: `Tests/Plugins.Tests` is validated with the cleanup on (see the note below), so a test opts in through its own `pluginConfigurationEditor`. |
 
 This is a *plugin attribute*: `ckli plugin info` describes its current value and
-[`ckli plugin set KeepLocalReleaseAfterPublish true`](../../README.md#plugin-set-name-value)
+[`ckli plugin set KeepLocalReleaseAfterPublish true`](../../CKli.Core/CKliCommands/README.md#plugin-set-name-value)
 (or `ckli plugin unset KeepLocalReleaseAfterPublish`) writes it without editing the World definition
 file by hand.
 
