@@ -65,11 +65,18 @@ sealed class PublishRoadmap
         return _gate.ToRenderable( screen, _roadmap ) ?? screen.Unit;
     }
 
+    /// <param name="lease">
+    /// The publication lease, null when the command holds none. Each release is a checkpoint: a renewal is a
+    /// no-op until the lease is half over. Losing it here only warns - a publication cannot be undone, so the
+    /// releases that follow must still reach their feeds. The gate that refuses to START without the lock is in
+    /// <c>PublishPlugin.OnRoadmapBuildAsync</c>.
+    /// </param>
     internal async Task<bool> PublishAsync( IActivityMonitor monitor,
                                             World world,
                                             SVersion profileVersion,
                                             RoadmapPublisher publisher,
                                             IndirectPublisher indirectPublisher,
+                                            GitRepository.DistributedLock.Lease? lease,
                                             CancellationToken cancellation )
     {
         Throw.DebugAssert( CanPublish );
@@ -88,6 +95,7 @@ sealed class PublishRoadmap
             {
                 foreach( var release in _gate.RequiredPublications )
                 {
+                    lease?.KeepAlive( monitor );
                     if( !await indirectPublisher.PublishAsync( monitor, release, cancellation ).ConfigureAwait( false ) )
                     {
                         return false;
@@ -103,10 +111,13 @@ sealed class PublishRoadmap
         foreach( var s in _roadmap.OrderedSolutions )
         {
             // Now that any required already built versions are published, we can publish the "current" one.
-            if( s.PublishableStatus is PublishableStatus.Build or PublishableStatus.PublishRequired
-                && !await publisher.PublishAsync( monitor, s, cancellation ).ConfigureAwait( false ) )
+            if( s.PublishableStatus is PublishableStatus.Build or PublishableStatus.PublishRequired )
             {
-                return false;
+                lease?.KeepAlive( monitor );
+                if( !await publisher.PublishAsync( monitor, s, cancellation ).ConfigureAwait( false ) )
+                {
+                    return false;
+                }
             }
         }
         return true;

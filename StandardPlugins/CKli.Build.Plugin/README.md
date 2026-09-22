@@ -137,6 +137,46 @@ branch, deletes the remote `dev/` and, for `publish`, creates the actual release
 asked for by name. `--release` and `--ci.0` are mutually exclusive and refused together
 (`BuildPlugin.CheckReleaseAndCIForce`).
 
+### The publication lock: one publisher at a time per World
+
+`publish`, `*publish` and `fix publish` run under the World's `publish`
+[distributed lock](../../CKli.Core/README.md#gitrepositorydistributedlock-a-mutex-shared-by-the-developers-of-a-stack)
+— `BuildPlugin.UnderPublishLockAsync`, `{World}-publish` on the Stack remote. `build` and `*build` take nothing:
+they produce `local/` versions and push nothing, so there is nothing to serialize.
+
+**It is the same reference that `ckli world lock publish` takes**, which is what makes the two commands compose: a
+developer can reserve the publication before starting, and `ckli world unlock publish` is what frees one that a
+crash left behind. The lease is taken with `AcquireOrRenew`, so such a reservation — or a lease left by this
+clone's own previous run — is renewed instead of being reported as held, and the lock is released when the command
+ends however it was obtained: the publication it was reserving is over.
+
+Three decisions worth keeping:
+
+- **The lock covers the whole command, not the publication step.** The roadmap decides which versions are produced
+  from what the remotes currently carry, so a lock taken after that decision would be protecting a decision
+  already made on state somebody else has moved.
+- **`--dry-run` takes no lock.** It publishes nothing; making the team wait for a preview would be a lock
+  protecting nothing.
+- **A lock held by somebody else is an error, never a wait.** The message names the holder, when they took it and
+  when it frees itself. `ckli publish` is interactive: a silent wait of unknown length is worse than being told.
+
+**The lease is 15 minutes (`BuildPlugin.PublishLeaseDuration`) and is renewed while the command runs.** That
+duration is not a budget for the publication — a publication takes as long as its builds take. It answers the only
+question a lease duration can answer: **how long a client that crashed keeps the rest of the team from
+publishing.** The work is kept inside it by renewing, at two kinds of place:
+
+| Where | How | On loss |
+|---|---|---|
+| `Roadmap.BuildAsync`, around `RoadmapExecutor.BuildAsync` | `Lease.KeepAliveWhileAsync` — the builds offer no checkpoint, so the lease is renewed *while* they run | Recorded (`IsLost`), reported once the builds are over. The builds themselves are local and harmless. |
+| Each `fix publish` target, each release `PublishRoadmap.PublishAsync` sends | `Lease.KeepAlive` — a no-op until the lease is half over | Warned. A publication cannot be undone, so the remaining releases must still reach their feeds. |
+| **Before the first artifact is pushed**, in `PublishPlugin.OnRoadmapBuildAsync` | `Lease.KeepAlive` | **Fails the command.** This is the gate. |
+
+The gate is the point of the whole arrangement: the builds that just ran are local, pushing packages and version
+tags is not, so the lock has to be proven still held exactly there and nowhere else is a hard stop justified.
+`KeepAliveWhileAsync` may wrap the builds only because they work in the Repos and never touch the Stack
+repository — a renewal commits to it and pushes it. See
+[Keeping a lease alive](../../CKli.Core/README.md#keeping-a-lease-alive-keepalive-and-keepalivewhileasync).
+
 ### Events
 
 | Event | Raised by | Payload | Purpose |

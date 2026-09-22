@@ -291,7 +291,13 @@ public sealed partial class Roadmap
             }
         }
         var builder = new BuildPlugin.RoadmapExecutor( buildPlugin, context, this, runTest, maxDop, cancellation );
-        var result = await builder.BuildAsync( monitor );
+        // The builds are the one step of a publication that offers no checkpoint - they take as long as they take
+        // - so the publication lease is renewed WHILE they run rather than being sized on them. They work in the
+        // Repos and never touch the Stack repository, which is what makes that concurrent renewal legal.
+        var lease = buildPlugin.PublishLease;
+        var result = lease != null
+                        ? await lease.KeepAliveWhileAsync( monitor, builder.BuildAsync( monitor ) )
+                        : await builder.BuildAsync( monitor );
         if( result != null )
         {
             _buildSuccess = true;

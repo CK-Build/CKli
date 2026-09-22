@@ -62,6 +62,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     readonly ShallowSolutionPlugin _solutionPlugin;
     readonly PerfectEventSender<RoadmapBuildEventArgs> _onRoadmapBuild;
     readonly PerfectEventSender<FixBuildEventArgs> _onFixBuild;
+    GitRepository.DistributedLock.Lease? _publishLease;
 
     static BuilderFunction _builderFunction = RealBuildAsync;
 
@@ -127,6 +128,95 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// Raised whenever a fix has been successfully built.
     /// </summary>
     public PerfectEvent<FixBuildEventArgs> OnFixBuild => _onFixBuild.PerfectEvent;
+
+    /// <summary>
+    /// The name of the World lock that every publishing command takes: this is the very lock that
+    /// <c>ckli world lock publish</c> acquires, so a developer can reserve the publication before starting
+    /// and <c>ckli world unlock publish</c> is what frees one that a crash left behind.
+    /// </summary>
+    public const string PublishLockName = "publish";
+
+    /// <summary>
+    /// The lease duration of <see cref="PublishLockName"/>.
+    /// <para>
+    /// This is not a budget for the publication - a publication takes as long as its builds take, and the lease
+    /// is renewed while they run (see <see cref="GitRepository.DistributedLock.Lease.KeepAlive"/> and
+    /// <see cref="GitRepository.DistributedLock.Lease.KeepAliveWhileAsync"/>). It answers the only question a
+    /// lease duration can answer: how long a client that crashed - or that was killed between two renewals -
+    /// keeps the rest of the team from publishing.
+    /// </para>
+    /// </summary>
+    public static readonly TimeSpan PublishLeaseDuration = TimeSpan.FromMinutes( 15 );
+
+    /// <summary>
+    /// Gets the lease of the <see cref="PublishLockName"/> lock while a publishing command runs, null otherwise
+    /// (including during a <c>--dry-run</c>, which publishes nothing and must not hold a lock the team shares).
+    /// <para>
+    /// This is how the roadmap execution and the Publish plugin reach the lease: the lock belongs to the running
+    /// command rather than to the roadmap it happens to have computed.
+    /// </para>
+    /// </summary>
+    public GitRepository.DistributedLock.Lease? PublishLease => _publishLease;
+
+    /// <summary>
+    /// Runs <paramref name="work"/> while holding the <see cref="PublishLockName"/> lock of the current World.
+    /// <para>
+    /// The lock covers the WHOLE command, not only the publication step: the roadmap decides which versions are
+    /// produced from what the remotes currently carry, so a lock taken after that decision would protect a
+    /// decision already made on state somebody else has moved.
+    /// </para>
+    /// <para>
+    /// A lease of this same clone - a reservation taken by <c>ckli world lock publish</c>, or one left behind by
+    /// a previous run - is renewed rather than reported as held, and the lock is released when the command ends
+    /// whichever way it was obtained: the publication it was reserving is over.
+    /// </para>
+    /// </summary>
+    async Task<bool> UnderPublishLockAsync( IActivityMonitor monitor, bool dryRun, Func<Task<bool>> work )
+    {
+        // A --dry-run only displays what would happen: it publishes nothing, so making the team wait for it
+        // would be a lock protecting nothing.
+        if( dryRun ) return await work().ConfigureAwait( false );
+
+        var lockName = $"{World.Name.FullName}-{PublishLockName}";
+        if( !World.StackRepository.GetLock( monitor, lockName, out var theLock ) )
+        {
+            return false;
+        }
+        var result = theLock.AcquireOrRenew( monitor, PublishLeaseDuration, out var lease, out var holder );
+        if( result != GitRepository.DistributedLock.AcquireResult.Acquired )
+        {
+            if( result == GitRepository.DistributedLock.AcquireResult.Held )
+            {
+                Throw.DebugAssert( holder != null );
+                var remaining = holder.ExpiresAt - DateTimeOffset.UtcNow;
+                if( remaining < TimeSpan.Zero ) remaining = TimeSpan.Zero;
+                monitor.Error( $"""
+                    Unable to publish: '{theLock.LockReference}' is held by
+                    {holder.OwnerId}
+                    since {holder.AcquiredAt:u}. Unless its holder renews it, it frees itself
+                    on {holder.ExpiresAt:u} (in {remaining:hh\:mm\:ss}).
+                    Publishing is serialized across the developers of the Stack: wait for it, or ask the holder
+                    to run "ckli world unlock {PublishLockName}".
+                    """ );
+            }
+            return false;
+        }
+        Throw.DebugAssert( lease != null );
+        monitor.Info( $"Holding '{theLock.LockReference}' until {lease.ExpiresAt:u} ({PublishLeaseDuration.TotalMinutes:0} minutes, renewed while working)." );
+        _publishLease = lease;
+        try
+        {
+            return await work().ConfigureAwait( false );
+        }
+        finally
+        {
+            _publishLease = null;
+            // Release refuses to delete a reference that is no longer ours, so a lost lease leaves the winner's
+            // lock alone. Dispose is the "forgot to release" warning: it stays silent on a lost lease.
+            lease.Release( monitor );
+            lease.Dispose();
+        }
+    }
 
     /// <summary>
     /// Core build command. Upstream repositories are not involved: dependencies are not upgraded.
@@ -215,9 +305,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                     bool all = false )
     {
         if( !CheckReleaseAndCIForce( monitor, release, ciForce ) ) return Task.FromResult( false );
-        return release
+        return UnderPublishLockAsync( monitor, dryRun, () => release
           ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: true )
-          : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: true );
+          : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: true ) );
     }
 
     /// <summary>
@@ -313,9 +403,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                         bool all = false )
     {
         if( !CheckReleaseAndCIForce( monitor, release, ciForce ) ) return Task.FromResult( false );
-        return release
+        return UnderPublishLockAsync( monitor, dryRun, () => release
          ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: true )
-         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: true );
+         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: true ) );
     }
 
     // "--ci.0" asks for a CI version: it cannot be combined with "--release". Before CI became the default

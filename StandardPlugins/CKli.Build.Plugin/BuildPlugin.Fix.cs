@@ -69,13 +69,16 @@ public sealed partial class BuildPlugin
         {
             return Task.FromResult( false );
         }
-        return DoBuildFixAsync( monitor,
-                                context,
-                                runTest: rebuild ? true : null,
-                                workflow,
-                                rebuild,
-                                publish: true,
-                                keepBranch );
+        // A fix publishes real versions of this World: it takes the very lock that "publish" does.
+        return UnderPublishLockAsync( monitor,
+                                      dryRun: false,
+                                      () => DoBuildFixAsync( monitor,
+                                                             context,
+                                                             runTest: rebuild ? true : null,
+                                                             workflow,
+                                                             rebuild,
+                                                             publish: true,
+                                                             keepBranch ) );
     }
 
     async Task<bool> DoBuildFixAsync( IActivityMonitor monitor,
@@ -99,6 +102,9 @@ public sealed partial class BuildPlugin
         var packageMapping = new FixPackageMapper();
         foreach( var target in workflow.Targets )
         {
+            // The publication lock, when this is a "fix publish": each target is a checkpoint, and a renewal
+            // is a no-op until the lease is half over.
+            _publishLease?.KeepAlive( monitor );
             using( monitor.OpenInfo( $"Building n°{target.Index} - {target.Repo.DisplayPath}" ) )
             {
                 if( !await BuildOneFixTargetAsync( monitor,

@@ -70,11 +70,11 @@ blocking it):
 
 1. `PublishRoadmap.Create(monitor, roadmap, versionTag)` computes the **publication gate** (see
    below) and renders its verdict to the screen.
-2. Unless `roadmap.DryRun` is set: the gate must be open (`publish.CanPublish`), a `PackageSender`
-   is created from the World's configured NuGet feeds, a free profile version is minted from the
-   `PublishedFolder` (see [The profile version](#the-profile-version)), and
-   `PublishRoadmap.PublishAsync` runs the actual publication with a `RoadmapPublisher` and an
-   `IndirectPublisher`.
+2. Unless `roadmap.DryRun` is set: the gate must be open (`publish.CanPublish`), **the publication
+   lock must still be held** (see below), a `PackageSender` is created from the World's configured
+   NuGet feeds, a free profile version is minted from the `PublishedFolder` (see
+   [The profile version](#the-profile-version)), and `PublishRoadmap.PublishAsync` runs the actual
+   publication with a `RoadmapPublisher` and an `IndirectPublisher`.
 3. On success, the `FinalProfile` is added to the `PublishedFolder`, the CI profiles it supersedes are
    removed (see [Superseded CI profiles](#superseded-ci-profiles)) and the folder is `Save`d, then
    `World.StackRepository.PushChanges` commits and pushes it along with everything else the Stack
@@ -85,6 +85,15 @@ blocking it):
 
 A `--dry-run` stops after step 1: it only reports. This mirrors how a `BuildingPending` roadmap is
 handled — the verdict is displayed, and it is the real publication that fails.
+
+**`BuildPlugin.PublishLease` is checked in step 2 and that check is the hard one.** The command took
+the World's `publish` lock before computing anything (see
+[The publication lock](../CKli.Build.Plugin/README.md#the-publication-lock-one-publisher-at-a-time-per-world))
+and renewed it while the builds ran; here, one `Lease.KeepAlive` decides whether it is still held. A
+lost lock fails the command **before the first artifact is pushed** — that is the only place a hard
+stop is justified, because everything before it is local and everything after it cannot be undone.
+Past that point `PublishRoadmap.PublishAsync` keeps renewing at each release and only *warns* if it
+loses the lock: the releases that follow must still reach their feeds.
 
 #### `OnFixBuildAsync` — `fix build` / `fix publish`
 
@@ -202,6 +211,10 @@ when the fix workflow starts writing updated profiles, a deprecated one is not a
    first.
 3. Every solution whose `PublishableStatus` is `Build` or `PublishRequired` is published by the
    `RoadmapPublisher`, in `OrderedSolutions` order.
+
+Steps 2 and 3 are also the checkpoints of the publication lease: each release starts with a
+`Lease.KeepAlive` (a no-op until the lease is half over). Losing the lock there only warns — by then
+the publication is under way and cannot be undone.
 
 ### `PublishedProfileBuilder` — the publication gate
 

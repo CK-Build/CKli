@@ -306,6 +306,20 @@ public sealed class PublishPlugin : PrimaryPluginBase
                             e.SetFailed();
                             return;
                         }
+                        // The publication is the irreversible step, so this is where the lock must still be held:
+                        // the builds that just ran are local and harmless, pushing packages and version tags is
+                        // not. A lease that could not be renewed while they ran stops the command here.
+                        var lease = _build.PublishLease;
+                        if( lease != null && !lease.KeepAlive( monitor ) )
+                        {
+                            monitor.Error( $"""
+                                Unable to publish: this clone no longer holds '{lease.LockReference}'.
+                                Another developer took it over while the builds were running, so what this
+                                publication was computed from may have moved. Run the command again.
+                                """ );
+                            e.SetFailed();
+                            return;
+                        }
                         var packageSender = PackageSender.Create( monitor, _artifactHandler, _branchModel, e.Context.SecretsStore );
                         if( packageSender == null )
                         {
@@ -326,6 +340,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                                                          profileVersion,
                                                          roadmapPublisher,
                                                          indirectPublisher,
+                                                         lease,
                                                          cancellation ).ConfigureAwait( false ) )
                         {
                             e.SetFailed();
