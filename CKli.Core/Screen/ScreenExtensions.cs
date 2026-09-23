@@ -229,12 +229,11 @@ public static class ScreenExtensions
             // > ShortName       | <Xml>
             // |   TextStatus    |
             // |   Version       |
-            // | Message:
-            // |    <Message>
+            // |   <Message>
             //
-            // The "Message:" row takes the whole line. Nothing declares that: TableLayout splits a row
+            // The Message row takes the whole line. Nothing declares that: TableLayout splits a row
             // into cells only when it is a HorizontalContent (see its ApplyHOrV), and this row is a
-            // VerticalContent - the "Message:" label above the message itself - so it is a single cell.
+            // VerticalContent so it is a single cell.
 
             display = display.AddBelow(
                 s.EmptyString,
@@ -247,10 +246,7 @@ public static class ScreenExtensions
                                                         .Box( paddingLeft: 3 ) )
                                                    .Box( paddingRight: 3 )
                                                    .AddRight( s.Text( i.Configuration?.ToString() ).Collapsable() )
-                                                   .AddBelow( i.Message != null
-                                                                ? s.Text( "Message:", ConsoleColor.DarkYellow )
-                                                                   .AddBelow( i.Message.Box( paddingLeft: 3, foreColor: ConsoleColor.Yellow ) )
-                                                                : null ) ) ) )
+                                                   .AddBelow( i.Message?.Box( paddingLeft: 3, foreColor: ConsoleColor.Yellow ) ) ) ) )
                       .TableLayout() );
         }
         screen.Display( display );

@@ -41,7 +41,6 @@ public class PluginTests
                 > MyFirstOne     > <MyFirstOne />
                 │    Available                   
                 │    <source>                    
-                │ Message:                            
                 │    Message from 'MyFirstOne' plugin.
                 ❰✓❱
 
@@ -59,7 +58,6 @@ public class PluginTests
             > MyFirstOne     > <MyFirstOne />
             │    Available                   
             │    <source>                    
-            │ Message:                            
             │    Message from 'MyFirstOne' plugin.
             ❰✓❱
 
@@ -79,12 +77,10 @@ public class PluginTests
             > MyFirstOne                > <MyFirstOne />             
             │    Available                                           
             │    <source>                                            
-            │ Message:                                               
             │    Message from 'MyFirstOne' plugin.                   
             > MySecondOneWithLongName   > <MySecondOneWithLongName />
             │    Available                                           
             │    <source>                                            
-            │ Message:                                               
             │    Message from 'MySecondOneWithLongName' plugin.      
             ❰✓❱
 
@@ -106,7 +102,6 @@ public class PluginTests
                 > MySecondOneWithLongName   > <MySecondOneWithLongName />
                 │    Available                                           
                 │    <source>                                            
-                │ Message:                                               
                 │    Message from 'MySecondOneWithLongName' plugin.      
                 ❰✓❱
 
