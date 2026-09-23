@@ -311,13 +311,22 @@ exist is not an error, and a `<References>` element that becomes empty is remove
 
 ## World LTS commands (create, clone)
 
-A Stack has one default World and any number of Long Term Support Worlds. A World is defined by a
-`{StackName}@{ltsName}.xml` file in the Stack repository and its repositories live in the Stack's own
-`@ltsName/` folder — so the Worlds of a Stack are siblings, not copies of it. A LTS name must be at
+A Stack has one default World and any number of Long Term Support Worlds. A LTS World is defined by a
+`@{ltsName}/{StackName}@{ltsName}.xml` file in the Stack repository — its own folder there, beside its plugin
+solution and its `Published/` folder — and its repositories live in the Stack's own `@ltsName/` folder — so
+the Worlds of a Stack are siblings, not copies of it. A LTS name must be at
 least 3 characters starting with `@`, then only ASCII lowercase letters, digits, `-`, `_` and `.`.
 
 ### `world lts create <@ltsName>`
-Creates a new LTS World from the current default World. Must be run from the default World.
+Creates a new LTS World from the current default World. Must be run from the default World. The CKli Stack
+itself refuses it: its plugin solution references the Standard Plugins by source, which a snapshot in the
+`@ltsName/` folder cannot follow.
+
+The command holds two [World locks](#world-lock-commands-lock-unlock) of the default World for its whole
+duration: **`publish`** — nobody publishes while the version ranges are cut — and **`lts`** — the LTS Worlds of a
+Stack are created one at a time. Another developer holding either of them makes the command fail, naming the
+holder; a reservation of this very clone (`ckli world lock publish`) is renewed rather than refused. Both are
+released when the command ends.
 
 The new World's definition file is a clone of the current one, and the plugins are given the opportunity to
 adjust it through the `WorldEvents.CreateLTS` event. The
@@ -327,7 +336,9 @@ starts a new Major above them — and to reduce the new World's branch model to 
 
 The World must be **fully published** for this to be possible: no version or branch issue anywhere, every
 repository currently offering a published version (no `+fake`, no `+deprecated`), no pending `local/` or
-`building/` release left anywhere, and every `dev/` root branch integrated. Otherwise the command fails,
+`building/` release left anywhere, every `dev/` root branch integrated, and every root branch equal to its
+remote one (the repositories are fetched: a teammate's publication since the last pull would otherwise be left
+below the cut, in neither World). Otherwise the command fails,
 listing every repository that is in the way, and nothing is written — neither the new definition file nor the
 `InfVersion` the current World would have received.
 
@@ -348,8 +359,32 @@ setting that only the default World carries — a copy on the new World could on
 actually used. See
 [`LockPrefix`](../README.md#lockprefix-the-reference-namespace-that-locks-the-stack).
 
-Only the definition file is created. The new World's repositories and its plugin solution appear when it is
-first opened, which is what [`world lts clone`](#world-lts-clone-ltsname) does.
+Once every plugin has accepted the creation, the new World gets its own folders: `@ltsName/` in the Stack
+repository and `@ltsName/` in its git ignored `$Local` folder. What the new World starts with is written there:
+
+- its definition file, `@ltsName/{StackName}@ltsName.xml`;
+- its **root branch**, `@ltsName/stable`, created in every repository on the commit of its last published version
+  and **pushed**, by the
+  [VersionTag plugin](../../StandardPlugins/CKli.VersionTag.Plugin/README.md#worldeventscreatelts--cutting-the-version-range-of-a-new-lts).
+  The LTS World starts with the last published version; whatever comes after it stays in the default World;
+- a **snapshot of the plugin solution**: `{StackName}-Plugins/` is copied to `@ltsName/{StackName}-Plugins@ltsName/`
+  (its git ignored files excepted: they are regenerated), its `.slnx` renamed and its build output redirected to
+  `$Local/@ltsName/`. The plugins a LTS World uses during its whole life are the ones it has been created with;
+- a copy of the `Common/` folder, by the
+  [CommonFiles plugin](../../StandardPlugins/CKli.CommonFiles.Plugin/README.md#long-term-support-worlds);
+- the `TestRun.Sha.txt` cache of the successful test runs, **moved** to `$Local/@ltsName/` by the
+  [Build plugin](../../StandardPlugins/CKli.Build.Plugin/README.md): the LTS World is the one that keeps the code
+  those tests ran on.
+
+Everything is committed in the Stack repository by a single `Created Long Term Support world '…'.` commit, which
+is **pushed while the locks are still held**: once they are released anybody can publish again, and the default
+World must already carry its new `InfVersion` by then. If anything fails before that, both new folders are deleted
+and nothing is left of the new World locally (a root branch already pushed stays on its remote: a new attempt
+accepts it when it is on the same commit).
+
+Finally, after the locks are released, the new World is cloned in the Stack's `@ltsName/` folder exactly as
+[`world lts clone`](#world-lts-clone-ltsname) does. A failure there doesn't undo anything: the LTS World exists and
+`ckli world lts clone <@ltsName>` finishes the job.
 
 ### `world lts clone <@ltsName>`
 Clones the repositories of an existing LTS World of the current Stack into its `@ltsName/` folder. Use this
@@ -374,8 +409,8 @@ The name is scoped to the current World (`publish` in the `One` World is `refs/c
 developers working on two Worlds of one Stack never wait for each other.
 
 **`publish` is taken automatically.** `ckli publish`, `ckli *publish` and `ckli fix publish` hold that very lock
-for the whole command and release it when they end, so publishing is already serialized across the Stack without
-anybody running these two commands (`ckli build` takes nothing — it publishes nothing). Their lease is 15 minutes
+for the whole command and release it when they end (so does [`world lts create`](#world-lts-create-ltsname), with
+an `lts` one), so publishing is already serialized across the Stack without anybody running these two commands (`ckli build` takes nothing — it publishes nothing). Their lease is 15 minutes
 and is renewed while they work, so a publication is never cut short by its own duration. What the two commands add
 is the ability to **reserve** the slot before starting (`ckli world lock publish --duration 30`, which a later
 `ckli publish` from the same clone renews rather than trips over) and to **free** one that a crashed run left

@@ -88,7 +88,9 @@ StackRoot/
 |   |                         locally defined, source-based, plugins. 
 │   ├── Logs/               ← Per-stack log output.
 │   ├── CK-Build.xml        ← Default World definition file. Contains the repositories and the plugins configuration.
-│   ├── CK-Build@net8.xml   ← A LTS World definition file.
+│   ├── @net8/              ← Everything the "@net8" LTS World owns in the Stack repository.
+│   │   ├── CK-Build@net8.xml          ← The LTS World definition file.
+│   │   └── CK-Build-Plugins@net8/     ← Its plugins solution folder.
 │   └── .gitignore          ← Ignores $Local, Logs, .vs/, .idea/, and the generated CompiledPlugins.cs file.
 └── ... (cloned repositories)
 ```
@@ -637,6 +639,13 @@ world.Events.FixedLayout   += e => { /* Repositories layout has been fixed: ther
 world.Events.PluginInfo    += e => { /* Query the plugins. The plugins are free to react the way they want. */ };
 world.Events.Issue         += e => { /* Discover (or fix) issues. */ };
 ```
+
+`WorldEvents.CreateLTS` ("ckli world lts create") is raised on the default World while the new Long Term Support
+World is not written yet: a handler validates and adjusts `CreateLTSEventArgs.LTSDefinition`, or refuses the
+creation with `SetFailed()`. Since any handler can still refuse, a handler that must write files for the new World
+does not write them in the event: it registers a step with `AddCreationStep`. The steps run once every handler has
+accepted the creation, in the new World's folders (`CreateLTSEventArgs.LTSWorldName`'s `SharedDataFolder` and
+`LocalDataFolder`), and both folders are deleted if anything fails.
 
 ## Plugin configuration
 

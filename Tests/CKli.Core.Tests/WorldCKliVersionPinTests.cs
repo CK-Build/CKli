@@ -33,6 +33,13 @@ public class WorldCKliVersionPinTests
     // always uses a locally compiled CKli") until CKli built itself and the 3 tests that relied on it failed.
     static bool LocallyCompiled => World.CKliVersion.Version == SVersion.ZeroVersion;
 
+    // "ckli world lts create" takes the "publish" and "lts" locks: it pushes lock references to the "file://" remote.
+    [OneTimeSetUp]
+    public void OneTimeSetup() => TestEnv.SetFileSystemWritePAT();
+
+    [OneTimeTearDown]
+    public void OneTimeTearDown() => TestEnv.RemoveFileSystemWritePAT();
+
     /// <summary>
     /// The syntax is checked before the escape hatch below, so this one is reachable in both modes: a World that
     /// states an unparsable version must be fixed rather than silently opened.
@@ -138,7 +145,7 @@ public class WorldCKliVersionPinTests
                 logs.ShouldContain( l => l.Contains( "is created" ) && l.Contains( "without its CKliVersion pin" ) );
             }
         }
-        var ltsRoot = XDocument.Load( StackFolder( context ).AppendPart( "One@net8.xml" ) ).Root.ShouldNotBeNull();
+        var ltsRoot = XDocument.Load( StackFolder( context ).Combine( "@net8/One@net8.xml" ) ).Root.ShouldNotBeNull();
         ltsRoot.Attribute( XNames.LTSName ).ShouldNotBeNull().Value.ShouldBe( "@net8" );
         var pin = ltsRoot.Attribute( XNames.CKliVersion );
         if( LocallyCompiled )
@@ -171,9 +178,10 @@ public class WorldCKliVersionPinTests
 
     static void WriteLTSWorld( CKliEnv context, string ltsName, string? ckliVersion )
     {
-        var fileName = $"One@{ltsName[1..]}.xml";
         var attributes = ckliVersion != null ? $""" CKliVersion="{ckliVersion}" """.TrimEnd() : "";
-        var path = StackFolder( context ).AppendPart( fileName );
+        // A LTS world definition file is in the world's own "@ltsName/" folder of the Stack repository.
+        var path = StackFolder( context ).AppendPart( ltsName ).AppendPart( $"One{ltsName}.xml" );
+        Directory.CreateDirectory( path.RemoveLastPart() );
         File.WriteAllText( path,
                            $"""
                             <One LTSName="{ltsName}"{attributes}>

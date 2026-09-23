@@ -232,7 +232,8 @@ public class StackReferenceTests
         // The One-Stack gets a "@net8" LTS world with the same single repository as its default one...
         ArrangeStack( context, one.StackUri, "One", git =>
         {
-            File.WriteAllText( git.WorkingFolder.AppendPart( "One@net8.xml" ),
+            Directory.CreateDirectory( git.WorkingFolder.AppendPart( "@net8" ) );
+            File.WriteAllText( git.WorkingFolder.Combine( "@net8/One@net8.xml" ),
                                """
                                <One LTSName="@net8">
                                  <Repository Url="OneRepo" />

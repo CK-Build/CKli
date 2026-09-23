@@ -1,4 +1,6 @@
 using CK.Core;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
 
@@ -7,21 +9,27 @@ namespace CKli.Core;
 /// <summary>
 /// Raised by the "ckli world lts create" command.
 /// If <see cref="SetFailed()"/> is called, the creation is aborted.
+/// <para>
+/// The handlers validate and adjust the <see cref="LTSDefinition"/>: nothing is written while this event is
+/// raised, since any handler can still refuse the creation. A handler that must write files for the new World
+/// registers a step with <see cref="AddCreationStep"/>: the steps run once every handler has accepted it.
+/// </para>
 /// </summary>
 public sealed class CreateLTSEventArgs : WorldEventArgs
 {
-    readonly string _ltsName;
+    readonly LocalWorldName _ltsWorldName;
     readonly XElement _ltsDefinition;
+    List<Func<IActivityMonitor, bool>>? _creationSteps;
     bool _success;
 
     internal CreateLTSEventArgs( IActivityMonitor monitor,
                                  CKliEnv context,
                                  World world,
-                                 string ltsName,
+                                 LocalWorldName ltsWorldName,
                                  XElement ltsDefinition )
         : base( monitor, context, world )
     {
-        _ltsName = ltsName;
+        _ltsWorldName = ltsWorldName;
         _ltsDefinition = ltsDefinition;
         _success = true;
     }
@@ -29,7 +37,34 @@ public sealed class CreateLTSEventArgs : WorldEventArgs
     /// <summary>
     /// Gets the name of the new Long Term Support world.
     /// </summary>
-    public string LTSName => _ltsName;
+    public string LTSName => _ltsWorldName.LTSName!;
+
+    /// <summary>
+    /// Gets the local name of the new Long Term Support world: its <see cref="LocalWorldName.SharedDataFolder"/>
+    /// (in the Stack repository) and its <see cref="LocalWorldName.LocalDataFolder"/> (in the git ignored
+    /// "$Local" folder) are where a <see cref="AddCreationStep">creation step</see> writes.
+    /// <para>
+    /// Both folders exist when the creation steps run, and both are deleted if the creation fails.
+    /// </para>
+    /// </summary>
+    public LocalWorldName LTSWorldName => _ltsWorldName;
+
+    /// <summary>
+    /// Registers a step that runs once every handler of this event has accepted the creation (none of them
+    /// has called <see cref="SetFailed()"/>). A step returns false (and logs the error) to fail the creation.
+    /// <para>
+    /// The steps should only write in the <see cref="LTSWorldName"/>'s folders: they are deleted when the
+    /// creation fails, which undoes what the steps did there. Anything a step changes elsewhere is not undone.
+    /// </para>
+    /// </summary>
+    /// <param name="step">The step to run.</param>
+    public void AddCreationStep( Func<IActivityMonitor, bool> step )
+    {
+        Throw.CheckNotNullArgument( step );
+        (_creationSteps ??= new List<Func<IActivityMonitor, bool>>()).Add( step );
+    }
+
+    internal IReadOnlyList<Func<IActivityMonitor, bool>> CreationSteps => (IReadOnlyList<Func<IActivityMonitor, bool>>?)_creationSteps ?? [];
 
     /// <summary>
     /// Gets the mutable definition of the new LTS.

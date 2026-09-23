@@ -11,7 +11,7 @@ namespace CKli.Core.Tests;
 
 /// <summary>
 /// A Stack has one default World and any number of Long Term Support Worlds, each one defined by a
-/// "StackName@ltsName.xml" file in the Stack repository and rooted in its own "@ltsName/" folder.
+/// "@ltsName/StackName@ltsName.xml" file in the Stack repository and rooted in its own "@ltsName/" folder.
 /// <para>
 /// "ckli clone --lts-name" clones a Stack at one of its LTS worlds and "ckli world lts clone" obtains one in
 /// an already cloned Stack.
@@ -87,7 +87,16 @@ public class LTSWorldTests
             git.Index.Select( e => e.Path )
                .ShouldContain( $"@net8/One-Plugins@net8/One-Plugins@net8.slnx",
                                customMessage: "The LTS world's plugin solution is tracked." );
+            git.Index.Select( e => e.Path )
+               .ShouldContain( $"@net8/One@net8.xml",
+                               customMessage: "The LTS world's definition file is in its own folder." );
         }
+        // The LTS world's plugins are compiled where they are loaded from: its own "$Local/@net8/" folder.
+        var stackFolder = stackRoot.AppendPart( ".PublicStack" );
+        File.Exists( stackFolder.Combine( "$Local/@net8/One-Plugins@net8/bin/CKli.Plugins/run/CKli.Plugins.dll" ) )
+            .ShouldBeTrue( "The plugins have been compiled in the LTS world's local folder." );
+        Directory.Exists( stackFolder.Combine( "@net8/$Local" ) )
+                 .ShouldBeFalse( "Nothing is compiled in the LTS world's shared folder." );
 
         // Idempotent: nothing left to do.
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
@@ -105,6 +114,81 @@ public class LTSWorldTests
 
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", one.StackUri )).ShouldBeTrue();
         var inStack = context.ChangeDirectory( "One" );
+
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, inStack, "world", "lts", "clone", "@net8" )).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( "Stack 'One' has no '@net8' Long Term Support world." ) );
+        }
+    }
+
+    /// <summary>
+    /// "ckli world lts create" snapshots the default world's plugin solution in the new world's folder: the plugins
+    /// used during the life of a LTS world are the ones it has been created with. The git ignored files are not
+    /// copied (they are regenerated), the ".slnx" is renamed and the build output is redirected to the LTS world's
+    /// local folder. Everything is committed in a single commit.
+    /// </summary>
+    [Test]
+    public async Task lts_create_snapshots_the_plugin_solution_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var one = TestEnv.OpenRemotes( "One" );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", one.StackUri )).ShouldBeTrue();
+        var inStack = context.ChangeDirectory( "One" );
+        var stackFolder = inStack.CurrentDirectory.AppendPart( ".PublicStack" );
+        var defaultSolution = stackFolder.AppendPart( "One-Plugins" );
+        // Opening the default world with its plugins creates its plugin solution.
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, inStack, "plugin", "info" )).ShouldBeTrue();
+        File.Exists( defaultSolution.AppendPart( "One-Plugins.slnx" ) ).ShouldBeTrue();
+        File.WriteAllText( defaultSolution.AppendPart( "Marker.txt" ), "Snapshot me." );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, inStack, "world", "lts", "create", "@net8" )).ShouldBeTrue();
+
+        var ltsSolution = stackFolder.Combine( "@net8/One-Plugins@net8" );
+        File.Exists( ltsSolution.AppendPart( "One-Plugins@net8.slnx" ) ).ShouldBeTrue( "The solution file is renamed." );
+        File.Exists( ltsSolution.AppendPart( "One-Plugins.slnx" ) ).ShouldBeFalse();
+        File.ReadAllText( ltsSolution.AppendPart( "Marker.txt" ) ).ShouldBe( "Snapshot me." );
+        File.ReadAllText( ltsSolution.AppendPart( "Directory.Build.props" ) )
+            .ShouldContain( "<ArtifactsPath>$(MSBuildThisFileDirectory)../../$Local/@net8/One-Plugins@net8</ArtifactsPath>" );
+        Directory.Exists( stackFolder.Combine( "$Local/@net8" ) ).ShouldBeTrue( "The LTS world's local folder is created." );
+
+        using( var git = new LibGit2Sharp.Repository( stackFolder ) )
+        {
+            git.RetrieveStatus( new LibGit2Sharp.StatusOptions() ).IsDirty
+               .ShouldBeFalse( "The Stack repository has been committed." );
+            git.Head.Tip.MessageShort.ShouldBe( "Created Long Term Support world 'One@net8'." );
+            git.Index.Select( e => e.Path )
+               .ShouldContain( "@net8/One-Plugins@net8/Marker.txt" );
+            git.Index.Select( e => e.Path )
+               .ShouldNotContain( $"@net8/One-Plugins@net8/{PluginMachinery.CKliVersionPropsFileName}",
+                                  "A git ignored file is not copied: it is regenerated when the LTS world is opened." );
+            git.Head.TrackedBranch.ShouldNotBeNull().Tip.ShouldBe( git.Head.Tip, "The Stack repository has been pushed." );
+        }
+
+        // The command has cloned the new world: opening it has compiled its snapshot in its own local folder.
+        Directory.Exists( inStack.CurrentDirectory.Combine( "@net8/OneRepo" ) ).ShouldBeTrue();
+        File.Exists( stackFolder.Combine( "$Local/@net8/One-Plugins@net8/bin/CKli.Plugins/run/CKli.Plugins.dll" ) ).ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// A LTS world is defined by the "@ltsName/StackName@ltsName.xml" file: the same file at the root of the
+    /// Stack repository (next to the default world's one) defines nothing.
+    /// </summary>
+    [Test]
+    public async Task a_LTS_world_definition_file_must_be_in_the_LTS_folder_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var one = TestEnv.OpenRemotes( "One" );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", one.StackUri )).ShouldBeTrue();
+        var inStack = context.ChangeDirectory( "One" );
+        File.WriteAllText( inStack.CurrentDirectory.Combine( ".PublicStack/One@net8.xml" ),
+                           """
+                           <One LTSName="@net8">
+                             <Repository Url="OneRepo" />
+                           </One>
+                           """ );
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
@@ -141,7 +225,7 @@ public class LTSWorldTests
     }
 
     /// <summary>
-    /// Pushes a "{name}@{ltsName}.xml" world definition file to the Stack remote. Its layout is the same
+    /// Pushes a "@{ltsName}/{name}@{ltsName}.xml" world definition file to the Stack remote. Its layout is the same
     /// single repository as the fixture's default world.
     /// </summary>
     static void ArrangeLTSWorld( CKliEnv context, Uri stackUri, string name, string ltsName )
@@ -153,7 +237,9 @@ public class LTSWorldTests
                                              path,
                                              path.LastPart ).ShouldNotBeNull();
         // An LTS world definition file must carry its LTSName on its root element.
-        File.WriteAllText( git.WorkingFolder.AppendPart( $"{name}@{ltsName[1..]}.xml" ),
+        var ltsFolder = git.WorkingFolder.AppendPart( ltsName );
+        Directory.CreateDirectory( ltsFolder );
+        File.WriteAllText( ltsFolder.AppendPart( $"{name}{ltsName}.xml" ),
                            $"""
                             <{name} LTSName="{ltsName}">
                               <Repository Url="OneRepo" />

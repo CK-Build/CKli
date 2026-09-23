@@ -164,7 +164,7 @@ public sealed partial class PluginMachinery
                 Directory.CreateDirectory( Root );
                 File.WriteAllText( SlnxPath, DefaultSlnFile );
                 Directory.CreateDirectory( CKliPluginsFolder );
-                File.WriteAllText( DirectoryBuildProps, string.Format( DefaultDirectoryBuildPropsPattern, Name ) );
+                File.WriteAllText( DirectoryBuildProps, string.Format( DefaultDirectoryBuildPropsPattern, GetArtifactsPath( _definitionFile.World ) ) );
                 File.WriteAllText( DirectoryPackageProps, DefaultDirectoryPackageProps );
                 File.WriteAllText( CKliPluginsCSProj, DefaultCKliPluginsCSProj );
                 File.WriteAllText( CKliPluginsFile, DefaultCKliPluginsFile );
@@ -990,7 +990,7 @@ public sealed partial class PluginMachinery
                 """;
 
     /// <summary>
-    /// Gets the default "Directory.Build.props" file content: the {0} placeholder is for the <see cref="Name"/>.
+    /// Gets the default "Directory.Build.props" file content: the {0} placeholder is for the <see cref="GetArtifactsPath(LocalWorldName)"/>.
     /// </summary>
     const string DefaultDirectoryBuildPropsPattern = """
                 <Project>
@@ -998,7 +998,7 @@ public sealed partial class PluginMachinery
                   <Import Project="$(MSBuildThisFileDirectory)CKli.Version.props" Condition="Exists('$(MSBuildThisFileDirectory)CKli.Version.props')" />
                   <PropertyGroup>
                     <TargetFramework>net10.0</TargetFramework>
-                    <ArtifactsPath>$(MSBuildThisFileDirectory)../$Local/{0}</ArtifactsPath>
+                    <ArtifactsPath>{0}</ArtifactsPath>
                     <ArtifactsPivots>run</ArtifactsPivots>
                     <Nullable>enable</Nullable>
                   </PropertyGroup>

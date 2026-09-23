@@ -1,4 +1,5 @@
 using CK.Core;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -8,45 +9,56 @@ namespace CKli.Core;
 public sealed partial class World
 {
     /// <summary>
-    /// First step to create a LTS: the <paramref name="ltsName"/> must not exist (neither the definition file nor
-    /// the world root folder).
+    /// First step to create a LTS: the <paramref name="ltsName"/> must not exist: neither the definition file, the
+    /// world root folder, nor its "@ltsName/" folders in the Stack repository and in its "$Local" folder.
     /// <para>
     /// This creates the LTS world by cloning the current one: the <see cref="WorldDefinitionFile.XmlRoot"/> is cloned
     /// and the <see cref="WorldEvents.CreateLTS"/> event is raised (the plugins must handle the
-    /// <see cref="CreateLTSEventArgs.LTSDefinition"/>).
+    /// <see cref="CreateLTSEventArgs.LTSDefinition"/>). Once every handler has accepted the creation, the new world's
+    /// folders are created, the plugin solution of this world is snapshot in the new world's shared folder (see
+    /// <see cref="PluginMachinery.SnapshotPluginSolution"/>), the <see cref="CreateLTSEventArgs.AddCreationStep">creation
+    /// steps</see> run and the definition file is written in the "@ltsName/" folder of the Stack repository (see
+    /// <see cref="StackRepository.GetLTSDefinitionFilePath(string)"/>).
     /// </para>
     /// <para>
-    /// The new world's plugin solution is not created here: the <see cref="PluginMachinery"/> generates it on the
-    /// first open of the new world (this is what "ckli world lts clone" relies on).
+    /// When anything fails after the new world's folders have been created, they are deleted: nothing is left of the
+    /// new world.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The current context.</param>
     /// <param name="ltsName">The LTS name.</param>
+    /// <param name="beforeWriting">
+    /// Called once the creation has been accepted, before anything is written: returning false aborts it.
+    /// This is where the command checks that it still holds its locks.
+    /// </param>
     /// <returns>True on success, false on error.</returns>
-    internal async Task<bool> CreateLTSAsync( IActivityMonitor monitor, CKliEnv context, string ltsName )
+    internal async Task<bool> CreateLTSAsync( IActivityMonitor monitor,
+                                              CKliEnv context,
+                                              string ltsName,
+                                              Func<IActivityMonitor, bool> beforeWriting )
     {
         Throw.DebugAssert( _name.IsDefaultWorld );
         Throw.DebugAssert( WorldName.IsValidLTSName( ltsName ) );
 
-        var newRoot = _name.WorldRoot.AppendPart( ltsName );
-        var newFileDesc = _stackRepository.StackWorkingFolder.AppendPart( $"{_name.StackName}{ltsName}.xml" );
-
-        if( Path.Exists( newFileDesc ) )
+        var ltsWorldName = new LocalWorldName( _stackRepository,
+                                               ltsName,
+                                               _name.WorldRoot.AppendPart( ltsName ),
+                                               _stackRepository.GetLTSDefinitionFilePath( ltsName ) );
+        var newFileDesc = ltsWorldName.XmlDescriptionFilePath;
+        foreach( var p in new[] { newFileDesc, ltsWorldName.WorldRoot, ltsWorldName.SharedDataFolder, ltsWorldName.LocalDataFolder } )
         {
-            monitor.Error( $"Unable to create '{_name.StackName}{ltsName}' world: file '{newFileDesc}' already exists." );
-            return false;
-        }
-        if( Path.Exists( newRoot ) )
-        {
-            monitor.Error( $"Unable to create '{_name.StackName}{ltsName}' world: directory '{newRoot}' already exists." );
-            return false;
+            if( Path.Exists( p ) )
+            {
+                monitor.Error( $"Unable to create '{ltsWorldName.FullName}' world: '{p}' already exists." );
+                return false;
+            }
         }
 
         var newDefFile = new XDocument( _definitionFile.XmlRoot );
         var newDefinition = newDefFile.Root!;
         // The root element name cannot be the LTS name: '@' is not a valid XML name character.
-        // Nothing reads the root element name (the world's LTS name comes from its file name): the
+        // Nothing reads the root element name (the world's LTS name comes from its folder name): the
         // LTSName attribute is here to identify the world when reading the file.
         newDefinition.SetAttributeValue( XNames.LTSName, ltsName );
         // The LockPrefix is a Stack level setting that only the default World carries: all the Worlds of a
@@ -63,16 +75,16 @@ public sealed partial class World
         if( pin == SVersion.ZeroVersion )
         {
             monitor.Warn( $"""
-                Using locally compiled CKli (version 0.0.0-0): world '{_name.StackName}{ltsName}' is created
+                Using locally compiled CKli (version 0.0.0-0): world '{ltsWorldName.FullName}' is created
                 without its CKliVersion pin. A Long Term Support world should state the CKli version it is
                 frozen on: add the CKliVersion attribute to '{newFileDesc.LastPart}' manually.
                 """ );
             pin = null;
         }
         newDefinition.SetAttributeValue( XNames.CKliVersion, pin );
+        var e = new CreateLTSEventArgs( monitor, context, this, ltsWorldName, newDefinition );
         if( _events._createLTSEventSender.HasHandlers )
         {
-            var e = new CreateLTSEventArgs( monitor, context, this, ltsName, newDefinition );
             if( !await _events._createLTSEventSender.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) || !e.Success )
             {
                 return false;
@@ -83,8 +95,47 @@ public sealed partial class World
             newDefinition.SetAttributeValue( XNames.LockPrefix, null );
             newDefinition.SetAttributeValue( XNames.CKliVersion, pin );
         }
-        XmlHelper.SafeSave( newDefFile, newFileDesc );
-        return true;
+        if( !beforeWriting( monitor ) )
+        {
+            return false;
+        }
+        bool success = false;
+        try
+        {
+            Directory.CreateDirectory( ltsWorldName.SharedDataFolder );
+            Directory.CreateDirectory( ltsWorldName.LocalDataFolder );
+            if( PluginMachinery.SnapshotPluginSolution( monitor, _stackRepository, _name, ltsWorldName ) )
+            {
+                success = true;
+                foreach( var step in e.CreationSteps )
+                {
+                    if( !step( monitor ) )
+                    {
+                        success = false;
+                        break;
+                    }
+                }
+                if( success )
+                {
+                    // The file lives in the world's own "@ltsName/" folder of the Stack repository (its SharedDataFolder).
+                    XmlHelper.SafeSave( newDefFile, newFileDesc );
+                }
+            }
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While creating '{ltsWorldName.FullName}' world.", ex );
+            success = false;
+        }
+        if( !success )
+        {
+            using( monitor.OpenInfo( $"Deleting the folders of the '{ltsWorldName.FullName}' world." ) )
+            {
+                FileHelper.DeleteFolder( monitor, ltsWorldName.SharedDataFolder );
+                FileHelper.DeleteFolder( monitor, ltsWorldName.LocalDataFolder );
+            }
+        }
+        return success;
     }
 
 }

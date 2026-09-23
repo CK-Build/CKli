@@ -160,6 +160,56 @@ public sealed class FileHelper
     }
 
     /// <summary>
+    /// Copies the content of the <paramref name="source"/> folder into the <paramref name="target"/> one (that
+    /// is created if needed). An existing target file is overwritten.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="source">The folder to copy.</param>
+    /// <param name="target">The folder to copy to.</param>
+    /// <param name="include">
+    /// Optional filter called with the full path of each source file or folder and whether it is a folder:
+    /// false skips it (for a folder, its whole content).
+    /// </param>
+    /// <returns>True on success, false on error.</returns>
+    public static bool CopyFolder( IActivityMonitor monitor,
+                                   NormalizedPath source,
+                                   NormalizedPath target,
+                                   Func<NormalizedPath, bool, bool>? include = null )
+    {
+        try
+        {
+            DoCopy( source, target, include );
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While copying folder '{source}' to '{target}'.", ex );
+            return false;
+        }
+
+        static void DoCopy( NormalizedPath source, NormalizedPath target, Func<NormalizedPath, bool, bool>? include )
+        {
+            Directory.CreateDirectory( target );
+            foreach( var f in Directory.EnumerateFiles( source ) )
+            {
+                var fPath = new NormalizedPath( f );
+                if( include == null || include( fPath, false ) )
+                {
+                    File.Copy( f, target.AppendPart( fPath.LastPart ), overwrite: true );
+                }
+            }
+            foreach( var d in Directory.EnumerateDirectories( source ) )
+            {
+                var dPath = new NormalizedPath( d );
+                if( include == null || include( dPath, true ) )
+                {
+                    DoCopy( dPath, target.AppendPart( dPath.LastPart ), include );
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Not so standard helper as this can delete a git working folder by removing the read-only attributes on ".git/objects/" files
     /// before attempting to delete the folder. Only ".git/objects/" files are handled: if the folder contains other read-only files,
     /// this fails.

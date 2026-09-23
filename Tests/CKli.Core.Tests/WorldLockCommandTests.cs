@@ -1,6 +1,7 @@
 using CK.Core;
 using NUnit.Framework;
 using Shouldly;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -120,6 +121,52 @@ public class WorldLockCommandTests
 
         (await Exec( a, "world", "unlock", "publish" )).ShouldBeTrue();
         (await Exec( b, "world", "unlock", "build" )).ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// "ckli world lts create" takes the "publish" lock (nobody publishes while the version ranges are cut) and
+    /// the "lts" one (the Long Term Support worlds of a Stack are created one at a time): another developer
+    /// holding either of them prevents it, and nothing is created.
+    /// </summary>
+    [TestCase( "publish" )]
+    [TestCase( "lts" )]
+    public async Task lts_create_is_refused_while_another_developer_holds_its_locks_Async( string lockName )
+    {
+        var (a, b) = await ArrangeAsync( $"{nameof( lts_create_is_refused_while_another_developer_holds_its_locks_Async )}-{lockName}" );
+
+        // The first lock ever taken sets the Stack's LockPrefix and pushes it with the ".gitignore" that the clone
+        // created (the fixture has none): when B does it, the pull of "lts create" in A conflicts with A's own
+        // untracked ".gitignore". A takes that first lock instead.
+        (await Exec( a, "world", "lock", "setup" )).ShouldBeTrue();
+        (await Exec( a, "world", "unlock", "setup" )).ShouldBeTrue();
+
+        (await Exec( b, "world", "lock", lockName, "--duration", "30" )).ShouldBeTrue();
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await Exec( a, "world", "lts", "create", "@net8" )).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( $"Unable to create a Long Term Support world: 'refs/ckli-locks/One-{lockName}' is held by" )
+                                     && l.Contains( $"""ckli world unlock {lockName}""" ) );
+        }
+        Directory.Exists( a.CurrentDirectory.Combine( ".PublicStack/@net8" ) ).ShouldBeFalse( "Nothing has been created." );
+        RemoteLockRefs( a ).ShouldBe( new[] { $"refs/ckli-locks/One-{lockName}" },
+                                      customMessage: "Only the other developer's lock remains: a lock taken before the refusal has been released." );
+
+        (await Exec( b, "world", "unlock", lockName )).ShouldBeTrue();
+        (await Exec( a, "world", "lts", "create", "@net8" )).ShouldBeTrue( "Released: the LTS can be created." );
+    }
+
+    /// <summary>
+    /// A reservation of this very clone ("ckli world lock publish" before starting) is renewed, not refused, and
+    /// the locks are released when the command ends: the operation they were reserving is over.
+    /// </summary>
+    [Test]
+    public async Task lts_create_renews_this_clone_reservation_and_releases_its_locks_Async()
+    {
+        var (a, _) = await ArrangeAsync();
+
+        (await Exec( a, "world", "lock", "publish", "--duration", "30" )).ShouldBeTrue();
+        (await Exec( a, "world", "lts", "create", "@net8" )).ShouldBeTrue();
+        RemoteLockRefs( a ).ShouldBeEmpty( "Both locks have been released." );
     }
 
     [Test]

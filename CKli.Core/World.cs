@@ -23,6 +23,23 @@ public sealed partial class World
     public static readonly InformationalVersion CKliVersion = InformationalVersion.ReadFromAssembly( typeof( PluginMachinery ).Assembly );
 
     /// <summary>
+    /// The name of the World lock that every publishing command takes (the lock reference is
+    /// <c>$"{Name.FullName}-publish"</c>, see <see cref="StackRepository.GetLock"/>). This is the very lock that
+    /// <c>ckli world lock publish</c> acquires and <c>ckli world unlock publish</c> frees.
+    /// <para>
+    /// "ckli world lts create" takes it too: nobody can publish while a Long Term Support World is cut from
+    /// this one.
+    /// </para>
+    /// </summary>
+    public const string PublishLockName = "publish";
+
+    /// <summary>
+    /// The name of the World lock that "ckli world lts create" takes, in addition to <see cref="PublishLockName"/>:
+    /// the Long Term Support Worlds of a Stack are created one at a time.
+    /// </summary>
+    public const string LTSLockName = "lts";
+
+    /// <summary>
     /// Loads the core "CKli.Plugins.dll" and all its plugins.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>

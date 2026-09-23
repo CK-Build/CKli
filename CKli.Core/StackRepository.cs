@@ -419,7 +419,10 @@ public sealed partial class StackRepository : IDisposable
     /// Gets all the worlds that this stack contains starting with the <see cref="DefaultWorldName"/>
     /// and lexicographically sorted.
     /// <para>
-    /// Worlds are defined by the xml World definition files "StackName[@LTSName].xml" in this stack repository <see cref="StackWorkingFolder"/>.
+    /// The default World is defined by the "StackName.xml" file at the root of this stack repository <see cref="StackWorkingFolder"/>.
+    /// A Long Term Support World is defined by the "@LTSName/StackName@LTSName.xml" file (see <see cref="GetLTSDefinitionFilePath(string)"/>):
+    /// the "@LTSName/" folder of the stack repository is the LTS World's <see cref="LocalWorldName.SharedDataFolder"/>, so
+    /// everything a LTS World owns in the stack repository is in this folder.
     /// </para>
     /// </summary>
     public ImmutableArray<LocalWorldName> WorldNames
@@ -428,8 +431,8 @@ public sealed partial class StackRepository : IDisposable
         {
             if( _worldNames.IsDefault )
             {
-                _worldNames = Directory.GetFiles( StackWorkingFolder, $"{StackName}@*.xml" )
-                                .Select( p => TryParseDefinitionFilePath( this, p ) )
+                _worldNames = Directory.GetDirectories( StackWorkingFolder, "@*" )
+                                .Select( p => TryGetLTSWorldName( this, Path.GetFileName( p ) ) )
                                 .Where( w => w != null )
                                 .OrderBy( n => n!.FullName )
                                 .Prepend( DefaultWorldName )
@@ -437,24 +440,27 @@ public sealed partial class StackRepository : IDisposable
             }
             return _worldNames;
 
-            static LocalWorldName? TryParseDefinitionFilePath( StackRepository stack, NormalizedPath path )
+            static LocalWorldName? TryGetLTSWorldName( StackRepository stack, string ltsName )
             {
-                Throw.DebugAssert( !path.IsEmptyPath
-                                   && path.Parts.Count >= 4
-                                   && path.LastPart.EndsWith( ".xml", StringComparison.OrdinalIgnoreCase ) );
-                var fName = path.LastPart;
-                Throw.DebugAssert( ".xml".Length == 4 );
-                fName = fName.Substring( 0, fName.Length - 4 );
-                if( !WorldName.TryParse( fName, out var stackName, out var ltsName ) ) return null;
-                Throw.DebugAssert( stackName == stack.StackName );
-                var wRoot = stack.StackRoot;
-                if( ltsName != null )
-                {
-                    return new LocalWorldName( stack, ltsName, wRoot.AppendPart( ltsName ), path );
-                }
-                return new LocalWorldName( stack, null, wRoot, path );
+                if( !WorldName.IsValidLTSName( ltsName ) ) return null;
+                var path = stack.GetLTSDefinitionFilePath( ltsName );
+                return File.Exists( path )
+                        ? new LocalWorldName( stack, ltsName, stack.StackRoot.AppendPart( ltsName ), path )
+                        : null;
             }
         }
+    }
+
+    /// <summary>
+    /// Gets the definition file path of a Long Term Support World: "<see cref="StackWorkingFolder"/>/@LTSName/StackName@LTSName.xml".
+    /// The file keeps its full world name so that it can be identified when it is opened out of its folder.
+    /// </summary>
+    /// <param name="ltsName">The Long Term Support name (with its leading '@').</param>
+    /// <returns>The definition file path.</returns>
+    internal NormalizedPath GetLTSDefinitionFilePath( string ltsName )
+    {
+        Throw.DebugAssert( WorldName.IsValidLTSName( ltsName ) );
+        return StackWorkingFolder.AppendPart( ltsName ).AppendPart( $"{StackName}{ltsName}.xml" );
     }
 
     /// <summary>
@@ -1501,31 +1507,6 @@ public sealed partial class StackRepository : IDisposable
             if( Directory.Exists( tryPath ) ) return tryPath;
         }
         return default;
-    }
-
-    // Not released, not tested yet.
-    internal LocalWorldName? CreateNewLTS( IActivityMonitor monitor, string ltsName, XDocument content )
-    {
-        Throw.CheckArgument( content?.Root != null );
-        Throw.CheckArgument( WorldName.IsValidLTSName( ltsName ) );
-
-        var newRoot = _stackRoot.AppendPart( ltsName );
-        var newDesc = _git.WorkingFolder.AppendPart( $"{StackName}{ltsName}.xml" );
-        var newOne = new LocalWorldName( this, ltsName, newRoot, newDesc );
-
-        if( File.Exists( newOne.XmlDescriptionFilePath ) )
-        {
-            monitor.Error( $"Unable to create '{newOne}' world: file '{newOne.XmlDescriptionFilePath}' already exists." );
-            return null;
-        }
-        if( Directory.Exists( newOne.WorldRoot ) )
-        {
-            monitor.Error( $"Unable to create '{newOne}' world: directory {newOne.WorldRoot} already exists." );
-            return null;
-        }
-        content.SafeSave( newOne.XmlDescriptionFilePath );
-        Directory.CreateDirectory( newOne.WorldRoot );
-        return newOne;
     }
 
     /// <summary>

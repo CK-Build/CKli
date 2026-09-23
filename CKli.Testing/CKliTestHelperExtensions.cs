@@ -44,7 +44,8 @@ public static partial class CKliTestHelperExtensions
         Throw.CheckState( pluginFolderName.Contains( "-Plugins" ) );
         int idx = pluginFolderName.IndexOf( "-Plugins" );
         var stackName = pluginFolderName.Substring( 0, idx );
-        var ltsName = pluginFolderName.Substring( idx + 8 );
+        string? ltsName = pluginFolderName.Substring( idx + 8 );
+        if( ltsName.Length == 0 ) ltsName = null;
         _defaultWorldName = new WorldName( stackName, ltsName );
         Throw.DebugAssert( PluginMachinery.GetPluginSolutionName( _defaultWorldName ) == pluginFolderName );
 
@@ -66,7 +67,11 @@ public static partial class CKliTestHelperExtensions
         // If the user deleted the CKli.CompiledPlugins.cs, he must run "ckli plugin compile" to restore the
         // compiled plugins.
         //
-        _hostPluginsConfiguration = ReadStackPluginConfiguration( TestHelper.Monitor, _defaultWorldName );
+        // The default world definition file is at the root of the Stack repository, a LTS world's one is in its
+        // "@ltsName/" folder (its shared data folder).
+        _hostPluginsConfiguration = ReadStackPluginConfiguration( TestHelper.Monitor,
+                                                                  _defaultWorldName,
+                                                                  sharedDataFolder.AppendPart( $"{_defaultWorldName.FullName}.xml" ) );
 
         // We initialize the root environment (no need to wait): any participant can now use the instance name
         // if needed. 
@@ -96,13 +101,12 @@ public static partial class CKliTestHelperExtensions
         }
         World.DirectPluginFactory = f;
 
-        static XElement ReadStackPluginConfiguration( IActivityMonitor monitor, WorldName worldHostName )
+        static XElement ReadStackPluginConfiguration( IActivityMonitor monitor, WorldName worldHostName, NormalizedPath stackDefinitionFile )
         {
             // Reads the host's default world definition definition file <Plugins> element.
             XElement? stackPlugins = null;
             try
             {
-                var stackDefinitionFile = TestHelper.SolutionFolder.AppendPart( $"{worldHostName}.xml" );
                 XDocument stackDefinitionDoc = XDocument.Load( stackDefinitionFile, LoadOptions.PreserveWhitespace );
                 stackPlugins = stackDefinitionDoc.Root?.Element( "Plugins" );
                 if( stackPlugins == null )

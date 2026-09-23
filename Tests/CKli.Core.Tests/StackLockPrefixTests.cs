@@ -169,7 +169,7 @@ public class StackLockPrefixTests
 
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "world", "lts", "create", "@net8" )).ShouldBeTrue();
 
-        var ltsRoot = XDocument.Load( StackFolder( context ).AppendPart( "One@net8.xml" ) ).Root.ShouldNotBeNull();
+        var ltsRoot = XDocument.Load( StackFolder( context ).Combine( "@net8/One@net8.xml" ) ).Root.ShouldNotBeNull();
         ltsRoot.Attribute( XNames.LTSName ).ShouldNotBeNull().Value.ShouldBe( "@net8" );
         ltsRoot.Attribute( XNames.LockPrefix )
                .ShouldBeNull( "The LockPrefix is a Stack level setting: the new LTS World must not copy it." );
@@ -226,10 +226,12 @@ public class StackLockPrefixTests
 
     static void WriteLTSWorld( CKliEnv context, string ltsName, string? lockPrefix )
     {
-        var fileName = $"One@{ltsName[1..]}.xml";
         var attributes = lockPrefix != null ? $""" LockPrefix="{lockPrefix}" """.TrimEnd() : "";
+        // A LTS world definition file is in the world's own "@ltsName/" folder of the Stack repository.
+        var path = StackFolder( context ).AppendPart( ltsName ).AppendPart( $"One{ltsName}.xml" );
+        Directory.CreateDirectory( path.RemoveLastPart() );
         WriteAndCommit( context,
-                        StackFolder( context ).AppendPart( fileName ),
+                        path,
                         $"""
                          <One LTSName="{ltsName}"{attributes}>
                            <Repository Url="OneRepo" />
