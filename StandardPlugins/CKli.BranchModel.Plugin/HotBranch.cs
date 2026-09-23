@@ -374,7 +374,7 @@ public sealed class HotBranch
             if( d.AheadBy is not 0 )
             {
                 var dev = EnsureDevBranch();
-                if( !Repo.GitRepository.MergeBranch( monitor, ref dev, parentBranch )
+                if( !Repo.GitRepository.MergeBranchContent( monitor, ref dev, parentBranch )
                     || !Refresh( monitor ) )
                 {
                     return false;
@@ -398,7 +398,7 @@ public sealed class HotBranch
         if( cd.AheadBy is not 0 )
         {
             var dev = EnsureDevBranch();
-            if( !Repo.GitRepository.MergeBranch( monitor, ref dev, tagCommit.Commit )
+            if( !Repo.GitRepository.MergeBranchContent( monitor, ref dev, tagCommit.Commit )
                 || !Refresh( monitor ) )
             {
                 return false;

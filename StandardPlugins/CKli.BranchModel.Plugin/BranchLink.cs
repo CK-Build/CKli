@@ -302,7 +302,7 @@ public sealed partial class BranchLink
     {
         Throw.CheckArgument( git.Repository == RepositoryOf( aheadBranch ) && git.Repository == RepositoryOf( baseBranch ) );
 
-        if( !git.MergeBranch( monitor, ref aheadBranch, baseBranch ) )
+        if( !git.MergeBranchContent( monitor, ref aheadBranch, baseBranch ) )
         {
             return null;
         }
@@ -334,7 +334,9 @@ public sealed partial class BranchLink
 
         bool aheadIsCheckedOut = aheadBranch.IsCurrentRepositoryHead;
 
-        if( !git.MergeBranch( monitor, ref baseBranch, aheadBranch ) )
+        // Merging the content only: an ahead branch that brings no change (like the "empty ahead commit")
+        // must not leave its commits in the base branch.
+        if( !git.MergeBranchContent( monitor, ref baseBranch, aheadBranch ) )
         {
             return null;
         }
