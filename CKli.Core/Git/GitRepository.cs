@@ -280,7 +280,7 @@ public sealed partial class GitRepository : IDisposable
     /// <summary>
     /// First calls <see cref="EnsureBranch(IActivityMonitor, string, LogLevel, LibGit2Sharp.Commit?)"/> and then attempts
     /// to <see cref="MergeTrackedBranch(IActivityMonitor, ref Branch, bool)"/> and calls
-    /// <see cref="MergeBranch(IActivityMonitor, ref Branch, LibGit2Sharp.Commit, bool)"/> with the <paramref name="baseCommit"/> if
+    /// <see cref="MergeBranchContent(IActivityMonitor, ref Branch, LibGit2Sharp.Commit)"/> with the <paramref name="baseCommit"/> if
     /// it is specified.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -303,7 +303,7 @@ public sealed partial class GitRepository : IDisposable
         }
         if( baseCommit != null )
         {
-            if( !MergeBranch( monitor, ref b, baseCommit ) )
+            if( !MergeBranchContent( monitor, ref b, baseCommit ) )
             {
                 return null;
             }
@@ -795,7 +795,9 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
-    /// Merges the <see cref="Branch.TrackedBranch"/> into its tracking <paramref name="branch"/>.
+    /// Merges the <see cref="Branch.TrackedBranch"/> into its tracking <paramref name="branch"/>
+    /// with <see cref="MergeBranch(IActivityMonitor, ref Branch, Branch)"/>: on success, the tracked branch's
+    /// tip is reachable from the <paramref name="branch"/>, even when the two tips have the same content.
     /// The branch's <see cref="Branch.IsTracking"/> must be true otherwise an <see cref="ArgumentException"/> is thrown.
     /// <para>
     /// This method can handle local tracked branch even if it is mainly used with remote branches.
@@ -803,47 +805,100 @@ public sealed partial class GitRepository : IDisposable
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="branch">The local branch. This is updated to the new Branch instance on success.</param>
-    /// <param name="withEmptyCommit">True to create an empty commit even if there is nothing to merge.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool MergeTrackedBranch( IActivityMonitor monitor, ref Branch branch, bool withEmptyCommit = false )
+    public bool MergeTrackedBranch( IActivityMonitor monitor, ref Branch branch )
     {
         Throw.CheckArgument( branch.TrackedBranch != null );
-        return MergeBranch( monitor, ref branch, branch.TrackedBranch, withEmptyCommit );
+        return MergeBranch( monitor, ref branch, branch.TrackedBranch );
     }
 
     /// <summary>
     /// Tries to merge <paramref name="other"/> into <paramref name="branch"/>. There must be no conflict.
+    /// <para>
+    /// On success, the <paramref name="other"/>'s tip is reachable from <paramref name="branch"/>: the branch is
+    /// fast-forwarded when it is behind, and a merge commit is created when the two have diverged, even if the
+    /// two tips have the same content (the merge commit is then "empty"). To not integrate commits that bring no
+    /// change, use <see cref="MergeBranchContent(IActivityMonitor, ref Branch, Branch)"/>.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="branch">The target branch (that will be moved on success).</param>
     /// <param name="other">The branch to merge.</param>
-    /// <param name="withEmptyCommit">True to create an empty commit even if there is nothing to merge.</param>
     /// <returns>True on success, false on error.</returns>
-    public bool MergeBranch( IActivityMonitor monitor, ref Branch branch, Branch other, bool withEmptyCommit = false )
+    public bool MergeBranch( IActivityMonitor monitor, ref Branch branch, Branch other )
+    {
+        return DoMergeBranch( monitor, ref branch, other, skipSameContent: false );
+    }
+
+    /// <summary>
+    /// Tries to merge <paramref name="commit"/> into <paramref name="branch"/>. There must be no conflict.
+    /// <para>
+    /// On success, the <paramref name="commit"/> is reachable from <paramref name="branch"/>: the branch is
+    /// fast-forwarded when it is behind, and a merge commit is created when the two have diverged, even if the
+    /// branch's tip and the commit have the same content (the merge commit is then "empty"). To not integrate
+    /// commits that bring no change, use <see cref="MergeBranchContent(IActivityMonitor, ref Branch, Commit)"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="branch">The target branch (that will be moved on success).</param>
+    /// <param name="commit">The commit to integrate.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool MergeBranch( IActivityMonitor monitor, ref Branch branch, Commit commit )
+    {
+        return DoMergeBranch( monitor, ref branch, commit, skipSameContent: false );
+    }
+
+    /// <summary>
+    /// Tries to merge the content of <paramref name="other"/> into <paramref name="branch"/>. There must be no conflict.
+    /// <para>
+    /// Unlike <see cref="MergeBranch(IActivityMonitor, ref Branch, Branch)"/>, when the two tips have the same content,
+    /// nothing is done: the <paramref name="branch"/> is left as-is and <paramref name="other"/> doesn't become
+    /// part of its history. This is what makes an "ahead" branch that brings nothing vanish without a trace.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="branch">The target branch (that will be moved on success).</param>
+    /// <param name="other">The branch to merge.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool MergeBranchContent( IActivityMonitor monitor, ref Branch branch, Branch other )
+    {
+        return DoMergeBranch( monitor, ref branch, other, skipSameContent: true );
+    }
+
+    /// <summary>
+    /// Tries to merge the content of <paramref name="commit"/> into <paramref name="branch"/>. There must be no conflict.
+    /// <para>
+    /// Unlike <see cref="MergeBranch(IActivityMonitor, ref Branch, Commit)"/>, when the branch's tip and the commit have
+    /// the same content, nothing is done: the <paramref name="branch"/> is left as-is and <paramref name="commit"/>
+    /// doesn't become part of its history.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="branch">The target branch (that will be moved on success).</param>
+    /// <param name="commit">The commit to integrate.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool MergeBranchContent( IActivityMonitor monitor, ref Branch branch, Commit commit )
+    {
+        return DoMergeBranch( monitor, ref branch, commit, skipSameContent: true );
+    }
+
+    bool DoMergeBranch( IActivityMonitor monitor, ref Branch branch, Branch other, bool skipSameContent )
     {
         Throw.CheckNotNullArgument( other );
         if( other.IsCurrentRepositoryHead && !CheckCleanCommit( monitor ) )
         {
             return false;
         }
-        return DoMergeBranch( monitor, ref branch, other.Tip, $"branch '{other.FriendlyName}'", withEmptyCommit );
+        return DoMergeBranch( monitor, ref branch, other.Tip, $"branch '{other.FriendlyName}'", skipSameContent );
     }
 
-    /// <summary>
-    /// Tries to ensures that <paramref name="commit"/> is integrated in <paramref name="branch"/>. There must be no conflict.
-    /// </summary>
-    /// <param name="monitor">The monitor.</param>
-    /// <param name="branch">The target branch (that will be moved on success).</param>
-    /// <param name="commit">The commit to integrate.</param>
-    /// <param name="withEmptyCommit">True to create an empty commit even if there is nothing to merge.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool MergeBranch( IActivityMonitor monitor, ref Branch branch, Commit commit, bool withEmptyCommit = false )
+    bool DoMergeBranch( IActivityMonitor monitor, ref Branch branch, Commit commit, bool skipSameContent )
     {
         Throw.CheckNotNullArgument( commit );
-        return DoMergeBranch( monitor, ref branch, commit, $"commit '{commit.Id.Sha.AsSpan(0,7)} {commit.MessageShort}'", withEmptyCommit );
+        return DoMergeBranch( monitor, ref branch, commit, $"commit '{commit.Id.Sha.AsSpan( 0, 7 )} {commit.MessageShort}'", skipSameContent );
     }
 
-    bool DoMergeBranch( IActivityMonitor monitor, ref Branch branch, Commit otherTip, string otherName, bool withEmptyCommit = false )
+    bool DoMergeBranch( IActivityMonitor monitor, ref Branch branch, Commit otherTip, string otherName, bool skipSameContent )
     {
         if( branch.Tip.Sha == otherTip.Sha )
         {
@@ -858,9 +913,14 @@ public sealed partial class GitRepository : IDisposable
         Exception? exception = null;
         try
         {
-            var c = CreateMergeCommit( this, branch, otherTip, otherName, withEmptyCommit );
+            var c = CreateMergeCommit( this, branch, otherTip, otherName, skipSameContent );
             if( c != null )
             {
+                // No-op: the branch doesn't move.
+                if( c.Sha == branch.Tip.Sha )
+                {
+                    return true;
+                }
                 if( isHead )
                 {
                     // Before updating the branch, we need to detach the head.
@@ -868,10 +928,9 @@ public sealed partial class GitRepository : IDisposable
                     Commands.Checkout( _git, branch.Tip );
                 }
                 branch = _git.Branches.Add( localName, c, allowOverwrite: true );
-                if( c != otherTip )
-                {
-                    monitor.Trace( $"The {otherName} has been merged into '{localName}' in '{DisplayPath}'." );
-                }
+                monitor.Trace( c.Sha == otherTip.Sha
+                                ? $"Branch '{localName}' has been fast-forwarded to {otherName} in '{DisplayPath}'."
+                                : $"The {otherName} has been merged into '{localName}' in '{DisplayPath}'." );
                 if( isHead )
                 {
                     branch = Commands.Checkout( _git, branch );
@@ -893,25 +952,26 @@ public sealed partial class GitRepository : IDisposable
                                           Branch branch,
                                           Commit otherTip,
                                           string trackedName,
-                                          bool withEmptyCommit )
+                                          bool skipSameContent )
         {
-            bool mustMerge = branch.Tip.Tree.Sha != otherTip.Tree.Sha;
-            if( !mustMerge && !withEmptyCommit )
+            if( skipSameContent && branch.Tip.Tree.Sha == otherTip.Tree.Sha )
             {
-                // No-op.
+                // No-op: there is no content to merge.
                 return branch.Tip;
             }
             var div = git.Repository.ObjectDatabase.CalculateHistoryDivergence( branch.Tip, otherTip );
             if( div?.BehindBy is 0 )
             {
-                // No-op.
+                // No-op: otherTip is already reachable from branch.
                 return branch.Tip;
             }
             if( div?.AheadBy is 0 )
             {
-                // Move "branch" to "tracked".
+                // Fast-forward "branch" to "otherTip".
                 return otherTip;
             }
+            // The two have diverged: this creates a merge commit, even if the two tips have
+            // the same content (the merge commit is then empty) when skipSameContent is false.
             var result = git.Repository.ObjectDatabase.MergeCommits( branch.Tip, otherTip, new MergeTreeOptions() { SkipReuc = true, FailOnConflict = true } );
             return result.Tree == null
                     ? null

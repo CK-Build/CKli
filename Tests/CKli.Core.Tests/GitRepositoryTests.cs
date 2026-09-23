@@ -4,6 +4,7 @@ using NUnit.Framework;
 using Shouldly;
 using System;
 using System.IO;
+using System.Linq;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
@@ -340,8 +341,92 @@ public partial class GitRepositoryTests
         // Tim "ckli pull": there's no conflict and the "test-1" local branch is simply moved to the "origin/test-1".
         tim.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
         tim.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeTrue();
-        bob.Repository.Branches["test-1"].Tip.Sha.ShouldBe( bob.Repository.Branches["origin/test-1"].Tip.Sha );
+        tim.Repository.Branches["test-1"].Tip.Sha.ShouldBe( tim.Repository.Branches["origin/test-1"].Tip.Sha );
 
+    }
+
+    // A "ckli pull" used to leave a branch behind its remote when the remote commits brought no change
+    // (empty commits, like the ones the branch model creates): the merge was skipped because the two trees
+    // were the same, and "ckli status" still displayed "↑0↓3" after the pull.
+    [Test]
+    public void pull_integrates_remote_commits_that_bring_no_change()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var remotes = TestEnv.OpenRemotes( "One" );
+        var remoteUrl = remotes.GetUriFor( "OneRepo" );
+
+        var timPath = context.CurrentDirectory.AppendPart( "Tim" );
+        using var tim = GitRepository.Clone( TestHelper.Monitor,
+                                             new GitRepositoryKey( context.SecretsStore, remoteUrl, true ),
+                                             context.Committer,
+                                             timPath,
+                                             timPath.LastPart ).ShouldNotBeNull();
+
+        var bobPath = context.CurrentDirectory.AppendPart( "Bob" );
+        using var bob = GitRepository.Clone( TestHelper.Monitor,
+                                             new GitRepositoryKey( context.SecretsStore, remoteUrl, true ),
+                                             context.Committer,
+                                             bobPath,
+                                             bobPath.LastPart ).ShouldNotBeNull();
+
+        // Tim pushes 3 empty commits on "master".
+        AddEmptyCommit( tim, "Tim's empty commit (1)." );
+        AddEmptyCommit( tim, "Tim's empty commit (2)." );
+        AddEmptyCommit( tim, "Tim's empty commit (3)." );
+        tim.PushBranch( TestHelper.Monitor, tim.Repository.Head, autoCreateRemoteBranch: false ).ShouldBeTrue();
+
+        // Bob fetches: its "master" (checked out) is behind by 3 commits that have the same content.
+        bob.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
+        var bobMaster = bob.Repository.Head;
+        bobMaster.TrackingDetails.BehindBy.ShouldBe( 3 );
+        bobMaster.TrackingDetails.AheadBy.ShouldBe( 0 );
+        bobMaster.Tip.Tree.Sha.ShouldBe( bobMaster.TrackedBranch.Tip.Tree.Sha );
+
+        // MergeBranchContent doesn't integrate commits that bring no change.
+        {
+            var content = bobMaster;
+            bob.MergeBranchContent( TestHelper.Monitor, ref content, bobMaster.TrackedBranch ).ShouldBeTrue();
+            content.ShouldBeSameAs( bobMaster, "Nothing done: the branch has not been rewritten." );
+            bob.Repository.Head.Tip.Sha.ShouldBe( bobMaster.Tip.Sha );
+        }
+
+        // The pull fast-forwards it.
+        bob.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeTrue();
+        bobMaster = bob.Repository.Head;
+        bobMaster.FriendlyName.ShouldBe( "master", "Still checked out." );
+        bobMaster.Tip.Sha.ShouldBe( bobMaster.TrackedBranch.Tip.Sha );
+        bobMaster.TrackingDetails.BehindBy.ShouldBe( 0 );
+
+        // Diverged branches with the same content: Tim and Bob both have an empty commit on "master".
+        var timLast = AddEmptyCommit( tim, "Tim's empty commit (4)." );
+        tim.PushBranch( TestHelper.Monitor, tim.Repository.Head, autoCreateRemoteBranch: false ).ShouldBeTrue();
+        var bobLast = AddEmptyCommit( bob, "Bob's empty commit." );
+
+        bob.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
+        bobMaster = bob.Repository.Head;
+        bobMaster.TrackingDetails.BehindBy.ShouldBe( 1 );
+        bobMaster.TrackingDetails.AheadBy.ShouldBe( 1 );
+
+        // The pull creates an (empty) merge commit...
+        bob.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeTrue();
+        bobMaster = bob.Repository.Head;
+        bobMaster.FriendlyName.ShouldBe( "master" );
+        bobMaster.Tip.Parents.Select( p => p.Sha ).ShouldBe( [bobLast.Sha, timLast.Sha] );
+        bobMaster.Tip.Tree.Sha.ShouldBe( bobLast.Tree.Sha );
+        bobMaster.TrackingDetails.BehindBy.ShouldBe( 0 );
+        bobMaster.TrackingDetails.AheadBy.ShouldBe( 2 );
+
+        // ...so that Bob can push.
+        bob.PushBranch( TestHelper.Monitor, bobMaster, autoCreateRemoteBranch: false ).ShouldBeTrue();
+    }
+
+    static Commit AddEmptyCommit( GitRepository r, string message )
+    {
+        var head = r.Repository.Head;
+        var c = r.Repository.ObjectDatabase.CreateCommit( r.Committer, r.Committer, message, head.Tip.Tree, [head.Tip], prettifyMessage: false );
+        // The tree doesn't change: the working folder and the index are still in sync with the head.
+        r.Repository.Refs.UpdateTarget( r.Repository.Refs[head.CanonicalName], c.Id );
+        return c;
     }
 
     static void CreateBranchAndPush( GitRepository r, int i )
