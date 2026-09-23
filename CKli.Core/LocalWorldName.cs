@@ -152,9 +152,18 @@ public sealed class LocalWorldName : WorldName
                 }
                 else if( vPin != ckliVersion )
                 {
+                    // A Long Term Support world has its pinned CKli as a local tool in its root folder: it is installed
+                    // right now (this is idempotent) so that the user only has to retry with "dotnet ckli".
+                    var hint = LTSName != null && LocalCKliTool.Ensure( monitor, _root, vPin )
+                                ? $"""
+                                  CKli '{vPin}' is installed as a local tool in '{_root}': use '{LocalCKliTool.LocalCommand}' instead
+                                  of 'ckli' in this folder (or below) and retry.
+                                  """
+                                : "Please use the appropriate CKli version.";
                     monitor.Error( $"""
                         This world is pinned to CKli version '{pinCKliVersion}'. This CKli version is '{ckliVersion}'.
-                        Please use the appropriate CKli version. File: '{_xmlDescriptionFilePath}'.
+                        {hint}
+                        File: '{_xmlDescriptionFilePath}'.
                         """ );
                     return null;
                 }

@@ -30,6 +30,9 @@ the current version is a pre release.
 
 `--dry-run` (or `-d`) only displays the `dotnet tool update` command line that would be run.
 
+This command is refused in a Long Term Support World (`StackRoot/@ltsName/` or below): CKli is frozen there on the
+World's pinned version, the local tool that `dotnet ckli` runs, and this command updates the global tool.
+
 This command transparently updates the CKli version used by the `CKli.Plugins` solution. If a `Tests/Plugins.Tests`
 project exists in the `{WorldName}-Plugins` solution, the version of the `CKli.Testing` package reference is also updated.
 
@@ -317,6 +320,16 @@ solution and its `Published/` folder — and its repositories live in the Stack'
 the Worlds of a Stack are siblings, not copies of it. A LTS name must be at
 least 3 characters starting with `@`, then only ASCII lowercase letters, digits, `-`, `_` and `.`.
 
+> **In a LTS World, use `dotnet ckli` instead of `ckli`.** A LTS World is pinned to the CKli version that
+> created it, and the global `ckli` follows the latest version. Cloning a LTS World (`world lts clone`,
+> `clone --lts-name`, the end of `world lts create`) installs its pinned CKli as a **local .NET tool** in its
+> `@ltsName/` folder: `dotnet new tool-manifest` then
+> `dotnet tool update CKli --version <pin> --source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json`
+> (the feed that carries every CKli version, prereleases included). `dotnet ckli`, run in that folder or below,
+> launches it. When the global `ckli` is used there anyway, it refuses to open the World: it installs the local
+> tool then (if it wasn't) and tells you to retry with `dotnet ckli`. `update` is refused in a LTS World: it
+> updates the global tool, not the pinned one.
+
 ### `world lts create <@ltsName>`
 Creates a new LTS World from the current default World. Must be run from the default World. The CKli Stack
 itself refuses it: its plugin solution references the Standard Plugins by source, which a snapshot in the
@@ -347,8 +360,8 @@ up in the new LTS World while the code it came from stays in the default one. Pu
 supersede it) first.
 
 The new World is **pinned** to the CKli version that creates it: its root element receives a
-`CKliVersion="0.13.0"` attribute, and CKli then refuses to open that World with any other version, naming the
-one to install. This is the point of a LTS World — it is frozen, so its plugins must not be built against a
+`CKliVersion="0.13.0"` attribute, and CKli then refuses to open that World with any other version — installing
+the pinned one as the World's local tool, so that `dotnet ckli` is all it takes to retry. This is the point of a LTS World — it is frozen, so its plugins must not be built against a
 CKli it has never seen. The default World carries no such attribute: there, each developer keeps its own CKli
 version. There is no flag to skip the pin; removing it is a manual edit of the definition file, like
 `MinCKliVersion`.
@@ -393,6 +406,11 @@ when the Stack is already cloned; `clone --lts-name` is the equivalent for a Sta
 Only the missing repositories are cloned, so running it again does nothing. Opening a World for the first
 time also generates its plugin solution inside the Stack repository, so the command commits the Stack: no
 `push` is needed for the World to exist locally, but a `push --stack-only` publishes that plugin solution.
+
+The World's pinned CKli is then installed as the local tool of its `@ltsName/` folder (idempotent: an existing
+manifest is kept and the tool is moved back to the pinned version). Nothing is installed under a test harness,
+nor for a World that has no pin (one created by a locally compiled CKli). A failed install is a warning, not a
+failure: the next command run with the global `ckli` installs it again.
 
 ## World lock commands (lock, unlock)
 

@@ -191,6 +191,12 @@ The pin is what keeps a **LTS World frozen**: it is written by `World.CreateLTSA
 and the default World deliberately carries none - there, each developer keeps its own CKli version, which is
 what [the plugin solution's `$(CKliVersion)`](#plugin-discovery-and-loading) makes possible.
 
+The pinned CKli is the **local .NET tool** of the LTS World's root folder (`LocalCKliTool.Ensure`: a
+`dotnet-tools.json` manifest and `dotnet tool update CKli --version <pin> --source <the Signature-OpenSource feed>`),
+so `dotnet ckli` runs it there. Cloning a LTS World installs it (`CKliLTSClone.AddWorld`,
+`StackRepository.CloneAsync`) and so does the refusal above: a mismatching CKli installs the pinned one before
+telling the user to retry with `dotnet ckli`. Nothing is installed when `CKliRootEnv.IsTestRun` is set.
+
 Both skip their check when the running CKli is `SVersion.ZeroVersion` (`0.0.0-0`, a locally compiled one):
 a developer building CKli must be able to open any World. For the same reason `CreateLTSAsync` refuses to
 *write* a `0.0.0-0` pin - nobody can install that version, so the World would be unopenable by everyone else

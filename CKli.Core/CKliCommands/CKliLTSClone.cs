@@ -122,6 +122,15 @@ sealed class CKliLTSClone : Command
                           newClones == null || newClones.Count == 0
                             ? $"World '{worldName.FullName}' has no repository to clone."
                             : $"Cloned {newClones.Count} repositories of world '{worldName.FullName}'." );
+            // A Long Term Support world is frozen on its pinned CKli: it is installed as a local tool in the world's
+            // root folder, where "dotnet ckli" runs it. Failing to install it is not a clone failure (a later version
+            // mismatch installs it again).
+            var pin = world.DefinitionFile.PinnedCKliVersion;
+            if( pin != null && !worldName.IsDefaultWorld && LocalCKliTool.Ensure( monitor, worldName.WorldRoot, pin ) )
+            {
+                monitor.Info( ScreenType.CKliScreenTag,
+                              $"CKli '{pin}' is installed in '{worldName.WorldRoot}': use '{LocalCKliTool.LocalCommand}' instead of 'ckli' there." );
+            }
             // Opening the world creates its plugin solution in the Stack repository: a tracked
             // "@ltsName/{StackName}-Plugins@ltsName/" folder that must be committed.
             return stack.Commit( monitor, $"Cloned world '{worldName.FullName}'." );

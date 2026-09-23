@@ -1175,10 +1175,11 @@ public sealed partial class StackRepository : IDisposable
             var layout = definitionFile.ReadLayout( monitor );
             if( layout == null ) return false;
 
+            bool success;
             using( monitor.OpenInfo( $"Cloning {layout.Count} repositories in {stack.StackRoot} ({(maxDop <= 0 ? "parallel" : $"--max-dop {maxDop}")})." ) )
             {
                 var pool = new ActivityMonitorAsyncPool( maxDop <= 0 ? int.MaxValue : maxDop );
-                return await pool.ParallelAsync( layout,
+                success = await pool.ParallelAsync( layout,
                                                  ( monitor, l, cancellation ) => GitRepository.TryCloneWorkingFolder( monitor,
                                                                                                                       new GitRepositoryKey( stack.SecretsStore, l.Url, stack.IsPublic ),
                                                                                                                       world.WorldRoot.Combine( l.Path ),
@@ -1187,6 +1188,14 @@ public sealed partial class StackRepository : IDisposable
                                                  cancellation )
                                  .ConfigureAwait( false );
             }
+            // Same as CKliLTSClone.AddWorld: a Long Term Support world's pinned CKli is its local tool.
+            var pin = definitionFile.PinnedCKliVersion;
+            if( success && pin != null && !world.IsDefaultWorld && LocalCKliTool.Ensure( monitor, world.WorldRoot, pin ) )
+            {
+                monitor.Info( ScreenType.CKliScreenTag,
+                              $"CKli '{pin}' is installed in '{world.WorldRoot}': use '{LocalCKliTool.LocalCommand}' instead of 'ckli' there." );
+            }
+            return success;
         }
     }
 

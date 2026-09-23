@@ -172,6 +172,56 @@ public class LTSWorldTests
     }
 
     /// <summary>
+    /// Cloning a LTS world installs its pinned CKli as a local tool in the world's root folder: "dotnet ckli" runs it
+    /// there. Under a test harness nothing is installed (this would download the tool) but the commands are logged.
+    /// </summary>
+    [Test]
+    public async Task lts_clone_installs_the_pinned_CKli_as_a_local_tool_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var one = TestEnv.OpenRemotes( "One" );
+        // A locally compiled CKli ignores the pin (with a warning), a released one must match it to open the world.
+        var pin = World.CKliVersion.Version == SVersion.ZeroVersion ? "1.2.3" : World.CKliVersion.Version.ToString();
+        ArrangeLTSWorld( context, one.StackUri, "One", "@net8", pin );
+
+        StackRepository.ClearRegistry( TestHelper.Monitor ).ShouldBeTrue();
+        var target = context.ChangeDirectory( "Target" );
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, target, "clone", one.StackUri, "--lts-name", "@net8" ))
+                .ShouldBeTrue();
+            logs.ShouldContain( l => l.Contains( "Test run: skipping 'dotnet new tool-manifest' and " )
+                                     && l.Contains( $"'dotnet tool update CKli --version {pin} --source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json'" )
+                                     && l.Contains( target.CurrentDirectory.Combine( "One/@net8" ) ) );
+        }
+    }
+
+    /// <summary>
+    /// "ckli update" updates the global tool: in a LTS world, CKli is the pinned local tool that "dotnet ckli" runs.
+    /// </summary>
+    [Test]
+    public async Task update_is_refused_in_a_LTS_world_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var one = TestEnv.OpenRemotes( "One" );
+        ArrangeLTSWorld( context, one.StackUri, "One", "@net8" );
+
+        StackRepository.ClearRegistry( TestHelper.Monitor ).ShouldBeTrue();
+        var target = context.ChangeDirectory( "Target" );
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, target, "clone", one.StackUri, "--lts-name", "@net8" ))
+            .ShouldBeTrue();
+        var inLTS = target.ChangeDirectory( target.CurrentDirectory.Combine( "One/@net8/OneRepo" ) );
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, inLTS, "update", "--dry-run" )).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( "The Long Term Support world '@net8' is frozen on its pinned CKli version" )
+                                     && l.Contains( "'dotnet ckli'" ) );
+        }
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, target.ChangeDirectory( "One" ), "update", "--dry-run" ))
+            .ShouldBeTrue( "The default world is not concerned." );
+    }
+
+    /// <summary>
     /// A LTS world is defined by the "@ltsName/StackName@ltsName.xml" file: the same file at the root of the
     /// Stack repository (next to the default world's one) defines nothing.
     /// </summary>
@@ -228,7 +278,7 @@ public class LTSWorldTests
     /// Pushes a "@{ltsName}/{name}@{ltsName}.xml" world definition file to the Stack remote. Its layout is the same
     /// single repository as the fixture's default world.
     /// </summary>
-    static void ArrangeLTSWorld( CKliEnv context, Uri stackUri, string name, string ltsName )
+    static void ArrangeLTSWorld( CKliEnv context, Uri stackUri, string name, string ltsName, string? ckliVersion = null )
     {
         var path = context.CurrentDirectory.Combine( "Arrange" ).AppendPart( name );
         using var git = GitRepository.Clone( TestHelper.Monitor,
@@ -241,7 +291,7 @@ public class LTSWorldTests
         Directory.CreateDirectory( ltsFolder );
         File.WriteAllText( ltsFolder.AppendPart( $"{name}{ltsName}.xml" ),
                            $"""
-                            <{name} LTSName="{ltsName}">
+                            <{name} LTSName="{ltsName}"{(ckliVersion != null ? $" CKliVersion=\"{ckliVersion}\"" : "")}>
                               <Repository Url="OneRepo" />
                             </{name}>
                             """ );

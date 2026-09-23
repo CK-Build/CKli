@@ -56,6 +56,24 @@ sealed class CKliUpdate : Command
             monitor.Error( "Update command cannot be used in interactive mode." );
             return ValueTask.FromResult( false );
         }
+        // In a Long Term Support world ("StackRoot/@ltsName/..."), CKli is frozen on the world's pinned version, the
+        // local tool that "dotnet ckli" runs: this command updates the global tool, which is not the one used there.
+        if( !context.CurrentStackPath.IsEmptyPath )
+        {
+            var stackRoot = context.CurrentStackPath.RemoveLastPart();
+            var current = context.CurrentDirectory;
+            if( current.Parts.Count > stackRoot.Parts.Count
+                && current.StartsWith( stackRoot )
+                && WorldName.IsValidLTSName( current.Parts[stackRoot.Parts.Count] ) )
+            {
+                monitor.Error( $"""
+                    The Long Term Support world '{current.Parts[stackRoot.Parts.Count]}' is frozen on its pinned CKli version:
+                    it is the local tool that '{LocalCKliTool.LocalCommand}' runs in '{stackRoot.AppendPart( current.Parts[stackRoot.Parts.Count] )}'.
+                    To update the global 'ckli' tool, run this command out of this folder.
+                    """ );
+                return ValueTask.FromResult( false );
+            }
+        }
         var info = InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() );
         if( !info.IsValidSyntax )
         {
@@ -67,7 +85,7 @@ sealed class CKliUpdate : Command
             prerelease = info.Version.IsPrerelease;
         }
         var updateCmd = prerelease
-                ? "dotnet tool update CKli -g --prerelease --add-source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json"
+                ? $"dotnet tool update CKli -g --prerelease --add-source {LocalCKliTool.FeedUrl}"
                 : "dotnet tool update CKli -g";
         if( allowDowngrade ) updateCmd += " --allow-downgrade";
         updateCmd += " --no-http-cache";
