@@ -29,6 +29,11 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     internal LocalStringCache? _shaTestRunCache;
 
     /// <summary>
+    /// The name of the <see cref="LocalStringCache"/> of the commit contents whose tests have successfully run.
+    /// </summary>
+    internal const string ShaTestRunCacheName = "TestRun.Sha";
+
+    /// <summary>
     /// Initializes a new builder plugin.
     /// </summary>
     /// <param name="primaryContext">The CKli context.</param>
@@ -39,10 +44,23 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
         _artifactHandler = artifactHandler;
         _onCoreBuild = new PerfectEventSender<CoreBuildEventArgs>();
         World.Events.PluginInfo += PluginInfoRequested;
+        World.Events.CreateLTS.Sync += LTSCreated;
         // <Build DeleteBeforeBuild="$StObjGen;*.g.cs" />: entries that a previous build produced and that
         // this one must produce again instead of reusing. CKli knows nothing about a World's code
         // generators, so this is empty by default.
         _deleteBeforeBuild = SplitDeleteBeforeBuild( (string?)primaryContext.Configuration.XElement.Attribute( XNames.DeleteBeforeBuild ) );
+    }
+
+    // The "TestRun.Sha" cache records the commit contents whose tests have successfully run: it moves to the new
+    // Long Term Support world, the one that keeps the code it has been computed on.
+    void LTSCreated( IActivityMonitor monitor, CreateLTSEventArgs e )
+    {
+        var current = LocalStringCache.GetFilePath( World.Name, ShaTestRunCacheName );
+        if( File.Exists( current ) )
+        {
+            var target = LocalStringCache.GetFilePath( e.LTSWorldName, ShaTestRunCacheName );
+            e.AddCreationStep( m => FileHelper.MoveFile( m, current, target ) );
+        }
     }
 
     void PluginInfoRequested( PluginInfoEventArgs e )
@@ -195,7 +213,7 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     /// <inheritdoc />
     protected override RepoBuilder Create( IActivityMonitor monitor, Repo repo )
     {
-        _shaTestRunCache ??= new LocalStringCache( repo.World.Name, "TestRun.Sha" );
+        _shaTestRunCache ??= new LocalStringCache( repo.World.Name, ShaTestRunCacheName );
         return new RepoBuilder( repo, this, _artifactHandler, _artifactHandler.Get( monitor, repo ) );
     }
 

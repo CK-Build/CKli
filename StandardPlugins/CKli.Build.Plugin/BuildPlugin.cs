@@ -133,8 +133,11 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// The name of the World lock that every publishing command takes: this is the very lock that
     /// <c>ckli world lock publish</c> acquires, so a developer can reserve the publication before starting
     /// and <c>ckli world unlock publish</c> is what frees one that a crash left behind.
+    /// <para>
+    /// This is <see cref="World.PublishLockName"/>: "ckli world lts create" takes it too.
+    /// </para>
     /// </summary>
-    public const string PublishLockName = "publish";
+    public const string PublishLockName = World.PublishLockName;
 
     /// <summary>
     /// The lease duration of <see cref="PublishLockName"/>.

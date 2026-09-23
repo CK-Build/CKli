@@ -233,10 +233,23 @@ the same projection `MigrationPlugin.InitializeInfVersionFromMaster` applies.
 - a repository has a **pending `local/`/`building/` release** (`VersionTagInfo.GetLocalReleases`), even though the
   version it offers is published;
 - any repository's `dev/` root branch is ahead of its root branch. Code sitting there has no version, so it would
-  be inherited by the LTS World and have to be re-produced above the cut by the default World.
+  be inherited by the LTS World and have to be re-produced above the cut by the default World;
+- any repository's root branch differs from its remote one, once fetched. Everything above is decided on the local
+  repositories: a root branch behind its remote misses another developer's publication, which would end up below
+  the cut and on no LTS branch. This runs under the `publish` lock that the command holds.
 
 Every offending repository is listed, not just the first, and nothing is written on refusal — `ComputeRepoLTSVersions`
 decides, `LTSCreated` only applies.
+
+`LTSCreated` also registers a creation step (`CreateLTSEventArgs.AddCreationStep`, run once every handler has
+accepted) that creates the **LTS root branch** (`@ltsName/stable`) of every repository on
+`RepoLTSVersion.LTSRootCommit` — the commit of `HotZone.LastStable`, the last published version — and pushes it.
+The LTS starts with its last published version, and what may follow it on the root branch stays in the default
+World. The branch is created in the default World's repositories (they share their remotes with the LTS World's
+ones) and deleted once pushed: the LTS World's clones obtain it from the remote. It has to be on the remotes
+before the command ends, otherwise a `ckli world lts clone` run later would fix the missing root branch from what
+the default root has become since. A remote branch already on the right commit is accepted (a previous attempt
+pushed it), one elsewhere is an error.
 
 The checks are independent, so several can hold at once. Each one details the repositories it concerns and
 contributes a short reason; the last error then **names the actual cause(s)** —

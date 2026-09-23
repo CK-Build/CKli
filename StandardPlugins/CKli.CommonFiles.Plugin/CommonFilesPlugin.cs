@@ -29,6 +29,23 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
     {
         _branchModel = branchModel;
         _branchModel.ContentIssue += ContentIssueRequested;
+        World.Events.CreateLTS.Sync += LTSCreated;
+    }
+
+    // A Long Term Support world starts with the common files of the world it is created from: its "Common/"
+    // folder is a snapshot of this one, and then both evolve independently.
+    void LTSCreated( IActivityMonitor monitor, CreateLTSEventArgs e )
+    {
+        var source = CommonFolder;
+        if( Directory.Exists( source ) )
+        {
+            var target = e.LTSWorldName.SharedDataFolder.AppendPart( "Common" );
+            e.AddCreationStep( m =>
+            {
+                m.Info( $"Copying '{source}' to '{target}'." );
+                return FileHelper.CopyFolder( m, source, target );
+            } );
+        }
     }
 
     /// <summary>

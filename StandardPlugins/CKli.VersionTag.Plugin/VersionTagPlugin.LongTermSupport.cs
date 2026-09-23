@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
+using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -19,7 +20,11 @@ public sealed partial class VersionTagPlugin
     /// <param name="Repo">The Repo.</param>
     /// <param name="LTSInfVersion">The InfVersion for this Repo in the LTS world.</param>
     /// <param name="LTSSupVersion">The SupVersion for this Repo in the LTS world.</param>
-    public sealed record RepoLTSVersion( Repo Repo, SVersion? LTSInfVersion, SVersion LTSSupVersion )
+    /// <param name="LTSRootCommit">
+    /// The commit where the LTS world starts: the one that carries the last published version. The root branch
+    /// of the LTS world is created on it. What comes after it (if anything) stays in the default World.
+    /// </param>
+    public sealed record RepoLTSVersion( Repo Repo, SVersion? LTSInfVersion, SVersion LTSSupVersion, Commit LTSRootCommit )
     {
         /// <summary>
         /// Gets the future <see cref="VersionTagInfo.InfVersion"/> for this Repo in the default World.
@@ -55,6 +60,11 @@ public sealed partial class VersionTagPlugin
         // Clearing LTS world branch model (keeping only the root branch).
         // This is centralized here (instead of being handled by the BranchModelPlugin).
         var ns = _branchModel.BranchNamespace.CreateForLTS( e.LTSName );
+        // The LTS world's root branch of every repository is created on the commit of its last published version
+        // and pushed: it must exist on the remotes before the command ends, otherwise a "ckli world lts clone"
+        // run later would fix the missing root branch from what the default World's root has become since.
+        var ltsRootName = ns.Root.Name;
+        e.AddCreationStep( m => CreateLTSRootBranches( m, ltsRepos, ltsRootName ) );
         var branchModelConfig = e.LTSDefinition.Ensure( Core.XNames.Plugins )
                                                .Ensure( _branchModel.PluginInfo.GetXName() );
         // WriteConfiguration replaces the <Prerelease> AND <Explo> elements: the cloned ones name branches
@@ -130,7 +140,7 @@ public sealed partial class VersionTagPlugin
                 else
                 {
                     var cut = SVersion.Create( lastStable.Major + 1, 0, 0, "0" );
-                    result[v.Repo.Index] = new RepoLTSVersion( v.Repo, v.InfVersion, cut );
+                    result[v.Repo.Index] = new RepoLTSVersion( v.Repo, v.InfVersion, cut, v.HotZone.LastStable.Commit );
                 }
             }
         }
@@ -208,6 +218,37 @@ public sealed partial class VersionTagPlugin
                 (causes ??= new List<string>()).Add( $"non published code in a '{devName}' branch" );
             }
         }
+        // Finally, all this has been checked on the local repositories: their root branch must be the remote one.
+        // A root branch behind its remote misses a publication of another developer (the LTS would be cut below
+        // it), a root branch ahead of it holds commits that nobody else has.
+        if( causes == null )
+        {
+            var rootName = _branchModel.BranchNamespace.Root.Name;
+            var desync = new List<string>();
+            foreach( var b in allBranches )
+            {
+                var git = b.Repo.GitRepository;
+                if( !git.FetchRemoteBranches( monitor, withTags: false, branchSpec: rootName ) )
+                {
+                    return null;
+                }
+                var local = b.Root.GitBranch;
+                Throw.DebugAssert( "Used TryGetAllWithoutIssue above.", local != null );
+                var remote = git.Repository.Branches[$"origin/{rootName}"];
+                if( remote == null || remote.Tip.Sha != local.Tip.Sha )
+                {
+                    desync.Add( b.Repo.DisplayPath );
+                }
+            }
+            if( desync.Count > 0 )
+            {
+                monitor.Error( $"""
+                    The '{rootName}' branch differs from 'origin/{rootName}' in {(desync.Count > 1 ? $"{desync.Count} repositories" : "repository")} {desync.Concatenate()}.
+                    Use 'ckli pull' (and 'ckli push') first.
+                    """ );
+                (causes ??= new List<string>()).Add( $"'{rootName}' branches not synchronized with their remote" );
+            }
+        }
         if( causes != null )
         {
             monitor.Error( $"""
@@ -219,4 +260,51 @@ public sealed partial class VersionTagPlugin
         return result;
     }
 
+    // Creates and pushes the LTS root branch of every repository on its LTSRootCommit. The branch is created in the
+    // repositories of the default World (they share their remote with the ones of the LTS World) and deleted once
+    // pushed: it belongs to the LTS World, whose clones obtain it from the remote.
+    // This is idempotent: a remote branch that is already on the commit is fine (a previous attempt pushed it and
+    // then failed), one that is elsewhere is an error.
+    static bool CreateLTSRootBranches( IActivityMonitor monitor, RepoLTSVersion[] ltsRepos, string ltsRootName )
+    {
+        using var _ = monitor.OpenInfo( $"Creating '{ltsRootName}' branch in {ltsRepos.Length} repositories." );
+        foreach( var r in ltsRepos )
+        {
+            var git = r.Repo.GitRepository;
+            if( !git.FetchRemoteBranches( monitor, withTags: false, branchSpec: ltsRootName ) )
+            {
+                return false;
+            }
+            var existing = git.Repository.Branches[$"origin/{ltsRootName}"];
+            if( existing != null )
+            {
+                if( existing.Tip.Sha == r.LTSRootCommit.Sha )
+                {
+                    monitor.Info( $"Branch '{ltsRootName}' already exists on the remote of '{r.Repo.DisplayPath}'." );
+                    continue;
+                }
+                monitor.Error( $"Branch '{ltsRootName}' already exists on the remote of '{r.Repo.DisplayPath}' on commit '{existing.Tip.Sha}' instead of '{r.LTSRootCommit.Sha}'." );
+                return false;
+            }
+            if( git.Repository.Branches[ltsRootName] != null )
+            {
+                monitor.Error( $"A local branch '{ltsRootName}' already exists in '{r.Repo.DisplayPath}'." );
+                return false;
+            }
+            var branch = git.Repository.CreateBranch( ltsRootName, r.LTSRootCommit );
+            try
+            {
+                if( !git.GetRemote( monitor, "origin", forWrite: true, out var remote, out var creds )
+                    || !git.Push( monitor, remote, creds, [$"{branch.CanonicalName}:{branch.CanonicalName}"] ) )
+                {
+                    return false;
+                }
+            }
+            finally
+            {
+                git.Repository.Branches.Remove( branch );
+            }
+        }
+        return true;
+    }
 }

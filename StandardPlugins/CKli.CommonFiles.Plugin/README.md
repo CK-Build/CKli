@@ -78,3 +78,10 @@ year and repository name) and must set `Handled = true`; if no subscriber handle
 Because everything is reported through the shared `Collector`/monitor of the content-issue pass, any `Error` or `Fatal` log
 (including the "no handler for template" case) makes `ckli issue` report a failure for the repository, and `ckli issue --fix` will
 apply the queued `CreateFile`/`UpdateFile` actions to actually write the files.
+
+### Long Term Support worlds
+
+`ckli world lts create` starts the new LTS World with a **copy** of the `Common/` folder of the World it is created
+from: the plugin handles `WorldEvents.CreateLTS` with a creation step that copies `Common/` to `@ltsName/Common/`, the
+new World's own `SharedDataFolder`. The two folders then evolve independently: a common file changed in the default
+World does not reach the LTS World.

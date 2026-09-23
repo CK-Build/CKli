@@ -55,7 +55,15 @@ public sealed class LocalStringCache
         }
     }
 
-    string GetFilePath() => _filePath ??= _world.LocalDataFolder.AppendPart( $"{_name}.txt" );
+    string GetFilePath() => _filePath ??= GetFilePath( _world, _name );
+
+    /// <summary>
+    /// Gets the file path of a cache: "<see cref="LocalWorldName.LocalDataFolder"/>/<paramref name="name"/>.txt".
+    /// </summary>
+    /// <param name="world">The world name.</param>
+    /// <param name="name">The name of the cache.</param>
+    /// <returns>The cache file path.</returns>
+    public static NormalizedPath GetFilePath( LocalWorldName world, string name ) => world.LocalDataFolder.AppendPart( $"{name}.txt" );
 
     HashSet<string> GetCache( IActivityMonitor monitor )
     {

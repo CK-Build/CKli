@@ -144,7 +144,8 @@ asked for by name. `--release` and `--ci.0` are mutually exclusive and refused t
 — `BuildPlugin.UnderPublishLockAsync`, `{World}-publish` on the Stack remote. `build` and `*build` take nothing:
 they produce `local/` versions and push nothing, so there is nothing to serialize.
 
-**It is the same reference that `ckli world lock publish` takes**, which is what makes the two commands compose: a
+**It is the same reference that `ckli world lock publish` takes** (its name is `World.PublishLockName`, and
+`ckli world lts create` takes it too), which is what makes the two commands compose: a
 developer can reserve the publication before starting, and `ckli world unlock publish` is what frees one that a
 crash left behind. The lease is taken with `AcquireOrRenew`, so such a reservation — or a lease left by this
 clone's own previous run — is renewed instead of being reported as held, and the lock is released when the command
@@ -545,7 +546,9 @@ a hook inside `RepoBuilder` would never run under the fake harness (nor under a 
 `RepoBuilder.HasTestRun`/the successful-test cache is backed by `LocalStringCache` (`RepoBuilder/LocalStringCache.cs`): a
 trivial newline-delimited set of keys persisted under the World's `$Local` folder (`TestRun.Sha.txt`), shared by every
 Repo of the World, with no eviction/housekeeping - it exists purely to let `skipTests`-by-default behavior survive
-across CKli invocations on the same machine.
+across CKli invocations on the same machine. `ckli world lts create` **moves** it to the new LTS World's
+`$Local/@ltsName/` folder (a creation step of `RepositoryBuilderPlugin`'s `CreateLTS` handler): the LTS World is the
+one that keeps the code those tests ran on.
 
 ### `fix build` / `fix publish`: the Fix Workflow
 
