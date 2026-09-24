@@ -14,7 +14,7 @@ and helped is in [`CKli.Core`'s README](../README.md#commands).
 ## Core commands
 These commands are implemented by `CKli.Core`. They apply to any Git repositories.
 
-### `update --stable --prerelease --allow-downgrade --dry-run`
+### `update --version <version> --stable --prerelease --allow-downgrade`
 
 Auto updates CKli with a newer available version if it exists. Use `ckli --version` to display the
 currently installed version.
@@ -28,10 +28,23 @@ With `--prerelease`, prerelease versions will be considered (including CI builds
 The `--allow-downgrade` flags allows package downgrade. This is useful to come back to the last stable version when
 the current version is a pre release.
 
-`--dry-run` (or `-d`) only displays the `dotnet tool update` command line that would be run.
+`--version <version>` installs that exact version instead of the latest one. The tool comes from the
+`Signature-OpenSource` feed, which carries every CKli version (prereleases and CI builds included).
 
-This command is refused in a Long Term Support World (`StackRoot/@ltsName/` or below): CKli is frozen there on the
-World's pinned version, the local tool that `dotnet ckli` runs, and this command updates the global tool.
+**In a Long Term Support World** (`StackRoot/@ltsName/` or below), CKli is frozen on the World's pinned version,
+the local tool that `dotnet ckli` runs: there, `--version` is required and the command moves the World to that
+CKli, in-process and in 3 ordered steps:
+
+1. the World's local tool (this checks that the version exists, and refuses a downgrade without
+   `--allow-downgrade`: then nothing is changed);
+2. the `CKliVersion` attribute of `@ltsName/{StackName}@ltsName.xml`, committed and **pushed** in the Stack
+   repository: the other developers get the new pin with their next pull, and its mismatch installs it as their
+   local tool;
+3. the `CKli.Version.props` of the World's plugin solution, deleted: its regeneration by the next command is what
+   recompiles the plugins against the new CKli.
+
+These steps cannot be atomic: on error, fix the cause and run the command again. If it is not run again, the next
+command in the World finds a local tool that is not the pinned one and moves it back to the pin.
 
 This command transparently updates the CKli version used by the `CKli.Plugins` solution. If a `Tests/Plugins.Tests`
 project exists in the `{WorldName}-Plugins` solution, the version of the `CKli.Testing` package reference is also updated.
@@ -327,8 +340,8 @@ least 3 characters starting with `@`, then only ASCII lowercase letters, digits,
 > `dotnet tool update CKli --version <pin> --source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json`
 > (the feed that carries every CKli version, prereleases included). `dotnet ckli`, run in that folder or below,
 > launches it. When the global `ckli` is used there anyway, it refuses to open the World: it installs the local
-> tool then (if it wasn't) and tells you to retry with `dotnet ckli`. `update` is refused in a LTS World: it
-> updates the global tool, not the pinned one.
+> tool then (if it wasn't) and tells you to retry with `dotnet ckli`. In a LTS World, `update --version <version>`
+> moves the World to another CKli (see [`update`](#update---version-version---stable---prerelease---allow-downgrade)).
 
 ### `world lts create <@ltsName>`
 Creates a new LTS World from the current default World. Must be run from the default World. The CKli Stack

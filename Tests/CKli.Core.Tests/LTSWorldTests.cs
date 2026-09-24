@@ -191,16 +191,17 @@ public class LTSWorldTests
             (await CKliCommands.ExecAsync( TestHelper.Monitor, target, "clone", one.StackUri, "--lts-name", "@net8" ))
                 .ShouldBeTrue();
             logs.ShouldContain( l => l.Contains( "Test run: skipping 'dotnet new tool-manifest' and " )
-                                     && l.Contains( $"'dotnet tool update CKli --version {pin} --source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json'" )
+                                     && l.Contains( $"'dotnet tool update CKli --version {pin} --allow-downgrade --source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json'" )
                                      && l.Contains( target.CurrentDirectory.Combine( "One/@net8" ) ) );
         }
     }
 
     /// <summary>
-    /// "ckli update" updates the global tool: in a LTS world, CKli is the pinned local tool that "dotnet ckli" runs.
+    /// "ckli update" updates the global tool. In a LTS world, CKli is the pinned local tool that "dotnet ckli" runs:
+    /// the version to move to must be explicit.
     /// </summary>
     [Test]
-    public async Task update_is_refused_in_a_LTS_world_Async()
+    public async Task update_in_a_LTS_world_requires_a_version_Async()
     {
         var context = TestEnv.EnsureCleanFolder();
         var one = TestEnv.OpenRemotes( "One" );
@@ -211,14 +212,57 @@ public class LTSWorldTests
         (await CKliCommands.ExecAsync( TestHelper.Monitor, target, "clone", one.StackUri, "--lts-name", "@net8" ))
             .ShouldBeTrue();
         var inLTS = target.ChangeDirectory( target.CurrentDirectory.Combine( "One/@net8/OneRepo" ) );
+        inLTS.LTSName.ShouldBe( "@net8" );
+        target.ChangeDirectory( "One" ).LTSName.ShouldBeNull();
+        target.ChangeDirectory( target.CurrentDirectory.Combine( "One/.PublicStack/@net8" ) ).LTSName
+              .ShouldBeNull( "The '@net8/' folder of the Stack repository is not the LTS world's folder." );
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
-            (await CKliCommands.ExecAsync( TestHelper.Monitor, inLTS, "update", "--dry-run" )).ShouldBeFalse();
-            logs.ShouldContain( l => l.Contains( "The Long Term Support world '@net8' is frozen on its pinned CKli version" )
-                                     && l.Contains( "'dotnet ckli'" ) );
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, inLTS, "update" )).ShouldBeFalse();
+            logs.ShouldContain( l => l.Contains( "The --version option is required to update the CKli version in the Long Term Support world '@net8'." ) );
         }
-        (await CKliCommands.ExecAsync( TestHelper.Monitor, target.ChangeDirectory( "One" ), "update", "--dry-run" ))
-            .ShouldBeTrue( "The default world is not concerned." );
+    }
+
+    /// <summary>
+    /// "ckli update --version" in a LTS world moves it to another CKli: its local tool, its CKliVersion pin
+    /// (committed and pushed) and the CKli.Version.props of its plugin solution (deleted: its regeneration recompiles the
+    /// plugins). Under a test harness, the tool commands are only logged.
+    /// </summary>
+    [Test]
+    public async Task update_in_a_LTS_world_updates_its_pinned_CKli_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var one = TestEnv.OpenRemotes( "One" );
+        var pin = World.CKliVersion.Version == SVersion.ZeroVersion ? "1.2.3" : World.CKliVersion.Version.ToString();
+        ArrangeLTSWorld( context, one.StackUri, "One", "@net8", pin );
+
+        StackRepository.ClearRegistry( TestHelper.Monitor ).ShouldBeTrue();
+        var target = context.ChangeDirectory( "Target" );
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, target, "clone", one.StackUri, "--lts-name", "@net8" ))
+            .ShouldBeTrue();
+        var stackFolder = target.CurrentDirectory.Combine( "One/.PublicStack" );
+        var props = stackFolder.Combine( $"@net8/One-Plugins@net8/{PluginMachinery.CKliVersionPropsFileName}" );
+        Directory.CreateDirectory( props.RemoveLastPart() );
+        File.WriteAllText( props, "<Project />" );
+
+        var inLTS = target.ChangeDirectory( target.CurrentDirectory.Combine( "One/@net8/OneRepo" ) );
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, inLTS, "update", "--version", "0.99.0", "--allow-downgrade" )).ShouldBeTrue();
+            logs.ShouldContain( l => l.Contains( $"Updating the CKli version of the Long Term Support world 'One@net8' from '{pin}' to '0.99.0'" )
+                                     && l.Contains( "on error, fix the cause and run this command again" ) );
+            logs.ShouldContain( l => l.Contains( "'dotnet tool update CKli --version 0.99.0 --allow-downgrade --source https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json'" )
+                                     && l.Contains( target.CurrentDirectory.Combine( "One/@net8" ) ) );
+        }
+        System.Xml.Linq.XDocument.Load( stackFolder.Combine( "@net8/One@net8.xml" ) ).Root.ShouldNotBeNull()
+              .Attribute( XNames.CKliVersion ).ShouldNotBeNull().Value.ShouldBe( "0.99.0" );
+        File.Exists( props ).ShouldBeFalse( "Its regeneration recompiles the plugins against the new CKli." );
+        using( var git = new LibGit2Sharp.Repository( stackFolder ) )
+        {
+            git.Head.Tip.MessageShort.ShouldBe( "Updated CKli version of 'One@net8' to '0.99.0'." );
+            git.RetrieveStatus( new LibGit2Sharp.StatusOptions() ).IsDirty.ShouldBeFalse();
+            git.Head.TrackedBranch.ShouldNotBeNull().Tip.ShouldBe( git.Head.Tip, "The new pin has been pushed." );
+        }
     }
 
     /// <summary>

@@ -27,7 +27,8 @@ static class LocalCKliTool
 
     /// <summary>
     /// Ensures that CKli <paramref name="version"/> is the local tool of <paramref name="folder"/>: creates the tool
-    /// manifest if needed, then installs (or moves back) the "CKli" tool to the version. This is idempotent.
+    /// manifest if needed, then installs (or moves back) the "CKli" tool to the version, downgrading it if needed:
+    /// the pin is the truth. This is idempotent.
     /// <para>
     /// Nothing is installed under a test harness (<see cref="CKliRootEnv.IsTestRun"/>): this would download the
     /// tool from the feed.
@@ -39,11 +40,29 @@ static class LocalCKliTool
     /// <returns>True when installed, false otherwise (a warning has been logged).</returns>
     internal static bool Ensure( IActivityMonitor monitor, NormalizedPath folder, SVersion version )
     {
-        var install = $"tool update CKli --version {version} --source {FeedUrl}";
+        return Install( monitor, folder, version, allowDowngrade: true ) && !CKliRootEnv.IsTestRun;
+    }
+
+    /// <summary>
+    /// Installs or updates the "CKli" local tool of <paramref name="folder"/> to <paramref name="version"/>,
+    /// creating the tool manifest if needed. The commands run in <paramref name="folder"/>: a manifest of a
+    /// sub folder (a repository may have its own) must not receive CKli.
+    /// <para>
+    /// Under a test harness (<see cref="CKliRootEnv.IsTestRun"/>), the commands are only logged and this succeeds.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="folder">The root folder of the Long Term Support world.</param>
+    /// <param name="version">The version to install.</param>
+    /// <param name="allowDowngrade">Whether the tool can be moved to a lower version.</param>
+    /// <returns>True on success, false otherwise (a warning has been logged).</returns>
+    internal static bool Install( IActivityMonitor monitor, NormalizedPath folder, SVersion version, bool allowDowngrade )
+    {
+        var install = $"tool update CKli --version {version}{(allowDowngrade ? " --allow-downgrade" : "")} --source {FeedUrl}";
         if( CKliRootEnv.IsTestRun )
         {
             monitor.Info( $"Test run: skipping 'dotnet new tool-manifest' and 'dotnet {install}' in '{folder}'." );
-            return false;
+            return true;
         }
         using( monitor.OpenInfo( $"Installing CKli '{version}' as a local tool in '{folder}'." ) )
         {
@@ -59,7 +78,8 @@ static class LocalCKliTool
                     monitor.Warn( $"Command 'dotnet new tool-manifest' failed in '{folder}'." );
                     return false;
                 }
-                // "update" installs the tool when it is missing, and moves it back to the version otherwise.
+                // "update" installs the tool when it is missing, and moves it to the version otherwise (it fails
+                // for a version that doesn't exist, and for a lower one without "--allow-downgrade").
                 if( ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", install, folder, null ) != 0 )
                 {
                     monitor.Warn( $"Command 'dotnet {install}' failed in '{folder}'." );

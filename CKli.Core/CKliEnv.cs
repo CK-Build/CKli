@@ -21,6 +21,8 @@ public sealed class CKliEnv
     readonly ISecretsStore _secretsStore;
     readonly NormalizedPath _currentDirectory;
     readonly NormalizedPath _currentStackPath;
+    string? _ltsName;
+    bool _ltsNameComputed;
     DateTimeOffset _startCommandHandlingLocalTime;
     Signature? _committer;
 
@@ -79,6 +81,35 @@ public sealed class CKliEnv
     /// or the <see cref="NormalizedPath.IsEmptyPath"/>.
     /// </summary>
     public NormalizedPath CurrentStackPath => _currentStackPath;
+
+    /// <summary>
+    /// Gets the <see cref="WorldName.LTSName"/> if the <see cref="CurrentDirectory"/> is in a LTS folder
+    /// ("StackRoot/@ltsName/..."). Null otherwise.
+    /// </summary>
+    public string? LTSName
+    {
+        get
+        {
+            if( !_ltsNameComputed )
+            {
+                _ltsNameComputed = true;
+                // The CurrentStackPath is the "StackRoot/.PublicStack" (or ".PrivateStack") folder: the LTS folder
+                // is the part that follows the StackRoot.
+                Throw.DebugAssert( "The CurrentStackPath is found from the CurrentDirectory (StackRepository.FindGitStackPath).",
+                                   _currentStackPath.IsEmptyPath || _currentDirectory.StartsWith( _currentStackPath.RemoveLastPart(), strict: false ) );
+                int idx = _currentStackPath.Parts.Count - 1;
+                if( idx > 0 && _currentDirectory.Parts.Count > idx )
+                {
+                    var candidate = _currentDirectory.Parts[idx];
+                    if( WorldName.IsValidLTSName( candidate ) )
+                    {
+                        _ltsName = candidate;
+                    }
+                }
+            }
+            return _ltsName;
+        }
+    }
 
     /// <summary>
     /// Gets the secrets store to use.

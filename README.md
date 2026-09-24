@@ -196,7 +196,7 @@ plugin adds its own, and its commands appear in `ckli --help` the same way.
 | **`repo`**<br/>`add` `create` `remove` | Adds, creates and removes the Repositories of the current World. | [intrinsic](CKli.Core/CKliCommands/README.md#repo-add-url---allow-lts) |
 | **`status`** | Lists the World's Repos, or every Stack that exists locally when outside a Stack. | [intrinsic](CKli.Core/CKliCommands/README.md#status---by-branch---all---skip-pull-stack) |
 | **`tag`**<br/>`delete` `fetch` `list` `pull` `push` | Git tag operations on the current Repo or on all the Repos of the World. | [intrinsic](CKli.Core/CKliCommands/README.md#tag-commands-list-fetch-pull-push-delete) |
-| **`update`** | Auto update CKli (must not be in interactive mode). | [intrinsic](CKli.Core/CKliCommands/README.md#update---stable---prerelease---allow-downgrade---dry-run) |
+| **`update`** | Auto update CKli (must not be in interactive mode). | [intrinsic](CKli.Core/CKliCommands/README.md#update---version-version---stable---prerelease---allow-downgrade) |
 | **`version`**<br/>`bump` `deprecate` | The CSemVer version tags of a repository: bumping and deprecating. | [`VersionTag`](StandardPlugins/CKli.VersionTag.Plugin/README.md#commands) |
 | **`world`**<br/>`lock` `lts` `reference` `unlock` | The definition of the current World and the locks its Stack shares. | intrinsic: [references](CKli.Core/CKliCommands/README.md#world-commands-reference-list-set-remove), [LTS Worlds](CKli.Core/CKliCommands/README.md#world-lts-commands-create-clone) and [locks](CKli.Core/CKliCommands/README.md#world-lock-commands-lock-unlock) |
 
