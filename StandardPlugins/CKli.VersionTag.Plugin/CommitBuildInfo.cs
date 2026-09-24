@@ -62,11 +62,22 @@ public sealed class CommitBuildInfo
     public string FileVersion => CK.Core.InformationalVersion.ZeroFileVersion;
 
     /// <summary>
-    /// Gets whether the build must use "Release" configuration: the version to build is a
-    /// <see cref="CSVersionKind.Stable"/>, conformant prerelease from <see cref="CSVersionKind.Romeo"/>
-    /// to <see cref="CSVersionKind.Zulu"/> or a <see cref="CSVersionKind.Exploratory"/>.
+    /// Gets whether the build must use "Release" configuration (see <see cref="IsReleaseConfiguration(SVersion)"/>).
     /// </summary>
-    public bool ReleaseConfiguration => _version.VersionKind is CSVersionKind.Exploratory or >= CSVersionKind.Romeo;
+    public bool ReleaseConfiguration => IsReleaseConfiguration( _version );
+
+    /// <summary>
+    /// Gets whether a version must be built in "Release" configuration: it is not a CI version
+    /// (<see cref="SVersion.IsCI"/> versions are always built in "Debug") and it is a <see cref="CSVersionKind.Stable"/>,
+    /// a conformant prerelease from <see cref="CSVersionKind.Romeo"/> to <see cref="CSVersionKind.Zulu"/>
+    /// or a <see cref="CSVersionKind.Exploratory"/>.
+    /// </summary>
+    /// <param name="version">The version to build.</param>
+    /// <returns>True for "Release", false for "Debug".</returns>
+    public static bool IsReleaseConfiguration( SVersion version )
+    {
+        return !version.IsCI && version.VersionKind is CSVersionKind.Exploratory or >= CSVersionKind.Romeo;
+    }
 
     /// <summary>
     /// Sets this <see cref="Version"/> as a tag on <see cref="BuildCommit"/>.
