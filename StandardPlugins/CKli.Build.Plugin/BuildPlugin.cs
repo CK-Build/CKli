@@ -44,7 +44,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
 {
     const string _dBranch = "Specify the branch to consider. By default, the current head is considered when in a Repo.";
     const string _oBranch = "--branch,-b";
-    const string _dMaxDoP = "Maximal Degree of Parallelism. Defaults to 4.";
+    const string _dMaxDoP = "Maximal Degree of Parallelism of the builds and of the publications. Defaults to 4.";
     const string _dRelease = "Build regular exploratory, prerelease or stable versions instead of CI versions.";
     const string _oRelease = "--release";
     const string _dCIForce = "Build a ci.0 version when a released version is already available on the commit.";
@@ -446,7 +446,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             return Task.FromResult( false );
         }
         return dryRun
-                ? RaiseRoadmapBuildEvent( monitor, context, roadmap )
+                ? RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaxDoP )
                 : DoRunAsync( monitor, context, vMaxDoP, runTest, roadmap );
     }
 
@@ -471,7 +471,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             return Task.FromResult( false );
         }
         return dryRun
-                ? RaiseRoadmapBuildEvent( monitor, context, roadmap )
+                ? RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaDxDop )
                 : DoRunAsync( monitor, context, vMaDxDop, runTest: forceTests ? true : null, roadmap );
     }
 
@@ -482,10 +482,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return false;
         }
-        return await RaiseRoadmapBuildEvent( monitor, context, roadmap ).ConfigureAwait( false );
+        return await RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaxDoP ).ConfigureAwait( false );
     }
 
-    async Task<bool> RaiseRoadmapBuildEvent( IActivityMonitor monitor, CKliEnv context, Roadmap roadmap )
+    async Task<bool> RaiseRoadmapBuildEvent( IActivityMonitor monitor, CKliEnv context, Roadmap roadmap, int maxDop )
     {
         // Here, results.Length can be 0: everything was already built, we blindly raise the event,
         // it's up to the listeners to handle this (roadmap.SolutionBuildCount can be 0).
@@ -493,7 +493,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             using( monitor.OpenTrace( $"Raising RoadmapBuild event." ) )
             {
-                var e = new RoadmapBuildEventArgs( monitor, context, World, roadmap );
+                var e = new RoadmapBuildEventArgs( monitor, context, World, roadmap, maxDop );
                 if( !await _onRoadmapBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) || !e.Success )
                 {
                     return false;

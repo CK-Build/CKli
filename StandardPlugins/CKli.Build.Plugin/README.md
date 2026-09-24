@@ -107,7 +107,7 @@ All build-family commands share a common set of options (declared once as `const
 | Option | Meaning |
 |---|---|
 | `--branch,-b <name>` | Branch to consider. Defaults to the current HEAD (a `dev/` prefix is stripped); if multiple pivot Repos are selected and their checked-out branches differ, it must be specified explicitly. |
-| `--max-dop <n>` (positional `maxDop`) | Maximal degree of parallelism for the build. Defaults to 4. |
+| `--max-dop <n>` (positional `maxDop`) | Maximal degree of parallelism for the build and, for `publish`/`*publish`, for the publication (see [the parallel publication](../CKli.Publish.Plugin/README.md#the-parallel-publication-step-3)). Defaults to 4. |
 | `--release` | Build regular exploratory/prerelease/stable versions instead of CI (`dev/` branch) versions. **The build commands are in CI by default**: this flag is what asks for the integrating, releasing mode. |
 | `--ci.0` | Forces a CI version even when a *published* regular version is already available on the commit. It is not needed to switch a pending `local/` release to CI - a plain CI build rolls that one (see `RollingLocal` below). Exclusive with `--release`, which asks for the opposite. |
 | `skipTests` | Don't run tests even if they never ran locally on the commit (ignored - with a warning - for `--release` builds). |

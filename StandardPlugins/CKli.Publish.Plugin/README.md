@@ -92,8 +92,9 @@ the World's `publish` lock before computing anything (see
 and renewed it while the builds ran; here, one `Lease.KeepAlive` decides whether it is still held. A
 lost lock fails the command **before the first artifact is pushed** — that is the only place a hard
 stop is justified, because everything before it is local and everything after it cannot be undone.
-Past that point `PublishRoadmap.PublishAsync` keeps renewing at each release and only *warns* if it
-loses the lock: the releases that follow must still reach their feeds.
+Past that point `PublishRoadmap.PublishAsync` keeps renewing (at each required release, then while the
+direct publications run) and only *warns* if it loses the lock: the releases that follow must still reach
+their feeds.
 
 #### `OnFixBuildAsync` — `fix build` / `fix publish`
 
@@ -210,11 +211,37 @@ when the fix workflow starts writing updated profiles, a deprecated one is not a
 2. Every `Gate.RequiredPublications` release is published by the `IndirectPublisher`, producers
    first.
 3. Every solution whose `PublishableStatus` is `Build` or `PublishRequired` is published by the
-   `RoadmapPublisher`, in `OrderedSolutions` order.
+   `RoadmapPublisher`, **concurrently**, bounded by the command's `--max-dop` (`RoadmapBuildEventArgs.MaxDop`).
 
-Steps 2 and 3 are also the checkpoints of the publication lease: each release starts with a
-`Lease.KeepAlive` (a no-op until the lease is half over). Losing the lock there only warns — by then
-the publication is under way and cannot be undone.
+Each release of step 2 starts with a `Lease.KeepAlive` (a no-op until the lease is half over), and step 3
+runs under `Lease.KeepAliveWhileAsync`, exactly like the builds: the publications work in the Repos and never
+touch the Stack repository. Losing the lock there only warns — by then the publication is under way and cannot
+be undone.
+
+#### The parallel publication (step 3)
+
+A publication is atomic **per repository** only: its packages are pushed first (they are never compensated),
+then its tag, branch and release, and every failure of that atomic phase is compensated by the publisher (see
+[The publishers](#the-publishers--the-actual-publish-loop)). Across repositories there is no compensation, only
+an order: a repository is published once its upstreams have been, and nothing new starts after a failure. The
+parallel publication keeps exactly that:
+
+- **Each repository waits for the publications of its `BuildInfo.DirectRequirements`.** A requirement that is not
+  published by this roadmap waits for its own requirements, so the wait is transitive. Repositories that don't
+  depend on each other run concurrently, at most `--max-dop` at once (an `ActivityMonitorAsyncPool`).
+- **A failure closes the start gate; it never cancels.** Nothing starts after it and the failed repository's
+  consumers are skipped (*"Publication of 'X' skipped: one of its upstream publications failed."*), but the
+  publications already running complete normally. Canceling them would be a regression: an
+  `OperationCanceledException` in the atomic phase bypasses the compensation and leaves a pushed tag without
+  release. So the published set still always contains every upstream of every published repository — it may only
+  contain more of the failed repository's siblings than a sequential publication would have.
+- **The screen sees what it saw before.** Each publication runs on its own pooled monitor, which is bound to no
+  screen: what the publisher would have displayed (warnings, errors, `ScreenType.CKliScreenTag` infos) is
+  collected and relayed to the command's monitor when the publication ends, followed by
+  *"Unable to publish 'X'."* on failure.
+
+`ParallelPublishTests` covers a diamond at `--max-dop` 1 and 4, and a failure (a non fast-forward branch push)
+that is compensated, skips its consumer and leaves its upstream published.
 
 ### `PublishedProfileBuilder` — the publication gate
 
@@ -454,7 +481,7 @@ The three concrete publishers differ only in which Git branch they push, and how
 
 | Publisher | Branch | Branch handling |
 |---|---|---|
-| `RoadmapPublisher` | Resolved from the version through the World's `BranchNamespace` (`dev/` for a CI build, the regular one otherwise). | Non-CI: pushes the regular branch and deletes the remote `dev/` branch that was just integrated. CI: ensures the regular branch is tracked if the repository is brand new. Also pushes the `+fake` base tag when the version is a prerelease or CI one. |
+| `RoadmapPublisher` | Resolved from the version through the World's `BranchNamespace`: the regular branch for a non-CI version; for a CI one, the `dev/` branch when it exists (locally or on the remote), the regular one otherwise — the build reads `dev/` or its regular branch the same way, and a `dev/` branch created on the regular tip to build a `--ci.0` is deleted as useless by the next command. | Non-CI: pushes the regular branch and deletes the remote `dev/` branch that was just integrated. CI from `dev/`: ensures the regular branch is tracked if the repository is brand new. Also pushes the `+fake` base tag when the version is a prerelease or CI one. |
 | `FixPublisher` | The explicit `fix/vMajor.Minor` branch of the Fix Workflow, which is not resolvable from the version. | None: no `dev/` cleanup, no defensive push, no extra tag. |
 | `IndirectPublisher` | Resolved from the version like `RoadmapPublisher`. | None, deliberately: these releases belong to a branch the current operation is not working on, so touching its branches would be a side effect nobody asked for. |
 

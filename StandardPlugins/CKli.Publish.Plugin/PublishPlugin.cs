@@ -374,6 +374,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                                                          roadmapPublisher,
                                                          indirectPublisher,
                                                          lease,
+                                                         e.MaxDop,
                                                          cancellation ).ConfigureAwait( false ) )
                         {
                             e.SetFailed();
