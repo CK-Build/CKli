@@ -66,7 +66,8 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
 ### The branch namespace: `BranchName` / `BranchNamespace`
 
 A **`BranchName`** is an immutable node in a tree: it has a `Name`, a `DevName` ("`dev/`" +
-`Name`), a `ConfigurationName`, an `Index` (used to align with per-repo arrays), a `Parent` (null
+`Name` in the default World, "`@lts/dev/`" + the rest of the name in a Long Term Support one, so that every git
+branch of a LTS World is under its "`@lts/`" prefix), a `ConfigurationName`, an `Index` (used to align with per-repo arrays), a `Parent` (null
 only for the root), a `LinkType` describing how it is kept in sync with its parent, and a
 `VersionKind` (`CSVersionKind`, from CSemVer — `Stable`, `Alpha`..`Zulu`, or `Exploratory`).
 
@@ -267,9 +268,11 @@ the actual Git/file work, and only runs when the user asks `ckli issue` to fix i
 - `BranchModelPlugin.Create` special-cases `ckli issue` itself (`PrimaryPluginContext.Command is
   CKliIssue`): auto-fixing useless `dev/` branches is disabled while *detecting* issues, so the
   `issue` command reports what it would fix without silently fixing it first.
-- A `"dev/"`-prefixed branch name passed to `branch switch`/`branch sync` is recognized
-  (`GetReposAndBranch`) and stripped before namespace lookup, but still causes the command to
-  target/ensure the `dev/` branch specifically.
+- A name designating a `dev/` branch passed to `branch switch`/`branch sync` is recognized
+  (`GetReposAndBranch`) and normalized before namespace lookup, but still causes the command to
+  target/ensure the `dev/` branch specifically. `BranchNamespace.RemoveDevPrefix` accepts every spelling:
+  the command form `dev/X` (and `dev/@lts/X` in a LTS World) as well as the actual git name, `dev/X` or
+  `@lts/dev/X`. The Build plugin uses it too, to resolve the branch to build from the checked out ones.
 - `BranchLink.CreateAheadBranch` prefers reusing an existing `origin/dev/xxx` remote branch over
   creating a fresh local one, and can add an empty "Initializing '...'" commit when there is no
   remote to base the new `dev/` branch on (needed because a `dev/` branch identical to its base is

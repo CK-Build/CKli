@@ -263,7 +263,8 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
                             [NotNullWhen( true )] out BranchName? branch,
                             out bool isDevName )
     {
-        isDevName = branchName.StartsWith( "dev/" );
+        // "dev/X", "dev/@lts/X" and the git name "@lts/dev/X" of a "dev/" branch are normalized.
+        branchName = _namespace.RemoveDevPrefix( branchName, out isDevName );
         repos = all
                 ? World.GetAllDefinedRepo( monitor )
                 : World.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
@@ -272,7 +273,6 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
             branch = null;
             return false;
         }
-        if( isDevName ) branchName = branchName.Substring( 4 );
         branch = _namespace.FindRequired( monitor, branchName );
         return branch != null;
     }

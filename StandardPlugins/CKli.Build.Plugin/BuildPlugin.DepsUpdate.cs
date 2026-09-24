@@ -490,12 +490,11 @@ public sealed partial class BuildPlugin
     {
         if( branch == null )
         {
-            branch = pivots[0].GitStatus.CurrentBranchName;
-            if( branch.StartsWith( "dev/", StringComparison.OrdinalIgnoreCase ) ) branch = branch.Substring( 4 );
+            var ns = _branchModel.BranchNamespace;
+            branch = ns.RemoveDevPrefix( pivots[0].GitStatus.CurrentBranchName, out _ );
             for( int i = 1; i < pivots.Count; ++i )
             {
-                var other = pivots[i].GitStatus.CurrentBranchName;
-                if( other.StartsWith( "dev/", StringComparison.OrdinalIgnoreCase ) ) other = other.Substring( 4 );
+                var other = ns.RemoveDevPrefix( pivots[i].GitStatus.CurrentBranchName, out _ );
                 if( other != branch )
                 {
                     monitor.Error( $"""

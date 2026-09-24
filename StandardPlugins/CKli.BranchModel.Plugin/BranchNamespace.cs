@@ -346,6 +346,33 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
     public BranchName? Find( string name ) => _byName.GetValueOrDefault( WorldName.EnsureLTSPrefix( _ltsName, name ) );
 
     /// <summary>
+    /// Normalizes a name that may designate the "dev/" branch of a branch "X": the command form "dev/X" (in a Long
+    /// Term Support world, "dev/@lts/X" as well) and the actual git name of that branch - "dev/X" in the default
+    /// world, "@lts/dev/X" in a LTS one (see <see cref="BranchName.DevName"/>) - all return "X" (or "@lts/X") with
+    /// <paramref name="isDevName"/> set to true. Any other name is returned as-is.
+    /// </summary>
+    /// <param name="name">The branch name (as typed by the user or as git names it).</param>
+    /// <param name="isDevName">Whether the name designates a "dev/" branch.</param>
+    /// <returns>The name of the branch.</returns>
+    public string RemoveDevPrefix( string name, out bool isDevName )
+    {
+        if( name.StartsWith( "dev/", StringComparison.OrdinalIgnoreCase ) )
+        {
+            isDevName = true;
+            return name.Substring( 4 );
+        }
+        if( _ltsName != null
+            && name.StartsWith( _ltsName, StringComparison.Ordinal )
+            && name.AsSpan( _ltsName.Length ).StartsWith( "/dev/", StringComparison.OrdinalIgnoreCase ) )
+        {
+            isDevName = true;
+            return string.Concat( _ltsName, name.AsSpan( _ltsName.Length + 4 ) );
+        }
+        isDevName = false;
+        return name;
+    }
+
+    /// <summary>
     /// Finds the <paramref name="branchName"/> in this <see cref="BranchNamespace"/> or emits an error
     /// if this is not an existing branch name.
     /// <para>

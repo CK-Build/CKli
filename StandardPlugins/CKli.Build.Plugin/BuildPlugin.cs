@@ -570,15 +570,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         }
         return roadmap;
 
-        static string GetBranchName( IActivityMonitor monitor, Repo r )
-        {
-            string branch = r.GitStatus.CurrentBranchName;
-            if( branch.StartsWith( "dev/", StringComparison.OrdinalIgnoreCase ) )
-            {
-                branch = branch.Substring( 4 );
-            }
-            return branch;
-        }
+        // The git name of a "dev/" branch is "@lts/dev/X" in a Long Term Support world: RemoveDevPrefix handles it.
+        string GetBranchName( IActivityMonitor monitor, Repo r ) => _branchModel.BranchNamespace.RemoveDevPrefix( r.GitStatus.CurrentBranchName, out _ );
     }
 
     static bool HandleForceSkipTests( IActivityMonitor monitor, bool skipTests, bool forceTests, out bool? runTest )
