@@ -544,7 +544,9 @@ public sealed partial class Roadmap
             var statusAndName = Repo.ToNameRenderable( head.Screen, willBeWritten: MustBuild );
             r = r.AddRight( statusAndName );
 
-            var currentVersion = _lastBuild.TagCommit.Version;
+            // The last build's Version, not its TagCommit's: in CI, this is the "--ci.0" when the TagCommit has one
+            // (a "+fake" with its "local/vX--ci.0" would otherwise display the "+fake").
+            var currentVersion = _lastBuild.Version;
             if( MustBuild )
             {
                 Throw.DebugAssert( BuildInfo.BuildReason != MustBuildReason.None );
