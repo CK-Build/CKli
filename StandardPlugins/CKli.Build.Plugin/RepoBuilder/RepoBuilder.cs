@@ -334,7 +334,14 @@ public class RepoBuilder : RepoInfo
     }
 
     /// <summary>
-    /// Helper that calls "dotnet test".
+    /// The "--blame-hang-timeout" of <see cref="DotNetTest"/>: a test that runs longer than this is considered hung.
+    /// The test host is then killed (after a hang dump is collected) and the tests fail, instead of blocking the
+    /// whole roadmap forever.
+    /// </summary>
+    public const string TestHangTimeout = "20m";
+
+    /// <summary>
+    /// Helper that calls "dotnet test" (with a <see cref="TestHangTimeout"/>).
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="release">Whether the build is in debug or in release.</param>
@@ -342,7 +349,7 @@ public class RepoBuilder : RepoInfo
     /// <returns>True on tests success, false otherwise.</returns>
     protected bool DotNetTest( IActivityMonitor monitor, bool release, CancellationToken cancellation )
     {
-        if( !Repo.RunDotnet( monitor, $"test -tl:off -c {(release ? "Release" : "Debug")} --nologo --no-build", cancellation: cancellation ) )
+        if( !Repo.RunDotnet( monitor, $"test -tl:off -c {(release ? "Release" : "Debug")} --nologo --no-build --blame-hang-timeout {TestHangTimeout}", cancellation: cancellation ) )
         {
             return false;
         }
