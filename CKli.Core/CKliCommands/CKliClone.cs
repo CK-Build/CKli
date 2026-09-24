@@ -139,6 +139,7 @@ sealed class CKliClone : Command
                                  maxDop,
                                  refMode,
                                  ltsName,
+                                 ltsFallback: false,
                                  existingStackRoot: default,
                                  state,
                                  scopeAlive )
@@ -159,12 +160,13 @@ sealed class CKliClone : Command
                                              int maxDop,
                                              ReferenceMode refMode,
                                              string? ltsName,
+                                             bool ltsFallback,
                                              NormalizedPath existingStackRoot,
                                              CloneState state,
                                              CancellationToken scopeAlive )
     {
-        List<(Uri Url, bool IsPublic, string? LTSName)>? references = null;
-        List<(Uri Url, NormalizedPath StackRoot, string? LTSName)>? extraWorlds = null;
+        List<(Uri Url, bool IsPublic, string? LTSName, bool LTSFallback)>? references = null;
+        List<(Uri Url, NormalizedPath StackRoot, string? LTSName, bool LTSFallback)>? extraWorlds = null;
         StackRepository? stack = null;
         try
         {
@@ -179,10 +181,16 @@ sealed class CKliClone : Command
                                                           StackRepository.BranchName,
                                                           maxDop,
                                                           ltsName,
-                                                          scopeAlive )
+                                                          scopeAlive,
+                                                          fallbackToDefaultWorld: ltsFallback )
                                              .ConfigureAwait( false );
                 if( stack == null ) return false;
                 state.ClonedStacks[url] = stack.StackRoot;
+                // On fallback, the default world of the Stack has been cloned.
+                if( ltsFallback && ltsName != null && !stack.WorldNames.Any( n => n.LTSName == ltsName ) )
+                {
+                    ltsName = null;
+                }
             }
             else
             {
@@ -191,8 +199,15 @@ sealed class CKliClone : Command
                 if( !StackRepository.OpenFromPath( monitor,
                                                    context.ChangeDirectory( existingStackRoot ),
                                                    out stack,
-                                                   skipPullStack: true )
-                    || !CKliLTSClone.AddWorld( monitor, command, stack, ltsName, scopeAlive ) )
+                                                   skipPullStack: true ) )
+                {
+                    return false;
+                }
+                if( ltsFallback )
+                {
+                    ltsName = stack.FindWorldNameOrDefault( monitor, ltsName ).LTSName;
+                }
+                if( !CKliLTSClone.AddWorld( monitor, command, stack, ltsName, scopeAlive ) )
                 {
                     return false;
                 }
@@ -211,7 +226,7 @@ sealed class CKliClone : Command
         }
         if( references != null )
         {
-            foreach( var (refUrl, refIsPublic, refLTSName) in references )
+            foreach( var (refUrl, refIsPublic, refLTSName, refLTSFallback) in references )
             {
                 if( scopeAlive.IsCancellationRequested ) return false;
                 using( monitor.OpenInfo( $"Cloning {WorldDisplay( refLTSName )} of the referenced {(refIsPublic ? "public" : "private")} Stack '{refUrl}'." ) )
@@ -220,7 +235,7 @@ sealed class CKliClone : Command
                     // reaching this means that the stack is not cloned anywhere.
                     if( !await CloneAsync( monitor, context, command, refUrl, refIsPublic,
                                            allowDuplicate: false, ignoreParentStack, maxDop, refMode,
-                                           refLTSName, existingStackRoot: default, state, scopeAlive )
+                                           refLTSName, refLTSFallback, existingStackRoot: default, state, scopeAlive )
                                 .ConfigureAwait( false ) )
                     {
                         return false;
@@ -230,14 +245,14 @@ sealed class CKliClone : Command
         }
         if( extraWorlds != null )
         {
-            foreach( var (refUrl, refRoot, refLTSName) in extraWorlds )
+            foreach( var (refUrl, refRoot, refLTSName, refLTSFallback) in extraWorlds )
             {
                 if( scopeAlive.IsCancellationRequested ) return false;
                 using( monitor.OpenInfo( $"Adding {WorldDisplay( refLTSName )} to the referenced Stack '{refUrl}' already cloned in '{refRoot}'." ) )
                 {
                     if( !await CloneAsync( monitor, context, command, refUrl, isPublic,
                                            allowDuplicate: false, ignoreParentStack, maxDop, refMode,
-                                           refLTSName, refRoot, state, scopeAlive )
+                                           refLTSName, refLTSFallback, refRoot, state, scopeAlive )
                                 .ConfigureAwait( false ) )
                     {
                         return false;
@@ -260,8 +275,8 @@ sealed class CKliClone : Command
                                 string? ltsName,
                                 ReferenceMode refMode,
                                 CloneState state,
-                                out List<(Uri Url, bool IsPublic, string? LTSName)>? references,
-                                out List<(Uri Url, NormalizedPath StackRoot, string? LTSName)>? extraWorlds )
+                                out List<(Uri Url, bool IsPublic, string? LTSName, bool LTSFallback)>? references,
+                                out List<(Uri Url, NormalizedPath StackRoot, string? LTSName, bool LTSFallback)>? extraWorlds )
     {
         references = null;
         extraWorlds = null;
@@ -294,8 +309,11 @@ sealed class CKliClone : Command
                         """ );
                 continue;
             }
-            // LTSName selects the world of the referenced Stack to clone: absent means its default world.
-            var refLTSName = r.LTSName;
+            // LTSName selects the world of the referenced Stack to clone. When absent, a default world uses the
+            // default world of the referenced Stack, and a LTS world uses its world with the same LTS name if it
+            // exists, its default world otherwise.
+            var refLTSName = r.LTSName ?? ltsName;
+            bool refLTSFallback = r.LTSName == null && ltsName != null;
             if( !state.HandledWorlds.Add( (url, refLTSName) ) )
             {
                 monitor.Trace( $"Reference to {WorldDisplay( refLTSName )} of '{url}' has already been handled." );
@@ -305,8 +323,8 @@ sealed class CKliClone : Command
             {
                 // This command has cloned this Stack for another of its worlds. A Stack is cloned once,
                 // so the referenced world is added to that clone instead.
-                extraWorlds ??= new List<(Uri, NormalizedPath, string?)>();
-                extraWorlds.Add( (url, clonedRoot, refLTSName) );
+                extraWorlds ??= new List<(Uri, NormalizedPath, string?, bool)>();
+                extraWorlds.Add( (url, clonedRoot, refLTSName, refLTSFallback) );
                 continue;
             }
             var already = StackRepository.FindExistingStacks( monitor, url );
@@ -318,13 +336,13 @@ sealed class CKliClone : Command
                         Referenced Stack '{url}' is already cloned here:
                         {already.Select( p => p.Path ).Concatenate( Environment.NewLine )}
                         {(refLTSName != null
-                            ? $"""To obtain {WorldDisplay( refLTSName )} there: ckli --path "{already[0].RemoveLastPart()}" lts clone {refLTSName}"""
+                            ? $"""To obtain {WorldDisplay( refLTSName )} there{(refLTSFallback ? " (if it exists)" : "")}: ckli --path "{already[0].RemoveLastPart()}" lts clone {refLTSName}"""
                             : "")}
                         """ );
                 continue;
             }
-            references ??= new List<(Uri, bool, string?)>();
-            references.Add( (url, !r.IsPrivate, refLTSName) );
+            references ??= new List<(Uri, bool, string?, bool)>();
+            references.Add( (url, !r.IsPrivate, refLTSName, refLTSFallback) );
         }
         return success;
     }

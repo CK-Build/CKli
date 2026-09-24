@@ -20,6 +20,7 @@ public sealed class CreateLTSEventArgs : WorldEventArgs
     readonly LocalWorldName _ltsWorldName;
     readonly XElement _ltsDefinition;
     List<Func<IActivityMonitor, bool>>? _creationSteps;
+    List<Func<IActivityMonitor, bool>>? _finalSteps;
     bool _success;
 
     internal CreateLTSEventArgs( IActivityMonitor monitor,
@@ -53,8 +54,9 @@ public sealed class CreateLTSEventArgs : WorldEventArgs
     /// Registers a step that runs once every handler of this event has accepted the creation (none of them
     /// has called <see cref="SetFailed()"/>). A step returns false (and logs the error) to fail the creation.
     /// <para>
-    /// The steps should only write in the <see cref="LTSWorldName"/>'s folders: they are deleted when the
-    /// creation fails, which undoes what the steps did there. Anything a step changes elsewhere is not undone.
+    /// When the creation fails, the <see cref="LTSWorldName"/>'s folders are deleted and the tracked files of the
+    /// Stack repository are restored (the Stack is committed before): this undoes what the steps did
+    /// locally. What a step pushes to a remote is not undone: such a step must be idempotent (a retry runs it again).
     /// </para>
     /// </summary>
     /// <param name="step">The step to run.</param>
@@ -65,6 +67,24 @@ public sealed class CreateLTSEventArgs : WorldEventArgs
     }
 
     internal IReadOnlyList<Func<IActivityMonitor, bool>> CreationSteps => (IReadOnlyList<Func<IActivityMonitor, bool>>?)_creationSteps ?? [];
+
+    /// <summary>
+    /// Registers a step that runs once the new world has been committed and pushed, while the command still holds
+    /// its locks. This is for what cannot be undone and must not happen if the creation fails (a retry must find
+    /// the default World as it was): typically what moves the default World itself on its remotes.
+    /// <para>
+    /// A failure here doesn't undo the creation (the Long Term Support world exists): the step must log how to
+    /// finish its job.
+    /// </para>
+    /// </summary>
+    /// <param name="step">The step to run.</param>
+    public void AddFinalStep( Func<IActivityMonitor, bool> step )
+    {
+        Throw.CheckNotNullArgument( step );
+        (_finalSteps ??= new List<Func<IActivityMonitor, bool>>()).Add( step );
+    }
+
+    internal IReadOnlyList<Func<IActivityMonitor, bool>> FinalSteps => (IReadOnlyList<Func<IActivityMonitor, bool>>?)_finalSteps ?? [];
 
     /// <summary>
     /// Gets the mutable definition of the new LTS.

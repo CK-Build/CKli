@@ -258,6 +258,57 @@ public class StackReferenceTests
                  .ShouldBeFalse( "The default world's repositories are not the ones that are used." );
     }
 
+    /// <summary>
+    /// A reference without LTSName of a LTS world uses the referenced Stack's world with the same LTS name when
+    /// it exists, its default world otherwise.
+    /// </summary>
+    [TestCase( true )]
+    [TestCase( false )]
+    public async Task a_reference_without_LTSName_of_a_LTS_world_uses_the_same_LTS_world_if_it_exists_Async( bool referencedHasLTS )
+    {
+        var context = TestEnv.EnsureCleanFolder( $"{nameof( a_reference_without_LTSName_of_a_LTS_world_uses_the_same_LTS_world_if_it_exists_Async )}-{referencedHasLTS}" );
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+
+        if( referencedHasLTS )
+        {
+            ArrangeStack( context, one.StackUri, "One", git =>
+            {
+                Directory.CreateDirectory( git.WorkingFolder.AppendPart( "@net8" ) );
+                File.WriteAllText( git.WorkingFolder.Combine( "@net8/One@net8.xml" ),
+                                   """
+                                   <One LTSName="@net8">
+                                     <Repository Url="OneRepo" />
+                                   </One>
+                                   """ );
+            } );
+        }
+        // The CKt-Stack's "@net8" world references the One-Stack without LTSName.
+        ArrangeStack( context, ckt.StackUri, "CKt", git =>
+        {
+            Directory.CreateDirectory( git.WorkingFolder.AppendPart( "@net8" ) );
+            File.WriteAllText( git.WorkingFolder.Combine( "@net8/CKt@net8.xml" ),
+                               $"""
+                               <CKt LTSName="@net8">
+                                 <Reference Url="{one.StackUri}" />
+                               </CKt>
+                               """ );
+        } );
+
+        StackRepository.ClearRegistry( TestHelper.Monitor ).ShouldBeTrue();
+        var target = context.ChangeDirectory( "Target" );
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, target, "clone", ckt.StackUri, "--lts-name", "@net8" )).ShouldBeTrue();
+            if( !referencedHasLTS )
+            {
+                logs.ShouldContain( l => l.Contains( "Stack 'One' has no '@net8' Long Term Support world: using its default world." ) );
+            }
+        }
+        Directory.Exists( target.CurrentDirectory.Combine( "One/@net8/OneRepo" ) ).ShouldBe( referencedHasLTS );
+        Directory.Exists( target.CurrentDirectory.Combine( "One/OneRepo" ) ).ShouldBe( !referencedHasLTS );
+    }
+
     [Test]
     public async Task clone_fails_when_the_referenced_Stack_has_no_such_LTS_world_Async()
     {

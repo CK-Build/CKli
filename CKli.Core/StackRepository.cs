@@ -492,6 +492,25 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
+    /// Same as <see cref="FindWorldName(IActivityMonitor, string?)"/> but returns the <see cref="DefaultWorldName"/>
+    /// (and logs an info) when this stack has no <paramref name="ltsName"/> world.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="ltsName">The Long Term Support name (with its leading '@') or null for the default world.</param>
+    /// <returns>The world name.</returns>
+    public LocalWorldName FindWorldNameOrDefault( IActivityMonitor monitor, string? ltsName )
+    {
+        if( ltsName == null ) return DefaultWorldName;
+        var world = WorldNames.FirstOrDefault( n => n.LTSName == ltsName );
+        if( world == null )
+        {
+            monitor.Info( $"Stack '{StackName}' has no '{ltsName}' Long Term Support world: using its default world." );
+            return DefaultWorldName;
+        }
+        return world;
+    }
+
+    /// <summary>
     /// Gets the world of this stack from an optional LTS name: the <see cref="DefaultWorldName"/> when
     /// <paramref name="ltsName"/> is null, the matching <see cref="WorldNames"/> otherwise.
     /// <para>
@@ -993,9 +1012,15 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="ltsName">
     /// The Long Term Support name (with its leading '@') of the world whose repositories must be cloned.
     /// When null, the repositories of the <see cref="DefaultWorldName"/> are cloned. When the Stack has no such
-    /// world, this is an error (see <see cref="FindWorldName(IActivityMonitor, string?)"/>).
+    /// world, this is an error (see <see cref="FindWorldName(IActivityMonitor, string?)"/>) unless
+    /// <paramref name="fallbackToDefaultWorld"/> is true.
     /// </param>
     /// <param name="cancellation">Cancellation token.</param>
+    /// <param name="fallbackToDefaultWorld">
+    /// True to clone the <see cref="DefaultWorldName"/> when the Stack has no <paramref name="ltsName"/> world.
+    /// This is used for a &lt;Reference /&gt; without LTSName of a LTS world: the referenced Stack's world with
+    /// the same LTS name is used if it exists.
+    /// </param>
     /// <returns>The repository or null on error.</returns>
     public static async Task<StackRepository?> CloneAsync( IActivityMonitor monitor,
                                                            CKliEnv context,
@@ -1006,7 +1031,8 @@ public sealed partial class StackRepository : IDisposable
                                                            string stackBranchName = BranchName,
                                                            int maxDop = 0,
                                                            string? ltsName = null,
-                                                           CancellationToken cancellation = default )
+                                                           CancellationToken cancellation = default,
+                                                           bool fallbackToDefaultWorld = false )
     {
         bool isTestRun = CKliRootEnv.IsTestRun;
         Throw.CheckArgument( ltsName == null || WorldName.IsValidLTSName( ltsName ) );
@@ -1151,7 +1177,7 @@ public sealed partial class StackRepository : IDisposable
                 var result = new StackRepository( git, stackRoot, context, stackNameFromUrl );
                 // Now we can clone the world's repositories: ltsName selects the world of this Stack
                 // to clone instead of the default one (it comes from a <Reference LTSName="..." />).
-                var world = result.FindWorldName( monitor, ltsName );
+                var world = fallbackToDefaultWorld ? result.FindWorldNameOrDefault( monitor, ltsName ) : result.FindWorldName( monitor, ltsName );
                 if( world != null
                     && await CloneWorldAsync( monitor, result, world, maxDop, cancellation ) )
                 {

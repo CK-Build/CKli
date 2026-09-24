@@ -73,6 +73,13 @@ sealed class CKliLTSCreate : Command
                 monitor.Error( "The CKli Stack cannot have a Long-Term-Support world." );
                 return false;
             }
+            // Everything the creation writes in the Stack repository is committed at once, and a failed creation
+            // restores its tracked files: the Stack is committed first (opening the World may have created its
+            // plugin solution), so that nothing unrelated is swept into that commit, nor lost by the restore.
+            if( !stack.Commit( monitor, $"Before creating Long Term Support world '{world.Name.StackName}{ltsName}'." ) )
+            {
+                return false;
+            }
             // The "publish" lock: nobody publishes while the version ranges are cut (a publication in the middle
             // would produce a version that is on neither side of the cut, or on the wrong one).
             // The "lts" lock: the Long Term Support worlds of a Stack are created one at a time.
@@ -81,7 +88,8 @@ sealed class CKliLTSCreate : Command
             {
                 return false;
             }
-            if( !await world.CreateLTSAsync( monitor, context, ltsName, CheckLocks ).ConfigureAwait( false ) )
+            var finalSteps = await world.CreateLTSAsync( monitor, context, ltsName, CheckLocks ).ConfigureAwait( false );
+            if( finalSteps == null )
             {
                 return false;
             }
@@ -91,13 +99,28 @@ sealed class CKliLTSCreate : Command
             // new InfVersion (and the new world's root branches must already be on the remotes, see the creation
             // steps of the VersionTag plugin).
             var fullName = $"{world.Name.StackName}{ltsName}";
-            bool success = world.DefinitionFile.SaveFile( monitor )
-                           && stack.Commit( monitor, $"Created Long Term Support world '{fullName}'." )
-                           && CheckLocks( monitor )
-                           && stack.PushChanges( monitor );
+            if( !world.DefinitionFile.SaveFile( monitor )
+                || !stack.Commit( monitor, $"Created Long Term Support world '{fullName}'." )
+                || !CheckLocks( monitor )
+                || !stack.PushChanges( monitor ) )
+            {
+                monitor.Error( $"""
+                    The Long Term Support world '{fullName}' has been created locally but it has not been pushed.
+                    Use "ckli push --stack-only" to push it, then "ckli issue --fix" and "ckli push" in the default world
+                    (its repositories need their initial version), then "ckli world lts clone {ltsName}".
+                    """ );
+                return false;
+            }
+            // The final steps move the default World itself (its initial versions): they run once the new world is
+            // pushed, still under the locks. A failure there doesn't undo the creation.
+            bool finalSuccess = true;
+            foreach( var step in finalSteps )
+            {
+                finalSuccess &= step( monitor );
+            }
             // The locks live in the Stack repository: they must be released before it is closed.
             ReleaseLeases( monitor );
-            if( !success || !stack.Close( monitor ) )
+            if( !stack.Close( monitor ) || !finalSuccess )
             {
                 return false;
             }

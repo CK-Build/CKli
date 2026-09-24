@@ -1,5 +1,7 @@
 using CK.Core;
+using LibGit2Sharp;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -32,8 +34,11 @@ public sealed partial class World
     /// Called once the creation has been accepted, before anything is written: returning false aborts it.
     /// This is where the command checks that it still holds its locks.
     /// </param>
-    /// <returns>True on success, false on error.</returns>
-    internal async Task<bool> CreateLTSAsync( IActivityMonitor monitor,
+    /// <returns>
+    /// The <see cref="CreateLTSEventArgs.AddFinalStep">final steps</see> to run once the new world is committed and
+    /// pushed on success, null on error.
+    /// </returns>
+    internal async Task<IReadOnlyList<Func<IActivityMonitor, bool>>?> CreateLTSAsync( IActivityMonitor monitor,
                                               CKliEnv context,
                                               string ltsName,
                                               Func<IActivityMonitor, bool> beforeWriting )
@@ -51,7 +56,7 @@ public sealed partial class World
             if( Path.Exists( p ) )
             {
                 monitor.Error( $"Unable to create '{ltsWorldName.FullName}' world: '{p}' already exists." );
-                return false;
+                return null;
             }
         }
 
@@ -87,7 +92,7 @@ public sealed partial class World
         {
             if( !await _events._createLTSEventSender.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) || !e.Success )
             {
-                return false;
+                return null;
             }
             // Silently skip any (stupid) change.
             newDefinition.Name = _definitionFile.XmlRoot.Name;
@@ -97,7 +102,7 @@ public sealed partial class World
         }
         if( !beforeWriting( monitor ) )
         {
-            return false;
+            return null;
         }
         bool success = false;
         try
@@ -129,13 +134,24 @@ public sealed partial class World
         }
         if( !success )
         {
-            using( monitor.OpenInfo( $"Deleting the folders of the '{ltsWorldName.FullName}' world." ) )
+            using( monitor.OpenInfo( $"Deleting the folders of the '{ltsWorldName.FullName}' world and restoring the Stack repository." ) )
             {
                 FileHelper.DeleteFolder( monitor, ltsWorldName.SharedDataFolder );
                 FileHelper.DeleteFolder( monitor, ltsWorldName.LocalDataFolder );
+                // The creation steps may have changed tracked files of the Stack repository (the default World's
+                // Published folder for instance): the Stack has been committed before, so this restores it.
+                try
+                {
+                    _stackRepository.GitRepository.Repository.CheckoutPaths( "HEAD", ["*"], new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force } );
+                }
+                catch( Exception ex )
+                {
+                    monitor.Error( $"While restoring '{_stackRepository.GitDisplayPath}'. It must be restored manually.", ex );
+                }
             }
+            return null;
         }
-        return success;
+        return e.FinalSteps;
     }
 
 }

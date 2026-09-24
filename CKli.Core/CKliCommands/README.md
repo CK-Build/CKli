@@ -84,6 +84,10 @@ used: the repositories of **that** World are the ones cloned (in the referenced 
 than at its root), and the recursion then follows that World's own references. A referenced Stack that has no
 such World is an error.
 
+A reference **without** `LTSName` of a Long Term Support World (`clone --lts-name @net8`) uses the referenced
+Stack's World with the same LTS name (`@net8`) when it has one, and its default World otherwise: a LTS World
+naturally depends on the LTS Worlds of its references.
+
 A Stack is cloned only once, so when two references name the same Stack with two different Worlds, the second
 World is **added** to the clone rather than cloned again — exactly what `world lts clone` does — and its own
 references are then followed too. When the Stack was instead found already cloned somewhere else on this
@@ -360,10 +364,11 @@ adjust it through the `WorldEvents.CreateLTS` event. The
 uses it to split the version range — the new World keeps the versions produced so far and the default World
 starts a new Major above them — and to reduce the new World's branch model to its root branch.
 
-The World must be **fully published** for this to be possible: no version or branch issue anywhere, every
-repository currently offering a published version (no `+fake`, no `+deprecated`), no pending `local/` or
-`building/` release left anywhere, every `dev/` root branch integrated, and every root branch equal to its
-remote one (the repositories are fetched: a teammate's publication since the last pull would otherwise be left
+The World must be **fully published** for this to be possible — publishing it first (`ckli publish --release`) is
+the user's job: no version or branch issue anywhere, every repository currently offering a published version (no
+`+fake`, no `+deprecated`), no pending `local/` or `building/` release left anywhere, **no `dev/` root branch at
+all** (neither local nor on the remote: a publication integrates and deletes it), and every root branch equal to
+its remote one (the repositories are fetched: a teammate's publication since the last pull would otherwise be left
 below the cut, in neither World). Otherwise the command fails,
 listing every repository that is in the way, and nothing is written — neither the new definition file nor the
 `InfVersion` the current World would have received.
@@ -400,13 +405,25 @@ repository and `@ltsName/` in its git ignored `$Local` folder. What the new Worl
   [CommonFiles plugin](../../StandardPlugins/CKli.CommonFiles.Plugin/README.md#long-term-support-worlds);
 - the `TestRun.Sha.txt` cache of the successful test runs, **moved** to `$Local/@ltsName/` by the
   [Build plugin](../../StandardPlugins/CKli.Build.Plugin/README.md): the LTS World is the one that keeps the code
-  those tests ran on.
+  those tests ran on;
+- the `Published/` folder, **moved** to `@ltsName/Published/` by the
+  [Publish plugin](../../StandardPlugins/CKli.Publish.Plugin/README.md#publishedfolder--where-the-profiles-live):
+  what the default World has published so far is below the cut. The default World is left with an empty folder
+  (and its empty `index.json`) until its first publication.
 
-Everything is committed in the Stack repository by a single `Created Long Term Support world '…'.` commit, which
-is **pushed while the locks are still held**: once they are released anybody can publish again, and the default
-World must already carry its new `InfVersion` by then. If anything fails before that, both new folders are deleted
-and nothing is left of the new World locally (a root branch already pushed stays on its remote: a new attempt
-accepts it when it is on the same commit).
+The Stack is committed first (`Before creating Long Term Support world '…'.`: opening the World may have created
+its plugin solution), then everything the creation writes is committed by a single `Created Long Term Support
+world '…'.` commit, which is **pushed while the locks are still held**: once they are released anybody can publish
+again, and the default World must already carry its new `InfVersion` by then. If anything fails before that, both
+new folders are deleted and the tracked files of the Stack are restored: nothing is left of the new World locally
+(a root branch already pushed stays on its remote: a new attempt accepts it when it is on the same commit).
+
+Then, still under the locks, the default World gets its **initial versions**: without a version in its range, all
+its repositories would have a "Missing initial version" issue. In every repository, an empty commit is added on
+the root branch (its tip carries the last published version, which a `+fake` must not share) and tagged
+`v{cut}+fake` (`v2.0.0+fake` for a cut at `2.0.0-0`); both are pushed. This runs last because a retry must find the
+default World as it was: if it fails, the LTS World exists and `ckli issue --fix` (which adds the same empty commit)
+then `ckli push` and `ckli tag push` finish the job.
 
 Finally, after the locks are released, the new World is cloned in the Stack's `@ltsName/` folder exactly as
 [`world lts clone`](#world-lts-clone-ltsname) does. A failure there doesn't undo anything: the LTS World exists and
