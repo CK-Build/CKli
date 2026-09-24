@@ -396,6 +396,11 @@ share neither a folder, nor an index, nor the next free `Version` Patch of the d
 CommonFiles folder (`{SharedDataFolder}/Common`) already follow — and a consumer reading a reference's
 published index therefore reads `{LTSName}/Published/index.json` for an LTS World.
 
+The folder is **bound to its World**: `ckli world lts create` moves the default World's `Published/` to the new
+LTS World's `{LTSName}/Published/` (a creation step of the `CreateLTS` handler): what has been published so far is
+below the cut, so it belongs to the LTS World. The default World is left with an empty folder and an empty
+`index.json` - so that a reader tells "nothing published yet" from "no such folder" - until its first publication.
+
 Because the folder lives inside the Stack repository's working folder, the
 `World.StackRepository.PushChanges` that follows a successful publication commits and pushes the new
 profile. `Tests/Plugins.Tests`' `PublishedFolderTests` covers the folder on its own and

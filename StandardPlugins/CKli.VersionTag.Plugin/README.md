@@ -232,8 +232,8 @@ the same projection `MigrationPlugin.InitializeInfVersionFromMaster` applies.
   published version to cut at;
 - a repository has a **pending `local/`/`building/` release** (`VersionTagInfo.GetLocalReleases`), even though the
   version it offers is published;
-- any repository's `dev/` root branch is ahead of its root branch. Code sitting there has no version, so it would
-  be inherited by the LTS World and have to be re-produced above the cut by the default World;
+- any repository has a `dev/` root branch, locally or on its remote (both fetched): a LTS starts "clean", from a
+  fully published World - a publication integrates and deletes that branch;
 - any repository's root branch differs from its remote one, once fetched. Everything above is decided on the local
   repositories: a root branch behind its remote misses another developer's publication, which would end up below
   the cut and on no LTS branch. This runs under the `publish` lock that the command holds.
@@ -250,6 +250,13 @@ ones) and deleted once pushed: the LTS World's clones obtain it from the remote.
 before the command ends, otherwise a `ckli world lts clone` run later would fix the missing root branch from what
 the default root has become since. A remote branch already on the right commit is accepted (a previous attempt
 pushed it), one elsewhere is an error.
+
+It also registers a **final step** (`CreateLTSEventArgs.AddFinalStep`, run once the new World is committed and
+pushed) that gives the default World its initial versions: `CreateInitialFakeVersion` tags `v{cut}+fake` on the
+root branch of every repository - after an empty commit, since the tip carries the last published version and a
+`+fake` must not share a commit with another version - and both are pushed. It runs last because a retry must find
+the default World unchanged; `CreateInitialFakeVersion` is also what the Build plugin's "Missing initial version"
+fix uses, so `ckli issue --fix` repairs a failed final step.
 
 The checks are independent, so several can hold at once. Each one details the repositories it concerns and
 contributes a short reason; the last error then **names the actual cause(s)** —
@@ -340,7 +347,7 @@ A version tag's `SVersion.ParsedPrefix` and build metadata drive how it's interp
 | `VersionTagInfo.HotZoneInfo` | The `LastStable`/`TopHot` pair plus a `TagCommitTree` builder/cache (`GetTagCommitTree`) that walks commit ancestry from any tip down to `LastStable`. |
 | `TagCommit : ITagCommit` | One valid version tag bound to its commit; exposes `IsFakeVersion`/`IsDeprecatedVersion`/`IsRegularVersion`/`IsBuildingOrLocal`, an optional paired `CI0Version`/`CI0VersionTag`, an optional paired `FakeVersion`, and `CanBearVersion` (guards against 2 incompatible versions on one commit). |
 | `TagCommitTree` | A breadth-first slice of commit history between a branch tip and `HotZoneInfo.LastStable`; computes `SVersionChange` (via prior tags + Conventional Commits parsing) and the actual next `SVersion` (`ComputeTargetVersion`). |
-| `CommitBuildInfo` | Result of a validated "can I build this (commit, version)" check; exposes `InformationalVersion`, `ReleaseConfiguration`, and `ApplyReleaseBuildTag` to actually write the tag. |
+| `CommitBuildInfo` | Result of a validated "can I build this (commit, version)" check; exposes `InformationalVersion`, `ReleaseConfiguration` (never for a CI version: CI builds are always in Debug, see the static `IsReleaseConfiguration`), and `ApplyReleaseBuildTag` to actually write the tag. |
 | `BuildContentInfo` *(from CKli.ArtifactHandler.Plugin)* | The parsed content of a version tag's annotation: `Consumed` (`PackageInstance` list) / `Produced` (package ids) / `AssetFileNames` / `Transitive` (NuGet's resolved transitive packages, absent from an annotation written before they were recorded — see `HasTransitive`). Backbone of the release graph. |
 | `DeprecatedTagInfo` | Parsed content of a `+deprecated` tag's annotation: `Reason`, `Expiration`, `DaysDelay`, `HasExpired`, plus the original `ContentInfo`. |
 | `VersionTagPlugin.ReleaseDatabase` | World-wide, lazily-built graph of `RepoReleaseInfo` nodes, indexed by produced `PackageInstance`; supports `GetDirectConsumers`/`GetAllConsumers` traversal used by `version deprecate`. |
@@ -380,6 +387,11 @@ requested/inferred `SVersionChange` (`GetVersionChange`, driven first by any int
 Conventional Commit headers / `BREAKING CHANGE` in the commit range up to the hot zone), applies the branch name as
 a prerelease suffix with an auto-incremented prerelease number, and finally sets the CI depth
 (`GitRepository.ComputeCommitDepth`) when a CI build is requested.
+
+**In a Long Term Support World (the only one with a `SupVersion`), a Major change is a Minor one**, whatever asked
+for it (a `!` conventional commit, a `BREAKING CHANGE`, an upstream): a LTS World never changes its Major, and since
+its cut is the next Major, this keeps every version below its `SupVersion`. The `vChange` is capped in place, so the
+roadmap's propagation to the downstream repositories sees the capped change too.
 
 `VersionTagInfo.TryGetCommitBuildInfo` is the gate a Build plugin calls before producing that version: it checks
 `InfVersion`/`SupVersion` bounds, that the target commit/version pair doesn't collide with an existing one (unless

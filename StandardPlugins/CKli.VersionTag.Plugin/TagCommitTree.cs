@@ -218,6 +218,13 @@ public sealed partial class TagCommitTree
                 var c = GetVersionChange();
                 if( c > vChange ) vChange = c;
             }
+            // A Long Term Support world (the only one with a SupVersion) never changes its Major: whatever
+            // requested it (a "!" conventional commit, a "BREAKING CHANGE", an upstream), a breaking change is a
+            // Minor one there. The cut being the next Major, this keeps the version below the SupVersion.
+            if( vChange == SVersionChange.Major && _hotZone.VersionTagInfo.SupVersion != null )
+            {
+                vChange = SVersionChange.Minor;
+            }
             v = v.SetNextVersionNumbers( vChange );
         }
         // The LastStable version may HasFakeMetadata but may also HasDeprecatedMetadata: we always 

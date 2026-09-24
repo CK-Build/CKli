@@ -9,6 +9,7 @@ using CKli.VersionTag.Plugin;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,6 +43,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
         : base( primaryContext )
     {
         World.Events.PluginInfo += PluginInfoRequested;
+        World.Events.CreateLTS.Sync += LTSCreated;
         _build = build;
         _artifactHandler = artifactHandler;
         _branchModel = branchModel;
@@ -55,6 +57,37 @@ public sealed class PublishPlugin : PrimaryPluginBase
         // Sync: this handler is file IO and git, there is nothing to await. The event is a PerfectEvent,
         // so this choice is ours alone - another listener can take the Async or ParallelAsync slot.
         _versionTag.VersionDeprecated.Sync += OnVersionDeprecated;
+    }
+
+    // The Published folder is bound to the World: what the default World has published so far now belongs to the new
+    // Long Term Support world (its versions are the ones below the cut). The default World starts with an empty
+    // folder - with its index, so that a reader tells "nothing published yet" from "no such folder" - waiting for
+    // its first publication.
+    void LTSCreated( IActivityMonitor monitor, CreateLTSEventArgs e )
+    {
+        var source = PublishedFolder.RootPath;
+        var target = e.LTSWorldName.SharedDataFolder.AppendPart( "Published" );
+        e.AddCreationStep( m =>
+        {
+            m.Info( $"Moving '{source}' to '{target}'." );
+            if( Directory.Exists( source )
+                && (!FileHelper.CopyFolder( m, source, target ) || !FileHelper.DeleteFolder( m, source )) )
+            {
+                return false;
+            }
+            try
+            {
+                var emptied = new PublishedFolder( source, createIfMissing: true );
+                File.WriteAllBytes( emptied.IndexFilePath, emptied.CreateIndexUtf8Bytes() );
+                _publishedFolder = null;
+                return true;
+            }
+            catch( Exception ex )
+            {
+                m.Error( $"While writing the empty '{PublishedFolder.IndexFileName}' of '{source}'.", ex );
+                return false;
+            }
+        } );
     }
 
     void PluginInfoRequested( PluginInfoEventArgs e )

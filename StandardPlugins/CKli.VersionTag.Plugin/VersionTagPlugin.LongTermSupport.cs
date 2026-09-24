@@ -65,6 +65,11 @@ public sealed partial class VersionTagPlugin
         // run later would fix the missing root branch from what the default World's root has become since.
         var ltsRootName = ns.Root.Name;
         e.AddCreationStep( m => CreateLTSRootBranches( m, ltsRepos, ltsRootName ) );
+        // The default World starts its new line at the cut: without a version in its range, all its repositories
+        // would have a "Missing initial version" issue. Their initial "+fake" versions are created and pushed once
+        // the new world is committed and pushed: before that, a retry must find the default World as it was.
+        var rootName = _branchModel.BranchNamespace.Root.Name;
+        e.AddFinalStep( m => CreateDefaultWorldInitialVersions( m, ltsRepos, rootName ) );
         var branchModelConfig = e.LTSDefinition.Ensure( Core.XNames.Plugins )
                                                .Ensure( _branchModel.PluginInfo.GetXName() );
         // WriteConfiguration replaces the <Prerelease> AND <Explo> elements: the cloned ones name branches
@@ -196,41 +201,32 @@ public sealed partial class VersionTagPlugin
             (causes ??= new List<string>()).Add( "pending local releases" );
         }
 
-        // If the versions are fine, all the dev/stable must be integrated or carry no new code.
-        if( causes == null )
-        {
-            var hasDev = allBranches.Where( b => b.Root.GitDevBranch != null && b.Root.GitDevBranch.Tip.Sha != b.Root.GitBranch!.Tip.Sha ).ToList();
-            if( hasDev.Count > 0 )
-            {
-                var devName = _branchModel.BranchNamespace.Root.DevName;
-                if( hasDev.Count == 1 )
-                {
-                    var b = hasDev[0];
-                    monitor.Error( $"Repository '{b.Repo.DisplayPath}' has a '{devName}' branch with non published code in it." );
-                }
-                else
-                {
-                    monitor.Error( $"""
-                        {hasDev.Count} repositories have '{devName}' branches with non published code:
-                        {hasDev.Select( b => b.Repo.DisplayPath.Path ).Concatenate()}.
-                        """ );
-                }
-                (causes ??= new List<string>()).Add( $"non published code in a '{devName}' branch" );
-            }
-        }
-        // Finally, all this has been checked on the local repositories: their root branch must be the remote one.
-        // A root branch behind its remote misses a publication of another developer (the LTS would be cut below
-        // it), a root branch ahead of it holds commits that nobody else has.
+        // Then the branches. Everything above has been decided on the local repositories: the root branches are
+        // fetched (with their "dev/" branch) under the "publish" lock that the command holds.
+        // - There must be no "dev/" root branch at all, neither local nor on the remote: a LTS starts "clean", its
+        //   last published version is on its root branch and nothing else can be in flight. A publication
+        //   integrates and deletes it.
+        // - The root branch must be the remote one: behind, it misses another developer's publication (the LTS
+        //   would be cut below it), ahead, it holds commits that nobody else has.
         if( causes == null )
         {
             var rootName = _branchModel.BranchNamespace.Root.Name;
+            var devName = _branchModel.BranchNamespace.Root.DevName;
+            var withDev = new List<string>();
             var desync = new List<string>();
             foreach( var b in allBranches )
             {
                 var git = b.Repo.GitRepository;
-                if( !git.FetchRemoteBranches( monitor, withTags: false, branchSpec: rootName ) )
+                if( !git.FetchRemoteBranches( monitor, withTags: false, branchSpec: rootName )
+                    || !git.FetchRemoteBranches( monitor, withTags: false, branchSpec: devName ) )
                 {
                     return null;
+                }
+                if( b.Root.GitDevBranch != null
+                    || git.Repository.Branches[devName] != null
+                    || git.Repository.Branches[$"origin/{devName}"] != null )
+                {
+                    withDev.Add( b.Repo.DisplayPath );
                 }
                 var local = b.Root.GitBranch;
                 Throw.DebugAssert( "Used TryGetAllWithoutIssue above.", local != null );
@@ -239,6 +235,14 @@ public sealed partial class VersionTagPlugin
                 {
                     desync.Add( b.Repo.DisplayPath );
                 }
+            }
+            if( withDev.Count > 0 )
+            {
+                monitor.Error( $"""
+                    {(withDev.Count > 1 ? $"{withDev.Count} repositories have" : "Repository has")} a '{devName}' branch (locally or on the remote): {withDev.Concatenate()}.
+                    A Long Term Support world starts from a fully published World: publish it first ("ckli publish --release").
+                    """ );
+                (causes ??= new List<string>()).Add( $"a '{devName}' branch" );
             }
             if( desync.Count > 0 )
             {
@@ -258,6 +262,39 @@ public sealed partial class VersionTagPlugin
             return null;
         }
         return result;
+    }
+
+    // Creates and pushes the "+fake" initial version of every repository of the default World on its root branch
+    // (see CreateInitialFakeVersion: the root tip bears the last version of the LTS, so an empty commit is added).
+    bool CreateDefaultWorldInitialVersions( IActivityMonitor monitor, RepoLTSVersion[] ltsRepos, string rootName )
+    {
+        using var _ = monitor.OpenInfo( $"Creating the initial version of the {ltsRepos.Length} repositories of the default World." );
+        var failed = new List<string>();
+        foreach( var r in ltsRepos )
+        {
+            var cut = r.NextInfVersion;
+            var vInit = $"v{cut.Major}.{cut.Minor}.{cut.Patch}+fake";
+            var git = r.Repo.GitRepository;
+            var root = git.Repository.Branches[rootName];
+            if( root == null
+                || !CreateInitialFakeVersion( monitor, r.Repo, root, vInit )
+                || !git.GetRemote( monitor, "origin", forWrite: true, out var remote, out var creds )
+                || !git.Push( monitor, remote, creds, [$"refs/heads/{rootName}:refs/heads/{rootName}", $"refs/tags/{vInit}:refs/tags/{vInit}"] ) )
+            {
+                failed.Add( r.Repo.DisplayPath );
+            }
+        }
+        if( failed.Count > 0 )
+        {
+            monitor.Error( $"""
+                The Long Term Support world is created, but the initial version of the default World could not be created
+                or pushed in: {failed.Concatenate()}.
+                In the default World, use "ckli issue --fix" (it creates the missing initial versions), then "ckli push"
+                and "ckli tag push <the +fake tags>".
+                """ );
+            return false;
+        }
+        return true;
     }
 
     // Creates and pushes the LTS root branch of every repository on its LTSRootCommit. The branch is created in the

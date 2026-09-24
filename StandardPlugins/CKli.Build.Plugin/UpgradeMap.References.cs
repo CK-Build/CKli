@@ -64,7 +64,7 @@ public sealed partial class UpgradeMap
                     monitor.Warn( $"Skipping reference '{r.RawUrl}': it is not a valid url." );
                     continue;
                 }
-                var profile = await ReadProfileAsync( monitor, context, r, branchName, options.ConsiderCI, cancellation ).ConfigureAwait( false );
+                var profile = await ReadProfileAsync( monitor, context, r, world.Name.LTSName, branchName, options.ConsiderCI, cancellation ).ConfigureAwait( false );
                 if( profile == null ) continue;
                 // The produced packages come first: inside a profile they win over what it depends on.
                 foreach( var (packageId, p) in profile.ProducedPackages )
@@ -123,6 +123,7 @@ public sealed partial class UpgradeMap
     static async Task<PublishedProfile?> ReadProfileAsync( IActivityMonitor monitor,
                                                            CKliEnv context,
                                                            WorldReference r,
+                                                           string? worldLTSName,
                                                            BranchName branchName,
                                                            bool considerCI,
                                                            CancellationToken cancellation )
@@ -134,17 +135,34 @@ public sealed partial class UpgradeMap
             return null;
         }
         // The Published folder is World scoped: an LTS World has its own below its name.
-        var folder = r.LTSName is null ? "Published/" : $"{r.LTSName}/Published/";
-        // The Stack branch is named explicitly: letting this default to the remote's default branch would
-        // read whatever that happens to be, and a (true, null) answer cannot tell a missing file from a
-        // missing ref - a reference read from the wrong branch would silently look like "publishes nothing".
-        var (success, content) = await provider.GetFileContentAsync( monitor,
-                                                                     repoPath,
-                                                                     folder + PublishedIndex.IndexFileName,
-                                                                     refName: StackRepository.BranchName,
-                                                                     cancellation: cancellation )
-                                              .ConfigureAwait( false );
-        if( !success ) return null;
+        // A reference without LTSName read from a LTS World uses the referenced Stack's world with the same LTS
+        // name if it has published something, its default World otherwise. Both reads are on the same repository
+        // and branch: a missing index there can only mean a missing folder.
+        var ltsName = r.LTSName;
+        string? folder = null;
+        byte[]? content = null;
+        if( ltsName == null && worldLTSName != null )
+        {
+            var ltsFolder = $"{worldLTSName}/Published/";
+            (var ok, content) = await ReadIndexAsync( ltsFolder ).ConfigureAwait( false );
+            if( !ok ) return null;
+            if( content != null )
+            {
+                ltsName = worldLTSName;
+                folder = ltsFolder;
+                monitor.Info( $"Reference '{r.Url}' has no LTSName: using its '{worldLTSName}' world (the one of this World)." );
+            }
+            else
+            {
+                monitor.Info( $"Reference '{r.Url}' has no LTSName and no published '{worldLTSName}' world: using its default World." );
+            }
+        }
+        if( folder == null )
+        {
+            folder = ltsName is null ? "Published/" : $"{ltsName}/Published/";
+            (var ok, content) = await ReadIndexAsync( folder ).ConfigureAwait( false );
+            if( !ok ) return null;
+        }
         if( content == null )
         {
             // Missing file, missing ref or missing repository: they cannot be told apart here.
@@ -174,19 +192,28 @@ public sealed partial class UpgradeMap
                 var ci = index.GetAlive( PublishedIndex.GetGroupName( versionBranchName, isCI: true ) );
                 foreach( var v in ci )
                 {
-                    var p = await LoadProfileAsync( monitor, provider, repoPath, folder, r, v, cancellation ).ConfigureAwait( false );
+                    var p = await LoadProfileAsync( monitor, provider, repoPath, folder, r, ltsName, v, cancellation ).ConfigureAwait( false );
                     if( p != null ) return p;
                 }
             }
             var alive = index.GetAlive( PublishedIndex.GetGroupName( versionBranchName, isCI: false ) );
             foreach( var v in alive )
             {
-                var p = await LoadProfileAsync( monitor, provider, repoPath, folder, r, v, cancellation ).ConfigureAwait( false );
+                var p = await LoadProfileAsync( monitor, provider, repoPath, folder, r, ltsName, v, cancellation ).ConfigureAwait( false );
                 if( p != null ) return p;
             }
         }
         monitor.Warn( $"Reference '{r.Url}' published no profile for branch '{branchName}' nor any of its parents." );
         return null;
+
+        // The Stack branch is named explicitly: letting this default to the remote's default branch would
+        // read whatever that happens to be, and a (true, null) answer cannot tell a missing file from a
+        // missing ref - a reference read from the wrong branch would silently look like "publishes nothing".
+        Task<(bool Success, byte[]? Content)> ReadIndexAsync( string folder ) => provider.GetFileContentAsync( monitor,
+                                                                                            repoPath,
+                                                                                            folder + PublishedIndex.IndexFileName,
+                                                                                            refName: StackRepository.BranchName,
+                                                                                            cancellation: cancellation );
     }
 
     static async Task<PublishedProfile?> LoadProfileAsync( IActivityMonitor monitor,
@@ -194,6 +221,7 @@ public sealed partial class UpgradeMap
                                                            NormalizedPath repoPath,
                                                            string folder,
                                                            WorldReference r,
+                                                           string? ltsName,
                                                            SVersion version,
                                                            CancellationToken cancellation )
     {
@@ -214,9 +242,9 @@ public sealed partial class UpgradeMap
         {
             var profile = PublishedProfile.Parse( content );
             // The folder is World scoped, so the profile's World is a sanity check, not a selector.
-            if( r.LTSName != null && !profile.World.FullName.EndsWith( r.LTSName, StringComparison.OrdinalIgnoreCase ) )
+            if( ltsName != null && !profile.World.FullName.EndsWith( ltsName, StringComparison.OrdinalIgnoreCase ) )
             {
-                monitor.Warn( $"Profile '{path}' of reference '{r.Url}' carries World '{profile.World.FullName}' but is in the '{r.LTSName}' folder." );
+                monitor.Warn( $"Profile '{path}' of reference '{r.Url}' carries World '{profile.World.FullName}' but is in the '{ltsName}' folder." );
             }
             monitor.Info( $"Reference '{r.Url}': using profile '{profile}' ({profile.ProducedPackages.Count} produced package(s))." );
             return profile;

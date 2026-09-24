@@ -208,6 +208,12 @@ expensive part:
 | The World References' published profiles | A profile's `ProducedPackages` are the first candidates - they are why the reference exists - and win inside a profile, then its `DirectDependencies`, then its regular `TransitiveDependencies`. Two references disagreeing **blocks that package**, not the command. An `AmbiguousDependency` nobody anchors is warned about: with `--with-nuget` the feed will answer instead (and may disagree with that very reference), without it the identifier simply has no target. |
 | The World's configured NuGet feeds, **only with `--with-nuget`** | The greatest version they offer. |
 
+**Which published folder of a reference is read.** A `<Reference LTSName="@net8">` reads the referenced Stack's
+`@net8/Published/`. A reference without `LTSName` reads its default World's `Published/`, except from a Long Term
+Support World: there, the referenced Stack's `{this World's LTS name}/Published/` is read first when it exists, and
+its default World's otherwise - the same rule `ckli clone` applies to choose the referenced World to clone. Both
+reads are on the same repository and branch, so a missing index there can only mean a missing folder.
+
 **The `<VersionTag><Packages>` configuration is not a source, it is a constraint.** It declares a
 [`SVersionBound`](../CKli.VersionTag.Plugin/README.md#configuration) per package identifier - by name or through a
 name holding `*` wildcards that covers a whole family - the range of versions this World accepts for it, and that

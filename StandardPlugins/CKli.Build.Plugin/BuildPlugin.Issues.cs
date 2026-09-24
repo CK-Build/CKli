@@ -81,7 +81,8 @@ public sealed partial class BuildPlugin
                     // We have a root branch: let's fix this by building it based on the InfVersion.
                     var vBase = versionTagInfo.InfVersion ?? SVersion.ZeroVersion;
                     var vInit = $"v{vBase.Major}.{vBase.Minor}.{vBase.Patch}+fake";
-                    collector( new NoVersionTagIssue( versionTagInfo.Repo,
+                    collector( new NoVersionTagIssue( _versionTag,
+                                                      versionTagInfo.Repo,
                                                       "Missing initial version.",
                                                       screenType.Text( $"""
                                                           This can be fixed by creating a '{vInit}' on '{branchModel.Root.BranchName}' branch.
@@ -149,13 +150,15 @@ public sealed partial class BuildPlugin
 
     sealed class NoVersionTagIssue : World.Issue
     {
+        readonly VersionTagPlugin _versionTag;
         readonly HotBranch _root;
         readonly string _vInit;
 
-        public NoVersionTagIssue( Repo repo, string title, IRenderable body, HotBranch root, string vInit )
+        public NoVersionTagIssue( VersionTagPlugin versionTag, Repo repo, string title, IRenderable body, HotBranch root, string vInit )
             : base( title, body, repo )
         {
             Throw.DebugAssert( vInit.EndsWith( "+fake" ) );
+            _versionTag = versionTag;
             _root = root;
             _vInit = vInit;
         }
@@ -165,9 +168,10 @@ public sealed partial class BuildPlugin
             Throw.DebugAssert( Repo != null && _root.GitBranch != null );
             using( monitor.OpenInfo( $"Fixing missing initial version in '{Repo.DisplayPath}' by creating '{_vInit}' on '{_root}'." ) )
             {
-                Repo.GitRepository.Repository.Tags.Add( _vInit, _root.GitBranch.Tip );
+                // This adds an empty commit when the tip already bears a version (the default World right after
+                // the creation of a Long Term Support world).
+                return ValueTask.FromResult( _versionTag.CreateInitialFakeVersion( monitor, Repo, _root.GitBranch, _vInit ) );
             }
-            return ValueTask.FromResult( true );
         }
     }
 }
