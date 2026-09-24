@@ -67,7 +67,11 @@ sealed class RoadmapPublisher : BasePublisher
         if( branch == null ) return Task.FromResult( false );
 
         bool isCI = version.IsCI;
-        string gitBranchName = isCI ? branch.DevName : branch.Name;
+        var repo = solution.Repo.GitRepository;
+        // A CI version is built from the "dev/" branch when it exists, from the regular one otherwise (a "--ci.0"
+        // is typically built on the regular branch tip). The branch to push is the one the version comes from.
+        bool fromDevBranch = isCI && repo.GetBranch( monitor, branch.DevName, missingLocalAndRemote: LogLevel.None ) != null;
+        string gitBranchName = fromDevBranch ? branch.DevName : branch.Name;
 
         Tag? fakeTagVersionToPush = null;
 
@@ -82,10 +86,9 @@ sealed class RoadmapPublisher : BasePublisher
         // computes pushRefSpecs and branchToRemove.
         ImmutableArray<string> pushRefSpecs = [];
         string? branchToRemove = null;
-        var repo = solution.Repo.GitRepository;
-        if( isCI )
+        if( fromDevBranch )
         {
-            // We are publishing a CI: we ensure that the non-CI branch is also visible to the
+            // We are publishing a CI from the "dev/" branch: we ensure that the non-CI branch is also visible to the
             // remote repository users.
             var b = repo.GetBranch( monitor, branch.Name, missingLocalAndRemote: LogLevel.Warn );
             if( b != null && !b.IsTracking )
@@ -95,7 +98,7 @@ sealed class RoadmapPublisher : BasePublisher
                 pushRefSpecs = [$"{b.CanonicalName}:{b.CanonicalName}"];
             }
         }
-        else
+        else if( !isCI )
         {
             branchToRemove = branch.DevName;
         }
