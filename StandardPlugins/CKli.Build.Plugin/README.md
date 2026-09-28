@@ -114,6 +114,7 @@ All build-family commands share a common set of options (declared once as `const
 | `forceTests` | Run tests even if they already ran successfully on the commit. Mutually exclusive with `skipTests`. |
 | `--dry-run,-d` | Only compute and display the roadmap; no build/publish is performed (`OnRoadmapBuild` is still raised, with `Roadmap.DryRun == true`). |
 | `all` | Consider all Repos of the World as pivots, not only the ones reachable from the current directory. |
+| `--focus` | `build` only. The pivots' upstreams are built too, the pivots are built before anything else and the build stops at the first failure - see [below](#build---focus-working-in-a-pivot-and-its-upstreams). CI only: exclusive with `--release`. |
 
 | `[CommandPath]` | Method | Description |
 |---|---|---|
@@ -136,6 +137,50 @@ funnel into the same `DoCIAsync`/`DoNonCIAsync` → `ComputeAndDisplayRoadmap` �
 branch, deletes the remote `dev/` and, for `publish`, creates the actual release), so it is the one that has to be
 asked for by name. `--release` and `--ci.0` are mutually exclusive and refused together
 (`BuildPlugin.CheckReleaseAndCIForce`).
+
+### `build --focus`: working in a pivot and its upstreams
+
+The development loop this is for: a developer works in a repository (the pivot) and modifies one of its upstreams at
+the same time. Neither existing command fits it:
+
+- a plain `build` **skips the upstreams**, even the modified one: `CodeChange` is a skippable reason, and a non-pivot is
+  only built when something forces it (see [the out of scope solutions](#the-roadmap-computing-what-to-build));
+- `*build` builds **everything that has a reason to build**, the repositories unrelated to the pivot included, and
+  they compete with it for the `--max-dop` monitors.
+
+`--focus` is in between, and it is three things:
+
+1. **Scope.** The pivots' upstreams are not skippable: `canSkip` gains `!(focus && IsPivotUpstream)`, nothing else
+   changes. The downstream propagation is not gated by `canSkip`, so a *sibling* - a repository that consumes a rebuilt
+   upstream without being related to the pivot - is still rebuilt: every consumer of a rebuilt package is. The
+   unrelated repositories with their own reasons to build are skipped, exactly as a plain `build` skips them.
+2. **The pivots first, really.** The priority scheduling of [the executor](#building-the-roadmap-roadmapexecutor)
+   becomes a barrier: no build outside the pivots and their upstreams starts before all of those have completed.
+3. **Fail-fast.** The first failure cancels the run: the builds that did not start never do, a running one stops at
+   its next step (build, test, pack), and the screen says *"Stopped after the first failure ('--focus'): k of N builds
+   were not started."* A running `dotnet` process is **not** killed: `ProcessRunner.RunProcess` deliberately ignores
+   its cancellation until .NET 11 brings a graceful termination, because a process-tree kill misses the detached
+   children (the compiler server, shared with the concurrent builds) and can interrupt a write into the NuGet cache or
+   the `$Local` feed.
+
+After a successful focused build, the screen names the repositories that a `*build` would have built: *"'X-Other' is
+out of focus and was not built. Run '*build' to complete the World."* (`BuildSolution.IsOutOfFocus`). **Nothing else
+marks them**, and in particular the `"building/"` tags are promoted to `"local/"` as usual: the versions a focused
+build produces are complete - the pivots, their upstreams and all their consumers - and what is not "ready" is only
+what it left out, whose reasons to build are still there for the next `*build` to find. Keeping `"building/"` tags as a
+marker would have given that prefix a second meaning, been erased by the next idle run (which completes an
+interrupted build in place), and blocked `publish` with a false *"unable to publish as at least one pending build
+exist"*.
+
+Two combinations are handled up front:
+
+- **`--release` is refused.** A non-CI build reads only the pivots from their `dev/` branch
+  (`HotZonePlugin.GetHotGraph`), so the work in progress of an upstream would be invisible - precisely what `--focus`
+  is about. `--ci.0` is fine.
+- **Without pivots** (the World root, `--all`) every repository is in scope: `--focus` is ignored with a warning.
+
+It is not on `*build`, where it would add nothing, nor on `publish`/`*publish`: a publication already needs every
+build to succeed.
 
 ### The publication lock: one publisher at a time per World
 
@@ -347,7 +392,7 @@ repository" rather than "where does this package move".
 
 ```csharp
 var hotGraph = _hotZone.GetHotGraph( monitor, branchName, ciBuildMode != CIBuildMode.None, pivots );
-var roadmap  = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish, dryRun );
+var roadmap  = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish, dryRun, focus );
 ```
 
 For every `HotGraph.Solution` (ordered topologically, `OrderedSolutions`), a `Roadmap.BuildSolution` is created and its
@@ -396,7 +441,8 @@ A solution can also be entirely **out of scope**: with `*build`/`*publish` pivot
 skippable one (`CodeChange`/`DependencyUpdate`("U")/`CI0`/`RollingLocal`) is left un-built - this is the only place the "star" vs
 non-star distinction actually changes the outcome (`canSkip` in `BuildSolution.Initialize`). Skipping therefore only
 ever happens in the non-star, has-pivots case: `*build`/`*publish` and a stack-root/`--all` roadmap (where no solution
-is a pivot) never skip anything.
+is a pivot) never skip anything. [`build --focus`](#build---focus-working-in-a-pivot-and-its-upstreams) narrows it: the
+pivots' upstreams are not skippable either.
 
 A skipped solution can be left holding **pending "U" updates**: its sources reference packages produced by this World
 in versions that have been superseded. This is not an error - since the solution is not built, nothing it produces
@@ -478,6 +524,11 @@ been computed and is not a dry-run:
   scheduling order only: `OrderedSolutions` stays the topological order, and a pivot still waits for its own
   upstreams. Without pivots (`--all`, a stack root) every build is in the first class and the order is the arrival
   one. The `Building roadmap n°k/N` log counts the builds as they start, so `k` is not the `BuildNumber`.
+- **Under `--focus`** the first class is a barrier (the other requests stay queued until its last build completed; it
+  cannot deadlock, since that class is closed upward) and the first failure cancels the executor's own
+  `CancellationTokenSource`, linked to the caller's. The requests queued at that moment still get a monitor, since
+  their task has to complete, but they end at once without logging a start. See
+  [`build --focus`](#build---focus-working-in-a-pivot-and-its-upstreams).
 - Per-solution build (`DoBuildAsync`) does, for the target repo: ensure/checkout the right branch (`dev/` for CI builds,
   or integrate `dev/` into the regular branch first for non-CI builds), handle a possible version-tag clash on the same
   commit (creates an empty commit when needed so the new version has its own commit), rewrite package references via
