@@ -405,6 +405,16 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     """ );
                 return null;
             }
+            if( !v.IsPrerelease || v.Prerelease != "0" )
+            {
+                var newV = SVersion.Create( v.Major, v.Minor, v.Patch, "0" );
+                monitor.Warn( $"""
+                    Fixed '{config.Repo.DisplayPath}', VersionTagPlugin.{name.LocalName}: '{v}' to '{newV}'.
+                    Infimum and Supremum must both end with the minimal prerelease marker '-0'.
+                    """ );
+                v = newV;
+                config.Edit( monitor, ( monitor, e ) => e.SetAttributeValue( name.LocalName, v.ToString() ) );
+            }
             return v;
         }
     }

@@ -75,6 +75,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// Gets the optional lower limit of the versions configured for this Repo in the VersionTag plugin configuration.
     /// <para>
     /// This is an infimum, not a minimum: when not null, considered versions are strictly greater than this value.
+    /// It necessarily is the "-0" lowest prerelease.
     /// </para>
     /// </summary>
     public SVersion? InfVersion => _infVersion;
@@ -83,6 +84,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// Gets the optional upper limit of the versions configured for this Repo in the VersionTag plugin configuration.
     /// <para>
     /// This is a supremum, not a maximum: when not null, considered versions are strictly lower than this value.
+    /// It necessarily is the "-0" lowest prerelease.
     /// </para>
     /// </summary>
     public SVersion? SupVersion => _supVersion;
