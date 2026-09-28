@@ -145,8 +145,12 @@ public sealed partial class Roadmap
             if( buildReason == MustBuildReason.None )
             {
                 // Pivot dependent conditions: this build can be skipped (not in the scope).
-                // This is the only place where the "star build" appears!
-                bool canSkip = !_roadmap._isPullBuild && _roadmap._graph.HasPivots && !_solution.IsPivot;
+                // This is the only place where the "star build" appears! And the "--focus" one: the upstreams of
+                // the pivots are in its scope (a modified upstream is built), the unrelated solutions are not.
+                bool canSkip = !_roadmap._isPullBuild
+                               && _roadmap._graph.HasPivots
+                               && !_solution.IsPivot
+                               && !(_roadmap._focus && _solution.IsPivotUpstream);
                 if( !canSkip )
                 {
                     UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, ref buildReason );

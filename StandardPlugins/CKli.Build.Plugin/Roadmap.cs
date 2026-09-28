@@ -33,6 +33,7 @@ public sealed partial class Roadmap
     readonly bool _mustPublish;
     readonly bool _dryRun;
     readonly bool _isPullBuild;
+    readonly bool _focus;
     readonly ImmutableArray<BuildSolution> _orderedSolutions;
     readonly ImmutableArray<BuildSolution> _pivots;
     readonly BuildSolutionList _buildSolutions;
@@ -48,11 +49,14 @@ public sealed partial class Roadmap
              bool isPullBuild,
              CIBuildMode ciBuildMode,
              bool mustPublish,
-             bool dryRun )
+             bool dryRun,
+             bool focus )
     {
+        Throw.DebugAssert( "'--focus' is ignored without pivots.", !focus || graph.HasPivots );
         _graph = graph;
         _packageUpdater = packageUpdater;
         _isPullBuild = isPullBuild;
+        _focus = focus;
         _ciBuildMode = ciBuildMode;
         _mustPublish = mustPublish;
         _dryRun = dryRun;
@@ -83,7 +87,8 @@ public sealed partial class Roadmap
                                      bool isPullBuild,
                                      CIBuildMode ciBuildMode,
                                      bool mustPublish,
-                                     bool dryRun )
+                                     bool dryRun,
+                                     bool focus )
     {
 
         // Refactor this?...
@@ -108,7 +113,7 @@ public sealed partial class Roadmap
             var packageUpdater = graph.GetPackageUpdater( monitor, versionTag );
             if( packageUpdater == null ) return null;
 
-            roadmap = new Roadmap( graph, packageUpdater, isPullBuild, ciBuildMode, mustPublish, dryRun );
+            roadmap = new Roadmap( graph, packageUpdater, isPullBuild, ciBuildMode, mustPublish, dryRun, focus );
             if( !roadmap.Initialize( monitor ) )
             {
                 return null;
@@ -175,6 +180,12 @@ public sealed partial class Roadmap
     /// Gets whether this is a build on the "dev/" branch (produces CI packages).
     /// </summary>
     public bool IsCIBuild => _ciBuildMode != CIBuildMode.Release;
+
+    /// <summary>
+    /// Gets whether this is a "--focus" build: the upstreams of the <see cref="HotGraph.Pivots"/> are
+    /// not skippable. Always false when <see cref="HotGraph.HasPivots"/> is false.
+    /// </summary>
+    public bool IsFocus => _focus;
 
     /// <summary>
     /// Gets the package mapping.
@@ -310,6 +321,7 @@ public sealed partial class Roadmap
                             bool hasPivots,
                             int pivotsCount,
                             bool isPullBuild,
+                            bool isFocus,
                             bool isPublish,
                             PublishableStatus publishableStatus,
                             int directPublishCount,
@@ -368,7 +380,7 @@ public sealed partial class Roadmap
                                 : "the repository that already carries";
                     r = r.AddBelow( screen.Text( $"(Use '--ci.0' to build a CI version from {what} a released version.)", TextEffect.Italic ) );
                 }
-                if( !isPullBuild && hasPivots )
+                if( !isPullBuild && !isFocus && hasPivots )
                 {
                     r = r.AddBelow( screen.Text( $"(Using '*{Action}' may detect required builds in upstreams repositories.)", TextEffect.Italic ) );
                 }
@@ -439,6 +451,7 @@ public sealed partial class Roadmap
                                 _graph.HasPivots,
                                 _pivots.Length,
                                 _isPullBuild,
+                                _focus,
                                 _mustPublish,
                                 _publishable,
                                 _directPublishCount,

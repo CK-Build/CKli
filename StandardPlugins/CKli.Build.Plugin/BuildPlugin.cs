@@ -53,6 +53,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     const string _dForceTests = "Run tests even if they have already run successfully on the commit.";
     const string _dDryRun = "Only display the build roadmap.";
     const string _oDryRun = "--dry-run,-d";
+    const string _oFocus = "--focus";
 
     readonly VersionTagPlugin _versionTag;
     readonly BranchModelPlugin _branchModel;
@@ -234,6 +235,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="forceTests"></param>
     /// <param name="dryRun"></param>
     /// <param name="all"></param>
+    /// <param name="focus"></param>
     /// <returns></returns>
     [Description( "Build-Test-Package and propagates packages from the current repositories to their consumers, keeping them local.",
                   Summary = "Build-Test-Package, keeping the produced packages local." )]
@@ -259,12 +261,26 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                   [OptionName(_oDryRun)]
                                   bool dryRun = false,
                                   [Description( "Build all the Repos, not only the current repositories and their consumers." )]
-                                  bool all = false )
+                                  bool all = false,
+                                  [Description( """
+                                                Focus on the current repositories: their upstreams that need a build are built too
+                                                (they are skipped otherwise) and the current repositories are built first.
+                                                CI only: incompatible with '--release'.
+                                                """ )]
+                                  [OptionName( _oFocus )]
+                                  bool focus = false )
     {
         if( !CheckReleaseAndCIForce( monitor, release, ciForce ) ) return Task.FromResult( false );
+        // In a non-CI build only the pivots are read from their "dev/" branch: the work in progress of an upstream
+        // would be invisible, and this is precisely what "--focus" is about.
+        if( release && focus )
+        {
+            monitor.Error( $"'{_oRelease}' and '{_oFocus}' are exclusive: '{_oFocus}' needs the \"dev/\" branches of the upstreams that only a CI build considers." );
+            return Task.FromResult( false );
+        }
         return release
             ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: false )
-            : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: false );
+            : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: false, focus );
     }
 
     /// <summary>
@@ -433,14 +449,15 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                           bool ciForce,
                           bool dryRun,
                           bool isPullBuild,
-                          bool publish )
+                          bool publish,
+                          bool focus = false )
     {
         if( !ParseInteger( monitor, "--max-dop", maxDop, out var vMaxDoP, 4 )
             || !HandleForceSkipTests( monitor, skipTests, forceTests, out bool? runTest ) )
         {
             return Task.FromResult( false );
         }
-        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all, dryRun );
+        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all, dryRun, focus );
         if( roadmap == null )
         {
             return Task.FromResult( false );
@@ -514,7 +531,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                        bool mustPublish,
                                        string? branch,
                                        bool all,
-                                       bool dryRun )
+                                       bool dryRun,
+                                       bool focus = false )
     {
         // Consider the repositories selected by current path as the Pivots.
         var pivots = all
@@ -563,7 +581,12 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         var hotGraph = _hotZone.GetHotGraph( monitor, branchName, ciBuildMode != CIBuildMode.Release, pivots );
         if( hotGraph == null ) return null;
 
-        var roadmap = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish, dryRun );
+        if( focus && !hotGraph.HasPivots )
+        {
+            monitor.Warn( $"'{_oFocus}' is ignored: all the repositories are selected, there is no pivot to focus on." );
+            focus = false;
+        }
+        var roadmap = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish, dryRun, focus );
         if( roadmap != null  )
         {
             context.Screen.Display( roadmap.ToRenderable );
