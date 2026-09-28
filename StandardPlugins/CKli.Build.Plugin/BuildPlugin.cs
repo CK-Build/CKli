@@ -264,8 +264,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                   bool all = false,
                                   [Description( """
                                                 Focus on the current repositories: their upstreams that need a build are built too
-                                                (they are skipped otherwise) and the current repositories are built first.
-                                                CI only: incompatible with '--release'.
+                                                (they are skipped otherwise), they are built before any other repository and the
+                                                build stops at the first failure. CI only: incompatible with '--release'.
                                                 """ )]
                                   [OptionName( _oFocus )]
                                   bool focus = false )

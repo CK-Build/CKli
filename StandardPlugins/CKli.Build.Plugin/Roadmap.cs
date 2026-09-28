@@ -281,6 +281,7 @@ public sealed partial class Roadmap
             }
             monitor.Info( ScreenType.CKliScreenTag, "No repositories need to be built." );
             _buildSuccess = true;
+            ReportOutOfFocus( monitor );
             return [];
         }
         foreach( var s in _orderedSolutions )
@@ -312,8 +313,23 @@ public sealed partial class Roadmap
         if( result != null )
         {
             _buildSuccess = true;
+            ReportOutOfFocus( monitor );
         }
         return result;
+    }
+
+    // The versions a focused build produces are complete: what is not "ready" is only the solutions it left out.
+    // They are named here rather than marked anywhere (their "building/" tags are promoted as usual): their build
+    // reasons are still there for the next "*build" to find.
+    void ReportOutOfFocus( IActivityMonitor monitor )
+    {
+        if( !_focus ) return;
+        var outOfFocus = _orderedSolutions.Where( s => s.IsOutOfFocus ).Select( s => s.Repo.DisplayPath.Path ).ToArray();
+        if( outOfFocus.Length == 0 ) return;
+        monitor.Info( ScreenType.CKliScreenTag,
+                      outOfFocus.Length == 1
+                        ? $"'{outOfFocus[0]}' is out of focus and was not built. Run '*build' to complete the World."
+                        : $"{outOfFocus.Length} repositories are out of focus and were not built: '{outOfFocus.Concatenate( "', '" )}'. Run '*build' to complete the World." );
     }
 
     internal struct RStats( int repositoryCount,

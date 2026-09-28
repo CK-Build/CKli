@@ -25,6 +25,7 @@ public sealed partial class Roadmap
         HotGraph.SolutionVersionInfo.LastBuiltVersion _lastBuild;
         int _buildNumber;
         PublishableStatus _publishable;
+        bool _isOutOfFocus;
 
         internal BuildSolution( Roadmap roadmap, HotGraph.Solution solution, HotGraph.SolutionVersionInfo versionInfo )
         {
@@ -164,6 +165,13 @@ public sealed partial class Roadmap
                             Building it in CI takes its place on the same commit: the pending release is destroyed.
                             """ );
                     }
+                }
+                else if( _roadmap._focus )
+                {
+                    // A "*build" would have built it: this is what "--focus" leaves out of the build.
+                    var wouldBuild = MustBuildReason.None;
+                    UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, ref wouldBuild );
+                    _isOutOfFocus = wouldBuild != MustBuildReason.None;
                 }
                 if( buildReason == MustBuildReason.None )
                 {
@@ -511,6 +519,12 @@ public sealed partial class Roadmap
         /// </para>
         /// </summary>
         public bool HasPendingUpdates => !BuildInfo.MustBuild && BuildInfo.UUpdates != null;
+
+        /// <summary>
+        /// Gets whether this solution is skipped by a <see cref="Roadmap.IsFocus"/> roadmap although it has its own
+        /// reasons to build: a "*build" would build it.
+        /// </summary>
+        public bool IsOutOfFocus => _isOutOfFocus;
 
         /// <summary>
         /// Gets the 1-based build number in the order of the <see cref="HotGraph.Solution.OrderedIndex"/>.

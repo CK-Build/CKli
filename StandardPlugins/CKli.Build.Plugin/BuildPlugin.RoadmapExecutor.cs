@@ -26,6 +26,14 @@ public sealed partial class BuildPlugin
         readonly CancellationToken _cancellation;
         readonly bool? _runTest;
         readonly bool _singleBuild;
+        // "--focus": the builds of the class 0 (see GetPriorityClass) that have not completed yet. While it is
+        // not 0, no build of another class starts. Always 0 when the roadmap is not a focused one.
+        int _pendingPriorityBuilds;
+        // Linked to the caller's cancellation. "--focus" cancels it on the first failure: no new build starts,
+        // and a running one stops at its next step. _stopped is true when this happened.
+        readonly CancellationTokenSource _stop;
+        bool _stopped;
+        int _startedCount;
 
         public RoadmapExecutor( BuildPlugin buildPlugin,
                                 CKliEnv context,
@@ -40,7 +48,12 @@ public sealed partial class BuildPlugin
             _singleBuild = roadmap.SolutionBuildCount == 1;
             _runTest = runTest;
             _maxDoP = maxDoP;
-            _cancellation = cancellation;
+            _stop = CancellationTokenSource.CreateLinkedTokenSource( cancellation );
+            _cancellation = _stop.Token;
+            if( roadmap.IsFocus )
+            {
+                _pendingPriorityBuilds = roadmap.OrderedSolutions.Count( s => s.MustBuild && GetPriorityClass( s.BuildInfo ) == 0 );
+            }
             _buildPlugin = buildPlugin;
             _context = context;
             _channel = Channel.CreateUnbounded<object>( new UnboundedChannelOptions() { SingleReader = true } );
@@ -55,23 +68,36 @@ public sealed partial class BuildPlugin
         internal async Task<BuildResult[]?> BuildAsync( IActivityMonitor monitor )
         {
             Throw.DebugAssert( _roadmap.SolutionBuildCount > 0 );
-            if( _cancellation.IsCancellationRequested ) return null;
             BuildResult[]? result;
-            if( _singleBuild )
+            try
             {
-                var s = _roadmap.OrderedSolutions.Single( s => s.MustBuild );
-                Throw.DebugAssert( !s.BuildInfo.DirectRequirements.Any( s => s.MustBuild ) );
-                var r = await DoBuildAsync( monitor, s.BuildInfo );
-                result = r != null
-                            ? s.BuildInfo.SetSingleBuildResult( r )
-                            : null;
-            }
-            else
-            {
-                using( monitor.OpenInfo( $"Building {_roadmap.SolutionBuildCount} solutions (--max-dop {_maxDoP})." ) )
+                if( _cancellation.IsCancellationRequested ) return null;
+                if( _singleBuild )
                 {
-                    result = await RunLoopAsync( monitor );
+                    var s = _roadmap.OrderedSolutions.Single( s => s.MustBuild );
+                    Throw.DebugAssert( !s.BuildInfo.DirectRequirements.Any( s => s.MustBuild ) );
+                    var r = await DoBuildAsync( monitor, s.BuildInfo );
+                    result = r != null
+                                ? s.BuildInfo.SetSingleBuildResult( r )
+                                : null;
                 }
+                else
+                {
+                    using( monitor.OpenInfo( $"Building {_roadmap.SolutionBuildCount} solutions (--max-dop {_maxDoP})." ) )
+                    {
+                        result = await RunLoopAsync( monitor );
+                    }
+                    if( _stopped )
+                    {
+                        Throw.DebugAssert( result == null );
+                        monitor.Info( ScreenType.CKliScreenTag,
+                                      $"Stopped after the first failure ('--focus'): {_roadmap.SolutionBuildCount - _startedCount} of {_roadmap.SolutionBuildCount} builds were not started." );
+                    }
+                }
+            }
+            finally
+            {
+                _stop.Dispose();
             }
             if( result != null )
             {
@@ -140,20 +166,35 @@ public sealed partial class BuildPlugin
                             {
                                 monitor.Info( ScreenType.CKliScreenTag, $"Build '{req.Build.Solution.Repo.DisplayPath}' succeed." );
                             }
+                            else if( _roadmap.IsFocus && !_stop.IsCancellationRequested )
+                            {
+                                // The first failure (a null result on an external cancellation is not one).
+                                _stopped = true;
+                                _stop.Cancel();
+                            }
+                            if( _pendingPriorityBuilds > 0 && GetPriorityClass( req.Build ) == 0 )
+                            {
+                                --_pendingPriorityBuilds;
+                            }
                             monitorPool.Enqueue( req.Acquired );
                             Throw.DebugAssert( monitorPool.Count <= _maxDoP );
                         }
                     }
                     while( _channel.Reader.TryRead( out msg ) );
 
-                    while( waiting.Count > 0 )
+                    while( waiting.TryPeek( out var next, out var priority ) )
                     {
+                        // The "--focus" barrier: the class 0 is closed upward, so it never waits for the builds
+                        // held here. Once stopped, the held builds are released: they end immediately.
+                        if( priority.Class > 0 && _pendingPriorityBuilds > 0 && !_stopped ) break;
                         if( !monitorPool.TryDequeue( out var available ) )
                         {
                             if( monitorCount == _maxDoP ) break;
                             available = new ActivityMonitor( $"Build Agent n°{++monitorCount}." );
                         }
-                        waiting.Dequeue().SetMonitor( monitor, available, ++dispatchCount );
+                        waiting.Dequeue();
+                        // Once stopped, a request still needs its monitor to complete, but it will not build.
+                        next.SetMonitor( monitor, available, _stopped ? 0 : ++dispatchCount );
                     }
                 }
             }
@@ -221,7 +262,10 @@ public sealed partial class BuildPlugin
 
             public void SetMonitor( IActivityMonitor monitor, IActivityMonitor available, int dispatchNumber )
             {
-                monitor.Info( $"Building roadmap n°{dispatchNumber}/{_build.Solution.Roadmap.SolutionBuildCount}: '{_build.Solution.Repo.DisplayPath}'." );
+                if( dispatchNumber > 0 )
+                {
+                    monitor.Info( $"Building roadmap n°{dispatchNumber}/{_build.Solution.Roadmap.SolutionBuildCount}: '{_build.Solution.Repo.DisplayPath}'." );
+                }
                 _initialize.SetResult( available );
             }
 
@@ -260,6 +304,7 @@ public sealed partial class BuildPlugin
         async Task<BuildResult?> DoBuildAsync( IActivityMonitor monitor, Roadmap.BuildInfo build )
         {
             if( _cancellation.IsCancellationRequested ) return null;
+            Interlocked.Increment( ref _startedCount );
 
             Throw.DebugAssert( build.MustBuild );
             var repo = build.Solution.Repo;
