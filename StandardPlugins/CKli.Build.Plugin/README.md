@@ -469,9 +469,15 @@ been computed and is not a dry-run:
   rather than by an explicit scheduler loop.
 - Parallelism is bounded by `--max-dop` through a hand-written **`IActivityMonitor` pool**: an unbounded `Channel<object>`
   carries `MonitorRequest`s (asking to acquire a monitor) and results; a single `RunLoopAsync` consumer hands out
-  monitors up to `maxDop`, queueing extra requests (`waitingQueue`) until one is released. Each acquired monitor is a
+  monitors up to `maxDop`, queueing extra requests until one is released. Each acquired monitor is a
   fresh `ActivityMonitor` up to `maxDop` instances, reused across builds. This exists so N repositories can build
   concurrently while each gets its own log scope, without spawning unbounded loggers.
+- **The pivots are served first.** The waiting requests are a priority queue: the pivots and their upstreams, then
+  the pivots' downstreams, then the others, ties broken by arrival order. The loop handles every message already in
+  the channel before handing out a monitor, so the builds that are ready at the same time really compete. This is a
+  scheduling order only: `OrderedSolutions` stays the topological order, and a pivot still waits for its own
+  upstreams. Without pivots (`--all`, a stack root) every build is in the first class and the order is the arrival
+  one. The `Building roadmap n°k/N` log counts the builds as they start, so `k` is not the `BuildNumber`.
 - Per-solution build (`DoBuildAsync`) does, for the target repo: ensure/checkout the right branch (`dev/` for CI builds,
   or integrate `dev/` into the regular branch first for non-CI builds), handle a possible version-tag clash on the same
   commit (creates an empty commit when needed so the new version has its own commit), rewrite package references via

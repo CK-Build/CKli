@@ -98,61 +98,62 @@ public sealed partial class BuildPlugin
         {
             try
             {
-                Queue<MonitorRequest>? waitingQueue = null;
+                // The requests waiting for a monitor, best first (see GetPriorityClass). The arrival sequence
+                // breaks the ties, so that without pivots the order is the one of the requests.
+                var waiting = new PriorityQueue<MonitorRequest, (int Class, int Seq)>( _roadmap.SolutionBuildCount );
+                int arrivalSeq = 0;
                 Queue<IActivityMonitor> monitorPool = new Queue<IActivityMonitor>( Math.Min( _maxDoP, 32 ) );
                 int monitorCount = 0;
+                // Counts the builds that have started: this is the "n°k" of the "Building roadmap n°k/N" log.
+                // The BuildNumber is the roadmap order, and the builds don't start in that order.
+                int dispatchCount = 0;
                 _ = WaitForTerminationAsync();
-                int remainingCount = _roadmap.SolutionBuildCount;
                 for(; ; )
                 {
                     var msg = await _channel.Reader.ReadAsync();
-                    if( msg is BuildResult?[] results )
+                    // Every message already written is handled before any monitor is given: a monitor must go
+                    // to the best waiting request, not to the first one that happened to be read. At start, this
+                    // is what puts all the builds that are ready in competition.
+                    do
                     {
-                        // There SHOULD never be any pending requests here: all tasks have been completed,
-                        // they have released their monitor.
-                        Throw.DebugAssert( waitingQueue == null || waitingQueue.Count == 0 );
-                        while( monitorPool.TryDequeue( out var m ) )
+                        if( msg is BuildResult?[] results )
                         {
-                            m.MonitorEnd();
+                            // There SHOULD never be any pending requests here: all tasks have been completed,
+                            // they have released their monitor.
+                            Throw.DebugAssert( waiting.Count == 0 );
+                            while( monitorPool.TryDequeue( out var m ) )
+                            {
+                                m.MonitorEnd();
+                            }
+                            return (results.All( r => r != null ) ? results : null)!;
                         }
-                        return (results.All( r => r != null ) ? results : null)!;
-                    }
-                    Throw.DebugAssert( msg is MonitorRequest );
-                    var req = (MonitorRequest)msg;
-                    if( req.MustAcquire )
-                    {
-                        if( monitorPool.TryDequeue( out var available ) )
+                        Throw.DebugAssert( msg is MonitorRequest );
+                        var req = (MonitorRequest)msg;
+                        if( req.MustAcquire )
                         {
-                            req.SetMonitor( monitor, available );
-                        }
-                        else if( monitorCount < _maxDoP )
-                        {
-                            req.SetMonitor( monitor, new ActivityMonitor( $"Build Agent n°{++monitorCount}." ) );
+                            waiting.Enqueue( req, (GetPriorityClass( req.Build ), arrivalSeq++) );
                         }
                         else
                         {
-                            Throw.DebugAssert( _roadmap.SolutionBuildCount > _maxDoP );
-                            waitingQueue ??= new Queue<MonitorRequest>( _roadmap.SolutionBuildCount - _maxDoP );
-                            waitingQueue.Enqueue( req );
-                        }
-                    }
-                    else
-                    {
-                        // On a null BuildResult, the error message must have been emitted by the build itself (rather than a generic message here).
-                        --remainingCount;
-                        if( req.BuildResult != null )
-                        {
-                            monitor.Info( ScreenType.CKliScreenTag, $"Build '{req.Build.Solution.Repo.DisplayPath}' succeed." );
-                        }
-                        if( waitingQueue != null && waitingQueue.TryDequeue( out var waiter ) )
-                        {
-                            waiter.SetMonitor( monitor, req.Acquired );
-                        }
-                        else
-                        {
+                            // On a null BuildResult, the error message must have been emitted by the build itself (rather than a generic message here).
+                            if( req.BuildResult != null )
+                            {
+                                monitor.Info( ScreenType.CKliScreenTag, $"Build '{req.Build.Solution.Repo.DisplayPath}' succeed." );
+                            }
                             monitorPool.Enqueue( req.Acquired );
                             Throw.DebugAssert( monitorPool.Count <= _maxDoP );
                         }
+                    }
+                    while( _channel.Reader.TryRead( out msg ) );
+
+                    while( waiting.Count > 0 )
+                    {
+                        if( !monitorPool.TryDequeue( out var available ) )
+                        {
+                            if( monitorCount == _maxDoP ) break;
+                            available = new ActivityMonitor( $"Build Agent n°{++monitorCount}." );
+                        }
+                        waiting.Dequeue().SetMonitor( monitor, available, ++dispatchCount );
                     }
                 }
             }
@@ -162,6 +163,23 @@ public sealed partial class BuildPlugin
                 return null;
             }
 
+        }
+
+        /// <summary>
+        /// The pivots and their upstreams come first, then the pivots' downstreams, then the others: the
+        /// developer gets the result of the pivots as soon as their dependencies allow it.
+        /// <para>
+        /// The class 0 is closed upward (an upstream of an upstream is an upstream), so it never waits for a build
+        /// of another class. This is a scheduling order only: the <see cref="Roadmap.OrderedSolutions"/> stays the
+        /// topological order. Without pivots, the 3 flags are false and every build is in the class 0.
+        /// </para>
+        /// </summary>
+        static int GetPriorityClass( Roadmap.BuildInfo build )
+        {
+            var s = build.Solution.Solution;
+            return s.IsPivot || s.IsPivotUpstream
+                    ? 0
+                    : s.IsPivotDownstream ? 1 : 2;
         }
 
         async Task WaitForTerminationAsync()
@@ -201,9 +219,9 @@ public sealed partial class BuildPlugin
 
             public BuildResult? BuildResult => _buildResult;
 
-            public void SetMonitor( IActivityMonitor monitor, IActivityMonitor available )
+            public void SetMonitor( IActivityMonitor monitor, IActivityMonitor available, int dispatchNumber )
             {
-                monitor.Info( $"Building roadmap n°{_build.Solution.BuildNumber}/{_build.Solution.Roadmap.SolutionBuildCount}: '{_build.Solution.Repo.DisplayPath}'." );
+                monitor.Info( $"Building roadmap n°{dispatchNumber}/{_build.Solution.Roadmap.SolutionBuildCount}: '{_build.Solution.Repo.DisplayPath}'." );
                 _initialize.SetResult( available );
             }
 
