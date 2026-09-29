@@ -870,7 +870,7 @@ public Task<bool> StarPublishAsync( IActivityMonitor monitor,
                                 [Description( "Build regular exploratory, prerelease or stable versions instead of CI versions." )]
                                 [OptionName( "--release" )]
                                 bool release = false,
-                                [Description( "Build a ci.0 version when a released version is already available on the commit." )]
+                                [Description( "Build a ci.0 version when a released version is already available on the commit (a ci.1 from another branch's version)." )]
                                 [OptionName( "--ci.0" )]
                                 bool ciForce = false,
                                 [Description( "Skip running tests altogether." )]
