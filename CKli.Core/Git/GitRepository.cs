@@ -851,9 +851,10 @@ public sealed partial class GitRepository : IDisposable
     /// <summary>
     /// Tries to merge the content of <paramref name="other"/> into <paramref name="branch"/>. There must be no conflict.
     /// <para>
-    /// Unlike <see cref="MergeBranch(IActivityMonitor, ref Branch, Branch)"/>, when the two tips have the same content,
-    /// nothing is done: the <paramref name="branch"/> is left as-is and <paramref name="other"/> doesn't become
-    /// part of its history. This is what makes an "ahead" branch that brings nothing vanish without a trace.
+    /// Unlike <see cref="MergeBranch(IActivityMonitor, ref Branch, Branch)"/>, when the two tips have diverged and have
+    /// the same content, no empty merge commit is created: the <paramref name="branch"/> is left as-is and
+    /// <paramref name="other"/> doesn't become part of its history.
+    /// A fast-forward creates no commit and is always done, whatever the content.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
@@ -869,8 +870,9 @@ public sealed partial class GitRepository : IDisposable
     /// Tries to merge the content of <paramref name="commit"/> into <paramref name="branch"/>. There must be no conflict.
     /// <para>
     /// Unlike <see cref="MergeBranch(IActivityMonitor, ref Branch, Commit)"/>, when the branch's tip and the commit have
-    /// the same content, nothing is done: the <paramref name="branch"/> is left as-is and <paramref name="commit"/>
-    /// doesn't become part of its history.
+    /// diverged and have the same content, no empty merge commit is created: the <paramref name="branch"/> is left as-is
+    /// and <paramref name="commit"/> doesn't become part of its history.
+    /// A fast-forward creates no commit and is always done, whatever the content.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
@@ -954,11 +956,10 @@ public sealed partial class GitRepository : IDisposable
                                           string trackedName,
                                           bool skipSameContent )
         {
-            if( skipSameContent && branch.Tip.Tree.Sha == otherTip.Tree.Sha )
-            {
-                // No-op: there is no content to merge.
-                return branch.Tip;
-            }
+            // The history comes first: a fast-forward creates no commit, so it is never skipped, even when the
+            // two tips have the same content. Skipping it would leave the commits of otherTip out of the branch:
+            // a "dev/" branch holding only a "Producing 'vX' from unchanged head." commit would be integrated
+            // without it and then deleted, orphaning the version tag it carries.
             var div = git.Repository.ObjectDatabase.CalculateHistoryDivergence( branch.Tip, otherTip );
             if( div?.BehindBy is 0 )
             {
@@ -970,8 +971,14 @@ public sealed partial class GitRepository : IDisposable
                 // Fast-forward "branch" to "otherTip".
                 return otherTip;
             }
-            // The two have diverged: this creates a merge commit, even if the two tips have
-            // the same content (the merge commit is then empty) when skipSameContent is false.
+            // The two have diverged. When skipSameContent is true, we don't create an empty merge commit.
+            if( skipSameContent && branch.Tip.Tree.Sha == otherTip.Tree.Sha )
+            {
+                // No-op: there is no content to merge.
+                return branch.Tip;
+            }
+            // This creates a merge commit, even if the two tips have the same content (the merge commit
+            // is then empty) when skipSameContent is false.
             var result = git.Repository.ObjectDatabase.MergeCommits( branch.Tip, otherTip, new MergeTreeOptions() { SkipReuc = true, FailOnConflict = true } );
             return result.Tree == null
                     ? null

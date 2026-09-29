@@ -382,11 +382,14 @@ public partial class GitRepositoryTests
         bobMaster.TrackingDetails.AheadBy.ShouldBe( 0 );
         bobMaster.Tip.Tree.Sha.ShouldBe( bobMaster.TrackedBranch.Tip.Tree.Sha );
 
-        // MergeBranchContent doesn't integrate commits that bring no change.
+        // MergeBranchContent fast-forwards too: a fast-forward creates no commit, so it is never skipped because
+        // the content is the same (a "dev/" branch holding only a version carrying empty commit would otherwise
+        // be integrated without it). This is checked on another branch: "master" is left to the pull.
         {
-            var content = bobMaster;
+            var content = bob.Repository.Branches.Add( "content-check", bobMaster.Tip );
             bob.MergeBranchContent( TestHelper.Monitor, ref content, bobMaster.TrackedBranch ).ShouldBeTrue();
-            content.ShouldBeSameAs( bobMaster, "Nothing done: the branch has not been rewritten." );
+            content.Tip.Sha.ShouldBe( bobMaster.TrackedBranch.Tip.Sha, "Fast-forwarded." );
+            bob.Repository.Branches.Remove( content );
             bob.Repository.Head.Tip.Sha.ShouldBe( bobMaster.Tip.Sha );
         }
 
@@ -406,6 +409,15 @@ public partial class GitRepositoryTests
         bobMaster = bob.Repository.Head;
         bobMaster.TrackingDetails.BehindBy.ShouldBe( 1 );
         bobMaster.TrackingDetails.AheadBy.ShouldBe( 1 );
+
+        // MergeBranchContent doesn't create an empty merge commit when the two have diverged with the same content.
+        {
+            var content = bob.Repository.Branches.Add( "content-check", bobMaster.Tip );
+            var before = content;
+            bob.MergeBranchContent( TestHelper.Monitor, ref content, bobMaster.TrackedBranch ).ShouldBeTrue();
+            content.ShouldBeSameAs( before, "Nothing done: the branch has not been rewritten." );
+            bob.Repository.Branches.Remove( content );
+        }
 
         // The pull creates an (empty) merge commit...
         bob.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeTrue();
