@@ -206,7 +206,7 @@ public sealed partial class BuildResult
                                             out ImmutableArray<PackageInstance> transitive )
     {
         var stdOut = new StringBuilder();
-        if( !repo.RunDotnet( monitor, "package list --include-transitive --format json --no-restore", stdOut ) )
+        if( !repo.RunDotnet( monitor, "package list --include-transitive --format json --no-restore", stdOut, noLog: true ) )
         {
             packages = transitive = [];
             return false;
