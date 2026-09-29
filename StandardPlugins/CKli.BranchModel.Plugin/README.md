@@ -193,7 +193,7 @@ The relationship between a `GitBranch` and its `GitDevBranch` is captured by an 
 | `IssueKind` | Meaning |
 |---|---|
 | `None` | Fine: `Ahead` doesn't exist, or is strictly ahead of `Branch`. |
-| `Useless` | `Ahead` has no commit beyond `Branch` (or identical tree) — should be deleted (auto-fixed unless checked out and dirty, see `AutoFixUselessBranch`). |
+| `Useless` | `Ahead` has no commit beyond `Branch` — should be deleted (auto-fixed unless checked out and dirty, see `AutoFixUselessBranch`). This is about commits, not content: an `Ahead` with commits of its own and the same tree as `Branch` (a "Producing 'vX' from unchanged head." commit that carries a version) is not useless. |
 | `Unrelated` | `Ahead` shares no common ancestor with `Branch` — must be fixed manually. |
 | `Desynchronized` | `Ahead` is behind `Branch` — fixable by merging `Branch` into `Ahead`. |
 | `DesynchronizedCheckout` | Same as above, but `Ahead` is checked out and the working folder is dirty — cannot be auto-merged. |

@@ -41,10 +41,11 @@ public sealed partial class BranchLink
         get
         {
             if( _ahead == null ) return IssueKind.None;
-            // If the ahead branch is not ahead, it is useless. We also consider the case of the exact same content:
-            // the "ahead empty commit" is here... it is useless...
-            bool sameContent = _branch.Tip.Tree.Sha == _ahead.Tip.Tree.Sha;
-            if( _aheadBy == 0 || sameContent )
+            // If the ahead branch is not ahead, it is useless.
+            // This is about commits, never about content: an ahead branch with the same content as its branch
+            // is NOT useless when it has commits of its own. The "Producing 'vX' from unchanged head." empty
+            // commit carries a version tag: deleting its branch would orphan that version.
+            if( _aheadBy == 0 )
             {
                 // ...but if the ahead branch is checked out and the working folder is dirty
                 // then we may not say that the ahead branch is useless:
@@ -119,7 +120,7 @@ public sealed partial class BranchLink
                     ? null
                     : newAhead == _ahead
                         ? this
-                        : new BranchLink( _branch, newAhead, _aheadName, _aheadBy, 0 );
+                        : Create( _branch, newAhead );
         }
         if( issue is IssueKind.DesynchronizedCheckout )
         {
@@ -227,7 +228,10 @@ public sealed partial class BranchLink
         Throw.CheckArgument( repo.Repository == RepositoryOf( Branch ) );
         if( _ahead != null ) return this;
         Branch ahead = CreateAheadBranch( repo, _branch.Tip, _aheadName, withEmptyInitializationCommit );
-        return new BranchLink( _branch, ahead, _aheadName, 1, 0 );
+        // The ahead branch can be on the base tip (no initialization commit), one commit ahead (the
+        // empty initialization commit), or anywhere when it has been created from an existing remote
+        // branch: the actual divergence must be computed.
+        return Create( _branch, ahead );
     }
 
     /// <summary>
@@ -286,7 +290,7 @@ public sealed partial class BranchLink
 
     /// <summary>
     /// Tries to merge the <paramref name="baseBranch"/> in the <paramref name="aheadBranch"/> (the "ahead" branch).
-    /// On success, the updated ahead branch is returned.
+    /// On success, the updated ahead branch is returned and the base branch's tip is reachable from it.
     /// </summary>
     /// <param name="monitor">The required monitor.</param>
     /// <param name="git">The repository.</param>
@@ -302,7 +306,10 @@ public sealed partial class BranchLink
     {
         Throw.CheckArgument( git.Repository == RepositoryOf( aheadBranch ) && git.Repository == RepositoryOf( baseBranch ) );
 
-        if( !git.MergeBranchContent( monitor, ref aheadBranch, baseBranch ) )
+        // A merge of commits, not of content: this fixes a Desynchronized link (the base branch has commits
+        // that the ahead branch doesn't have), which is about commits. When the two have diverged with the
+        // same content, skipping the (empty) merge commit would leave the link Desynchronized forever.
+        if( !git.MergeBranch( monitor, ref aheadBranch, baseBranch ) )
         {
             return null;
         }
@@ -334,8 +341,9 @@ public sealed partial class BranchLink
 
         bool aheadIsCheckedOut = aheadBranch.IsCurrentRepositoryHead;
 
-        // Merging the content only: an ahead branch that brings no change (like the "empty ahead commit")
-        // must not leave its commits in the base branch.
+        // The base branch is fast-forwarded whenever possible, even when the ahead branch brings no change
+        // (its commits may carry versions). Merging the content only means that no empty merge commit is
+        // created in the base branch when the two have diverged with the same content.
         if( !git.MergeBranchContent( monitor, ref baseBranch, aheadBranch ) )
         {
             return null;
