@@ -217,16 +217,20 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
         // but here we save the case where this Version is published.
         //
         // A "ci.0" is by definition produced on its base's own commit ("a true 0-based commit depth" - see the
-        // note above), so that commit can bear it. Recognizing it must NOT use
-        // SetCINumber( -1, impactStablePatchNumber: true ): that only decrements the Patch of a STABLE version,
-        // so it maps '0.3.4--ci.0' back to '0.3.3' but leaves a prerelease '0.3.4-romeo.0.ci.0' at
-        // '0.3.4-romeo.0'. Prerelease ci.0 builds were therefore never recognized: each one was refused here,
-        // which forced a useless empty commit and gave a "--ci.0" that was not at depth 0 at all.
-        // IsPreviousVersionNumbersOf compares Major.Minor.Patch only and ignores the prerelease, which is
-        // exactly the relation between a ci.0 build and the version it is based on.
+        // note above), so that commit can bear it.
+        //
+        // The relation MUST be the one VersionTagPlugin.Create recognizes when it reads the "ci.0" tags back:
+        // the base is SetCINumber( -1, impactStablePatchNumber: true ) of the "ci.0", on the same commit. That
+        // maps '0.3.4--ci.0' back to '0.3.3' and '0.3.4-romeo.0.ci.0' back to '0.3.4-romeo.0': a "ci.0" is on the
+        // branch of its base. A looser relation (IsPreviousVersionNumbersOf, that ignores the prerelease) once
+        // accepted a '1.0.1-juliet.0.ci.0' on the 'v1.0.0' commit: the tag was written, then found baseless
+        // at the next read, hence removable, and AutoFixRemovableTag deleted it - the "juliet" branch lost its
+        // only version and every consumer fell back to the stable one.
+        // Such a first build of a branch on another branch's version gets its own (empty) commit instead:
+        // RequiresNewCommit answers true and the roadmap computes a "ci.1".
         bool validCI0 = !IsBuildingOrLocal
-                        && ((version.CINumber == 0 && Version.IsPreviousVersionNumbersOf( version, out _ ))
-                            || (Version.CINumber == 0 && version.IsPreviousVersionNumbersOf( Version, out _ )));
+                        && ((version.CINumber == 0 && version.SetCINumber( -1, impactStablePatchNumber: true ) == Version)
+                            || (Version.CINumber == 0 && Version.SetCINumber( -1, impactStablePatchNumber: true ) == version));
 
         // rollingLocal requires IsBuildingOrLocal and validCI0 requires !IsBuildingOrLocal: they are mutually
         // exclusive. Only when NEITHER applies is the version refused (this was a "||" - hence always true - test).
