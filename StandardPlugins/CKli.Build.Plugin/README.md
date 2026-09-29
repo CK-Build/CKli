@@ -405,7 +405,7 @@ For every `HotGraph.Solution` (ordered topologically, `OrderedSolutions`), a `Ro
 | `FakeVersion` / `DeprecatedVersion` | The last built version tag is a `+fake` or `+deprecated` marker - never "skippable". |
 | `DependencyUpdate` | A package reference must move to a version coming from `<VersionTag>` plugin configuration or from cross-repo discrepancy resolution ("C"/"D" updates - "U" updates from already-built upstream packages are, by themselves, skippable). |
 | `CodeChange` | The commit's own code changed since the last build (conventional-commit/version-tag driven). |
-| `CI0` | `--ci.0` is used, there is no other reason to build, and the last version is a *published* non-CI build with no `ci.0` yet on this commit - forces a `ci.0` rebuild, opening a new version line above the published one. |
+| `CI0` | `--ci.0` is used, there is no other reason to build, and the last version is a *published* non-CI build with no `ci.0` yet on this commit - forces a `ci.0` rebuild, opening a new version line above the published one. From another branch's version (the first build of a prerelease branch on a stable commit) the version cannot be a `ci.0`, which is always on the branch of its base: it gets its own commit, becomes a `ci.1`, and the roadmap displays `(CI0+branch)`. |
 | `RollingLocal` | A CI build is done (the default mode is enough), there is no other reason to build, and the last version is a release build still pending as a `local/`/`building/` release - the CI version takes its place on the same commit. |
 
 `CI0` and `RollingLocal` are the two halves of "the commit already carries a version, build it in CI anyway", split

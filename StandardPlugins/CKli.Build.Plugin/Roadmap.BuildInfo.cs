@@ -192,7 +192,14 @@ public sealed partial class Roadmap
 
         internal IRenderable RenderBuildReason( ScreenType screen, ref RStats stats )
         {
-            IRenderable r = screen.Text( $"({_buildReason})", TextStyle.Default.With( TextEffect.Italic ) );
+            // A "--ci.0" from another branch's version cannot be a "ci.0": a "ci.0" is on the branch of its base
+            // (see TagCommit.CanBearVersion), so it gets its own commit and becomes a "ci.1". "CI0+branch" tells
+            // why the displayed target version is not the "ci.0" the user asked for.
+            var reason = _buildReason == MustBuildReason.CI0
+                         && _targetVersion.BranchName != _solution.LastBuild.Version.BranchName
+                            ? "CI0+branch"
+                            : _buildReason.ToString();
+            IRenderable r = screen.Text( $"({reason})", TextStyle.Default.With( TextEffect.Italic ) );
             if( _uUpdates != null )
             {
                 // This is used only when building the upstreams is skipped, the updates here are existing upstreams

@@ -47,7 +47,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     const string _dMaxDoP = "Maximal Degree of Parallelism of the builds and of the publications. Defaults to 4.";
     const string _dRelease = "Build regular exploratory, prerelease or stable versions instead of CI versions.";
     const string _oRelease = "--release";
-    const string _dCIForce = "Build a ci.0 version when a released version is already available on the commit.";
+    const string _dCIForce = "Build a ci.0 version when a released version is already available on the commit (a ci.1 from another branch's version).";
     const string _oCIForce = "--ci.0";
     const string _dSkipTests = "Don't run tests even if they have never locally run on the commit.";
     const string _dForceTests = "Run tests even if they have already run successfully on the commit.";

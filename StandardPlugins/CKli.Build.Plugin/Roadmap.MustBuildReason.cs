@@ -50,6 +50,11 @@ public sealed partial class Roadmap
         /// There is no code change, "--ci.0" (<see cref="CIBuildMode.CIForce"/>) is used and the last
         /// version is a PUBLISHED non-CI build: the commit must be rebuilt in CI, which opens a new
         /// version line above the published one. See <see cref="RollingLocal"/> for the local case.
+        /// <para>
+        /// From another branch's version (the first build of a prerelease branch on a stable commit), the
+        /// version cannot be a "ci.0": a "ci.0" is on the branch of its base. It gets its own commit and
+        /// becomes a "ci.1", and the roadmap displays "CI0+branch" for this reason.
+        /// </para>
         /// </summary>
         CI0 = 64,
 
