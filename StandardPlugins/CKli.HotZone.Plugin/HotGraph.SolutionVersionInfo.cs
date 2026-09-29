@@ -106,12 +106,24 @@ public sealed partial class HotGraph
             /// <summary>
             /// Gets whether a build is required because <see cref="TagCommit"/>'s content is not the same as
             /// the dev's git branch's tip content if it exists (otherwise, the <see cref="HotBranch.GitBranch"/> is used).
+            /// <para>
+            /// When the graph branch is missing in the repository, the content is the one of the commit that branch
+            /// would be created at (the <see cref="GitSolution.Commit"/>, see <c>HotBranch.GetStartCommit</c>): the
+            /// closest existing branch's tips are irrelevant. Comparing with them would detect a change - an unbuilt
+            /// "dev/stable" commit for a "CI" linked branch - that the build will not contain, and rebuild the last
+            /// built content under a new version.
+            /// </para>
             /// </summary>
             public bool HasCodeChange
             {
                 get
                 {
-                    HotBranch hotBranch = _info._solution.Branch;
+                    var solution = _info._solution;
+                    if( !solution.CanBeDevSolution )
+                    {
+                        return _tagCommit.Commit.Tree.Sha != solution.GitSolution.Commit.Tree.Sha;
+                    }
+                    HotBranch hotBranch = solution.Branch;
                     Throw.DebugAssert( hotBranch.Exists );
                     return _tagCommit.Commit.Tree.Sha != (hotBranch.GitDevBranch ?? hotBranch.GitBranch).Tip.Tree.Sha;
                 }
