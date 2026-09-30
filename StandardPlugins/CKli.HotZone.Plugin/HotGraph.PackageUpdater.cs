@@ -147,9 +147,7 @@ public sealed partial class HotGraph
                     {
                         return null;
                     }
-                    return _ciBuild && v.TagCommit.CI0Version != null
-                            ? v.TagCommit.CI0Version
-                            : v.TagCommit.Version;
+                    return _ciBuild ? v.TagCommit.CIVersion : v.TagCommit.Version;
                 }
                 return null;
             }

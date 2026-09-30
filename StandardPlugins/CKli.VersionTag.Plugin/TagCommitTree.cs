@@ -157,7 +157,7 @@ public sealed partial class TagCommitTree
                 var tc = candidates[i].T;
                 if( allowCI )
                 {
-                    return (tc, tc.CI0Version ?? tc.Version);
+                    return (tc, tc.CIVersion);
                 }
                 return tc.Version.IsCI ? (null, null) : (tc, tc.Version);
             }

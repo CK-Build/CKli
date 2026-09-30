@@ -128,9 +128,9 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         var t = info.HotZone.GetRequiredTagCommitTree( monitor, b );
         if( t == null ) return null;
         var tc = t.GetLastBuildWithFallback( branch.BranchName, allowCI ).Commit;
-        if( allowCI && !tc.Version.IsCI && tc.CI0Version != null ) 
+        if( allowCI && tc.CIVersion != tc.Version )
         {
-            return ITagCommit.Create( tc.Repo, tc.CI0Version, tc.Commit );
+            return ITagCommit.Create( tc.Repo, tc.CIVersion, tc.Commit );
         }
         return tc;
     }
@@ -782,10 +782,11 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     ci0VersionTags.RemoveAt( i-- );
                     continue;
                 }
-                // --ci.0 can be on the +fake with the same Major.Minor.Patch
+                // --ci.0 can be on the +fake with the same Major.Minor.Patch (or on the version that has since
+                // replaced this +fake on the same commit: the +fake has been built or published)
                 // or on a non fake with a previous patch number.
                 var vBase = v.SetCINumber( -1, impactStablePatchNumber: false );
-                if( (!v2c.TryGetValue( vBase, out var tBase ) || !tBase.IsFakeVersion) && v.Patch > 0 )
+                if( (!v2c.TryGetValue( vBase, out var tBase ) || !(tBase.IsFakeVersion || tBase.Sha == t.Target.Sha)) && v.Patch > 0 )
                 {
                     vBase = v.SetCINumber( -1, impactStablePatchNumber: true );
                     if( v2c.TryGetValue( vBase, out tBase ) && tBase.IsFakeVersion ) 

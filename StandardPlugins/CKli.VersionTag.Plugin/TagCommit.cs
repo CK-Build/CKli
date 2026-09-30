@@ -130,6 +130,16 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     public SVersion? CI0Version => _ci0Version;
 
     /// <summary>
+    /// Gets the version that a CI build considers for this TagCommit: the <see cref="CI0Version"/> if it exists,
+    /// except when it has been superseded by this <see cref="Version"/>.
+    /// <para>
+    /// A "v1.0.0--ci.0" produced on a "v1.0.0+fake" is the version while the fake is alive (<see cref="IsOrHasFakeVersion"/>),
+    /// but once the fake has been replaced on the same commit by its published "v1.0.0", this greater Version wins.
+    /// </para>
+    /// </summary>
+    public SVersion CIVersion => _ci0Version != null && (IsOrHasFakeVersion || _ci0Version > _version) ? _ci0Version : _version;
+
+    /// <summary>
     /// Gets the "+fake" TagCommit that carries this same <see cref="Version"/> if it exists.
     /// This is available only when <see cref="IsBuildingOrLocal"/> is true.
     /// <para>
@@ -330,7 +340,8 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
 #endif
         Throw.DebugAssert( tag != null && tag.IsAnnotated && BuildContentInfo.TryParse( tag.Annotation.Message, out _ ) );
         Throw.DebugAssert( v.CINumber == 0
-                            && ((v.SetCINumber( -1, impactStablePatchNumber: false ) == _version && IsOrHasFakeVersion)
+                            // On the +fake, or on the version that replaced it on its commit once built or published.
+                            && ((v.SetCINumber( -1, impactStablePatchNumber: false ) == _version)
                                 ||
                                 (v.SetCINumber( -1, impactStablePatchNumber: true ) == _version && !IsOrHasFakeVersion)) );
         _ci0Tag = tag;

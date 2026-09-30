@@ -270,9 +270,13 @@ public sealed partial class VersionTagInfo : RepoInfo
     }
 
     /// <summary>
-    /// Gets all the <see cref="TagCommit"/>.
+    /// Gets all the <see cref="TagCommit"/>, each of them once.
+    /// <para>
+    /// A TagCommit that holds a <see cref="TagCommit.CI0Version"/> is indexed twice by version (under
+    /// its <see cref="TagCommit.Version"/> and under its CI0Version): the second entry is skipped.
+    /// </para>
     /// </summary>
-    public IEnumerable<TagCommit> AllTagCommits => _v2C.Values;
+    public IEnumerable<TagCommit> AllTagCommits => _v2C.Where( kv => kv.Key != kv.Value.CI0Version ).Select( kv => kv.Value );
 
     /// <summary>
     /// Enumerates all the versions with the <see cref="Tag"/> that declares them and their associated <see cref="TagCommit"/>.
@@ -292,7 +296,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     {
         get
         {
-            foreach( var tc in _v2C.Values )
+            foreach( var tc in AllTagCommits )
             {
                 yield return (tc.Version, tc.Tag, tc);
                 if( tc.CI0Version != null ) yield return (tc.CI0Version, tc.CI0VersionTag!, tc);
