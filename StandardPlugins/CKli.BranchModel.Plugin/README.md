@@ -221,7 +221,7 @@ branch doesn't exist), `Synchronize` and `Close` pass the parent.
 
 | `[CommandPath]` | Purpose |
 |---|---|
-| `branch list` | Displays the opened branches of the World as an indented tree (`BranchNamespace.GetDisplayBranches`), each one prefixed by its link type's compact code, followed by the legend that maps each code to the name the configuration and `--link` use. World-global: it reports the `BranchNamespace`, not the Git branches of the repositories (that is `ckli issue`). |
+| `branch list` | Displays the opened branches of the World as an indented tree (`BranchNamespace.GetDisplayBranches`), each one prefixed by its link type's compact code, followed by the legend that maps each code to the name the configuration and `--link` use. A second column summarizes where each branch has changes: see [What `branch list` reads](#what-branch-list-reads). World-global: it reports the `BranchNamespace`, not the Git branches of the repositories (that is `ckli issue`). |
 | `branch open <branchName> [--link] [--parent]` | Opens (or updates the link type of) a pre-release or `explo/` branch: updates the `BranchNamespace`, then creates/synchronizes the corresponding `dev/` branch in every repo under the current path and checks it out. `--link` (`Manual`/`Release`/`CI`/`Full`) defaults to `CI` for a new branch and leaves an already opened branch's link type unchanged. |
 | `branch close <branchName> [--discard]` | Retires a branch World-wide: integrates it into its closest *open parent* branch (via `HotBranch.Close`) in every repo, then removes it from the namespace. Must be run at the World root; `--discard` skips the Git-side integration and only edits the namespace. |
 | `branch switch <branch> [--create/-c] [--all]` | Checks out `branch` (or its `dev/` branch if it exists) in the current/all repos; `--create` first ensures the branch exists and synchronizes it. |
@@ -232,6 +232,35 @@ All commands accept the standard `IActivityMonitor` + `CKliEnv` prefix; reposito
 follows the usual CKli convention (current directory's repo(s), or `--all`/`all` for the whole
 World). `TryParseBranchFixName` is a small static helper (`fix/vMAJOR.MINOR` parsing) kept here for
 reuse by the Fix Workflow machinery in `CKli.HotZone.Plugin`.
+
+### What `branch list` reads
+
+```
+Opened branches of 'Test':
+stable        4 repositories
+  => bravo    No change, 4 unchanged.
+    => alpha  X-Core and 1 other repository, 2 unchanged, weight: 3 repositories, 3 projects.
+```
+
+The root row counts the World's repositories. Every other row lists the **tips** of the repositories
+where the branch has changes (the ones none of whose upstreams has changes), then how many other such
+repositories there are, the number of repositories where the branch is opened but **unchanged**, and the
+**weight** of the branch: the repositories and projects (all the projects of their solutions) that a build of
+the branch touches. That is the repositories with changes and all their downstreams, unchanged ones included:
+above, X-Middle is unchanged but weighs, since it is updated with X-Core's new version.
+
+- **Unchanged is about content, not commits**, and this notion exists only here: a branch is unchanged when the
+  tree of its tip (`GitDevBranch ?? GitBranch`) is the tree of its merge base with its closest existing
+  parent. The empty merge commits of a synchronization and the "Producing 'vX' from unchanged head."
+  commits bring nothing to a reader of the system. This is deliberately the opposite of the
+  [useless `dev/` branch](#issue-detection-worldeventsissue-and-ckli-issue) rule, which counts commits so
+  that a version is never orphaned.
+- **Upstreams are transitive and every repository is read.** A repository where the branch doesn't exist
+  is read from its closest existing branch: with X-Core ← X-Middle ← X-App and changes in X-Core and X-App
+  only, X-App is not a tip.
+- **No `HotGraph`**: `CKli.HotZone.Plugin` depends on this plugin, and a `HotGraph` refuses a World with
+  issues. The relation is computed from the shallow solutions alone, with the HotGraph's project name to
+  package identifier heuristic (an explicitly non packable project produces nothing).
 
 ### Issue detection: `World.Events.Issue` and `ckli issue`
 
