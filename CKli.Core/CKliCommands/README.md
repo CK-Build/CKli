@@ -576,8 +576,8 @@ and, when there is one, the `CKli.Testing` reference of `Tests/Plugins.Tests`.
 `CKli.Plugins.Core` and every Standard Plugin package are referenced at `$(CKliVersion)` rather than at a
 literal version, and that property comes from a **generated, git ignored** `CKli.Version.props` sitting beside
 `Directory.Build.props`. So the CKli version each developer runs is *not* recorded in the Stack repository:
-two developers on two CKli versions no longer produce a conflicting change in a tracked file. (It used to be a
-literal version rewritten on every World open, which left the Stack dirty and made the next `pull` fail.)
+two developers on two CKli versions don't produce a conflicting change in a tracked file. A literal version in a
+tracked file would be rewritten on every World open, leaving the Stack dirty and making the next `pull` fail.
 
 `CKli.Version.props` is written on every World open, and rewriting it is what triggers a recompilation of the
 plugins. `ckli` passes the value to its own builds explicitly; an IDE or a plain `dotnet build`/`dotnet test`
