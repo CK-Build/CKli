@@ -11,22 +11,21 @@ namespace CKli.BranchModel.Plugin;
 public sealed partial class BranchModelPlugin
 {
     /// <summary>
-    /// Displays the opened branches of the World and, for each of them, the repositories where it has changes.
+    /// Implements "ckli branch list" (the command is handled by the HotZone plugin, that provides the
+    /// <paramref name="versionResolver"/>): displays the opened branches of the World and, for each of them, what
+    /// "ckli branch sync" would do and the repositories where it has changes.
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The minimal context.</param>
+    /// <param name="versionResolver">
+    /// Optional provider of the resolver of the package versions that conflict: with it, a merge that conflicts on
+    /// package versions only is a merge, as it is for "ckli branch sync". It receives the branch and a monitor that is
+    /// not bound to the screen.
+    /// </param>
     /// <returns>True on success, false if a solution cannot be read.</returns>
-    [Description( """
-        Displays the opened branches of the World and how each one is linked to its parent.
-        For each branch, the repositories where it has changes are summarized by their tips (the ones that have no
-        upstream repository where the branch has changes), the number of repositories where the branch is opened
-        without changes and the weight of the branch: the number of repositories and projects that a build of the
-        branch touches (the ones with changes and all their downstreams).
-        When a branch is behind its link, a "Branch sync" column tells what "ckli branch sync" would do: the number of
-        fast-forwards and merges, and the repositories where the merge conflicts.
-        """ )]
-    [CommandPath( "branch list" )]
-    public bool BranchList( IActivityMonitor monitor, CKliEnv context )
+    public bool DisplayBranchList( IActivityMonitor monitor,
+                                   CKliEnv context,
+                                   Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver )
     {
         var repos = World.GetAllDefinedRepo( monitor );
         if( repos == null ) return false;
@@ -55,7 +54,7 @@ public sealed partial class BranchModelPlugin
                                     ? Repositories( repos.Count )
                                     : GetChangeSummary( monitor, repos, infos, b, reader );
                 cells.Add( (label.Box( marginLeft: 2 * depth, marginRight: 2 ),
-                            GetSyncStatus( syncMonitor, s, infos, b ),
+                            GetSyncStatus( syncMonitor, s, infos, b, versionResolver ),
                             s.Text( summary, ConsoleColor.DarkGray )) );
             }
         }
@@ -120,7 +119,11 @@ public sealed partial class BranchModelPlugin
     /// with depend on a fetch, that is the business of "ckli pull".
     /// </para>
     /// </summary>
-    IRenderable? GetSyncStatus( IActivityMonitor monitor, ScreenType s, BranchModelInfo[] infos, BranchName b )
+    IRenderable? GetSyncStatus( IActivityMonitor monitor,
+                                ScreenType s,
+                                BranchModelInfo[] infos,
+                                BranchName b,
+                                Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver )
     {
         if( b.IsRoot || b.LinkType is BranchLinkType.Manual or BranchLinkType.None )
         {
@@ -132,7 +135,7 @@ public sealed partial class BranchModelPlugin
         var unknowns = new List<string>();
         foreach( var info in infos )
         {
-            switch( GetSyncStatus( monitor, info, b ) )
+            switch( GetSyncStatus( monitor, info, b, versionResolver ) )
             {
                 case SyncStatus.FastForward: ++fastForwards; break;
                 case SyncStatus.Merge: ++merges; break;
@@ -162,8 +165,12 @@ public sealed partial class BranchModelPlugin
     /// Classifies the branch <paramref name="b"/> of a repository the same way <see cref="HotBranch.Synchronize"/>
     /// integrates its <see cref="HotBranch.GetLinkCommit"/>: nothing to do when the commit is already reachable or
     /// brings no content, a fast-forward, or a merge that is computed (in the object database only) to detect a conflict.
+    /// With a <paramref name="versionResolver"/>, a merge that conflicts on package versions only is a merge.
     /// </summary>
-    SyncStatus? GetSyncStatus( IActivityMonitor monitor, BranchModelInfo info, BranchName b )
+    SyncStatus? GetSyncStatus( IActivityMonitor monitor,
+                               BranchModelInfo info,
+                               BranchName b,
+                               Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver )
     {
         Throw.DebugAssert( b.Parent != null );
         var hb = info.Branches[b.Index];
@@ -183,7 +190,19 @@ public sealed partial class BranchModelPlugin
         // Diverged with the same content: Synchronize creates no empty merge commit.
         if( tip.Tree.Sha == linkCommit.Tree.Sha ) return SyncStatus.UpToDate;
         var merge = git.ObjectDatabase.MergeCommits( tip, linkCommit, new MergeTreeOptions { SkipReuc = true, FailOnConflict = true } );
-        return merge.Tree == null ? SyncStatus.Conflict : SyncStatus.Merge;
+        if( merge.Tree != null ) return SyncStatus.Merge;
+        if( versionResolver == null ) return SyncStatus.Conflict;
+        // The same aligned merge as the synchronization (its objects are left unreferenced in the object database).
+        return PackageVersionMerge.CreateMergeCommit( monitor,
+                                                      info.Repo.GitRepository,
+                                                      tip,
+                                                      linkCommit,
+                                                      b.Name,
+                                                      $"commit '{linkCommit.Sha.AsSpan( 0, 7 )} {linkCommit.MessageShort}'",
+                                                      () => versionResolver( monitor, b ),
+                                                      out _ ) != null
+                ? SyncStatus.Merge
+                : SyncStatus.Conflict;
     }
 
     /// <summary>

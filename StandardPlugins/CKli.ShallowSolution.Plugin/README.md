@@ -178,6 +178,31 @@ doc comment explains the motivation: `dotnet package update`
 only operates on one project at a time and silently no-ops when a package isn't found — unusable for a batched,
 multi-repository update.
 
+### `PackageVersionMerge`
+
+The other writing side, and it writes **objects only**: `PackageVersionMerge.CreateMergeCommit(monitor, git, ours,
+theirs, oursName, theirsName, getResolver, out aligned)` creates the merge commit of `theirs` into `ours` in the
+object database (no branch moves, no working folder) for merges that conflict on package versions only — two
+branches built independently both rewrite the references to the World's packages, on the very same lines.
+
+- **The versions are aligned before merging, not repaired afterwards.** In each conflicting project file, every
+  `(package, attribute)` whose value differs between the two sides is set, on **both** sides, to what the
+  `IPackageVersionResolver` answers. Both aligned trees are committed as children of their original commit (so the
+  merge base doesn't change) and merged: the version lines have been changed the same way on both sides and no
+  longer conflict, so **whatever still conflicts is a real conflict** and fails, as does a conflict in a file that
+  is not a project file. The merge commit has the aligned merge's tree and `[ours, theirs]` as parents, and the
+  same `Merged {theirsName}.` message as `GitRepository.MergeBranchContent`.
+- **The project files are `MutableSolution.UpdatePackages`' ones**: `<PackageVersion Version>` in a
+  `Directory.Packages.props`, `<PackageReference Version|VersionOverride>` in any other `*proj` file and in
+  `Directory.Build.props`. `Version` and `VersionOverride` are aligned separately (an override exists to differ).
+- **It is a text edit of the attribute value**: nothing else changes in the files (layout, encoding, BOM, line
+  endings), unlike `MutableSolution`'s `XElement` round trip. Only the identifiers that differ between the two
+  sides are touched: aligning the others is the next build's business.
+- **`getResolver` is called only when it is needed**: the merge conflicts, and on project files only. A null
+  resolver (it must have logged why) fails the merge. `CKli.HotZone.Plugin` provides it from the branch's
+  `HotGraph`, and `HotBranch.Synchronize` fast-forwards the `dev/` branch to the returned commit (which is what
+  handles a checked out `dev/`).
+
 ### Package mappings: `IPackageMapping`, `PackageMapper`, `BrutalPackageMapper`, `PackageBounds`
 
 ```csharp
@@ -240,6 +265,7 @@ Three implementations are provided here (`CKli.Build.Plugin`'s `FixPackageMapper
 | `GitSolutionContent` / `GitSolutionContent.Project` | Read-only projects + consumed packages, independent of any `Repo`/`Branch`. |
 | `GitSolution` | `GitSolutionContent` bound to the `Repo`/`Branch` it was read from. |
 | `MutableSolution` | Working-folder-only solution used to rewrite package versions in place; handles `.sln` → `.slnx` migration and renaming. |
+| `PackageVersionMerge` / `IPackageVersionResolver` | Creates a merge commit (objects only) whose package version conflicts are aligned on both sides with the resolver's answer; any other conflict fails. |
 | `CommonSolution` | Internal shared walker: resolves `.slnx` `<Project>` entries and `Directory.*.props` files. |
 | `INormalizedFileProvider` / `TreeFolder` / `CheckedOutFileProvider` / `GitFileInfo` / `FileInfoExtensions` | Uniform read-only file access over either a Git `Tree` or the physical working folder. |
 | `IPackageMapping` / `PackageMappingType` / `PackageMappingExtensions` / `PackageMapper` / `BrutalPackageMapper` | Package-id + version → target-version mapping abstraction used for update detection and application. `PackageMappingType` says, per identifier, whether an unmapped version is "leave it alone" or an anomaly. |

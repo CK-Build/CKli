@@ -1,7 +1,10 @@
 using CK.Core;
 using CKli.Core;
+using CKli.ShallowSolution.Plugin;
 using LibGit2Sharp;
+using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 
 namespace CKli.BranchModel.Plugin;
 
@@ -349,8 +352,15 @@ public sealed class HotBranch
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="applyLink">Optional link type to consider. By default, this configured <see cref="BranchName.LinkType"/> is considered.</param>
+    /// <param name="versionResolver">
+    /// Optional provider of the resolver of the package versions that conflict when merging the link commit (see
+    /// <see cref="PackageVersionMerge"/>). It is called only when such a merge conflicts and only on project files;
+    /// returning null (that must have logged why) fails the synchronization. Without it, any conflict fails it.
+    /// </param>
     /// <returns>True on success, false on error.</returns>
-    public bool Synchronize( IActivityMonitor monitor, BranchLinkType applyLink = BranchLinkType.None )
+    public bool Synchronize( IActivityMonitor monitor,
+                             BranchLinkType applyLink = BranchLinkType.None,
+                             Func<IActivityMonitor, IPackageVersionResolver?>? versionResolver = null )
     {
         Throw.CheckState( Exists );
         // Merge the tracked branches of the regular and the dev/ if they exist.
@@ -407,15 +417,59 @@ public sealed class HotBranch
             var dev = EnsureDevBranch();
             // Full merges the parent's branch rather than its tip commit: the merge then refuses a checked out
             // and dirty parent and names the branch in its commit message.
-            bool merged = applyLink is BranchLinkType.Full
-                            ? Repo.GitRepository.MergeBranchContent( monitor, ref dev, parent.GitDevBranch ?? parent.GitBranch )
-                            : Repo.GitRepository.MergeBranchContent( monitor, ref dev, linkCommit );
+            var parentBranch = applyLink is BranchLinkType.Full ? parent.GitDevBranch ?? parent.GitBranch : null;
+            // A merge commit is needed when the histories have diverged and the contents differ: this is where the
+            // package versions may conflict.
+            bool merged = versionResolver != null && d.BehindBy is not 0 && dev.Tip.Tree.Sha != linkCommit.Tree.Sha
+                            ? MergeAligningPackageVersions( monitor, ref dev, parentBranch, linkCommit, versionResolver )
+                            : parentBranch != null
+                                ? Repo.GitRepository.MergeBranchContent( monitor, ref dev, parentBranch )
+                                : Repo.GitRepository.MergeBranchContent( monitor, ref dev, linkCommit );
             if( !merged || !Refresh( monitor ) )
             {
                 return false;
             }
         }
         return true;
+    }
+
+    // Same as GitRepository.MergeBranchContent, but the package versions that conflict are aligned (see PackageVersionMerge).
+    // The merge commit is created in the object database and the "dev/" branch is fast-forwarded to it: this is what
+    // handles the "dev/" being checked out.
+    bool MergeAligningPackageVersions( IActivityMonitor monitor,
+                                       ref Branch dev,
+                                       Branch? parentBranch,
+                                       Commit linkCommit,
+                                       Func<IActivityMonitor, IPackageVersionResolver?> versionResolver )
+    {
+        var git = Repo.GitRepository;
+        if( parentBranch != null && parentBranch.IsCurrentRepositoryHead && !git.CheckCleanCommit( monitor ) )
+        {
+            return false;
+        }
+        var otherName = parentBranch != null
+                            ? $"branch '{parentBranch.FriendlyName}'"
+                            : $"commit '{linkCommit.Sha.AsSpan( 0, 7 )} {linkCommit.MessageShort}'";
+        var merge = PackageVersionMerge.CreateMergeCommit( monitor,
+                                                           git,
+                                                           dev.Tip,
+                                                           linkCommit,
+                                                           dev.FriendlyName,
+                                                           otherName,
+                                                           () => versionResolver( monitor ),
+                                                           out var aligned );
+        if( merge == null )
+        {
+            return false;
+        }
+        if( aligned.Count > 0 )
+        {
+            monitor.Info( $"""
+                Merging {otherName} into '{dev.FriendlyName}' in '{Repo.DisplayPath}' aligned {aligned.Count} package version(s):
+                {aligned.Select( a => $"{a.PackageId}: {a.Ours} / {a.Theirs} => {a.Resolved}" ).Concatenate( Environment.NewLine )}
+                """ );
+        }
+        return git.MergeBranchContent( monitor, ref dev, merge );
     }
 
     /// <summary>

@@ -203,11 +203,15 @@ The relationship between a `GitBranch` and its `GitDevBranch` is captured by an 
 - **`EnsureExists`** — creates the branch from the closest existing ancestor if missing.
 - **`Close`** — integrates `dev/` into the branch, then merges the branch into its closest existing
   parent and deletes it (used to retire a pre-release line).
-- **`Synchronize(monitor, applyLink)`** — the core propagation logic: merges tracked (`origin/...`)
-  branches first, resolves `Desynchronized`/`Useless` locally, then — unless the link is `Manual`
-  or `None` — synchronizes the closest existing parent with its own remote branches (as a `Manual`
-  link: the parent's own link is not followed) and merges its `GetLinkCommit` into `dev/` when this
-  branch doesn't already contain it.
+- **`Synchronize(monitor, applyLink, versionResolver)`** — the core propagation logic: merges tracked
+  (`origin/...`) branches first, resolves `Desynchronized`/`Useless` locally, then — unless the link is
+  `Manual` or `None` — synchronizes the closest existing parent with its own remote branches (as a
+  `Manual` link: the parent's own link is not followed) and merges its `GetLinkCommit` into `dev/` when
+  this branch doesn't already contain it. The optional `versionResolver` provides an
+  `IPackageVersionResolver`: when the merge needs a merge commit, it goes through
+  `ShallowSolution`'s `PackageVersionMerge`, which aligns the package versions that conflict and fails
+  only on what still conflicts. It is called only when such a merge conflicts on project files (so a
+  `HotGraph` is computed only then); without it, any conflict fails.
 - **`GetLinkCommit(monitor, parent, linkType)`** — what a link propagates, read without changing
   anything: `Full` gives the parent's `dev/` tip (its regular tip when there is no `dev/`), `Release`/`CI`
   the commit from `ITagCommitProvider`. `Synchronize` merges it and `GetStartCommit` creates a missing
@@ -226,11 +230,11 @@ branch doesn't exist), `Synchronize` and `Close` pass the parent.
 
 | `[CommandPath]` | Purpose |
 |---|---|
-| `branch list` | Displays the opened branches of the World as an indented tree (`BranchNamespace.GetDisplayBranches`), each one prefixed by its link type's compact code, followed by the legend that maps each code to the name the configuration and `--link` use. A last column summarizes where each branch has changes and, when a branch is behind its link, a column before it tells what `branch sync` would do: see [What `branch list` reads](#what-branch-list-reads). World-global: it reports the `BranchNamespace`, not the Git branches of the repositories (that is `ckli issue`). |
+| `branch list` | **Handled by [`CKli.HotZone.Plugin`](../CKli.HotZone.Plugin/README.md#how-branch-sync-and-branch-list), implemented here** (`DisplayBranchList`). Displays the opened branches of the World as an indented tree (`BranchNamespace.GetDisplayBranches`), each one prefixed by its link type's compact code, followed by the legend that maps each code to the name the configuration and `--link` use. A last column summarizes where each branch has changes and, when a branch is behind its link, a column before it tells what `branch sync` would do: see [What `branch list` reads](#what-branch-list-reads). World-global: it reports the `BranchNamespace`, not the Git branches of the repositories (that is `ckli issue`). |
 | `branch open <branchName> [--link] [--parent]` | Opens (or updates the link type of) a pre-release or `explo/` branch: updates the `BranchNamespace`, then creates/synchronizes the corresponding `dev/` branch in every repo under the current path and checks it out. `--link` (`Manual`/`Release`/`CI`/`Full`) defaults to `CI` for a new branch and leaves an already opened branch's link type unchanged. |
 | `branch close <branchName> [--discard]` | Integrates the branch into its closest *existing parent* branch (via `HotBranch.Close`) in the repos under the current path, and removes it from the namespace once no repo of the World has it anymore. See [Closing a branch](#closing-a-branch). `--discard` skips the Git-side integration and only edits the namespace: it must be run at the World root. |
 | `branch switch <branch> [--create/-c] [--all]` | Checks out `branch` (or its `dev/` branch if it exists) in the current/all repos; `--create` first ensures the branch exists and synchronizes it. |
-| `branch sync <branch> [mode] [--all]` | Runs `HotBranch.Synchronize` for `branch` in the current/all repos, optionally overriding the configured `LinkType` with `mode` (`Release`/`CI`/`Full`). A repository with issues is skipped and fails the command; the others are still synchronized. When `branch` (or its `dev/`) was checked out, its `dev/` branch is checked out afterwards: a merge can create it, and the auto fix of a useless `dev/` moves the checkout to the base branch. |
+| `branch sync <branch> [mode] [--all]` | **Handled by [`CKli.HotZone.Plugin`](../CKli.HotZone.Plugin/README.md#how-branch-sync-and-branch-list), implemented here** (`SynchronizeBranch`): the package versions that conflict are resolved the way a build of the branch updates them. Runs `HotBranch.Synchronize` for `branch` in the current/all repos, optionally overriding the configured `LinkType` with `mode` (`Release`/`CI`/`Full`). A repository with issues is skipped and fails the command; the others are still synchronized. When `branch` (or its `dev/`) was checked out, its `dev/` branch is checked out afterwards: a merge can create it, and the auto fix of a useless `dev/` moves the checkout to the base branch. |
 | `commit <message> [--all]` | Commits any pending changes in the current/all repos (no-op if nothing changed). |
 
 All commands accept the standard `IActivityMonitor` + `CKliEnv` prefix; repository selection
@@ -287,9 +291,9 @@ above, X-Middle is unchanged but weighs, since it is updated with X-Core's new v
 - **Upstreams are transitive and every repository is read.** A repository where the branch doesn't exist
   is read from its closest existing branch: with X-Core ← X-Middle ← X-App and changes in X-Core and X-App
   only, X-App is not a tip.
-- **No `HotGraph`**: `CKli.HotZone.Plugin` depends on this plugin, and a `HotGraph` refuses a World with
-  issues. The relation is computed from the shallow solutions alone, with the HotGraph's project name to
-  package identifier heuristic (an explicitly non packable project produces nothing).
+- **No `HotGraph` for the summary**: `CKli.HotZone.Plugin` depends on this plugin, and a `HotGraph` refuses a
+  World with issues. The relation is computed from the shallow solutions alone, with the HotGraph's project
+  name to package identifier heuristic (an explicitly non packable project produces nothing).
 
 When at least one branch is not up to date with its link, a **Branch sync** column between the branch and
 its summary tells what `ckli branch sync` would do to it:
@@ -307,7 +311,10 @@ implement it yet.
 For each repository where the branch exists, its tip (`GitDevBranch ?? GitBranch`) is compared with the
 `HotBranch.GetLinkCommit` of its closest existing parent, in the order `Synchronize` merges it: up to date
 when that commit is reachable or brings no content (nothing is shown), a **fast-forward**, or a **merge**
-that is computed in the object database only, to tell a clean one from a **conflict**. Conflicts are the
+that is computed in the object database only, to tell a clean one from a **conflict**. A merge that conflicts
+on package versions only is computed the way `branch sync` resolves it (`PackageVersionMerge`, with the
+resolver from the branch's `HotGraph`, computed only when such a conflict is found): it is a merge. When the
+`HotGraph` cannot be obtained (a World with issues), it stays a conflict. Conflicts are the
 only outcome that needs someone, so they are the only one that names its repositories (in red);
 **unknown** ones (yellow) are where the commit to integrate cannot be found: a Release or CI link
 without an `ITagCommitProvider`, or a repository whose version tags have issues. Their errors go to a

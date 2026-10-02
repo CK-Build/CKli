@@ -1,30 +1,36 @@
 using CK.Core;
 using CKli.Core;
+using CKli.ShallowSolution.Plugin;
+using System;
 
 namespace CKli.BranchModel.Plugin;
 
 public sealed partial class BranchModelPlugin
 {
     /// <summary>
-    /// Synchronize the specified branch with its closest parent branch.
+    /// Implements "ckli branch sync" (the command is handled by the HotZone plugin, that provides the
+    /// <paramref name="versionResolver"/>): synchronizes the specified branch with its closest parent branch.
+    /// <para>
+    /// A repository with issues is skipped and fails the command; the other ones are still synchronized. When the branch
+    /// (or its "dev/") was checked out, its "dev/" branch is checked out afterwards.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The minimal context.</param>
     /// <param name="branch">The branch name to synchronize.</param>
     /// <param name="mode">Specifies the mode (Release, CI or Full). Overrides the configured mode.</param>
+    /// <param name="all">Consider all the Repos of the current World (even if current path is in a Repo).</param>
+    /// <param name="versionResolver">
+    /// Optional provider of the resolver of the package versions that conflict (see <see cref="HotBranch.Synchronize"/>).
+    /// It receives the branch to synchronize.
+    /// </param>
     /// <returns>True on success, false on error.</returns>
-    [Description( """
-        Synchronize the specified branch with its closest parent branch.
-        """ )]
-    [CommandPath( "branch sync" )]
-    public bool BranchSync( IActivityMonitor monitor,
-                            CKliEnv context,
-                            [Description( "Branch name to synchronize." )]
-                            string branch,
-                            [Description( "Specifies the mode (Release, CI or Full). Overrides the configured link type." )]
-                            string? mode = null,
-                            [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
-                            bool all = false )
+    public bool SynchronizeBranch( IActivityMonitor monitor,
+                                   CKliEnv context,
+                                   string branch,
+                                   string? mode,
+                                   bool all,
+                                   Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver )
     {
         if( !ParseLink( monitor, mode, allowManual: false, out var linkType ) )
         {
@@ -35,7 +41,9 @@ public sealed partial class BranchModelPlugin
             return false;
         }
         Throw.DebugAssert( (branchName.LinkType is BranchLinkType.None) == branchName.IsRoot );
-
+        Func<IActivityMonitor, IPackageVersionResolver?>? resolver = versionResolver != null
+                                                                        ? m => versionResolver( m, branchName )
+                                                                        : null;
         bool success = true;
         foreach( var repo in repos )
         {
@@ -55,7 +63,7 @@ public sealed partial class BranchModelPlugin
             {
                 continue;
             }
-            if( !b.Synchronize( monitor, linkType ) )
+            if( !b.Synchronize( monitor, linkType, resolver ) )
             {
                 success = false;
                 continue;

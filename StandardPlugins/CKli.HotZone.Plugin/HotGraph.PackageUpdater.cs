@@ -122,6 +122,28 @@ public sealed partial class HotGraph
                                                                                                                                          kv => kv.Value.Max( sv => sv.Version )!,
                                                                                                                                          StringComparer.OrdinalIgnoreCase ) );
 
+        /// <summary>
+        /// Creates the resolver of the package versions that conflict when merging into this graph's branch (see
+        /// <see cref="PackageVersionMerge"/>): a package is resolved the way a build of the branch updates the
+        /// references of a solution it doesn't rebuild. The <see cref="GetAlreadyBuiltMapping(bool)"/> maps a package
+        /// of the World, then the <see cref="WorldConfiguredMapping"/> applies the World's bounds and the greatest of
+        /// the two versions is the default (this is the <see cref="DiscrepanciesMapping"/> rule, applied to the two sides).
+        /// </summary>
+        /// <param name="ciBuild">True for the CI point of view.</param>
+        /// <returns>The resolver.</returns>
+        public IPackageVersionResolver CreateVersionResolver( bool ciBuild ) => new VersionResolver( GetAlreadyBuiltMapping( ciBuild ), WorldConfiguredMapping );
+
+        sealed class VersionResolver( IPackageMapping alreadyBuilt, IPackageMapping configured ) : IPackageVersionResolver
+        {
+            public SVersion Resolve( string packageId, SVersion ours, SVersion theirs )
+            {
+                var greatest = ours.CompareTo( theirs ) >= 0 ? ours : theirs;
+                return alreadyBuilt.GetMappedVersion( packageId, greatest )
+                       ?? configured.GetMappedVersion( packageId, greatest )
+                       ?? greatest;
+            }
+        }
+
         sealed class LastBuildVersionMapping : IPackageMapping
         {
             readonly Dictionary<string, Solution> _p2s;

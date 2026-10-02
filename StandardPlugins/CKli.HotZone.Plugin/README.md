@@ -67,6 +67,32 @@ starting a workflow: it checks that no repo is dirty and that no repo's `Version
 `BranchModelInfo` currently has an issue, logging one error per offending repo. `CKli.Build.Plugin`
 calls it from `BuildPlugin.Fix.cs` before building a Fix Workflow.
 
+## How: `branch sync` and `branch list`
+
+Both commands are implemented by `CKli.BranchModel.Plugin` (`BranchModelPlugin.SynchronizeBranch` and
+`DisplayBranchList`, documented in [its README](../CKli.BranchModel.Plugin/README.md#commands)) but handled here
+(`HotZonePlugin.Branch.cs`): a command is not tied to the plugin that implements its feature, and this one
+needs a `HotGraph`.
+
+Two branches that are built independently both rewrite the references to the World's packages, so merging
+a parent's build into its child typically conflicts on the very same `<PackageReference Version="..." />`
+lines, each side referencing its own build. These conflicts are resolved the way a build of the branch updates the
+references of a solution it doesn't rebuild: `HotGraph.PackageUpdater.CreateVersionResolver( ciBuild )` maps a
+package with `GetAlreadyBuiltMapping` (a World package: its producer's last build *for this branch*, the
+closest branch toward the root), then `WorldConfiguredMapping` (the World's bounds), and defaults to the
+greatest of the two versions (the `DiscrepanciesMapping` rule applied to the two sides). The merges go to the
+`dev/` branches, so the graph is the CI one.
+
+`CreateVersionResolverProvider` computes the `HotGraph` of a branch the first time a merge of that branch
+conflicts on project files and caches it, failure included: a sync or a list without such a conflict never
+computes it, and a World with issues (that has no `HotGraph`) still synchronizes everything that merges
+cleanly. The aligned merge itself is `ShallowSolution`'s
+[`PackageVersionMerge`](../CKli.ShallowSolution.Plugin/README.md#packageversionmerge): any conflict beyond the
+package versions still fails.
+
+The roadmap doesn't need this: its `Synchronize` call (`BuildPlugin.RoadmapExecutor`) runs right after
+`EnsureExists` created the branch at its start commit, which is the link commit itself.
+
 ## How: the Fix Workflow
 
 A **Fix Workflow** targets a version that already fell out of the hot zone (an old stable release)
