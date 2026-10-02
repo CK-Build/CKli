@@ -226,7 +226,7 @@ branch doesn't exist), `Synchronize` and `Close` pass the parent.
 
 | `[CommandPath]` | Purpose |
 |---|---|
-| `branch list` | Displays the opened branches of the World as an indented tree (`BranchNamespace.GetDisplayBranches`), each one prefixed by its link type's compact code, followed by the legend that maps each code to the name the configuration and `--link` use. A second column summarizes where each branch has changes: see [What `branch list` reads](#what-branch-list-reads). World-global: it reports the `BranchNamespace`, not the Git branches of the repositories (that is `ckli issue`). |
+| `branch list` | Displays the opened branches of the World as an indented tree (`BranchNamespace.GetDisplayBranches`), each one prefixed by its link type's compact code, followed by the legend that maps each code to the name the configuration and `--link` use. A last column summarizes where each branch has changes and, when a branch is behind its link, a column before it tells what `branch sync` would do: see [What `branch list` reads](#what-branch-list-reads). World-global: it reports the `BranchNamespace`, not the Git branches of the repositories (that is `ckli issue`). |
 | `branch open <branchName> [--link] [--parent]` | Opens (or updates the link type of) a pre-release or `explo/` branch: updates the `BranchNamespace`, then creates/synchronizes the corresponding `dev/` branch in every repo under the current path and checks it out. `--link` (`Manual`/`Release`/`CI`/`Full`) defaults to `CI` for a new branch and leaves an already opened branch's link type unchanged. |
 | `branch close <branchName> [--discard]` | Integrates the branch into its closest *existing parent* branch (via `HotBranch.Close`) in the repos under the current path, and removes it from the namespace once no repo of the World has it anymore. See [Closing a branch](#closing-a-branch). `--discard` skips the Git-side integration and only edits the namespace: it must be run at the World root. |
 | `branch switch <branch> [--create/-c] [--all]` | Checks out `branch` (or its `dev/` branch if it exists) in the current/all repos; `--create` first ensures the branch exists and synchronizes it. |
@@ -265,6 +265,7 @@ nothing reaches a remote before a `ckli push`.
 
 ```
 Opened branches of 'Test':
+Branch        Repositories
 stable        4 repositories
   => bravo    No change, 4 unchanged.
     => alpha  X-Core and 1 other repository, 2 unchanged, weight: 3 repositories, 3 projects.
@@ -289,6 +290,32 @@ above, X-Middle is unchanged but weighs, since it is updated with X-Core's new v
 - **No `HotGraph`**: `CKli.HotZone.Plugin` depends on this plugin, and a `HotGraph` refuses a World with
   issues. The relation is computed from the shallow solutions alone, with the HotGraph's project name to
   package identifier heuristic (an explicitly non packable project produces nothing).
+
+When at least one branch is not up to date with its link, a **Branch sync** column between the branch and
+its summary tells what `ckli branch sync` would do to it:
+
+```
+Opened branches of 'Test':
+Branch       Branch sync                                       Repositories
+stable                                                         4 repositories
+  => sierra  1 fast-forward, 1 merge, 1 conflict (X-Conflict)  X-Merge, X-Conflict, 2 unchanged, weight: 2 repositories, 2 projects.
+```
+
+The header is the table's first row (underlined): `ColumnDefinition` has a header but `TableLayout` doesn't
+implement it yet.
+
+For each repository where the branch exists, its tip (`GitDevBranch ?? GitBranch`) is compared with the
+`HotBranch.GetLinkCommit` of its closest existing parent, in the order `Synchronize` merges it: up to date
+when that commit is reachable or brings no content (nothing is shown), a **fast-forward**, or a **merge**
+that is computed in the object database only, to tell a clean one from a **conflict**. Conflicts are the
+only outcome that needs someone, so they are the only one that names its repositories (in red);
+**unknown** ones (yellow) are where the commit to integrate cannot be found: a Release or CI link
+without an `ITagCommitProvider`, or a repository whose version tags have issues. Their errors go to a
+monitor that is not bound to the screen (the log file still has them): `ckli issue` is what reports them.
+
+- **Only the link to the parent is considered.** The merges of the `origin/` branches that a
+  synchronization starts with depend on a fetch: that is `ckli pull`'s business.
+- `Manual` links propagate nothing and the root has no parent: their cell is always empty.
 
 ### Issue detection: `World.Events.Issue` and `ckli issue`
 

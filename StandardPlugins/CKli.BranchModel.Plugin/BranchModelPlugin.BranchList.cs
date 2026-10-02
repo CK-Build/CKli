@@ -22,6 +22,8 @@ public sealed partial class BranchModelPlugin
         upstream repository where the branch has changes), the number of repositories where the branch is opened
         without changes and the weight of the branch: the number of repositories and projects that a build of the
         branch touches (the ones with changes and all their downstreams).
+        When a branch is behind its link, a "Branch sync" column tells what "ckli branch sync" would do: the number of
+        fast-forwards and merges, and the repositories where the merge conflicts.
         """ )]
     [CommandPath( "branch list" )]
     public bool BranchList( IActivityMonitor monitor, CKliEnv context )
@@ -35,22 +37,46 @@ public sealed partial class BranchModelPlugin
         // repositories (that is what "ckli issue" reports).
         var screen = context.Screen;
         var s = screen.ScreenType;
+        // The link commits come from the ITagCommitProvider: a repository whose version tags have issues logs
+        // errors there. Its sync status is simply unknown and "ckli issue" is what reports them, so they go to
+        // a monitor that is not bound to the screen (they still reach the log file).
+        var syncMonitor = new ActivityMonitor( "Computing the synchronization status of the branches." );
         // One row per branch: a multi line TextBlock trims each of its lines, so the indentation of the
         // tree is a Box margin, never spaces in the text.
-        var rows = new List<IRenderable>();
-        foreach( var (b, depth) in _namespace.GetDisplayBranches() )
+        var cells = new List<(IRenderable Label, IRenderable? Sync, IRenderable Summary)>();
+        try
         {
-            var label = b.IsRoot
-                        ? s.Text( b.Name )!
-                        : s.Text( $"{b.LinkType.ToCodeString()} {b.Name}" )!;
-            string summary = b.IsRoot
-                                ? Repositories( repos.Count )
-                                : GetChangeSummary( monitor, repos, infos, b, reader );
-            rows.Add( label.Box( marginLeft: 2 * depth, marginRight: 2 )
-                           .AddRight( s.Text( summary, ConsoleColor.DarkGray ) ) );
+            foreach( var (b, depth) in _namespace.GetDisplayBranches() )
+            {
+                var label = b.IsRoot
+                            ? s.Text( b.Name )!
+                            : s.Text( $"{b.LinkType.ToCodeString()} {b.Name}" )!;
+                string summary = b.IsRoot
+                                    ? Repositories( repos.Count )
+                                    : GetChangeSummary( monitor, repos, infos, b, reader );
+                cells.Add( (label.Box( marginLeft: 2 * depth, marginRight: 2 ),
+                            GetSyncStatus( syncMonitor, s, infos, b ),
+                            s.Text( summary, ConsoleColor.DarkGray )) );
+            }
         }
+        finally
+        {
+            syncMonitor.MonitorEnd();
+        }
+        // A zero width cell is skipped by a HorizontalContent, which would shift the summary of its row into the
+        // sync column: when the column exists, an empty cell is its margin. It exists only when needed.
+        bool hasSyncColumn = cells.Any( c => c.Sync != null );
+        var rows = cells.Select( c => hasSyncColumn
+                                        ? c.Label.AddRight( c.Sync ?? s.EmptyString.Box( marginRight: 2 ), c.Summary )
+                                        : c.Label.AddRight( c.Summary ) );
+        // The ColumnDefinition headers are not implemented by the TableLayout: the header is its first row.
+        IRenderable header = s.Text( "Branch", TextEffect.Underline ).Box( marginRight: 2 );
+        header = hasSyncColumn
+                    ? header.AddRight( s.Text( "Branch sync", TextEffect.Underline ).Box( marginRight: 2 ),
+                                       s.Text( "Repositories", TextEffect.Underline ) )
+                    : header.AddRight( s.Text( "Repositories", TextEffect.Underline ) );
         screen.Display( s.Text( $"Opened branches of '{World.Name}':" )!
-                         .AddBelow( s.Unit.AddBelow( rows ).TableLayout() ) );
+                         .AddBelow( s.Unit.AddBelow( rows.Prepend( header ) ).TableLayout() ) );
         // The codes are compact on purpose (they align in a column and read as a propagation gradient) but
         // they are display only: this legend spells the names that the configuration and "--link" take.
         screen.Display( s.Text( "" )! );
@@ -71,6 +97,94 @@ public sealed partial class BranchModelPlugin
     }
 
     static string Repositories( int count ) => count == 1 ? "1 repository" : $"{count} repositories";
+
+    /// <summary>
+    /// What "ckli branch sync" would do to the branch from its link, for each repository where the branch exists.
+    /// </summary>
+    enum SyncStatus
+    {
+        UpToDate,
+        FastForward,
+        Merge,
+        Conflict,
+        Unknown
+    }
+
+    /// <summary>
+    /// Summarizes what "ckli branch sync" would do to the (non root) branch <paramref name="b"/> across the repositories:
+    /// the number of fast-forwards and merges, and the repositories where the merge conflicts or where the commit to
+    /// integrate cannot be found. This is empty when the branch is up to date everywhere, when its link propagates
+    /// nothing (<see cref="BranchLinkType.Manual"/>) and for the root branch: null is returned.
+    /// <para>
+    /// Only the link to the parent is considered: the merges of the remote branches that a synchronization starts
+    /// with depend on a fetch, that is the business of "ckli pull".
+    /// </para>
+    /// </summary>
+    IRenderable? GetSyncStatus( IActivityMonitor monitor, ScreenType s, BranchModelInfo[] infos, BranchName b )
+    {
+        if( b.IsRoot || b.LinkType is BranchLinkType.Manual or BranchLinkType.None )
+        {
+            return null;
+        }
+        int fastForwards = 0;
+        int merges = 0;
+        var conflicts = new List<string>();
+        var unknowns = new List<string>();
+        foreach( var info in infos )
+        {
+            switch( GetSyncStatus( monitor, info, b ) )
+            {
+                case SyncStatus.FastForward: ++fastForwards; break;
+                case SyncStatus.Merge: ++merges; break;
+                case SyncStatus.Conflict: conflicts.Add( info.Repo.DisplayPath.Path ); break;
+                case SyncStatus.Unknown: unknowns.Add( info.Repo.DisplayPath.Path ); break;
+            }
+        }
+        var parts = new List<IRenderable>();
+        if( fastForwards > 0 ) parts.Add( s.Text( fastForwards == 1 ? "1 fast-forward" : $"{fastForwards} fast-forwards", ConsoleColor.DarkGray ) );
+        if( merges > 0 ) parts.Add( s.Text( merges == 1 ? "1 merge" : $"{merges} merges", ConsoleColor.DarkGray ) );
+        if( conflicts.Count > 0 ) parts.Add( s.Text( $"{(conflicts.Count == 1 ? "1 conflict" : $"{conflicts.Count} conflicts")} ({conflicts.Concatenate( ", " )})", ConsoleColor.Red ) );
+        if( unknowns.Count > 0 ) parts.Add( s.Text( $"{unknowns.Count} unknown ({unknowns.Concatenate( ", " )})", ConsoleColor.Yellow ) );
+        if( parts.Count == 0 )
+        {
+            return null;
+        }
+        // A TextBlock trims its content: the separators' spaces are margins.
+        IRenderable cell = parts[0];
+        for( int i = 1; i < parts.Count; ++i )
+        {
+            cell = cell.AddRight( s.Text( ",", ConsoleColor.DarkGray ), parts[i].Box( marginLeft: 1 ) );
+        }
+        return cell.Box( marginRight: 2 );
+    }
+
+    /// <summary>
+    /// Classifies the branch <paramref name="b"/> of a repository the same way <see cref="HotBranch.Synchronize"/>
+    /// integrates its <see cref="HotBranch.GetLinkCommit"/>: nothing to do when the commit is already reachable or
+    /// brings no content, a fast-forward, or a merge that is computed (in the object database only) to detect a conflict.
+    /// </summary>
+    SyncStatus? GetSyncStatus( IActivityMonitor monitor, BranchModelInfo info, BranchName b )
+    {
+        Throw.DebugAssert( b.Parent != null );
+        var hb = info.Branches[b.Index];
+        if( !hb.Exists ) return null;
+        var parent = info.GetClosestExistingBranch( b.Parent );
+        if( parent == null ) return null;
+        // Without a provider, Release and CI links cannot be honored (Synchronize would throw).
+        if( b.LinkType is not BranchLinkType.Full && TagCommitProvider == null ) return SyncStatus.Unknown;
+        var linkCommit = hb.GetLinkCommit( monitor, parent, b.LinkType );
+        if( linkCommit == null ) return SyncStatus.Unknown;
+
+        var git = info.Repo.GitRepository.Repository;
+        var tip = (hb.GitDevBranch ?? hb.GitBranch).Tip;
+        var d = git.ObjectDatabase.CalculateHistoryDivergence( tip, linkCommit );
+        if( d.BehindBy is 0 ) return SyncStatus.UpToDate;
+        if( d.AheadBy is 0 ) return SyncStatus.FastForward;
+        // Diverged with the same content: Synchronize creates no empty merge commit.
+        if( tip.Tree.Sha == linkCommit.Tree.Sha ) return SyncStatus.UpToDate;
+        var merge = git.ObjectDatabase.MergeCommits( tip, linkCommit, new MergeTreeOptions { SkipReuc = true, FailOnConflict = true } );
+        return merge.Tree == null ? SyncStatus.Conflict : SyncStatus.Merge;
+    }
 
     /// <summary>
     /// Summarizes the repositories where the (non root) branch <paramref name="b"/> has changes: its tips, the
