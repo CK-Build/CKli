@@ -223,7 +223,7 @@ branch doesn't exist), `Synchronize` and `Close` pass the parent.
 |---|---|
 | `branch list` | Displays the opened branches of the World as an indented tree (`BranchNamespace.GetDisplayBranches`), each one prefixed by its link type's compact code, followed by the legend that maps each code to the name the configuration and `--link` use. A second column summarizes where each branch has changes: see [What `branch list` reads](#what-branch-list-reads). World-global: it reports the `BranchNamespace`, not the Git branches of the repositories (that is `ckli issue`). |
 | `branch open <branchName> [--link] [--parent]` | Opens (or updates the link type of) a pre-release or `explo/` branch: updates the `BranchNamespace`, then creates/synchronizes the corresponding `dev/` branch in every repo under the current path and checks it out. `--link` (`Manual`/`Release`/`CI`/`Full`) defaults to `CI` for a new branch and leaves an already opened branch's link type unchanged. |
-| `branch close <branchName> [--discard]` | Retires a branch World-wide: integrates it into its closest *open parent* branch (via `HotBranch.Close`) in every repo, then removes it from the namespace. Must be run at the World root; `--discard` skips the Git-side integration and only edits the namespace. |
+| `branch close <branchName> [--discard]` | Integrates the branch into its closest *existing parent* branch (via `HotBranch.Close`) in the repos under the current path, and removes it from the namespace once no repo of the World has it anymore. See [Closing a branch](#closing-a-branch). `--discard` skips the Git-side integration and only edits the namespace: it must be run at the World root. |
 | `branch switch <branch> [--create/-c] [--all]` | Checks out `branch` (or its `dev/` branch if it exists) in the current/all repos; `--create` first ensures the branch exists and synchronizes it. |
 | `branch sync <branch> [mode] [--all]` | Runs `HotBranch.Synchronize` for `branch` in the current/all repos, optionally overriding the configured `LinkType` with `mode` (`Release`/`CI`/`Full`). |
 | `commit <message> [--all]` | Commits any pending changes in the current/all repos (no-op if nothing changed). |
@@ -232,6 +232,29 @@ All commands accept the standard `IActivityMonitor` + `CKliEnv` prefix; reposito
 follows the usual CKli convention (current directory's repo(s), or `--all`/`all` for the whole
 World). `TryParseBranchFixName` is a small static helper (`fix/vMAJOR.MINOR` parsing) kept here for
 reuse by the Fix Workflow machinery in `CKli.HotZone.Plugin`.
+
+### Closing a branch
+
+`branch close mike` works on the repositories under the current path, whatever the other repositories
+and the other branches are:
+
+- **Downstreams may keep the branch.** Closing an upstream first is safe: a downstream keeps consuming the
+  last `mike` version of it until its next `mike` build, which reads the upstream from its closest existing
+  branch and moves onto the next parent version (greater than the `mike` prerelease).
+- **Upstreams whose `mike` versions are consumed are closed too.** Closing a downstream alone would
+  integrate a reference to a `mike` version into its parent, and nothing would ever heal it: the upstream's
+  parent never receives the changes that version carries. So the scope is extended, transitively, to the
+  repositories that have `mike` and produce a package that a closed `mike` solution consumes in a `mike`
+  version (`BranchName.Match`). Each addition is announced (`Also closing 'mike' in 'X-Core': its 'mike'
+  versions are consumed by 'X-App'.`). An upstream whose `mike` versions nobody consumes is left alone.
+- **Only the closed branch and the branch that receives it matter**, and only in the closed repositories: an
+  issue on `juliet` (a child of `mike`) or in another repository doesn't block. Any issue on `mike` or on its
+  closest existing parent in a closed repository fails the command before anything is integrated.
+- **The namespace keeps `mike` while a repository of the World still has it**: the command then reports
+  `Branch 'mike' closed in N repositories, still opened in M.`
+
+This is local: `HotBranch.Close` deletes the local branches only (`DeleteGitBranchMode.WithTrackedBranch`),
+nothing reaches a remote before a `ckli push`.
 
 ### What `branch list` reads
 

@@ -111,21 +111,11 @@ public sealed partial class BranchModelPlugin
         {
             return unchangedCount == 0 ? "No change." : $"No change, {unchangedCount} unchanged.";
         }
-        // The same project name to package identifier heuristic as the HotGraph: an explicitly
-        // non packable project produces nothing and an explicitly packable one wins.
         var producers = new Dictionary<string, int>( StringComparer.OrdinalIgnoreCase );
         for( int i = 0; i < count; i++ )
         {
             var sol = solutions[i];
-            if( sol == null ) continue;
-            foreach( var p in sol.Projects )
-            {
-                if( p.IsPackable is false ) continue;
-                if( !producers.TryAdd( p.Name, i ) && p.IsPackable is true )
-                {
-                    producers[p.Name] = i;
-                }
-            }
+            if( sol != null ) RegisterProducer( producers, i, sol );
         }
         var upstreams = new List<int>[count];
         var downstreams = new List<int>[count];
@@ -202,6 +192,22 @@ public sealed partial class BranchModelPlugin
         var mergeBase = info.Repo.GitRepository.Repository.ObjectDatabase.FindMergeBase( tip, parentTip );
         // Unrelated histories have changes of their own.
         return mergeBase != null && mergeBase.Tree.Sha == tip.Tree.Sha;
+    }
+
+    /// <summary>
+    /// The same project name to package identifier heuristic as the HotGraph: an explicitly
+    /// non packable project produces nothing and an explicitly packable one wins.
+    /// </summary>
+    static void RegisterProducer( Dictionary<string, int> producers, int index, GitSolution solution )
+    {
+        foreach( var p in solution.Projects )
+        {
+            if( p.IsPackable is false ) continue;
+            if( !producers.TryAdd( p.Name, index ) && p.IsPackable is true )
+            {
+                producers[p.Name] = index;
+            }
+        }
     }
 
     /// <summary>
