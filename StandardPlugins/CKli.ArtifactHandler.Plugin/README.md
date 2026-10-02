@@ -131,9 +131,9 @@ then throw an `InvalidOperationException` rather than failing somewhere inside N
 is acceptable and throughput matters) and is always true for a push client, which must see the feed's actual
 current state.
 
-> Reading a feed is why this plugin is no longer push-only. `NuGetFeedClient` lived in
-`CKli.Publish.Plugin` until 2026-09-09; a consumer that only wants to *look up* versions has no business
-depending on the publication plugin, and feeds are this plugin's concern.
+> Feeds are this plugin's concern, reading them included: a consumer that only wants to *look up* versions
+has no business depending on the publication plugin, so `NuGetFeedClient` is here rather than in
+`CKli.Publish.Plugin`.
 
 - `LoggerAdapter` (`NuGetFeed/NuGetFeedClient.LoggerAdapter.cs`, a private nested class) adapts CKli's
   `IActivityLineEmitter` to NuGet's `ILogger`.

@@ -533,12 +533,12 @@ resolution; it is not called from anywhere else in this plugin.
 
 ### The feed clients
 
-`NuGetFeedClient` and its `LoggerAdapter` used to live here. They moved to
-[`CKli.ArtifactHandler.Plugin`](../CKli.ArtifactHandler.Plugin/README.md#nugetfeedclient--talking-to-a-feed)
-on 2026-09-09, where the `NuGetFeed` they talk to is also defined: a consumer that only wants to look up
-the versions of a package has no business depending on the publication plugin. This plugin obtains its
-clients from `NuGetFeed.CreatePushClient( monitor, secretsStore )`, which resolves the API key and answers
-null (having said why) when it cannot.
+`NuGetFeedClient` and its `LoggerAdapter` belong to
+[`CKli.ArtifactHandler.Plugin`](../CKli.ArtifactHandler.Plugin/README.md#nugetfeedclient--talking-to-a-feed),
+where the `NuGetFeed` they talk to is defined: a consumer that only wants to look up the versions of a
+package has no business depending on the publication plugin. This plugin obtains its clients from
+`NuGetFeed.CreatePushClient( monitor, secretsStore )`, which resolves the API key and answers null (having
+said why) when it cannot.
 
 ## Configuration
 
@@ -574,13 +574,10 @@ likewise resolved through `GitRepositoryKey` / `ISecretsStore`, documented in `C
   producers-first ordering, `IndirectPublisher`, and `BuildFinalProfile`'s conflict branch are all
   exercised only by reasoning. Constructing that state needs a fixture with a second configured
   branch.
-- `NuGetFeedClient.DeleteAsync` (now in `CKli.ArtifactHandler.Plugin`) is fully implemented but never
-  invoked by `PackageSender` or any publisher — there is currently no CKli-level command that
-  deletes/unlists a published package version.
-- `BasePublisher`'s `$Local` cleanup used to be skipped by matching a hard-coded test path
-  (`/.PublicStack/CK-Plugins/Tests/Plugins.Tests`). That literal never matched any real folder — CKli's
-  own harness lives in `CKli-Plugins`, not `CK-Plugins` — so the cleanup always ran, including in tests,
-  and the "trick for the tests" its comment described never happened. It is now driven by the
-  `KeepLocalReleaseAfterPublish` configuration above, left off by default: `Tests/Plugins.Tests` has only
-  ever been green with the cleanup on, and enabling it makes `S2.intermediate_build_error_Async`'s
-  `ckli publish` fail. Whether that test or the intended behavior is wrong is still open.
+- `NuGetFeedClient.DeleteAsync` (in `CKli.ArtifactHandler.Plugin`) is fully implemented but never
+  invoked by `PackageSender` or any publisher — there is no CKli-level command that deletes/unlists a
+  published package version.
+- `BasePublisher`'s `$Local` cleanup is driven by the `KeepLocalReleaseAfterPublish` configuration above,
+  false by default (the cleanup runs): `Tests/Plugins.Tests` is green with the cleanup, and setting it to true
+  makes `S2.intermediate_build_error_Async`'s `ckli publish` fail. Whether that test or the intended behavior is
+  wrong is open.
