@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Packaging.Abstractions;
 using CKli.ArtifactHandler.Plugin;
+using CKli.BranchModel.Plugin;
 using CKli.Build.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
@@ -376,18 +377,27 @@ sealed class PublishedProfileBuilder
     /// <summary>
     /// Renders the verdict: null when there is nothing to say.
     /// </summary>
-    internal IRenderable? ToRenderable( ScreenType screen, Roadmap roadmap )
+    internal IRenderable? ToRenderable( ScreenType screen, Roadmap roadmap, BranchNamespace branches )
     {
         IRenderable? r = null;
         if( !_requiredPublications.IsEmpty )
         {
-            r = Add( r, screen.Text( $"{_requiredPublications.Length} release(s) from other branches will be published first: '{_requiredPublications.Select( x => x.ToString() ).Concatenate( "', '" )}'.",
-                                     TextEffect.Italic ) );
+            // The publication order (producers first) is irrelevant to the reader: what matters is that releases
+            // of other branches are published by this command.
+            r = Add( r, Releases( screen,
+                                  screen.Text( $"Also publishing {Count( _requiredPublications.Length )} from parent branches:", TextEffect.Italic ),
+                                  _requiredPublications,
+                                  branches,
+                                  indent: 0 ) );
         }
         if( !_alreadyPublishedAliens.IsEmpty )
         {
-            r = Add( r, screen.Text( $"⚠ Already published releases found in the closure (a previous publication was incomplete): '{_alreadyPublishedAliens.Select( x => x.ToString() ).Concatenate( "', '" )}'.",
-                                     foreColor: ConsoleColor.DarkYellow ) );
+            r = Add( r, Releases( screen,
+                                  screen.Text( "⚠ Already published releases found in the closure (a previous publication was incomplete):",
+                                               foreColor: ConsoleColor.DarkYellow ),
+                                  _alreadyPublishedAliens,
+                                  branches,
+                                  indent: 0 ) );
         }
         if( IsValid ) return r;
 
@@ -404,17 +414,41 @@ sealed class PublishedProfileBuilder
         }
         if( !_buildingAliens.IsEmpty )
         {
-            r = Add( r, screen.Text( $"  Unsuccessful builds in the required publications: '{_buildingAliens.Select( x => x.ToString() ).Concatenate( "', '" )}'.",
-                                     foreColor: ConsoleColor.Red ) );
+            r = Add( r, Releases( screen,
+                                  screen.Text( "Unsuccessful builds in the required publications:", foreColor: ConsoleColor.Red ),
+                                  _buildingAliens,
+                                  branches,
+                                  indent: 2 ) );
         }
         if( !_missingArtifacts.IsEmpty )
         {
-            r = Add( r, screen.Text( $"  Required publications with no local artifacts left (rebuild them): '{_missingArtifacts.Select( x => x.ToString() ).Concatenate( "', '" )}'.",
-                                     foreColor: ConsoleColor.Red ) );
+            r = Add( r, Releases( screen,
+                                  screen.Text( "Required publications with no local artifacts left (rebuild them):", foreColor: ConsoleColor.Red ),
+                                  _missingArtifacts,
+                                  branches,
+                                  indent: 2 ) );
         }
         return r;
 
         static IRenderable Add( IRenderable? r, IRenderable line ) => r == null ? line : r.AddBelow( line );
+
+        static string Count( int count ) => count == 1 ? "1 release" : $"{count} releases";
+
+        // One row per branch, in the branch model order (the root first), the releases keeping their order in a row.
+        // A TextBlock trims its content: the indentation is a Box margin.
+        static IRenderable Releases( ScreenType screen,
+                                     IRenderable header,
+                                     ImmutableArray<RepoReleaseInfo> releases,
+                                     BranchNamespace branches,
+                                     int indent )
+        {
+            var rows = releases.GroupBy( release => branches.Find( release.Version ) )
+                               .OrderBy( g => g.Key?.Index ?? int.MaxValue )
+                               .Select( g => screen.Text( g.Key?.Name ?? g.First().Version.BranchName ?? "?" )
+                                                   .Box( marginLeft: indent + 2, marginRight: 2 )
+                                                   .AddRight( screen.Text( g.Select( release => release.ToString() ).Concatenate( ", " ) ) ) );
+            return header.Box( marginLeft: indent ).AddBelow( screen.Unit.AddBelow( rows ).TableLayout() );
+        }
     }
 
     /// <summary>
@@ -729,8 +763,9 @@ sealed class PublishedProfileBuilder
             if( !result.Ambiguous.IsEmpty )
             {
                 // Out of our control - these are external packages nobody here references - so this is
-                // reported, not gated.
-                monitor.Warn( $"{result.Ambiguous.Length} transitive package(s) resolved to more than one version "
+                // logged, not gated, and not displayed: there is nothing to do about it. The ambiguities are
+                // recorded in the profile anyway.
+                monitor.Info( $"{result.Ambiguous.Length} transitive package(s) resolved to more than one version "
                               + "across this publication, or to a version this publication does not carry: "
                               + $"{string.Join( ", ", result.Ambiguous.Select( a => a.PackageId ) )}." );
             }

@@ -330,7 +330,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                     // Always displays the verdict (this is the only output of a --dry-run). Mirroring how a
                     // PublishableStatus.BuildingPending roadmap is handled, a --dry-run only reports: it is the real
                     // publication that fails when the gate is closed.
-                    e.Screen.Display( publish.ToRenderable );
+                    e.Screen.Display( s => publish.ToRenderable( s, _branchModel.BranchNamespace ) );
                     if( !roadmap.DryRun )
                     {
                         if( !publish.CanPublish )

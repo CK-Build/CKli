@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Packaging.Abstractions;
+using CKli.BranchModel.Plugin;
 using CKli.Build.Plugin;
 using CKli.Core;
 using CKli.VersionTag.Plugin;
@@ -61,9 +62,9 @@ sealed class PublishRoadmap
     /// </summary>
     public IEnumerable<Roadmap.BuildSolution> DirectAlreadyPublished => _roadmap.OrderedSolutions.Where( s => s.PublishableStatus == PublishableStatus.AlreadyPublished );
 
-    internal IRenderable ToRenderable( ScreenType screen )
+    internal IRenderable ToRenderable( ScreenType screen, BranchNamespace branches )
     {
-        return _gate.ToRenderable( screen, _roadmap ) ?? screen.Unit;
+        return _gate.ToRenderable( screen, _roadmap, branches ) ?? screen.Unit;
     }
 
     /// <param name="lease">

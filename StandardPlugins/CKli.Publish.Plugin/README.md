@@ -277,7 +277,21 @@ alignment belongs to the 'D' discrepancies mapping. This is the version-level co
 branch invariant demonstrated in [`HotZone-Workflow.md`](../HotZone-Workflow.md): that invariant
 heals after the fact, and checking the profile before publishing makes it preventive.
 
-`ToRenderable` returns the verdict, or null when there is nothing to report.
+`ToRenderable` returns the verdict, or null when there is nothing to report. Its four release lists
+(`RequiredPublications`, `AlreadyPublishedAliens`, `BuildingAliens`, `MissingArtifacts`) are grouped by
+branch, one row per branch in the branch model order. For a publication on `juliet` (a child of `mike`):
+
+```
+Also publishing 3 releases from parent branches:
+  stable  CK-Util/local/v2.0.1
+  mike    CK-Core/local/v1.2.0-mike, CK-Auth/local/v0.4.0-mike.0.1--ci.3
+```
+
+The publication order (producers first) is not displayed: what matters to the reader is that this
+command also publishes releases of other branches. These releases come from parent branches since a
+branch missing in a repository is read from its closest existing branch, toward the root. Publishing them
+creates no profile on their branch (an `IndirectPublisher` pushes the packages and the version tag only):
+that branch's last profile stays coherent but is behind until its next publication.
 
 ### `PublishedProfile` — the published profile
 
@@ -351,7 +365,8 @@ Disagreement here is expected rather than exceptional: the 'D' mapping aligns th
 references across repositories, not their transitive resolutions. Two repositories whose graphs differ
 legitimately land on two versions of a package neither of them references, and a single repository does
 it alone when two of its target frameworks resolve differently. These are external packages nobody here
-references, so they are reported with a warning and never gated.
+references and there is nothing to do about them, so they are logged (an `Info`, that doesn't reach the
+screen) and never gated: the profile records them anyway.
 
 ### The profile version
 

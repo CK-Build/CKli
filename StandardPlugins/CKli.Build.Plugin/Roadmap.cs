@@ -370,7 +370,7 @@ public sealed partial class Roadmap
                 {
                     PublishableStatus.AlreadyPublished => "and nothing to publish",
                     PublishableStatus.PublishRequired or PublishableStatus.Build => $"but {directPublishCount} can be published",
-                    PublishableStatus.IndirectPublishRequired => "(publishing requires publications from other branches)",
+                    PublishableStatus.IndirectPublishRequired => "(publishing requires publications from parent branches)",
                     _ /*PublishableStatus.BuildingPending*/ => "(unable to publish as at least one pending build exist)"
                 };
 
@@ -407,7 +407,7 @@ public sealed partial class Roadmap
                 {
                     PublishableStatus.AlreadyPublished => "and nothing to publish",
                     PublishableStatus.PublishRequired or PublishableStatus.Build => $"and {directPublishCount} can be published",
-                    PublishableStatus.IndirectPublishRequired => "(publishing requires publications from other branches)",
+                    PublishableStatus.IndirectPublishRequired => "(publishing requires publications from parent branches)",
                     _ /*PublishableStatus.BuildingPending*/ => "(unable to publish as at least one pending build exist)"
                 };
 
