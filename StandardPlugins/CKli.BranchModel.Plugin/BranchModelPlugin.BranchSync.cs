@@ -37,26 +37,35 @@ public sealed partial class BranchModelPlugin
         Throw.DebugAssert( (branchName.LinkType is BranchLinkType.None) == branchName.IsRoot );
 
         bool success = true;
-        int hasIssueCount = 0;
         foreach( var repo in repos )
         {
-            var info = GetWithoutIssue( monitor, repo );
+            // Read before the BranchModelInfo exists: obtaining it can auto fix a useless "dev/" branch, which
+            // deletes it and checks out its base branch.
+            var checkedOut = repo.GitRepository.CurrentBranchName;
+            var info = GetWithoutIssue( monitor, repo, before: null );
             if( info == null )
             {
-                ++hasIssueCount;
+                // A skipped repository is a failure: the branch has not been synchronized there.
+                monitor.Error( $"Repository '{repo.DisplayPath}' has issues: branch '{branchName}' has not been synchronized. Please fix them first." );
+                success = false;
+                continue;
             }
-            else
+            var b = info.Branches[branchName.Index];
+            if( !b.Exists )
             {
-                var b = info.Branches[branchName.Index];
-                if( b.Exists )
-                {
-                    success &= b.Synchronize( monitor, linkType );
-                }
+                continue;
             }
-        }
-        if( hasIssueCount != 0 )
-        {
-            monitor.Warn( $"One or more repositories have issues. They have been skipped." );
+            if( !b.Synchronize( monitor, linkType ) )
+            {
+                success = false;
+                continue;
+            }
+            // When the branch was checked out, its work goes on in its "dev/" branch if it exists (a merge may
+            // have just created it): the next commit must not land on the base branch.
+            if( checkedOut == b.GitBranch.FriendlyName || checkedOut == b.GitDevBranch?.FriendlyName )
+            {
+                success &= repo.GitRepository.Checkout( monitor, b.GitDevBranch ?? b.GitBranch );
+            }
         }
         return success;
     }

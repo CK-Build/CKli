@@ -205,8 +205,13 @@ The relationship between a `GitBranch` and its `GitDevBranch` is captured by an 
   parent and deletes it (used to retire a pre-release line).
 - **`Synchronize(monitor, applyLink)`** — the core propagation logic: merges tracked (`origin/...`)
   branches first, resolves `Desynchronized`/`Useless` locally, then — unless the link is `Manual`
-  or `None` — recursively synchronizes the parent and merges the right thing into `dev/` according
-  to `LinkType` (`Full`: parent's `dev/` tip; `Release`/`CI`: the commit from `ITagCommitProvider`).
+  or `None` — synchronizes the closest existing parent with its own remote branches (as a `Manual`
+  link: the parent's own link is not followed) and merges its `GetLinkCommit` into `dev/` when this
+  branch doesn't already contain it.
+- **`GetLinkCommit(monitor, parent, linkType)`** — what a link propagates, read without changing
+  anything: `Full` gives the parent's `dev/` tip (its regular tip when there is no `dev/`), `Release`/`CI`
+  the commit from `ITagCommitProvider`. `Synchronize` merges it and `GetStartCommit` creates a missing
+  branch on it.
 - **`Commit`** / **`IntegrateDevBranch`** / **`EnsureDevBranch`** — everyday `dev/` branch
   operations (development always happens on `dev/`; only integration touches the base branch).
 
@@ -225,7 +230,7 @@ branch doesn't exist), `Synchronize` and `Close` pass the parent.
 | `branch open <branchName> [--link] [--parent]` | Opens (or updates the link type of) a pre-release or `explo/` branch: updates the `BranchNamespace`, then creates/synchronizes the corresponding `dev/` branch in every repo under the current path and checks it out. `--link` (`Manual`/`Release`/`CI`/`Full`) defaults to `CI` for a new branch and leaves an already opened branch's link type unchanged. |
 | `branch close <branchName> [--discard]` | Integrates the branch into its closest *existing parent* branch (via `HotBranch.Close`) in the repos under the current path, and removes it from the namespace once no repo of the World has it anymore. See [Closing a branch](#closing-a-branch). `--discard` skips the Git-side integration and only edits the namespace: it must be run at the World root. |
 | `branch switch <branch> [--create/-c] [--all]` | Checks out `branch` (or its `dev/` branch if it exists) in the current/all repos; `--create` first ensures the branch exists and synchronizes it. |
-| `branch sync <branch> [mode] [--all]` | Runs `HotBranch.Synchronize` for `branch` in the current/all repos, optionally overriding the configured `LinkType` with `mode` (`Release`/`CI`/`Full`). |
+| `branch sync <branch> [mode] [--all]` | Runs `HotBranch.Synchronize` for `branch` in the current/all repos, optionally overriding the configured `LinkType` with `mode` (`Release`/`CI`/`Full`). A repository with issues is skipped and fails the command; the others are still synchronized. When `branch` (or its `dev/`) was checked out, its `dev/` branch is checked out afterwards: a merge can create it, and the auto fix of a useless `dev/` moves the checkout to the base branch. |
 | `commit <message> [--all]` | Commits any pending changes in the current/all repos (no-op if nothing changed). |
 
 All commands accept the standard `IActivityMonitor` + `CKliEnv` prefix; repository selection

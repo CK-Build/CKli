@@ -229,15 +229,7 @@ public sealed class HotBranch
         {
             return closest.GitBranch.Tip;
         }
-        // The child follows the parent's "dev/" branch: starting there is what Synchronize would have
-        // obtained by merging it, without the merge commit.
-        if( linkType is BranchLinkType.Full )
-        {
-            return (closest.GitDevBranch ?? closest.GitBranch).Tip;
-        }
-        Throw.DebugAssert( linkType is BranchLinkType.Release or BranchLinkType.CI );
-        var commitProvider = _info._plugin.TagCommitProvider;
-        if( commitProvider == null )
+        if( linkType is not BranchLinkType.Full && _info._plugin.TagCommitProvider == null )
         {
             // A World can enable the BranchModel without the VersionTag plugin: there is no notion of a
             // "last built commit" here. The floor keeps the branch creatable (Synchronize would throw).
@@ -247,17 +239,56 @@ public sealed class HotBranch
                     """ );
             return closest.GitBranch.Tip;
         }
-        var tagCommit = commitProvider.GetCommit( monitor, closest, linkType is BranchLinkType.CI );
-        if( tagCommit == null )
+        // Starting at the link commit is what Synchronize would have obtained by merging it, without the
+        // merge commit.
+        var linkCommit = GetLinkCommit( monitor, closest, linkType );
+        if( linkCommit == null )
         {
             monitor.Error( $"""
                     Unable to find the last {(linkType is BranchLinkType.CI ? "built" : "released")} commit of branch
                     '{closest.BranchName}' in '{Repo.DisplayPath}': the '{linkType}' link type of branch '{_name}'
                     cannot be honored.
                     """ );
-            return null;
         }
-        return tagCommit.Commit;
+        return linkCommit;
+    }
+
+    /// <summary>
+    /// Gets the commit of <paramref name="parent"/> that the <paramref name="linkType"/> propagates to this branch:
+    /// <list type="bullet">
+    ///     <item>
+    ///     <see cref="BranchLinkType.Full"/>: the parent's "dev/" tip when it exists, its regular tip otherwise.
+    ///     </item>
+    ///     <item>
+    ///     <see cref="BranchLinkType.Release"/> and <see cref="BranchLinkType.CI"/>: the last built commit of the
+    ///     parent (CI builds are considered only for the CI link), obtained from the
+    ///     <see cref="BranchModelPlugin.SetTagCommitProvider(ITagCommitProvider)"/> that must have been set.
+    ///     </item>
+    /// </list>
+    /// <see cref="BranchLinkType.None"/> and <see cref="BranchLinkType.Manual"/> propagate nothing: they are not
+    /// valid here.
+    /// <para>
+    /// This reads the current state of the repository: nothing is fetched nor merged, and the parent is not
+    /// synchronized with its remote first (<see cref="Synchronize"/> does it before calling this).
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="parent">
+    /// The closest existing parent of this branch (see <see cref="BranchModelInfo.GetClosestExistingBranch(BranchName)"/>).
+    /// </param>
+    /// <param name="linkType">The link type to consider (this <see cref="BranchName.LinkType"/> or an override).</param>
+    /// <returns>The commit to integrate or null if the tag commit provider failed.</returns>
+    public Commit? GetLinkCommit( IActivityMonitor monitor, HotBranch parent, BranchLinkType linkType )
+    {
+        Throw.CheckArgument( parent.Exists && parent.Repo == Repo );
+        Throw.CheckArgument( linkType is BranchLinkType.Release or BranchLinkType.CI or BranchLinkType.Full );
+        if( linkType is BranchLinkType.Full )
+        {
+            return (parent.GitDevBranch ?? parent.GitBranch).Tip;
+        }
+        var commitProvider = _info._plugin.TagCommitProvider;
+        Throw.CheckState( "Required for BranchLinkType Release or CI.", commitProvider != null );
+        return commitProvider.GetCommit( monitor, parent, linkType is BranchLinkType.CI )?.Commit;
     }
 
     /// <summary>
@@ -362,44 +393,24 @@ public sealed class HotBranch
         {
             return false;
         }
-        // We always target the "dev/" branch if a merge must be done but the "dev/" may not exist.
-        var thisBranch = _gitDevBranch ?? GitBranch;
-
-        // Full: Make sure that the closest existing branch "dev/" (or base) branch is integrated into this branch.
-        //       If not, the "dev/" (or base) branch is merged into this "dev/" branch.
-        if( applyLink is BranchLinkType.Full )
-        {
-            var parentBranch = parent.GitDevBranch ?? parent.GitBranch;
-            var d = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( parentBranch.Tip, thisBranch.Tip );
-            if( d.AheadBy is not 0 )
-            {
-                var dev = EnsureDevBranch();
-                if( !Repo.GitRepository.MergeBranchContent( monitor, ref dev, parentBranch )
-                    || !Refresh( monitor ) )
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-        Throw.DebugAssert( applyLink is BranchLinkType.Release or BranchLinkType.CI );
-        // We must find the commit and make sure that it is integrated in this branch.
-        Throw.DebugAssert( _name.Parent != null );
-
-        var commitProvider = _info._plugin.TagCommitProvider;
-        Throw.CheckState( "Required for BranchLinkType Release or CI.", commitProvider != null );
-
-        var tagCommit = commitProvider.GetCommit( monitor, parent, applyLink is BranchLinkType.CI );
-        if( tagCommit == null )
+        // Make sure that the link commit is integrated into this branch. If not, it is merged into this "dev/"
+        // branch: we always target the "dev/" branch if a merge must be done but the "dev/" may not exist.
+        var linkCommit = GetLinkCommit( monitor, parent, applyLink );
+        if( linkCommit == null )
         {
             return false;
         }
-        var cd = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( tagCommit.Commit, thisBranch.Tip );
-        if( cd.AheadBy is not 0 )
+        var thisBranch = _gitDevBranch ?? GitBranch;
+        var d = Repo.GitRepository.Repository.ObjectDatabase.CalculateHistoryDivergence( linkCommit, thisBranch.Tip );
+        if( d.AheadBy is not 0 )
         {
             var dev = EnsureDevBranch();
-            if( !Repo.GitRepository.MergeBranchContent( monitor, ref dev, tagCommit.Commit )
-                || !Refresh( monitor ) )
+            // Full merges the parent's branch rather than its tip commit: the merge then refuses a checked out
+            // and dirty parent and names the branch in its commit message.
+            bool merged = applyLink is BranchLinkType.Full
+                            ? Repo.GitRepository.MergeBranchContent( monitor, ref dev, parent.GitDevBranch ?? parent.GitBranch )
+                            : Repo.GitRepository.MergeBranchContent( monitor, ref dev, linkCommit );
+            if( !merged || !Refresh( monitor ) )
             {
                 return false;
             }
