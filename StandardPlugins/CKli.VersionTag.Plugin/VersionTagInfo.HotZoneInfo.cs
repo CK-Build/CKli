@@ -107,97 +107,6 @@ public sealed partial class VersionTagInfo
         public TagCommit LastStable => _lastStable;
 
         /// <summary>
-        /// Gets all the reachable <see cref="TagCommit"/> from the <paramref name="start"/> up to <see cref="LastStable"/>
-        /// with their 0-based increasing level from the first tagged commit found.
-        /// <para>
-        /// This is a breadth-first traversal. Some consecutive levels may be the same: in that case, the ambiguity must
-        /// be resolved by considering the versions (for example, a CI version vs. a non-CI version, an "alpha" vs. a "romeo," etc.).
-        /// </para>
-        /// </summary>
-        /// <param name="start">The commit from which the hot <see cref="TagCommit"/> must be retrieved.</param>
-        /// <param name="maxLevel">Optional maximal level to retrieve.</param>
-        /// <param name="maxCount">Optional maximal number of commits to retrieve (regardless of the level).</param>
-        /// <returns>The versioned tagged commits with their 0-based level.</returns>
-        public IReadOnlyList<(TagCommit T, int Level)> CreateTagCommitTreeContent( Commit start, int maxLevel = -1, int maxCount = 0 )
-        {
-            // Why are we NOT using:
-            //
-            // _info.Repo.GitRepository.Repository.Commits.QueryBy( new CommitFilter() { IncludeReachableFrom = start, ExcludeReachableFrom = _lastStable } );
-            //
-            // To obtain the set of commits and then use it as a filter?
-            //
-            // Because libgit2 (as well as git, see https://git-scm.com/docs/git-rev-list#Documentation/git-rev-list.txt-Defaultmode) prunes the graph
-            // based on the Content SHA (TREESAME): when playing with "empty commits", we take the risk to miss parents.
-            //
-            // So we use the Parents and 3 mechanisms help us shorten the walk:
-            //  1) when LastStable is met, this stops the walk.
-            //  2) the TagCommit version (if it exists) must be greater to the LastStable otherwise we stop the walk.
-            //
-            // The fact is that the following code can produce TagCommits that don't have LastStable in their ancestors. This 
-            // means that the LastStable is not a "full synchronization point" in the graph, that some branches have not been
-            // resynchronized on it before being merged in our "tip" commit history (this is where 2 above kicks in: versions older than
-            // LastStable are rejected).
-            //
-            var collector = new List<(TagCommit, int)>();
-            var commitSeen = new HashSet<string>();
-
-            var stack = new Stack<(Commit,int)>();
-            stack.Push( (start, 0) );
-
-            do
-            {
-                var (c,l) = stack.Pop();
-                int nextL = Collect( _info, commitSeen, _lastStable, c, l, collector );
-                if( maxCount > 0 && collector.Count >= maxCount )
-                {
-                    break;
-                }
-                if( nextL >= 0 && (maxLevel == -1 || nextL <= maxLevel) )
-                {
-                    foreach( var p in start.Parents )
-                    {
-                        stack.Push( (p, nextL) );
-                    }
-                }
-            }
-            while( stack.Count > 0 );
-            return collector;
-
-            static int Collect( VersionTagInfo info,
-                                 HashSet<string> commitSeen,
-                                 TagCommit lastStable,
-                                 Commit c,
-                                 int level,
-                                 List<(TagCommit, int)> collector )
-            {
-                if( c.Sha == lastStable.Sha )
-                {
-                    collector.Add( (lastStable, level) );
-                    return -1;
-                }
-                if( !commitSeen.Add( c.Sha ) )
-                {
-                    return -1;
-                }
-                if( info.TagCommitsBySha.TryGetValue( c.Sha, out var tc ) )
-                {
-                    // Allow here the version to share the lastStable's Major.Minor.Patch when
-                    // the lastStable is a +fake (this is not the case if the lastStable is
-                    // a "local/" associated to a FakeVersion i.e. when IsOrHasFakeVersion is true).
-                    if( lastStable.Version < tc.Version
-                        || (lastStable.IsFakeVersion && !lastStable.Version.SameStableAs( tc.Version )) )
-                    {
-                        return -1;
-                    }
-                    collector.Add( (tc, level) );
-                    return level + 1;
-                }
-                return level;
-            }
-        }
-
-
-        /// <summary>
         /// Gets the <see cref="TagCommitTree"/> for a branch's tip and emits an error on failure.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -286,21 +195,36 @@ public sealed partial class VersionTagInfo
             // The commits from Tip to any TagCommits.
             var headCommits = new List<Commit>();
 
-            var stack = new Stack<(Commit, int)>();
-            stack.Push( (tip, 0) );
+            // The walk is breadth-first by level (a "0-1 BFS"): an untagged commit's parents stay at its level and are
+            // processed first, a tagged commit's parents are one level up and wait for the current level to be over.
+            // The commits are therefore processed in increasing level order: the collector is sorted by level (what
+            // TagCommitTree.GetBestBuildFor relies on) and a commit reachable along more than one path is seen first
+            // with its smallest level. This is what a merge commit whose parents both lead to version tags requires
+            // (a synchronized branch merges the builds of its parent): both parents are walked level by level.
+            var queue = new LinkedList<(Commit, int)>();
+            queue.AddFirst( (tip, 0) );
             do
             {
-                var (c, l) = stack.Pop();
+                var (c, l) = queue.First!.Value;
+                queue.RemoveFirst();
                 int nextL = Collect( _info, commitSeen, _lastStable, c, l, collector, headCommits );
-                if( nextL >= 0 )
+                if( nextL == l )
+                {
+                    // Reversed so that the first parent is processed first.
+                    foreach( var p in c.Parents.Reverse() )
+                    {
+                        queue.AddFirst( (p, nextL) );
+                    }
+                }
+                else if( nextL > l )
                 {
                     foreach( var p in c.Parents )
                     {
-                        stack.Push( (p, nextL) );
+                        queue.AddLast( (p, nextL) );
                     }
                 }
             }
-            while( stack.Count > 0 );
+            while( queue.Count > 0 );
 
             Throw.DebugAssert( collector.Count == 0 || collector.Select( x => x.Item2 ).IsSortedLarge() );
 
@@ -316,13 +240,14 @@ public sealed partial class VersionTagInfo
                                  List<(TagCommit, int)> collector,
                                  List<Commit> headCommits )
             {
+                // Seen first: the LastStable is collected once, with its smallest level.
+                if( !commitSeen.Add( c.Sha ) )
+                {
+                    return -1;
+                }
                 if( c.Sha == lastStable.Sha )
                 {
                     collector.Add( (lastStable, level) );
-                    return -1;
-                }
-                if( !commitSeen.Add( c.Sha ) )
-                {
                     return -1;
                 }
                 if( info.TagCommitsBySha.TryGetValue( c.Sha, out var tc ) )

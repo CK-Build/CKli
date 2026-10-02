@@ -428,3 +428,9 @@ releases it actually tagged, so the deprecation can be mirrored outside the tags
 - The hot-zone commit walk deliberately avoids LibGit2Sharp's `CommitFilter`/`QueryBy` and walks `Commit.Parents`
   manually, because git's TREESAME pruning can skip parents when empty commits are involved (see comments in
   `HotZoneInfo.CreateTagCommitTree`).
+- That walk is **breadth-first by level** (a "0-1 BFS": an untagged commit's parents stay at its level and are
+  processed first, a tagged commit's parents wait for the next level). `TagCommitTree.GetBestBuildFor` reads its
+  content level after level, so the content is sorted by level and a commit reachable along several paths gets
+  its smallest level. This matters for a merge commit whose two parents lead to version tags, which is what a
+  synchronized CI link has (its own builds on one side, its parent's on the other): the closest build of the
+  branch is found on both sides at the same level, and the branch's own one wins.
