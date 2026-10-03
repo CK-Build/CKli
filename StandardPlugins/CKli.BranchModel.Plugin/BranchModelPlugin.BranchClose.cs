@@ -1,5 +1,7 @@
 using CK.Core;
 using CKli.Core;
+using CKli.ShallowSolution.Plugin;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -8,27 +10,32 @@ namespace CKli.BranchModel.Plugin;
 public sealed partial class BranchModelPlugin
 {
     /// <summary>
-    /// Closes a Conformant SVersion branch in the repositories of the current directory: it is integrated in its
-    /// closest existing parent. The upstreams whose versions of the branch are consumed by a closed repository are
-    /// also closed. The branch leaves the branch model when no repository of the World has it anymore.
+    /// Implements "ckli branch close" (the command is handled by the HotZone plugin, that provides the
+    /// <paramref name="versionResolver"/>): closes a Conformant SVersion branch in the repositories of the current
+    /// directory. It is integrated in the "dev/" branch of its closest existing parent (see <see cref="HotBranch.Close"/>).
+    /// The upstreams whose versions of the branch are consumed by a closed repository are also closed. The branch leaves
+    /// the branch model when no repository of the World has it anymore.
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The minimal context.</param>
     /// <param name="branchName">The branch name to close.</param>
     /// <param name="discard">True to keep the branch where it is and not integrate it in its closest parent.</param>
+    /// <param name="versionResolver">
+    /// Optional provider of the resolver of the package versions that conflict. It receives the branch that receives the
+    /// merge: the closest existing parent.
+    /// </param>
+    /// <param name="failOnConflict">
+    /// True to fail without touching the repository when a merge conflicts beyond the package versions. By default, the
+    /// merge is left in progress in the working folder: once it is committed, closing the branch again completes it.
+    /// It requires a <paramref name="versionResolver"/>.
+    /// </param>
     /// <returns>True on success, false on error.</returns>
-    [Description( """
-        Closes a Conformant SVersion branch in the current repositories by integrating it in its closest parent.
-        The upstreams whose versions of this branch are consumed are also closed. The branch is removed from the
-        branch model when no repository of the World has it anymore.
-        """ )]
-    [CommandPath( "branch close" )]
-    public bool BranchClose( IActivityMonitor monitor,
+    public bool CloseBranch( IActivityMonitor monitor,
                              CKliEnv context,
-                             [Description( "Branch name to close." )]
                              string branchName,
-                             [Description( "Only remove the branch from the branch model (must be run at the root of the World): the Git branches are left as-is." )]
-                             bool discard )
+                             bool discard,
+                             Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver,
+                             bool failOnConflict = false )
     {
         var b = _namespace.FindRequired( monitor, branchName );
         if( b == null )
@@ -75,8 +82,15 @@ public sealed partial class BranchModelPlugin
         if( !success ) return false;
         foreach( var hb in toClose )
         {
-            if( !hb.Close( monitor ) ) return false;
+            // A merge left in progress (or any failure) in a repository doesn't stop the others: the branch is still
+            // opened there, and closing it again once the merge is committed completes it.
+            var parent = hb.BranchModelInfo.GetClosestExistingBranch( b.Parent! )!.BranchName;
+            Func<IActivityMonitor, IPackageVersionResolver?>? resolver = versionResolver != null
+                                                                            ? m => versionResolver( m, parent )
+                                                                            : null;
+            success &= hb.Close( monitor, resolver, prepareMergeOnConflict: resolver != null && !failOnConflict );
         }
+        if( !success ) return false;
         int stillOpened = infos.Count( i => i.Branches[b.Index].Exists );
         if( stillOpened > 0 )
         {

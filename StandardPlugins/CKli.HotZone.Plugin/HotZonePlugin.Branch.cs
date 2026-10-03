@@ -44,6 +44,38 @@ public sealed partial class HotZonePlugin
     }
 
     /// <summary>
+    /// Closes a Conformant SVersion branch in the current repositories by integrating it in the "dev/" branch of its
+    /// closest parent.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="context">The minimal context.</param>
+    /// <param name="branchName">The branch name to close.</param>
+    /// <param name="discard">True to keep the branch where it is and not integrate it in its closest parent.</param>
+    /// <param name="failOnConflict">True to fail without touching anything when a merge conflicts beyond the package versions.</param>
+    /// <returns>True on success, false on error.</returns>
+    [Description( """
+        Closes a Conformant SVersion branch in the current repositories by integrating it in the "dev/" branch of its
+        closest parent: the parent's base branch receives it when its "dev/" branch is integrated.
+        The upstreams whose versions of this branch are consumed are also closed. The branch is removed from the
+        branch model when no repository of the World has it anymore.
+        The package versions that conflict are resolved the way a build of the parent updates them. When other conflicts
+        remain, the merge is left in progress in the working folder: resolve them, commit the merge and close the branch
+        again.
+        """ )]
+    [CommandPath( "branch close" )]
+    public bool BranchClose( IActivityMonitor monitor,
+                             CKliEnv context,
+                             [Description( "Branch name to close." )]
+                             string branchName,
+                             [Description( "Only remove the branch from the branch model (must be run at the root of the World): the Git branches are left as-is." )]
+                             bool discard = false,
+                             [Description( "Fails without touching anything when a merge conflicts beyond the package versions." )]
+                             bool failOnConflict = false )
+    {
+        return _branchModel.CloseBranch( monitor, context, branchName, discard, CreateVersionResolverProvider(), failOnConflict );
+    }
+
+    /// <summary>
     /// Displays the opened branches of the World and, for each of them, what "ckli branch sync" would do and the
     /// repositories where it has changes.
     /// </summary>

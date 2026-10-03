@@ -69,10 +69,11 @@ calls it from `BuildPlugin.Fix.cs` before building a Fix Workflow.
 
 ## How: `branch sync` and `branch list`
 
-Both commands are implemented by `CKli.BranchModel.Plugin` (`BranchModelPlugin.SynchronizeBranch` and
-`DisplayBranchList`, documented in [its README](../CKli.BranchModel.Plugin/README.md#commands)) but handled here
-(`HotZonePlugin.Branch.cs`): a command is not tied to the plugin that implements its feature, and this one
-needs a `HotGraph`.
+These commands, and `branch close`, are implemented by `CKli.BranchModel.Plugin` (`BranchModelPlugin.SynchronizeBranch`,
+`DisplayBranchList` and `CloseBranch`, documented in [its README](../CKli.BranchModel.Plugin/README.md#commands)) but
+handled here (`HotZonePlugin.Branch.cs`): a command is not tied to the plugin that implements its feature, and these
+ones need a `HotGraph`. `branch close` merges a branch into its parent: its versions are resolved with the parent's
+`HotGraph`, the branch that receives the merge.
 
 Two branches that are built independently both rewrite the references to the World's packages, so merging
 a parent's build into its child typically conflicts on the very same `<PackageReference Version="..." />`
@@ -96,8 +97,9 @@ any Git tool shows only the real conflicts. The `dev/` branch is checked out for
 on that merge), `ckli status` shows `(merging, N conflicts)`, and the merge that the person commits has the two
 original commits as parents; aborting it restores the branch as it was. The synchronization of that repository
 fails until the merge is committed: the next `branch sync` then finds it up to date. `--fail-on-conflict` keeps the
-working folder untouched. Only `branch sync` prepares merges: `branch open`, `branch switch --create` and the
-roadmap fail on a conflict.
+working folder untouched. `branch close` prepares its merge the same way, on the parent's `dev/` branch: the
+branch stays opened until the merge is committed and the close is run again. Only these two commands prepare
+merges: `branch open`, `branch switch --create` and the roadmap fail on a conflict.
 
 The roadmap doesn't need this: its `Synchronize` call (`BuildPlugin.RoadmapExecutor`) runs right after
 `EnsureExists` created the branch at its start commit, which is the link commit itself.

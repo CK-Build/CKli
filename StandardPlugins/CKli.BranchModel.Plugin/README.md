@@ -206,8 +206,11 @@ The relationship between a `GitBranch` and its `GitDevBranch` is captured by an 
 `HotBranch` exposes the operations that keep this model consistent:
 
 - **`EnsureExists`** — creates the branch from the closest existing ancestor if missing.
-- **`Close`** — integrates `dev/` into the branch, then merges the branch into its closest existing
-  parent and deletes it (used to retire a pre-release line).
+- **`Close`** — integrates `dev/` into the branch, then merges the branch into the `dev/` branch of its
+  closest existing parent (created if needed) and deletes it (used to retire a pre-release line). The
+  parent's base branch is not touched: a base branch only moves when its `dev/` branch is integrated. The
+  merge is the one of `Synchronize` (package versions aligned with a resolver, left in progress on a
+  conflict when asked).
 - **`Synchronize(monitor, applyLink, versionResolver)`** — the core propagation logic: merges tracked
   (`origin/...`) branches first, resolves `Desynchronized`/`Useless` locally, then — unless the link is
   `Manual` or `None` — synchronizes the closest existing parent with its own remote branches (as a
@@ -237,7 +240,7 @@ branch doesn't exist), `Synchronize` and `Close` pass the parent.
 |---|---|
 | `branch list` | **Handled by [`CKli.HotZone.Plugin`](../CKli.HotZone.Plugin/README.md#how-branch-sync-and-branch-list), implemented here** (`DisplayBranchList`). Displays the opened branches of the World as an indented tree (`BranchNamespace.GetDisplayBranches`), each one prefixed by its link type's compact code, followed by the legend that maps each code to the name the configuration and `--link` use. A last column summarizes where each branch has changes and, when a branch is behind its link, a column before it tells what `branch sync` would do: see [What `branch list` reads](#what-branch-list-reads). World-global: it reports the `BranchNamespace`, not the Git branches of the repositories (that is `ckli issue`). |
 | `branch open <branchName> [--link] [--parent]` | Opens (or updates the link type of) a pre-release or `explo/` branch: updates the `BranchNamespace`, then creates/synchronizes the corresponding `dev/` branch in every repo under the current path and checks it out. `--link` (`Manual`/`Release`/`CI`/`Full`) defaults to `CI` for a new branch and leaves an already opened branch's link type unchanged. |
-| `branch close <branchName> [--discard]` | Integrates the branch into its closest *existing parent* branch (via `HotBranch.Close`) in the repos under the current path, and removes it from the namespace once no repo of the World has it anymore. See [Closing a branch](#closing-a-branch). `--discard` skips the Git-side integration and only edits the namespace: it must be run at the World root. |
+| `branch close <branchName> [--discard] [--fail-on-conflict]` | **Handled by [`CKli.HotZone.Plugin`](../CKli.HotZone.Plugin/README.md#how-branch-sync-and-branch-list), implemented here** (`CloseBranch`). Integrates the branch into the `dev/` branch of its closest *existing parent* branch (via `HotBranch.Close`) in the repos under the current path, and removes it from the namespace once no repo of the World has it anymore. See [Closing a branch](#closing-a-branch). `--discard` skips the Git-side integration and only edits the namespace: it must be run at the World root. `--fail-on-conflict` fails without touching anything on a conflict instead of leaving the merge in progress. |
 | `branch switch <branch> [--create/-c] [--all]` | Checks out `branch` (or its `dev/` branch if it exists) in the current/all repos; `--create` first ensures the branch exists and synchronizes it. |
 | `branch sync <branch> [mode] [--all] [--fail-on-conflict]` | **Handled by [`CKli.HotZone.Plugin`](../CKli.HotZone.Plugin/README.md#how-branch-sync-and-branch-list), implemented here** (`SynchronizeBranch`): the package versions that conflict are resolved the way a build of the branch updates them. When other conflicts remain, the merge is left in progress in the working folder, the versions already aligned (the `dev/` branch is checked out, `ckli status` shows `(merging, N conflicts)`): resolve the conflicts and commit the merge with any Git tool, or abort it. `--fail-on-conflict` fails without touching anything instead. Runs `HotBranch.Synchronize` for `branch` in the current/all repos, optionally overriding the configured `LinkType` with `mode` (`Release`/`CI`/`Full`). A repository with issues is skipped and fails the command; the others are still synchronized. When `branch` (or its `dev/`) was checked out, its `dev/` branch is checked out afterwards: a merge can create it, and the auto fix of a useless `dev/` moves the checkout to the base branch. |
 | `commit <message> [--all]` | Commits any pending changes in the current/all repos (no-op if nothing changed). |
@@ -266,6 +269,14 @@ and the other branches are:
   closest existing parent in a closed repository fails the command before anything is integrated.
 - **The namespace keeps `mike` while a repository of the World still has it**: the command then reports
   `Branch 'mike' closed in N repositories, still opened in M.`
+- **The content goes to the parent's `dev/` branch**, never to its base branch, which only moves when that
+  `dev/` branch is integrated by a release build.
+- **The merge is the one of `branch sync`**, resolved for the parent: the package versions that conflict are
+  resolved the way a build of the parent (the branch that receives the merge) updates them. A merge that
+  conflicts beyond them is left in progress on the parent's `dev/` branch (checked out for this), `mike` stays
+  opened in that repository and the command fails: once the merge is committed, `branch close mike` again
+  finds it merged and completes the close. The other repositories are closed regardless.
+  `--fail-on-conflict` keeps the working folder untouched.
 
 This is local: `HotBranch.Close` deletes the local branches only (`DeleteGitBranchMode.WithTrackedBranch`),
 nothing reaches a remote before a `ckli push`.
