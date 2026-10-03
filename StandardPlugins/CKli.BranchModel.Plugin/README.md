@@ -211,6 +211,9 @@ The relationship between a `GitBranch` and its `GitDevBranch` is captured by an 
   parent's base branch is not touched: a base branch only moves when its `dev/` branch is integrated. The
   merge is the one of `Synchronize` (package versions aligned with a resolver, left in progress on a
   conflict when asked).
+- **`PreparedMerge`** — a merge that `Synchronize` or `Close` left in progress in the working folder (their
+  `onPreparedMerge` callback receives it): the repository, the checked out branch, what is merged and the
+  paths in conflict. `PreparedMerge.Display` is how the commands show them.
 - **`Synchronize(monitor, applyLink, versionResolver)`** — the core propagation logic: merges tracked
   (`origin/...`) branches first, resolves `Desynchronized`/`Useless` locally, then — unless the link is
   `Manual` or `None` — synchronizes the closest existing parent with its own remote branches (as a

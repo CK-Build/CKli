@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using System;
+using System.Collections.Generic;
 
 namespace CKli.BranchModel.Plugin;
 
@@ -51,6 +52,7 @@ public sealed partial class BranchModelPlugin
                                                                         ? m => versionResolver( m, branchName )
                                                                         : null;
         bool success = true;
+        var preparedMerges = new List<PreparedMerge>();
         foreach( var repo in repos )
         {
             // Read before the BranchModelInfo exists: obtaining it can auto fix a useless "dev/" branch, which
@@ -69,7 +71,7 @@ public sealed partial class BranchModelPlugin
             {
                 continue;
             }
-            if( !b.Synchronize( monitor, linkType, resolver, prepareMergeOnConflict: resolver != null && !failOnConflict ) )
+            if( !b.Synchronize( monitor, linkType, resolver, resolver != null && !failOnConflict ? preparedMerges.Add : null ) )
             {
                 success = false;
                 continue;
@@ -81,6 +83,7 @@ public sealed partial class BranchModelPlugin
                 success &= repo.GitRepository.Checkout( monitor, b.GitDevBranch ?? b.GitBranch );
             }
         }
+        PreparedMerge.Display( context.Screen, preparedMerges );
         return success;
     }
 }

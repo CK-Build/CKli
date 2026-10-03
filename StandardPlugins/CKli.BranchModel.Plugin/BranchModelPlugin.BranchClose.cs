@@ -80,6 +80,7 @@ public sealed partial class BranchModelPlugin
             }
         }
         if( !success ) return false;
+        var preparedMerges = new List<PreparedMerge>();
         foreach( var hb in toClose )
         {
             // A merge left in progress (or any failure) in a repository doesn't stop the others: the branch is still
@@ -88,8 +89,9 @@ public sealed partial class BranchModelPlugin
             Func<IActivityMonitor, IPackageVersionResolver?>? resolver = versionResolver != null
                                                                             ? m => versionResolver( m, parent )
                                                                             : null;
-            success &= hb.Close( monitor, resolver, prepareMergeOnConflict: resolver != null && !failOnConflict );
+            success &= hb.Close( monitor, resolver, resolver != null && !failOnConflict ? preparedMerges.Add : null );
         }
+        PreparedMerge.Display( context.Screen, preparedMerges, closedBranch: b.Name );
         if( !success ) return false;
         int stillOpened = infos.Count( i => i.Branches[b.Index].Exists );
         if( stillOpened > 0 )

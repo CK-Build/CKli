@@ -98,7 +98,18 @@ on that merge), `ckli status` shows `(merging, N conflicts)`, and the merge that
 original commits as parents; aborting it restores the branch as it was. The synchronization of that repository
 fails until the merge is committed: the next `branch sync` then finds it up to date. `--fail-on-conflict` keeps the
 working folder untouched. `branch close` prepares its merge the same way, on the parent's `dev/` branch: the
-branch stays opened until the merge is committed and the close is run again. Only these two commands prepare
+branch stays opened until the merge is committed and the close is run again.
+
+The merges left in progress are reported to the command (`PreparedMerge`, through the `onPreparedMerge`
+callback of `HotBranch.Synchronize` and `HotBranch.Close`) and displayed together at its end, one collapsable
+per repository: the repository (linked to its working folder), the checked out branch, what is merged and the
+number of conflicts, above the paths in conflict.
+
+```
+A merge is left in progress: resolve its conflicts and commit it (or abort it).
+> X-Core  ⎇ dev/sierra ← branch 'dev/stable'  1 conflict
+│ Conflict.txt
+``` Only these two commands prepare
 merges: `branch open`, `branch switch --create` and the roadmap fail on a conflict.
 
 The roadmap doesn't need this: its `Synchronize` call (`BuildPlugin.RoadmapExecutor`) runs right after
