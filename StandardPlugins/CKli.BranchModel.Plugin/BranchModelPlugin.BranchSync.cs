@@ -25,10 +25,10 @@ public sealed partial class BranchModelPlugin
     /// Optional provider of the resolver of the package versions that conflict (see <see cref="HotBranch.Synchronize"/>).
     /// It receives the branch to synchronize.
     /// </param>
-    /// <param name="failOnConflict">
-    /// True to fail without touching anything when a merge conflicts beyond the package versions. By default, the merge is
-    /// left in progress in the working folder, the package versions already aligned: a person resolves the remaining
-    /// conflicts and commits (see <see cref="HotBranch.Synchronize"/>). It requires a <paramref name="versionResolver"/>.
+    /// <param name="dryRun">
+    /// True to only display what the synchronization would do (see <see cref="HotBranch.PredictSynchronize"/>): no merge is
+    /// done. This returns what the synchronization would return: false when a merge would be left in progress or when
+    /// it would fail.
     /// </param>
     /// <returns>True on success, false on error.</returns>
     public bool SynchronizeBranch( IActivityMonitor monitor,
@@ -37,7 +37,7 @@ public sealed partial class BranchModelPlugin
                                    string? mode,
                                    bool all,
                                    Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver,
-                                   bool failOnConflict = false )
+                                   bool dryRun = false )
     {
         if( !ParseLink( monitor, mode, allowManual: false, out var linkType ) )
         {
@@ -53,6 +53,7 @@ public sealed partial class BranchModelPlugin
                                                                         : null;
         bool success = true;
         var preparedMerges = new List<PreparedMerge>();
+        var outcomes = new List<MergeOutcome>();
         foreach( var repo in repos )
         {
             // Read before the BranchModelInfo exists: obtaining it can auto fix a useless "dev/" branch, which
@@ -71,7 +72,15 @@ public sealed partial class BranchModelPlugin
             {
                 continue;
             }
-            if( !b.Synchronize( monitor, linkType, resolver, resolver != null && !failOnConflict ? preparedMerges.Add : null ) )
+            if( dryRun )
+            {
+                var outcome = b.PredictSynchronize( monitor, linkType, resolver, out var conflict );
+                outcomes.Add( outcome );
+                if( conflict != null ) preparedMerges.Add( conflict );
+                success &= outcome is not (MergeOutcome.Conflict or MergeOutcome.Failed);
+                continue;
+            }
+            if( !b.Synchronize( monitor, linkType, resolver, resolver != null ? preparedMerges.Add : null ) )
             {
                 success = false;
                 continue;
@@ -83,7 +92,14 @@ public sealed partial class BranchModelPlugin
                 success &= repo.GitRepository.Checkout( monitor, b.GitDevBranch ?? b.GitBranch );
             }
         }
-        PreparedMerge.Display( context.Screen, preparedMerges );
+        if( dryRun )
+        {
+            PreparedMerge.DisplayDryRun( context.Screen, outcomes, preparedMerges );
+        }
+        else
+        {
+            PreparedMerge.Display( context.Screen, preparedMerges );
+        }
         return success;
     }
 }

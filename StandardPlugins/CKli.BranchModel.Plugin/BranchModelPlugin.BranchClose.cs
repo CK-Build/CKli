@@ -24,10 +24,10 @@ public sealed partial class BranchModelPlugin
     /// Optional provider of the resolver of the package versions that conflict. It receives the branch that receives the
     /// merge: the closest existing parent.
     /// </param>
-    /// <param name="failOnConflict">
-    /// True to fail without touching the repository when a merge conflicts beyond the package versions. By default, the
-    /// merge is left in progress in the working folder: once it is committed, closing the branch again completes it.
-    /// It requires a <paramref name="versionResolver"/>.
+    /// <param name="dryRun">
+    /// True to only display what the close would do (see <see cref="HotBranch.PredictClose"/>): nothing is merged nor
+    /// deleted and the branch model is not changed. This returns what the close would return: false when a merge would
+    /// be left in progress or when it would fail.
     /// </param>
     /// <returns>True on success, false on error.</returns>
     public bool CloseBranch( IActivityMonitor monitor,
@@ -35,7 +35,7 @@ public sealed partial class BranchModelPlugin
                              string branchName,
                              bool discard,
                              Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver,
-                             bool failOnConflict = false )
+                             bool dryRun = false )
     {
         var b = _namespace.FindRequired( monitor, branchName );
         if( b == null )
@@ -57,6 +57,11 @@ public sealed partial class BranchModelPlugin
                                 {World.Name.WorldRoot}
                                 """ );
                 return false;
+            }
+            if( dryRun )
+            {
+                context.Screen.Display( context.Screen.ScreenType.Text( $"Dry run: '{b.Name}' would be removed from the branch model. Nothing has been changed." ) );
+                return true;
             }
             return SaveBranchNamespace( monitor, _namespace.Remove( b ) );
         }
@@ -81,6 +86,7 @@ public sealed partial class BranchModelPlugin
         }
         if( !success ) return false;
         var preparedMerges = new List<PreparedMerge>();
+        var outcomes = new List<MergeOutcome>();
         foreach( var hb in toClose )
         {
             // A merge left in progress (or any failure) in a repository doesn't stop the others: the branch is still
@@ -89,7 +95,22 @@ public sealed partial class BranchModelPlugin
             Func<IActivityMonitor, IPackageVersionResolver?>? resolver = versionResolver != null
                                                                             ? m => versionResolver( m, parent )
                                                                             : null;
-            success &= hb.Close( monitor, resolver, resolver != null && !failOnConflict ? preparedMerges.Add : null );
+            if( dryRun )
+            {
+                var outcome = hb.PredictClose( monitor, resolver, out var conflict );
+                outcomes.Add( outcome );
+                if( conflict != null ) preparedMerges.Add( conflict );
+                success &= outcome is not (MergeOutcome.Conflict or MergeOutcome.Failed);
+            }
+            else
+            {
+                success &= hb.Close( monitor, resolver, resolver != null ? preparedMerges.Add : null );
+            }
+        }
+        if( dryRun )
+        {
+            PreparedMerge.DisplayDryRun( context.Screen, outcomes, preparedMerges );
+            return success;
         }
         PreparedMerge.Display( context.Screen, preparedMerges, closedBranch: b.Name );
         if( !success ) return false;

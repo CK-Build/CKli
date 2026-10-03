@@ -414,6 +414,94 @@ public sealed class HotBranch
     }
 
     /// <summary>
+    /// Predicts the merge of the link commit that <see cref="Synchronize"/> would do, without changing anything (the
+    /// merge is computed in the object database only). The prediction starts from the local branches: the merges of
+    /// the remote branches that a synchronization starts with depend on a fetch and are not predicted.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="applyLink">Optional link type to consider. By default, this configured <see cref="BranchName.LinkType"/> is considered.</param>
+    /// <param name="versionResolver">Optional provider of the resolver of the package versions that conflict.</param>
+    /// <param name="conflict">Outputs the merge that would be left in progress when the outcome is <see cref="MergeOutcome.Conflict"/>.</param>
+    /// <returns>What the synchronization would do.</returns>
+    public MergeOutcome PredictSynchronize( IActivityMonitor monitor,
+                                           BranchLinkType applyLink,
+                                           Func<IActivityMonitor, IPackageVersionResolver?>? versionResolver,
+                                           out PreparedMerge? conflict )
+    {
+        Throw.CheckState( Exists );
+        conflict = null;
+        if( applyLink == BranchLinkType.None )
+        {
+            applyLink = _name.LinkType;
+        }
+        if( applyLink is BranchLinkType.None or BranchLinkType.Manual )
+        {
+            return MergeOutcome.UpToDate;
+        }
+        Throw.DebugAssert( _name.Parent != null );
+        var parent = _info.GetRequiredClosestExistingBranch( monitor, _name.Parent );
+        if( parent == null ) return MergeOutcome.Failed;
+        var linkCommit = GetLinkCommit( monitor, parent, applyLink );
+        if( linkCommit == null ) return MergeOutcome.Failed;
+        var otherName = applyLink is BranchLinkType.Full
+                            ? $"branch '{(parent.GitDevBranch ?? parent.GitBranch!).FriendlyName}'"
+                            : $"commit '{linkCommit.Sha.AsSpan( 0, 7 )} {linkCommit.MessageShort}'";
+        // The merge targets the "dev/" branch, that the synchronization creates on the base when it doesn't exist.
+        return PredictMergeInto( monitor, (_gitDevBranch ?? GitBranch).Tip, _gitDevBranch?.FriendlyName ?? _name.DevName, linkCommit, otherName, versionResolver, out conflict );
+    }
+
+    /// <summary>
+    /// Predicts the merge into the "dev/" branch of the closest existing parent that <see cref="Close"/> would do,
+    /// without changing anything (the merge is computed in the object database only).
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="versionResolver">Optional provider of the resolver of the package versions that conflict (the parent's one).</param>
+    /// <param name="conflict">Outputs the merge that would be left in progress when the outcome is <see cref="MergeOutcome.Conflict"/>.</param>
+    /// <returns>What the close would do.</returns>
+    public MergeOutcome PredictClose( IActivityMonitor monitor,
+                                      Func<IActivityMonitor, IPackageVersionResolver?>? versionResolver,
+                                      out PreparedMerge? conflict )
+    {
+        Throw.CheckState( Exists && !BranchName.IsRoot );
+        conflict = null;
+        Throw.DebugAssert( _name.Parent != null );
+        var closest = _info.GetRequiredClosestExistingBranch( monitor, _name.Parent );
+        if( closest == null ) return MergeOutcome.Failed;
+        // The "dev/" branch is first integrated in the branch (it is ahead of it): the branch's content is its tip.
+        var tip = (_gitDevBranch ?? GitBranch).Tip;
+        var target = closest.GitDevBranch ?? closest.GitBranch!;
+        return PredictMergeInto( monitor, target.Tip, closest.BranchName.DevName, tip, $"branch '{_name.Name}'", versionResolver, out conflict );
+    }
+
+    MergeOutcome PredictMergeInto( IActivityMonitor monitor,
+                                   Commit targetTip,
+                                   string targetName,
+                                   Commit other,
+                                   string otherName,
+                                   Func<IActivityMonitor, IPackageVersionResolver?>? versionResolver,
+                                   out PreparedMerge? conflict )
+    {
+        conflict = null;
+        var git = Repo.GitRepository;
+        var d = git.Repository.ObjectDatabase.CalculateHistoryDivergence( other, targetTip );
+        if( d.AheadBy is 0 ) return MergeOutcome.UpToDate;
+        if( d.BehindBy is 0 ) return MergeOutcome.FastForward;
+        if( targetTip.Tree.Sha == other.Tree.Sha ) return MergeOutcome.UpToDate;
+        if( PackageVersionMerge.PredictMerge( monitor,
+                                              git,
+                                              targetTip,
+                                              other,
+                                              () => versionResolver?.Invoke( monitor ),
+                                              out var conflicts,
+                                              out _ ) )
+        {
+            return MergeOutcome.Merge;
+        }
+        conflict = new PreparedMerge( Repo, targetName, otherName, conflicts );
+        return MergeOutcome.Conflict;
+    }
+
+    /// <summary>
     /// Ensures that this <see cref="GitBranch"/> and <see cref="GitDevBranch"/> are synchronized with their
     /// remote origin counterparts (if any) and with the <see cref="BranchModelInfo.GetClosestExistingBranch(BranchName)"/>
     /// according to <see cref="BranchName.LinkType"/>.

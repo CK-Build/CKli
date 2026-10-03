@@ -49,4 +49,35 @@ public sealed record PreparedMerge( Repo Repo, string TargetBranch, string Merge
         screen.Display( s.Text( $"{(merges.Count == 1 ? "A merge is" : $"{merges.Count} merges are")} left in progress: {what}" )!
                          .AddBelow( merges.Select( m => m.ToRenderable( s ) ) ) );
     }
+
+    /// <summary>
+    /// Displays the result of a dry run: the count of each outcome and the merges that would be left in progress.
+    /// </summary>
+    /// <param name="screen">The screen.</param>
+    /// <param name="outcomes">The predicted outcomes, one per repository.</param>
+    /// <param name="conflicts">The merges that would be left in progress.</param>
+    public static void DisplayDryRun( IScreen screen, IReadOnlyList<MergeOutcome> outcomes, IReadOnlyList<PreparedMerge> conflicts )
+    {
+        var s = screen.ScreenType;
+        var counts = new List<string>();
+        Add( counts, outcomes, MergeOutcome.Merge, "merge", "merges" );
+        Add( counts, outcomes, MergeOutcome.FastForward, "fast-forward", "fast-forwards" );
+        Add( counts, outcomes, MergeOutcome.UpToDate, "up to date", "up to date" );
+        Add( counts, outcomes, MergeOutcome.Conflict, "conflict", "conflicts" );
+        Add( counts, outcomes, MergeOutcome.Failed, "failure", "failures" );
+        var summary = counts.Count == 0 ? "nothing to do" : counts.Concatenate( ", " );
+        IRenderable display = s.Text( $"Dry run: {summary}. Nothing has been changed." )!;
+        if( conflicts.Count > 0 )
+        {
+            display = display.AddBelow( s.Text( $"{(conflicts.Count == 1 ? "A merge would be" : $"{conflicts.Count} merges would be")} left in progress:" ),
+                                        s.Unit.AddBelow( conflicts.Select( m => m.ToRenderable( s ) ) ) );
+        }
+        screen.Display( display );
+
+        static void Add( List<string> counts, IReadOnlyList<MergeOutcome> outcomes, MergeOutcome outcome, string one, string many )
+        {
+            int n = outcomes.Count( o => o == outcome );
+            if( n > 0 ) counts.Add( $"{n} {(n == 1 ? one : many)}" );
+        }
+    }
 }

@@ -20,13 +20,15 @@ public sealed partial class HotZonePlugin
     /// <param name="branch">The branch name to synchronize.</param>
     /// <param name="mode">Specifies the mode (Release, CI or Full). Overrides the configured mode.</param>
     /// <param name="all">Consider all the Repos of the current World (even if current path is in a Repo).</param>
-    /// <param name="failOnConflict">True to fail without touching anything when a merge conflicts beyond the package versions.</param>
+    /// <param name="dryRun">True to only display what the synchronization would do.</param>
     /// <returns>True on success, false on error.</returns>
     [Description( """
         Synchronize the specified branch with its closest parent branch.
         The package versions that conflict are resolved the way a build of the branch updates them. When other conflicts
         remain, the merge is left in progress in the working folder (the "dev/" branch is checked out): resolve them and
         commit the merge.
+        With --dry-run, nothing is merged: what the synchronization would do is displayed and the command fails when it
+        would fail (a merge would be left in progress, for instance).
         """ )]
     [CommandPath( "branch sync" )]
     public bool BranchSync( IActivityMonitor monitor,
@@ -37,10 +39,11 @@ public sealed partial class HotZonePlugin
                             string? mode = null,
                             [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
                             bool all = false,
-                            [Description( "Fails without touching anything when a merge conflicts beyond the package versions." )]
-                            bool failOnConflict = false )
+                            [Description( "Displays what the synchronization would do without merging anything." )]
+                            [OptionName( "--dry-run,-d" )]
+                            bool dryRun = false )
     {
-        return _branchModel.SynchronizeBranch( monitor, context, branch, mode, all, CreateVersionResolverProvider(), failOnConflict );
+        return _branchModel.SynchronizeBranch( monitor, context, branch, mode, all, CreateVersionResolverProvider(), dryRun );
     }
 
     /// <summary>
@@ -51,7 +54,7 @@ public sealed partial class HotZonePlugin
     /// <param name="context">The minimal context.</param>
     /// <param name="branchName">The branch name to close.</param>
     /// <param name="discard">True to keep the branch where it is and not integrate it in its closest parent.</param>
-    /// <param name="failOnConflict">True to fail without touching anything when a merge conflicts beyond the package versions.</param>
+    /// <param name="dryRun">True to only display what the close would do.</param>
     /// <returns>True on success, false on error.</returns>
     [Description( """
         Closes a Conformant SVersion branch in the current repositories by integrating it in the "dev/" branch of its
@@ -61,6 +64,8 @@ public sealed partial class HotZonePlugin
         The package versions that conflict are resolved the way a build of the parent updates them. When other conflicts
         remain, the merge is left in progress in the working folder: resolve them, commit the merge and close the branch
         again.
+        With --dry-run, nothing is merged nor deleted: what the close would do is displayed and the command fails when it
+        would fail (a merge would be left in progress, for instance).
         """ )]
     [CommandPath( "branch close" )]
     public bool BranchClose( IActivityMonitor monitor,
@@ -69,10 +74,11 @@ public sealed partial class HotZonePlugin
                              string branchName,
                              [Description( "Only remove the branch from the branch model (must be run at the root of the World): the Git branches are left as-is." )]
                              bool discard = false,
-                             [Description( "Fails without touching anything when a merge conflicts beyond the package versions." )]
-                             bool failOnConflict = false )
+                             [Description( "Displays what the close would do without merging nor deleting anything." )]
+                             [OptionName( "--dry-run,-d" )]
+                             bool dryRun = false )
     {
-        return _branchModel.CloseBranch( monitor, context, branchName, discard, CreateVersionResolverProvider(), failOnConflict );
+        return _branchModel.CloseBranch( monitor, context, branchName, discard, CreateVersionResolverProvider(), dryRun );
     }
 
     /// <summary>

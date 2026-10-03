@@ -212,6 +212,50 @@ public static partial class PackageVersionMerge
         }
     }
 
+    /// <summary>
+    /// Predicts the merge of <paramref name="theirs"/> into <paramref name="ours"/> that <see cref="CreateMergeCommit"/>
+    /// (or <see cref="PrepareMerge"/>) would do: the package versions are aligned when the merge conflicts and a resolver
+    /// is available, and the paths that still conflict are returned. Like the merge itself, this creates objects in the
+    /// object database only (they are left unreferenced): no branch moves, the working folder is not touched.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="git">The repository.</param>
+    /// <param name="ours">The commit that receives the merge.</param>
+    /// <param name="theirs">The commit to merge.</param>
+    /// <param name="getResolver">Provides the resolver of the conflicting versions (called only when the merge conflicts).</param>
+    /// <param name="conflicts">Outputs the paths that would be in conflict.</param>
+    /// <param name="aligned">Outputs the package versions that would be aligned.</param>
+    /// <returns>True when the merge would succeed, false when it would conflict.</returns>
+    public static bool PredictMerge( IActivityMonitor monitor,
+                                     GitRepository git,
+                                     Commit ours,
+                                     Commit theirs,
+                                     Func<IPackageVersionResolver?> getResolver,
+                                     out IReadOnlyList<string> conflicts,
+                                     out IReadOnlyList<AlignedVersion> aligned )
+    {
+        aligned = [];
+        var db = git.Repository.ObjectDatabase;
+        var merge = db.MergeCommits( ours, theirs, new MergeTreeOptions { SkipReuc = true } );
+        if( merge.Status == MergeTreeStatus.Conflicts )
+        {
+            var resolver = getResolver();
+            if( resolver != null )
+            {
+                var alignedVersions = AlignSides( monitor, git, ours, theirs, resolver, out var oursAligned, out var theirsAligned );
+                if( alignedVersions.Count > 0 )
+                {
+                    merge = db.MergeCommits( oursAligned, theirsAligned, new MergeTreeOptions { SkipReuc = true } );
+                }
+                aligned = alignedVersions;
+            }
+        }
+        conflicts = merge.Status == MergeTreeStatus.Conflicts
+                        ? merge.Conflicts.SelectMany( c => new[] { c.Ancestor, c.Ours, c.Theirs } ).Where( e => e != null ).Select( e => e.Path ).Distinct().ToList()
+                        : [];
+        return conflicts.Count == 0;
+    }
+
     // Aligns the package versions that differ between the two sides: the aligned commits are children of their original
     // commit (the merge base stays the same), or the original commits themselves when nothing differs.
     static List<AlignedVersion> AlignSides( IActivityMonitor monitor,

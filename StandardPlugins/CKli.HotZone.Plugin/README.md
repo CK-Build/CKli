@@ -96,8 +96,12 @@ in progress in the working folder (`PackageVersionMerge.PrepareMerge`), its pack
 any Git tool shows only the real conflicts. The `dev/` branch is checked out for this (the person is about to work
 on that merge), `ckli status` shows `(merging, N conflicts)`, and the merge that the person commits has the two
 original commits as parents; aborting it restores the branch as it was. The synchronization of that repository
-fails until the merge is committed: the next `branch sync` then finds it up to date. `--fail-on-conflict` keeps the
-working folder untouched. `branch close` prepares its merge the same way, on the parent's `dev/` branch: the
+fails until the merge is committed: the next `branch sync` then finds it up to date. `branch sync --dry-run`
+merges nothing: it computes the merges in the object database (`HotBranch.PredictSynchronize`, from the local
+branches: the merges of the remote branches depend on a fetch and are not predicted), displays a summary of their
+outcomes and the merges that would be left in progress, and returns what the synchronization would return - so
+that a script can test it. `branch close --dry-run` does the same with `HotBranch.PredictClose`. The reading of the
+branch model is not inert, though: the `AutoFixDevBranch` repairs still happen. `branch close` prepares its merge the same way, on the parent's `dev/` branch: the
 branch stays opened until the merge is committed and the close is run again.
 
 The merges left in progress are reported to the command (`PreparedMerge`, through the `onPreparedMerge`
