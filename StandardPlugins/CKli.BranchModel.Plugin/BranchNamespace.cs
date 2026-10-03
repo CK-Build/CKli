@@ -466,7 +466,7 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
     /// <summary>
     /// Writes this namespace into a &lt;BranchModel&gt; <paramref name="configuration"/> element: sets its Root
     /// attribute and replaces its &lt;Prerelease&gt; and &lt;Explo&gt; elements. Any other attribute or element
-    /// (<see cref="XNames.AutoFixUselessBranch"/>) is left untouched.
+    /// (<see cref="XNames.AutoFixDevBranch"/>) is left untouched.
     /// <para>
     /// The constructor reads back exactly this: the configuration always round trips.
     /// </para>

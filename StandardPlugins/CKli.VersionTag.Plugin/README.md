@@ -279,7 +279,7 @@ fake build harness never satisfies it, because the harness leaves the repositori
 
 The new World's `<BranchModel>` keeps only its root branch (`BranchNamespace.CreateForLTS`), written by a single
 `WriteConfiguration()` call: it sets `Root` and replaces the cloned `<Prerelease>` and `<Explo>` elements (both
-empty here), leaving `AutoFixUselessBranch` alone. Both halves are
+empty here), leaving `AutoFixDevBranch` alone. Both halves are
 in the **configuration** form — without the `{LTSName}/` prefix — because `BranchNamespace` prepends that prefix
 itself when it reads back, and the `Root` parser rejects a name that does not match `^[a-z][0-9a-z_-]+`: an
 `@net8/stable` value makes the new World unloadable (`Invalid Root branch name in BranchModel

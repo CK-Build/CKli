@@ -83,47 +83,20 @@ sealed class RoadmapPublisher : BasePublisher
             var baseTagCommit = buildInfo.VersionInfo.HotZone.LastStable;
             fakeTagVersionToPush = baseTagCommit.IsFakeVersion ? baseTagCommit.Tag : baseTagCommit.FakeVersion?.Tag;
         }
-        // computes pushRefSpecs and branchToRemove.
-        ImmutableArray<string> pushRefSpecs = [];
-        string? branchToRemove = null;
-        if( fromDevBranch )
-        {
-            // We are publishing a CI from the "dev/" branch: we ensure that the non-CI branch is also visible to the
-            // remote repository users.
-            var b = repo.GetBranch( monitor, branch.Name, missingLocalAndRemote: LogLevel.Warn );
-            if( b != null && !b.IsTracking )
-            {
-                monitor.Warn( $"Branch '{branch.Name}' has no tracked branch. Creating branch 'origin/{branch.Name}'." );
-                b = repo.Repository.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
-                pushRefSpecs = [$"{b.CanonicalName}:{b.CanonicalName}"];
-            }
-        }
-        else if( !isCI )
-        {
-            branchToRemove = branch.DevName;
-        }
-        return PublishCoreAsync( monitor, solution.Repo, gitBranchName, pushRefSpecs, branchToRemove, version, tag, fakeTagVersionToPush, content, cancellation );
-    }
-
-    // Defensive fix for a brand new repository: on a CI build, the regular (non "dev/") branch may not
-    // have been pushed to the remote yet. If so, push it along with the "dev/" branch.
-    static ImmutableArray<string> ComputeMainLinePushRefSpecs( IActivityMonitor monitor, Repo repo, BranchName branch, bool isCI )
-    {
-        if( !isCI )
-        {
-            // The regular branch will be pushed.
-            // Its remote "dev/" branch (now integrated) is removed.
-            return [$":refs/heads/{branch.DevName}"];
-        }
-        // CI build: ensures that the "dev/" branch is tracked.
-        var r = repo.GitRepository;
-        var b = r.GetBranch( monitor, branch.Name, missingLocalAndRemote: LogLevel.Warn );
-        if( b != null && b.TrackedBranch == null )
-        {
-            monitor.Warn( $"Branch '{branch.Name}' has no tracked branch. Creating branch 'origin/{branch.Name}'." );
-            b = r.Repository.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
-            return [$"{b.CanonicalName}:{b.CanonicalName}"];
-        }
-        return ImmutableArray<string>.Empty;
+        // A CI version published from the "dev/" branch pushes its base too when the remote doesn't have it; a non-CI
+        // version integrates the "dev/" branch, that is removed from the remote.
+        string? baseBranchName = fromDevBranch ? branch.Name : null;
+        string? branchToRemove = isCI ? null : branch.DevName;
+        return PublishCoreAsync( monitor,
+                                 solution.Repo,
+                                 gitBranchName,
+                                 baseBranchName,
+                                 ImmutableArray<string>.Empty,
+                                 branchToRemove,
+                                 version,
+                                 tag,
+                                 fakeTagVersionToPush,
+                                 content,
+                                 cancellation );
     }
 }

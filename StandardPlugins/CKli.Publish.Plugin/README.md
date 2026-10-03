@@ -496,9 +496,15 @@ The three concrete publishers differ only in which Git branch they push, and how
 
 | Publisher | Branch | Branch handling |
 |---|---|---|
-| `RoadmapPublisher` | Resolved from the version through the World's `BranchNamespace`: the regular branch for a non-CI version; for a CI one, the `dev/` branch when it exists (locally or on the remote), the regular one otherwise — the build reads `dev/` or its regular branch the same way, and a `dev/` branch created on the regular tip to build a `--ci.0` is deleted as useless by the next command. | Non-CI: pushes the regular branch and deletes the remote `dev/` branch that was just integrated. CI from `dev/`: ensures the regular branch is tracked if the repository is brand new. Also pushes the `+fake` base tag when the version is a prerelease or CI one. |
-| `FixPublisher` | The explicit `fix/vMajor.Minor` branch of the Fix Workflow, which is not resolvable from the version. | None: no `dev/` cleanup, no defensive push, no extra tag. |
-| `IndirectPublisher` | Resolved from the version like `RoadmapPublisher`. | None, deliberately: these releases belong to a branch the current operation is not working on, so touching its branches would be a side effect nobody asked for. |
+| `RoadmapPublisher` | Resolved from the version through the World's `BranchNamespace`: the regular branch for a non-CI version; for a CI one, the `dev/` branch when it exists (locally or on the remote), the regular one otherwise — the build reads `dev/` or its regular branch the same way, and a `dev/` branch created on the regular tip to build a `--ci.0` is deleted as useless by the next command. | Non-CI: pushes the regular branch and deletes the remote `dev/` branch that was just integrated. Also pushes the `+fake` base tag when the version is a prerelease or CI one. |
+| `FixPublisher` | The explicit `fix/vMajor.Minor` branch of the Fix Workflow, which is not resolvable from the version. | None: no `dev/` cleanup, no extra tag. |
+| `IndirectPublisher` | Resolved from the version like `RoadmapPublisher`. | None beyond the base branch rule below: these releases belong to a branch the current operation is not working on, so touching its branches would be a side effect nobody asked for. |
+
+**A `dev/` branch never reaches the remote without its base.** Whatever the publisher, when the pushed branch is
+a `dev/` one, `BasePublisher` pushes its base along with it if the remote doesn't have it (and makes it track
+`origin`): another clone would otherwise fetch an orphan `dev/` branch. The base always exists locally: the
+BranchModel's `AutoFixDevBranch` recreates a missing one before anything is built, and when it is false the
+missing base is an issue that stops the build.
 
 `World.StackRepository.PushChanges` is called by `PublishPlugin` after a successful publication —
 publishing also pushes whatever the Stack repository itself accumulated.

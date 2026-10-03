@@ -35,6 +35,8 @@ public sealed partial class BranchModelInfo : RepoInfo
         _hasIssue = hasIssue;
     }
 
+    internal void SetHasIssue( bool hasIssue ) => _hasIssue = hasIssue;
+
     /// <summary>
     /// Gets the branch namespace.
     /// </summary>
@@ -95,7 +97,7 @@ public sealed partial class BranchModelInfo : RepoInfo
         {
             monitor.Error( $"""
                     Branch '{name.DevName}' in '{Repo.DisplayPath}' exists but its base '{name.Name}' branch doesn't exist.
-                    Please remove '{name.DevName}' branch or use 'ckli issue' to fix this.
+                    Use 'ckli issue --fix' to recreate it.
                     """ );
             return null;
         }
@@ -115,7 +117,7 @@ public sealed partial class BranchModelInfo : RepoInfo
                                  ScreenType screenType,
                                  Action<World.Issue> collector,
                                  bool forgetUselessBranches,
-                                 bool autoFixUselessBranch,
+                                 bool autoFixDevBranch,
                                  out bool hasSevereIssues )
     {
         // If the "stable" branch doesn't exist, no need to continue.
@@ -127,7 +129,7 @@ public sealed partial class BranchModelInfo : RepoInfo
             hasSevereIssues = true;
             return;
         }
-        var issues = new BranchIssueBuilder( forgetUselessBranches, autoFixUselessBranch );
+        var issues = new BranchIssueBuilder( forgetUselessBranches, autoFixDevBranch );
         foreach( var b in _branches )
         {
             b.Collect( issues );

@@ -45,6 +45,10 @@ abstract class BasePublisher
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="repo">The repository to publish.</param>
     /// <param name="branchName">The Git branch to push.</param>
+    /// <param name="baseBranchName">
+    /// The base branch when <paramref name="branchName"/> is a "dev/" branch: a "dev/" branch never reaches the remote
+    /// without its base, which is pushed along with it when the remote doesn't have it.
+    /// </param>
     /// <param name="pushRefSpecs">Additional ref specs to push along with <paramref name="branchName"/>.</param>
     /// <param name="branchToRemove">
     /// An optional branch short name (without "refs/heads/") that must be removed from the
@@ -59,6 +63,7 @@ abstract class BasePublisher
     protected async Task<bool> PublishCoreAsync( IActivityMonitor monitor,
                                                  Repo repo,
                                                  string branchName,
+                                                 string? baseBranchName,
                                                  ImmutableArray<string> pushRefSpecs,
                                                  string? branchToRemove,
                                                  SVersion version,
@@ -124,6 +129,22 @@ abstract class BasePublisher
             return false;
         }
 
+        if( baseBranchName != null )
+        {
+            // The other clones would see an orphan "dev/" branch. The base branch exists locally: the BranchModel
+            // recreates a missing one before anything is built (or its issue stops the build).
+            var baseBranch = r.Repository.Branches[baseBranchName];
+            Throw.CheckState( $"Branch '{baseBranchName}' of '{branchName}' must exist in '{repo.DisplayPath}'.", baseBranch != null );
+            if( r.Repository.Branches[$"origin/{baseBranchName}"] == null )
+            {
+                monitor.Info( $"Branch '{baseBranchName}' is not on the remote: it is pushed with '{branchName}'." );
+                if( !baseBranch.IsTracking )
+                {
+                    baseBranch = r.Repository.Branches.Update( baseBranch, u => { u.Remote = "origin"; u.UpstreamBranch = baseBranch.CanonicalName; } );
+                }
+                pushRefSpecs = pushRefSpecs.Add( $"{baseBranch.CanonicalName}:{baseBranch.CanonicalName}" );
+            }
+        }
         r.DeferredPushRefSpecs.AddRange( pushRefSpecs );
         if( !r.PushBranch( monitor, branch, autoCreateRemoteBranch: true ) )
         {

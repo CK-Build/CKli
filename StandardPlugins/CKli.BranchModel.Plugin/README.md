@@ -97,7 +97,7 @@ rather than mutating in place. `BranchModelPlugin` persists the result back to t
 
 ```xml
 <Plugins>
-  <BranchModel Root="stable" AutoFixUselessBranch="true">
+  <BranchModel Root="stable" AutoFixDevBranch="true">
     <Prerelease Name="beta" Link="Release" />
     <Prerelease Name="rc" Link="CI" />
     <Explo Name="explo/spike-x" Parent="beta" Link="Manual" />
@@ -116,11 +116,16 @@ rather than mutating in place. `BranchModelPlugin` persists the result back to t
   CSemVer stability order, which is the parent chain read top down. `Link` defaults to `CI`.
   This is what separates them from `<Explo>`: an exploratory name carries no order, which is why that
   element needs an explicit `Parent` (or XML nesting) and this one does not.
-- **`AutoFixUselessBranch`** (attribute, optional, default `true`) — when a branch's `dev/` exists
-  but has nothing ahead of its base (a "useless" `dev/`), silently delete it instead of reporting
-  it as an issue. This is a *plugin attribute*: `ckli plugin info` describes its current value and
-  [`ckli plugin set AutoFixUselessBranch false`](../../CKli.Core/CKliCommands/README.md#plugin-set-name-value)
-  (or `ckli plugin unset AutoFixUselessBranch`) writes it without editing this file by hand.
+- **`AutoFixDevBranch`** (attribute, optional, default `true`) — keeps each `dev/` branch consistent
+  with its base, silently, instead of reporting an issue: a `dev/` that has nothing ahead of its base
+  (a "useless" `dev/`) is deleted, and the missing base of a `dev/` branch is recreated where the `dev/`
+  branch left its closest existing parent (`HotBranch.RestoreMissingBase`). A `dev/` branch implies its
+  base, but a base can be missing: a `dev/` branch fetched from a remote that doesn't have its base, or a
+  base deleted locally. Recreating it loses nothing: the `dev/` branch keeps its commits, ahead of its
+  base. When it is false, `ckli issue --fix` does the same. This is a *plugin attribute*: `ckli plugin
+  info` describes its current value and
+  [`ckli plugin set AutoFixDevBranch false`](../../CKli.Core/CKliCommands/README.md#plugin-set-name-value)
+  (or `ckli plugin unset AutoFixDevBranch`) writes it without editing this file by hand.
 - **`<Explo Name="..." Parent="..." Link="...">`** — an exploratory branch. `Name` must be
   `explo/<lowercase-id>` (the `explo/` prefix and the LTS prefix are inferred if omitted) and must
   neither start with `ci-` nor end with `-ci` — that suffix qualifies a branch name to name its CI
@@ -147,7 +152,7 @@ and `ToParentedString()` are their only consumers. Three of the four contain a `
 escape, and the fourth is an emoji, which is why the configuration does not use them.
 
 `WriteConfiguration(XElement)` serializes back into this same shape — it sets `Root` and replaces the
-`<Prerelease>` and `<Explo>` elements, leaving any other attribute (`AutoFixUselessBranch`) untouched
+`<Prerelease>` and `<Explo>` elements, leaving any other attribute (`AutoFixDevBranch`) untouched
 — using `BranchName.ConfigurationName` so the round trip holds in an LTS world too
 (`BranchNamespaceTests.lts_namespace_configuration_round_trips` pins it). `ToConfiguration()` is the
 same thing into a fresh element, and `ToString()` is that element. `GetDisplayTree()` renders the whole
@@ -193,7 +198,7 @@ The relationship between a `GitBranch` and its `GitDevBranch` is captured by an 
 | `IssueKind` | Meaning |
 |---|---|
 | `None` | Fine: `Ahead` doesn't exist, or is strictly ahead of `Branch`. |
-| `Useless` | `Ahead` has no commit beyond `Branch` — should be deleted (auto-fixed unless checked out and dirty, see `AutoFixUselessBranch`). This is about commits, not content: an `Ahead` with commits of its own and the same tree as `Branch` (a "Producing 'vX' from unchanged head." commit that carries a version) is not useless. |
+| `Useless` | `Ahead` has no commit beyond `Branch` — should be deleted (auto-fixed unless checked out and dirty, see `AutoFixDevBranch`). This is about commits, not content: an `Ahead` with commits of its own and the same tree as `Branch` (a "Producing 'vX' from unchanged head." commit that carries a version) is not useless. |
 | `Unrelated` | `Ahead` shares no common ancestor with `Branch` — must be fixed manually. |
 | `Desynchronized` | `Ahead` is behind `Branch` — fixable by merging `Branch` into `Ahead`. |
 | `DesynchronizedCheckout` | Same as above, but `Ahead` is checked out and the working folder is dirty — cannot be auto-merged. |
@@ -336,8 +341,14 @@ without an `ITagCommitProvider`, or a repository whose version tags have issues 
      candidate is found (`stable`, `main`, `master`, `root`, `trunk`, `mother`, `primary`,
      `develop`, or an existing `dev/<root>`), it can be auto-created from it, otherwise it's a
      manual issue.
-   - **`RemovableBranchesIssue`** — one or more `Useless` `dev/` branches, or `dev/` branches whose
-     base branch is entirely missing; fixed by deleting them.
+   - **`MissingBaseBranchesIssue`** — one or more `dev/` branches whose base branch is missing (a
+     severe issue: the repository cannot be built); fixed by recreating the base where the `dev/` branch
+     left its parent.
+   - **`RemovableBranchesIssue`** — one or more `Useless` `dev/` branches; fixed by deleting them.
+
+   Both are *implicit* (Ⓘ) when `AutoFixDevBranch` is true: `ckli issue` itself fixes nothing, so it
+   reports them, but every other command fixes them silently when it reads the repository. When it is
+   false, they are automatic issues (⚙) for `ckli issue --fix`.
    - **`DesynchronizedBranchesIssue`** — `Desynchronized` branches that can be auto-merged without
      conflict; a separate manual `World.Issue` is raised for the ones that can't.
    - Manual-only issues for `Unrelated` and `DesynchronizedCheckout` links.

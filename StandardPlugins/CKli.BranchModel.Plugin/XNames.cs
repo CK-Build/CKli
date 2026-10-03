@@ -14,6 +14,6 @@ public static class XNames
     public static readonly XName Root = XNamespace.None + "Root";
     public static readonly XName Parent = XNamespace.None + "Parent";
     public static readonly XName Link = XNamespace.None + "Link";
-    public static readonly XName AutoFixUselessBranch = XNamespace.None + "AutoFixUselessBranch";
+    public static readonly XName AutoFixDevBranch = XNamespace.None + "AutoFixDevBranch";
     public static XName Name => CKli.Core.XNames.Name;
 }

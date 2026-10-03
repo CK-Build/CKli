@@ -12,24 +12,25 @@ namespace CKli.BranchModel.Plugin;
 /// </summary>
 sealed partial class BranchIssueBuilder
 {
-    List<(Branch Branch, object BaseOrName)>? _removables;
+    List<(Branch Branch, Branch Base)>? _removables;
+    List<HotBranch>? _missingBases;
     List<(Branch Ahead, Branch Base, int BehindBy)>? _desynchronized;
     List<(Branch Ahead, Branch Base)>? _desynchronizedCheckout;
     List<(Branch Ahead, Branch Base)>? _unrelated;
     bool _hasSevereIssues;
     readonly bool _forgetUselessBranches;
-    readonly bool _autoFixUselessBranch;
+    readonly bool _autoFixDevBranch;
 
-    public BranchIssueBuilder( bool forgetUselessBranches, bool autoFixUselessBranch )
+    public BranchIssueBuilder( bool forgetUselessBranches, bool autoFixDevBranch )
     {
         _forgetUselessBranches = forgetUselessBranches;
-        _autoFixUselessBranch = autoFixUselessBranch;
+        _autoFixDevBranch = autoFixDevBranch;
     }
 
-    public void OnMissingBaseBranch( Branch branch, string baseBranchName )
+    public void OnMissingBaseBranch( HotBranch branch )
     {
-        _removables ??= [];
-        _removables.Add( (branch, baseBranchName) );
+        _missingBases ??= [];
+        _missingBases.Add( branch );
         _hasSevereIssues = true;
     }
 
@@ -94,9 +95,13 @@ sealed partial class BranchIssueBuilder
                 collector( issue );
             }
         }
+        if( _missingBases != null )
+        {
+            collector( MissingBaseBranchesIssue.Create( screenType, repo, _missingBases, _autoFixDevBranch ) );
+        }
         if( _removables != null )
         {
-            collector( RemovableBranchesIssue.Create( screenType, repo, _removables, _autoFixUselessBranch ) );
+            collector( RemovableBranchesIssue.Create( screenType, repo, _removables, _autoFixDevBranch ) );
         }
         if( _desynchronized != null )
         {

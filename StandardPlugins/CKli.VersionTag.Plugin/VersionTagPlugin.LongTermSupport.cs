@@ -75,7 +75,7 @@ public sealed partial class VersionTagPlugin
         // WriteConfiguration replaces the <Prerelease> AND <Explo> elements: the cloned ones name branches
         // that this root-only namespace no longer has (an <Explo> Parent would not resolve and the new World
         // would fail to load). Both sets are empty here, so this removes the clone's elements without
-        // replacing them, and any other attribute of the clone (AutoFixUselessBranch) is kept.
+        // replacing them, and any other attribute of the clone (AutoFixDevBranch) is kept.
         ns.WriteConfiguration( branchModelConfig );
     }
 

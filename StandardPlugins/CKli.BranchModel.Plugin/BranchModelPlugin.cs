@@ -22,7 +22,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
 {
     readonly BranchNamespace _namespace;
     internal readonly ShallowSolutionPlugin _shallowSolution;
-    readonly bool _autoFixUselessBranch;
+    readonly bool _autoFixDevBranch;
     ITagCommitProvider? _commitProvider;
 
     /// <summary>
@@ -39,23 +39,23 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         _shallowSolution = shallowSolution;
         var configElement = primaryContext.Configuration.XElement;
         _namespace = new BranchNamespace( World.Name.LTSName, configElement );
-        _autoFixUselessBranch = (bool?)configElement.Attribute( XNames.AutoFixUselessBranch ) ?? true;
+        _autoFixDevBranch = (bool?)configElement.Attribute( XNames.AutoFixDevBranch ) ?? true;
     }
 
     void PluginInfoRequested( PluginInfoEventArgs e )
     {
         var s = e.ScreenType;
         IRenderable message;
-        if( _autoFixUselessBranch )
+        if( _autoFixDevBranch )
         {
-            message = s.Text( nameof( XNames.AutoFixUselessBranch ), foreColor: ConsoleColor.Green )
-                       .AddRight( s.Text( "is true (the default): useless branches are automatically deleted." )
+            message = s.Text( nameof( XNames.AutoFixDevBranch ), foreColor: ConsoleColor.Green )
+                       .AddRight( s.Text( """is true (the default): useless "dev/" branches are automatically deleted and the missing base of a "dev/" branch is automatically recreated.""" )
                                    .Box( marginLeft: 1 ) );
         }
         else
         {
-            message = s.Text( nameof( XNames.AutoFixUselessBranch ), foreColor: ConsoleColor.DarkGray )
-                       .AddRight( s.Text( """is false: useless branches will be removed by "ckli issue --fix".""" )
+            message = s.Text( nameof( XNames.AutoFixDevBranch ), foreColor: ConsoleColor.DarkGray )
+                       .AddRight( s.Text( """is false: "ckli issue --fix" deletes the useless "dev/" branches and recreates the missing base of a "dev/" branch.""" )
                                    .Box( marginLeft: 1 ) );
         }
         e.AddMessage( PrimaryPluginContext, message );
@@ -68,9 +68,9 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
                                                      string? attributeValue )
     {
         bool? result = null;
-        if( attributeName.Equals( XNames.AutoFixUselessBranch.LocalName, StringComparison.OrdinalIgnoreCase ) )
+        if( attributeName.Equals( XNames.AutoFixDevBranch.LocalName, StringComparison.OrdinalIgnoreCase ) )
         {
-            result = PrimaryPluginContext.Configuration.SetBooleanAttribute( monitor, XNames.AutoFixUselessBranch, attributeValue );
+            result = PrimaryPluginContext.Configuration.SetBooleanAttribute( monitor, XNames.AutoFixDevBranch, attributeValue );
         }
         return Task.FromResult( result );
     }
@@ -110,7 +110,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         foreach( var r in e.Repos )
         {
             var info = Get( monitor, r );
-            info.CollectIssues( monitor, e.ScreenType, e.Add, forgetUselessBranches, _autoFixUselessBranch, out hasSevereIssue );
+            info.CollectIssues( monitor, e.ScreenType, e.Add, forgetUselessBranches, _autoFixDevBranch, out hasSevereIssue );
         }
         if( !hasSevereIssue )
         {
@@ -196,15 +196,15 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="repo">The repository to consider.</param>
     /// <returns>The branch information for the repository.</returns>
-    protected override BranchModelInfo Create( IActivityMonitor monitor, Repo repo ) => CreateBranchModelInfo( monitor, repo, _namespace, _autoFixUselessBranch );
+    protected override BranchModelInfo Create( IActivityMonitor monitor, Repo repo ) => CreateBranchModelInfo( monitor, repo, _namespace, _autoFixDevBranch );
 
-    BranchModelInfo CreateBranchModelInfo( IActivityMonitor monitor, Repo repo, BranchNamespace ns, bool autoFixUselessBranch )
+    BranchModelInfo CreateBranchModelInfo( IActivityMonitor monitor, Repo repo, BranchNamespace ns, bool autoFixDevBranch )
     {
         bool isCKliIssueCommand = PrimaryPluginContext.Command is CKliIssue;
         bool isCKliRepoAddOrCreate = PrimaryPluginContext.Command is CKliRepoCreate or CKliRepoAdd;
         // We don't want to auto fix when executing "ckli issue" and we don't want to remove the "dev/stable"
         // that have been created by the repo create or add.
-        autoFixUselessBranch &= !isCKliIssueCommand && !isCKliRepoAddOrCreate;
+        autoFixDevBranch &= !isCKliIssueCommand && !isCKliRepoAddOrCreate;
         var info = new BranchModelInfo( repo, ns, this );
         var git = repo.GitRepository.Repository;
 
@@ -220,17 +220,21 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
             return info;
         }
         // We have our hot root "stable" branch.
-        bool hasIssue = root.HasIssue( monitor, autoFixUselessBranch );
         var hotBranches = new HotBranch[ns.Branches.Length];
         hotBranches[0] = root;
         for( int i = 1; i < hotBranches.Length; ++i )
         {
-            var branchName = ns.Branches[i];
-            var b = HotBranch.Create( monitor, info, repo.GitRepository, branchName );
-            hasIssue |= b.HasIssue( monitor, autoFixUselessBranch );
-            hotBranches[i] = b;
+            hotBranches[i] = HotBranch.Create( monitor, info, repo.GitRepository, ns.Branches[i] );
         }
-        info.Initialize( ImmutableCollectionsMarshal.AsImmutableArray( hotBranches ), hasIssue );
+        // The branches must be known before their issues are evaluated: recreating the missing base of a "dev/" branch
+        // walks up to its closest existing parent.
+        info.Initialize( ImmutableCollectionsMarshal.AsImmutableArray( hotBranches ), hasIssue: false );
+        bool hasIssue = false;
+        foreach( var b in hotBranches )
+        {
+            hasIssue |= b.HasIssue( monitor, autoFixDevBranch );
+        }
+        info.SetHasIssue( hasIssue );
         return info;
     }
 

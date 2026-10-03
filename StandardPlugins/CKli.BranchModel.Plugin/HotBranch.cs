@@ -115,12 +115,18 @@ public sealed class HotBranch
     /// Gets whether this branch has an issue that should be collected and fixed.
     /// <para>
     /// This is false when the <see cref="GitDevBranch"/> branch is <see cref="BranchLink.IssueKind.Useless"/>: this is a minor issue
-    /// that is collected by "ckli issue" but is not treated as a real issue. When <paramref name="deleteUselessDevBranch"/> is true,
-    /// the useless "dev/" branch is silently deleted.
+    /// that is collected by "ckli issue" but is not treated as a real issue.
+    /// </para>
+    /// <para>
+    /// When <paramref name="autoFixDevBranch"/> is true, the "dev/" branch is made consistent with its base: a useless "dev/"
+    /// branch is silently deleted and the missing base of an orphan "dev/" branch (<see cref="HasOrphanDevBranch"/>) is
+    /// recreated (see <see cref="RestoreMissingBase"/>).
     /// </para>
     /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="autoFixDevBranch">True to fix the "dev/" branch.</param>
     /// <returns>True if this branch has issue (other than being useless), false otherwise.</returns>
-    public bool HasIssue( IActivityMonitor monitor, bool deleteUselessDevBranch ) => HasIssue( deleteUselessDevBranch ? monitor : null );
+    public bool HasIssue( IActivityMonitor monitor, bool autoFixDevBranch ) => HasIssue( autoFixDevBranch ? monitor : null );
 
     /// <summary>
     /// Gets whether this branch has an issue that should be collected and fixed.
@@ -135,7 +141,11 @@ public sealed class HotBranch
     {
         if( _link == null )
         {
-            return _name.Index == 0 || _gitDevBranch != null;
+            if( _name.Index == 0 ) return true;
+            if( _gitDevBranch == null ) return false;
+            // An orphan "dev/" branch: once its base is recreated, the restored pair is evaluated (the "dev/"
+            // branch may well be useless).
+            return monitor == null || !RestoreMissingBase( monitor ) || HasIssue( monitor );
         }
         var i = _link.Issue;
         if( i == BranchLink.IssueKind.Useless )
@@ -165,6 +175,41 @@ public sealed class HotBranch
         return i != BranchLink.IssueKind.None;
     }
 
+    /// <summary>
+    /// Recreates the missing base of an orphan "dev/" branch (<see cref="HasOrphanDevBranch"/>) where the "dev/" branch
+    /// left its closest existing parent: the merge base of the "dev/" tip and the parent's tip ("dev/" first). Nothing is
+    /// lost: the "dev/" branch keeps its commits, ahead of its recreated base.
+    /// <para>
+    /// A "dev/" branch implies its base, but a base can be missing: a "dev/" branch can reach the remote without it and
+    /// be fetched by another clone, or the base can be deleted locally.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>True on success, false when the root branch is missing or when the "dev/" branch has no common ancestor with its parent.</returns>
+    internal bool RestoreMissingBase( IActivityMonitor monitor )
+    {
+        Throw.DebugAssert( HasOrphanDevBranch && _name.Parent != null );
+        var dev = _gitDevBranch!;
+        var parent = _info.GetClosestExistingBranch( _name.Parent );
+        if( parent == null ) return false;
+        var parentTip = (parent.GitDevBranch ?? parent.GitBranch!).Tip;
+        var git = Repo.GitRepository.Repository;
+        var forkPoint = git.ObjectDatabase.FindMergeBase( dev.Tip, parentTip );
+        if( forkPoint == null )
+        {
+            monitor.Warn( $"""
+                Branch '{dev.FriendlyName}' in '{Repo.DisplayPath}' has no common ancestor with '{parent.BranchName}':
+                its missing base '{_name.Name}' cannot be recreated.
+                """ );
+            return false;
+        }
+        var b = git.Branches.Add( _name.Name, forkPoint );
+        monitor.Info( ScreenType.CKliScreenTag,
+                      $"Recreated the missing branch '{_name.Name}' of '{dev.FriendlyName}' in '{Repo.DisplayPath}' where it left '{parent.BranchName}'." );
+        _link = BranchLink.Create( b, dev );
+        return true;
+    }
+
     internal void Collect( BranchIssueBuilder issues )
     {
         if( _link == null )
@@ -175,7 +220,7 @@ public sealed class HotBranch
             // as the starting point (instead of "main" or "master").
             if( _name.Index != 0 && _gitDevBranch != null )
             {
-                issues.OnMissingBaseBranch( _gitDevBranch, _name.Name );
+                issues.OnMissingBaseBranch( this );
             }
         }
         else

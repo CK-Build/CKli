@@ -46,10 +46,11 @@ sealed class IndirectPublisher : BasePublisher
         var branch = _branches.FindRequired( monitor, release.Version );
         if( branch == null ) return Task.FromResult( false );
 
-        string gitBranchName = release.Version.IsCI ? branch.DevName : branch.Name;
+        bool isCI = release.Version.IsCI;
         return PublishCoreAsync( monitor,
                                  release.Repo,
-                                 gitBranchName,
+                                 isCI ? branch.DevName : branch.Name,
+                                 isCI ? branch.Name : null,
                                  ImmutableArray<string>.Empty,
                                  null,
                                  release.Version,
