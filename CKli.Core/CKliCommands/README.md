@@ -205,7 +205,10 @@ the push.
 ### `status --by-branch --all --skip-pull-stack`
 
 When the current directory is in a World, lists the Repos with their folder path, current branch name,
-remote commit diffs, and remote origin url.
+remote commit diffs, and remote origin url. An operation that waits in the working folder follows the branch
+name, in yellow: `(merging, 1 conflict)` while conflicts remain, `(merging, resolved)` when only the commit
+is missing (a rebase, cherry-pick, revert, etc. is shown the same way). This is
+`GitRepository.SimpleStatusInfo.Operation` and `ConflictCount`; such a repository is also dirty (`✱`).
 
 Otherwise, this lists every Stack that is registered on this machine, with its root folder and whether
 it is public or private.

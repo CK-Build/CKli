@@ -44,6 +44,46 @@ public partial class GitRepositoryTests
         status.CurrentBranchName.ShouldBe( "(no branch)" );
     }
 
+    /// <summary>
+    /// A merge that conflicts waits in the working folder: the status says so, with the number of files that are
+    /// still conflicted. Once they are resolved (staged), only the commit is missing: the operation is still a merge.
+    /// </summary>
+    [Test]
+    public void GitStatus_tells_a_merge_in_progress_and_its_conflicts()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        using var r = GitRepository.InitOrphanRepository( TestHelper.Monitor,
+                                                          context.SecretsStore,
+                                                          context.CurrentDirectory,
+                                                          context.CurrentDirectory.LastPart,
+                                                          isPublic: true );
+        r.ShouldNotBeNull();
+        var file = context.CurrentDirectory.AppendPart( "SomeFile.txt" );
+        File.WriteAllText( file, "Base." );
+        r.Commit( TestHelper.Monitor, "Base." );
+        var other = r.Repository.CreateBranch( "other" );
+        File.WriteAllText( file, "Main." );
+        r.Commit( TestHelper.Monitor, "Main." );
+        Commands.Checkout( r.Repository, other );
+        File.WriteAllText( file, "Other." );
+        r.Commit( TestHelper.Monitor, "Other." );
+        Commands.Checkout( r.Repository, r.Repository.Branches["main"] );
+        r.GetSimpleStatusInfo().Operation.ShouldBe( CurrentOperation.None );
+
+        r.Repository.Merge( r.Repository.Branches["other"], r.Committer, new MergeOptions { CommitOnSuccess = false } )
+                    .Status.ShouldBe( MergeStatus.Conflicts );
+        var status = r.GetSimpleStatusInfo();
+        status.Operation.ShouldBe( CurrentOperation.Merge );
+        status.ConflictCount.ShouldBe( 1 );
+        status.IsDirty.ShouldBeTrue();
+
+        File.WriteAllText( file, "Resolved." );
+        Commands.Stage( r.Repository, "SomeFile.txt" );
+        status = r.GetSimpleStatusInfo();
+        status.Operation.ShouldBe( CurrentOperation.Merge );
+        status.ConflictCount.ShouldBe( 0 );
+    }
+
 
     [Test]
     public void fetch_works_when_the_objects_pack_folder_is_missing()

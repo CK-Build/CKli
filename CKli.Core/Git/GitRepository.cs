@@ -157,6 +157,17 @@ public sealed partial class GitRepository : IDisposable
         /// </summary>
         [MemberNotNullWhen( true, nameof( CommitAhead ), nameof( CommitBehind ) )]
         public bool IsTracked => CommitAhead.HasValue;
+
+        /// <summary>
+        /// Gets the operation in progress in the working folder: a merge that waits for its commit, a rebase,
+        /// a cherry-pick, etc. <see cref="CurrentOperation.None"/> most of the time.
+        /// </summary>
+        public CurrentOperation Operation { get; init; }
+
+        /// <summary>
+        /// Gets the number of files that are still conflicted (an <see cref="Operation"/> is in progress).
+        /// </summary>
+        public int ConflictCount { get; init; }
     }
 
     /// <summary>
@@ -166,12 +177,16 @@ public sealed partial class GitRepository : IDisposable
     public SimpleStatusInfo GetSimpleStatusInfo()
     {
         var branchDetails = _git.Head.TrackingDetails;
+        var status = _git.RetrieveStatus( _checkDirtyOptions );
+        var operation = _git.Info.CurrentOperation;
         return new SimpleStatusInfo()
         {
             CurrentBranchName = _git.Head.FriendlyName,
             CommitAhead = branchDetails.AheadBy,
             CommitBehind = branchDetails.BehindBy,
-            IsDirty = _git.RetrieveStatus( _checkDirtyOptions ).IsDirty,
+            IsDirty = status.IsDirty,
+            Operation = operation,
+            ConflictCount = operation == CurrentOperation.None ? 0 : status.Count( e => (e.State & FileStatus.Conflicted) != 0 )
         };
     }
 

@@ -1,4 +1,5 @@
 using CK.Core;
+using LibGit2Sharp;
 using System;
 using System.Text;
 using System.Threading;
@@ -232,6 +233,12 @@ public sealed class Repo
         if( branchName != null )
         {
             folder = folder.AddRight( screenType.Text( $"⎇ {branchName}" ).Box( marginRight: 1 ) );
+            // An operation that waits in the working folder (typically a merge whose conflicts must be resolved
+            // before it is committed) is the reason why this repository is dirty: it must be visible.
+            if( status.Operation != CurrentOperation.None )
+            {
+                folder = folder.AddRight( screenType.Text( GetOperationText( status ), ConsoleColor.Yellow ).Box( marginRight: 1 ) );
+            }
         }
         if( withRemoteDiffCount )
         {
@@ -258,6 +265,27 @@ public sealed class Repo
                                     count != 0
                                         ? new TextStyle( new Color( System.ConsoleColor.Red, System.ConsoleColor.Black ), TextEffect.Bold )
                                         : TextStyle.None );
+        }
+
+        // "(merging, 1 conflict)" while conflicts remain, "(merging, resolved)" when only the commit is missing.
+        static string GetOperationText( GitRepository.SimpleStatusInfo status )
+        {
+            var operation = status.Operation switch
+            {
+                CurrentOperation.Merge => "merging",
+                CurrentOperation.Revert or CurrentOperation.RevertSequence => "reverting",
+                CurrentOperation.CherryPick or CurrentOperation.CherryPickSequence => "cherry-picking",
+                CurrentOperation.Bisect => "bisecting",
+                CurrentOperation.ApplyMailbox => "applying patches",
+                _ => "rebasing"
+            };
+            var conflicts = status.ConflictCount switch
+            {
+                0 => "resolved",
+                1 => "1 conflict",
+                int n => $"{n} conflicts"
+            };
+            return $"({operation}, {conflicts})";
         }
     }
 
