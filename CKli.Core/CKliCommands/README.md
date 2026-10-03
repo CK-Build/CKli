@@ -633,7 +633,7 @@ Both sides of this are deliberately **manual**, and it is up to each plugin to i
 - writing them is the plugin's `OnPluginSetAsync` override.
 
 The 4 Standard Plugins that currently support attributes are
-[`BranchModel`](../../StandardPlugins/CKli.BranchModel.Plugin/README.md#configuration-xml) (`AutoFixUselessBranch`),
+[`BranchModel`](../../StandardPlugins/CKli.BranchModel.Plugin/README.md#configuration-xml) (`AutoFixDevBranch`),
 [`VersionTag`](../../StandardPlugins/CKli.VersionTag.Plugin/README.md#configuration) (`AutoFixRemovableTag`,
 `RemoveUselessFakeTag`),
 [`Publish`](../../StandardPlugins/CKli.Publish.Plugin/README.md#configuration) (`KeepLocalReleaseAfterPublish`) and
