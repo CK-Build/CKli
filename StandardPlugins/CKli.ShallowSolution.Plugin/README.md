@@ -207,6 +207,14 @@ branches built independently both rewrite the references to the World's packages
   default: `ckli branch list`, that only probes the merges, logs it as a trace. `CKli.HotZone.Plugin` provides it from the branch's
   `HotGraph`, and `HotBranch.Synchronize` fast-forwards the `dev/` branch to the returned commit (which is what
   handles a checked out `dev/`).
+- **`PrepareMerge(monitor, git, target, theirs, theirsName, getResolver, out conflicts)`** is for the merges that
+  still conflict: it leaves the merge **in progress in the working folder**, for a person to resolve with any Git
+  tool. The `target` branch is checked out with its versions aligned (detached), the aligned `theirs` is merged
+  without committing (the working folder and the index hold the merge, with conflict markers only where the conflicts
+  are real), then `HEAD` is the `target` branch again (only the reference moves) and `MERGE_HEAD`, `ORIG_HEAD` and
+  `MERGE_MSG` are the ones of a merge of the **original** commits. The merge that the person commits has the two
+  original commits as parents; the aligned commits stay unreferenced. `git merge --abort` restores the `target` as it
+  was. The working folder must be clean, and without a resolver nothing is aligned.
 
 ### Package mappings: `IPackageMapping`, `PackageMapper`, `BrutalPackageMapper`, `PackageBounds`
 

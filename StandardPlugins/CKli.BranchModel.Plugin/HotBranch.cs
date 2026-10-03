@@ -402,10 +402,16 @@ public sealed class HotBranch
     /// <see cref="PackageVersionMerge"/>). It is called only when such a merge conflicts and only on project files;
     /// returning null (that must have logged why) fails the synchronization. Without it, any conflict fails it.
     /// </param>
+    /// <param name="prepareMergeOnConflict">
+    /// True to leave the merge in progress in the working folder when it conflicts beyond the package versions (requires
+    /// a <paramref name="versionResolver"/>, see <see cref="PackageVersionMerge.PrepareMerge"/>): the "dev/" branch is
+    /// checked out and a person resolves the remaining conflicts and commits. The synchronization fails.
+    /// </param>
     /// <returns>True on success, false on error.</returns>
     public bool Synchronize( IActivityMonitor monitor,
                              BranchLinkType applyLink = BranchLinkType.None,
-                             Func<IActivityMonitor, IPackageVersionResolver?>? versionResolver = null )
+                             Func<IActivityMonitor, IPackageVersionResolver?>? versionResolver = null,
+                             bool prepareMergeOnConflict = false )
     {
         Throw.CheckState( Exists );
         // Merge the tracked branches of the regular and the dev/ if they exist.
@@ -466,7 +472,7 @@ public sealed class HotBranch
             // A merge commit is needed when the histories have diverged and the contents differ: this is where the
             // package versions may conflict.
             bool merged = versionResolver != null && d.BehindBy is not 0 && dev.Tip.Tree.Sha != linkCommit.Tree.Sha
-                            ? MergeAligningPackageVersions( monitor, ref dev, parentBranch, linkCommit, versionResolver )
+                            ? MergeAligningPackageVersions( monitor, ref dev, parentBranch, linkCommit, versionResolver, prepareMergeOnConflict )
                             : parentBranch != null
                                 ? Repo.GitRepository.MergeBranchContent( monitor, ref dev, parentBranch )
                                 : Repo.GitRepository.MergeBranchContent( monitor, ref dev, linkCommit );
@@ -485,7 +491,8 @@ public sealed class HotBranch
                                        ref Branch dev,
                                        Branch? parentBranch,
                                        Commit linkCommit,
-                                       Func<IActivityMonitor, IPackageVersionResolver?> versionResolver )
+                                       Func<IActivityMonitor, IPackageVersionResolver?> versionResolver,
+                                       bool prepareMergeOnConflict )
     {
         var git = Repo.GitRepository;
         if( parentBranch != null && parentBranch.IsCurrentRepositoryHead && !git.CheckCleanCommit( monitor ) )
@@ -502,9 +509,16 @@ public sealed class HotBranch
                                                            dev.FriendlyName,
                                                            otherName,
                                                            () => versionResolver( monitor ),
-                                                           out var aligned );
+                                                           out var aligned,
+                                                           // When the merge is prepared, the conflicts are listed below.
+                                                           prepareMergeOnConflict ? CK.Core.LogLevel.Trace : CK.Core.LogLevel.Error );
         if( merge == null )
         {
+            // The branch is not synchronized until the person commits the merge: this fails either way.
+            if( prepareMergeOnConflict )
+            {
+                PrepareMerge( monitor, dev, linkCommit, otherName, versionResolver );
+            }
             return false;
         }
         if( aligned.Count > 0 )
@@ -515,6 +529,32 @@ public sealed class HotBranch
                 """ );
         }
         return git.MergeBranchContent( monitor, ref dev, merge );
+    }
+
+    // Leaves the merge in progress in the working folder (see PackageVersionMerge.PrepareMerge): the "dev/" branch is
+    // checked out first. Always logs an error: what remains to be done when it succeeds, why it failed otherwise.
+    void PrepareMerge( IActivityMonitor monitor,
+                       Branch dev,
+                       Commit linkCommit,
+                       string otherName,
+                       Func<IActivityMonitor, IPackageVersionResolver?> versionResolver )
+    {
+        var git = Repo.GitRepository;
+        if( !dev.IsCurrentRepositoryHead )
+        {
+            if( !git.Checkout( monitor, dev ) ) return;
+            monitor.Info( ScreenType.CKliScreenTag, $"'{dev.FriendlyName}' is checked out in '{Repo.DisplayPath}' to resolve its conflicts." );
+            dev = git.Repository.Branches[dev.FriendlyName];
+        }
+        if( PackageVersionMerge.PrepareMerge( monitor, git, dev, linkCommit, otherName, () => versionResolver( monitor ), out var conflicts ) )
+        {
+            monitor.Error( $"""
+                Merging {otherName} into '{dev.FriendlyName}' in '{Repo.DisplayPath}' conflicts beyond the package versions.
+                The merge is in progress in the working folder: resolve the conflicts in
+                {conflicts.Concatenate( Environment.NewLine )}
+                and commit the merge (or abort it).
+                """ );
+        }
     }
 
     /// <summary>

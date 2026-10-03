@@ -88,7 +88,16 @@ conflicts on project files and caches it, failure included: a sync or a list wit
 computes it, and a World with issues (that has no `HotGraph`) still synchronizes everything that merges
 cleanly. The aligned merge itself is `ShallowSolution`'s
 [`PackageVersionMerge`](../CKli.ShallowSolution.Plugin/README.md#packageversionmerge): any conflict beyond the
-package versions still fails.
+package versions is a real conflict.
+
+A real conflict needs a person, and a person needs a merge to work on: by default, `branch sync` leaves the merge
+in progress in the working folder (`PackageVersionMerge.PrepareMerge`), its package versions already aligned, so that
+any Git tool shows only the real conflicts. The `dev/` branch is checked out for this (the person is about to work
+on that merge), `ckli status` shows `(merging, N conflicts)`, and the merge that the person commits has the two
+original commits as parents; aborting it restores the branch as it was. The synchronization of that repository
+fails until the merge is committed: the next `branch sync` then finds it up to date. `--fail-on-conflict` keeps the
+working folder untouched. Only `branch sync` prepares merges: `branch open`, `branch switch --create` and the
+roadmap fail on a conflict.
 
 The roadmap doesn't need this: its `Synchronize` call (`BuildPlugin.RoadmapExecutor`) runs right after
 `EnsureExists` created the branch at its start commit, which is the link commit itself.

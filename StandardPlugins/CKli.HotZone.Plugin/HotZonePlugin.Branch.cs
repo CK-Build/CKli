@@ -20,10 +20,13 @@ public sealed partial class HotZonePlugin
     /// <param name="branch">The branch name to synchronize.</param>
     /// <param name="mode">Specifies the mode (Release, CI or Full). Overrides the configured mode.</param>
     /// <param name="all">Consider all the Repos of the current World (even if current path is in a Repo).</param>
+    /// <param name="failOnConflict">True to fail without touching anything when a merge conflicts beyond the package versions.</param>
     /// <returns>True on success, false on error.</returns>
     [Description( """
         Synchronize the specified branch with its closest parent branch.
-        The package versions that conflict are resolved the way a build of the branch updates them.
+        The package versions that conflict are resolved the way a build of the branch updates them. When other conflicts
+        remain, the merge is left in progress in the working folder (the "dev/" branch is checked out): resolve them and
+        commit the merge.
         """ )]
     [CommandPath( "branch sync" )]
     public bool BranchSync( IActivityMonitor monitor,
@@ -33,9 +36,11 @@ public sealed partial class HotZonePlugin
                             [Description( "Specifies the mode (Release, CI or Full). Overrides the configured link type." )]
                             string? mode = null,
                             [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
-                            bool all = false )
+                            bool all = false,
+                            [Description( "Fails without touching anything when a merge conflicts beyond the package versions." )]
+                            bool failOnConflict = false )
     {
-        return _branchModel.SynchronizeBranch( monitor, context, branch, mode, all, CreateVersionResolverProvider() );
+        return _branchModel.SynchronizeBranch( monitor, context, branch, mode, all, CreateVersionResolverProvider(), failOnConflict );
     }
 
     /// <summary>

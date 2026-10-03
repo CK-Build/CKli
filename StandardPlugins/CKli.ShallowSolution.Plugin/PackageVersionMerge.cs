@@ -117,6 +117,112 @@ public static partial class PackageVersionMerge
                 """ );
             return null;
         }
+        var alignedVersions = AlignSides( monitor, git, ours, theirs, resolver, out var oursAligned, out var theirsAligned );
+        if( alignedVersions.Count > 0 )
+        {
+            merge = db.MergeCommits( oursAligned, theirsAligned, new MergeTreeOptions { SkipReuc = true } );
+        }
+        if( merge.Status == MergeTreeStatus.Conflicts )
+        {
+            monitor.Log( failureLevel, $"""
+                Failed merging {theirsName} into '{oursName}' in '{git.DisplayPath}'. Beyond the package versions, conflicts in:
+                {merge.Conflicts.SelectMany( c => new[] { c.Ancestor, c.Ours, c.Theirs } ).Where( e => e != null ).Select( e => e.Path ).Distinct().Concatenate( Environment.NewLine )}
+                This must be fixed manually.
+                """ );
+            return null;
+        }
+        aligned = alignedVersions;
+        return db.CreateCommit( git.Author, git.Committer, $"Merged {theirsName}.", merge.Tree, [ours, theirs], prettifyMessage: true );
+    }
+
+    /// <summary>
+    /// Leaves the merge of <paramref name="theirs"/> into the <paramref name="target"/> branch in progress in the
+    /// working folder, for the conflicts that remain once the package versions are aligned (see
+    /// <see cref="CreateMergeCommit"/>): a "merge in progress" that a person resolves and commits with any Git tool.
+    /// <para>
+    /// The <paramref name="target"/> is checked out with its versions aligned (detached) and the aligned
+    /// <paramref name="theirs"/> is merged without committing: the working folder and the index hold the merge, with
+    /// conflict markers only where the conflicts are real. The HEAD is then the <paramref name="target"/> branch again
+    /// (the index and the working folder are not touched) and MERGE_HEAD is the original <paramref name="theirs"/>:
+    /// the merge commit that the person creates has the two original commits as parents. Aborting the merge
+    /// ("git merge --abort") restores the <paramref name="target"/> branch as it was.
+    /// </para>
+    /// <para>
+    /// When <paramref name="getResolver"/> provides no resolver, nothing is aligned: the package versions conflict too.
+    /// The working folder must be clean.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="git">The repository.</param>
+    /// <param name="target">The branch that receives the merge.</param>
+    /// <param name="theirs">The commit to merge.</param>
+    /// <param name="theirsName">What is merged, for the merge message "Merged {theirsName}." ("branch 'X'" or "commit 'sha message'").</param>
+    /// <param name="getResolver">Provides the resolver of the conflicting versions.</param>
+    /// <param name="conflicts">Outputs the paths that are in conflict in the working folder.</param>
+    /// <returns>True when the merge is in progress, false on error.</returns>
+    public static bool PrepareMerge( IActivityMonitor monitor,
+                                     GitRepository git,
+                                     Branch target,
+                                     Commit theirs,
+                                     string theirsName,
+                                     Func<IPackageVersionResolver?> getResolver,
+                                     out IReadOnlyList<string> conflicts )
+    {
+        conflicts = [];
+        if( !git.CheckCleanCommit( monitor ) ) return false;
+        var repository = git.Repository;
+        var ours = target.Tip;
+        Commit oursAligned = ours;
+        Commit theirsAligned = theirs;
+        var resolver = getResolver();
+        if( resolver == null )
+        {
+            monitor.Warn( $"The package versions of '{git.DisplayPath}' cannot be aligned (see above): they conflict too." );
+        }
+        else
+        {
+            AlignSides( monitor, git, ours, theirs, resolver, out oursAligned, out theirsAligned );
+        }
+        try
+        {
+            Commands.Checkout( repository, oursAligned );
+            var result = repository.Merge( theirsAligned,
+                                           git.Committer,
+                                           new MergeOptions { CommitOnSuccess = false, FastForwardStrategy = FastForwardStrategy.NoFastForward } );
+            if( result.Status != MergeStatus.Conflicts )
+            {
+                monitor.Error( $"Unexpected merge status '{result.Status}' while preparing the merge of {theirsName} into '{target.FriendlyName}' in '{git.DisplayPath}'." );
+                Commands.Checkout( repository, target, new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force } );
+                return false;
+            }
+            // HEAD is the target branch again: only the reference changes, the index and the working folder
+            // hold the merge. MERGE_HEAD, MERGE_MSG and ORIG_HEAD are the ones of a merge of the original commits.
+            repository.Refs.UpdateTarget( repository.Refs.Head, repository.Refs[target.CanonicalName] );
+            var gitFolder = repository.Info.Path;
+            File.WriteAllText( Path.Combine( gitFolder, "MERGE_HEAD" ), theirs.Sha + "\n" );
+            File.WriteAllText( Path.Combine( gitFolder, "ORIG_HEAD" ), ours.Sha + "\n" );
+            File.WriteAllText( Path.Combine( gitFolder, "MERGE_MSG" ), $"Merged {theirsName}.\n" );
+            conflicts = repository.Index.Conflicts.Select( c => (c.Ours ?? c.Theirs ?? c.Ancestor).Path ).Distinct().ToList();
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While preparing the merge of {theirsName} into '{target.FriendlyName}' in '{git.DisplayPath}'.", ex );
+            return false;
+        }
+    }
+
+    // Aligns the package versions that differ between the two sides: the aligned commits are children of their original
+    // commit (the merge base stays the same), or the original commits themselves when nothing differs.
+    static List<AlignedVersion> AlignSides( IActivityMonitor monitor,
+                                            GitRepository git,
+                                            Commit ours,
+                                            Commit theirs,
+                                            IPackageVersionResolver resolver,
+                                            out Commit oursAligned,
+                                            out Commit theirsAligned )
+    {
+        var db = git.Repository.ObjectDatabase;
         // The project files of each side are the ones of its solution: a repository can contain project files
         // that are not built (a template, for instance) and whose references mean nothing.
         var oursFiles = ReadSolutionFiles( monitor, git, ours );
@@ -140,24 +246,17 @@ public static partial class PackageVersionMerge
                 }
             }
         }
-        if( alignedVersions.Count > 0 )
+        if( alignedVersions.Count == 0 )
         {
-            // Each aligned side is a child of its original commit: the merge base stays the same.
-            var oursAligned = db.CreateCommit( git.Committer, git.Committer, "Aligned package versions.", Align( db, ours.Tree, oursFiles, target ), [ours], prettifyMessage: false );
-            var theirsAligned = db.CreateCommit( git.Committer, git.Committer, "Aligned package versions.", Align( db, theirs.Tree, theirsFiles, target ), [theirs], prettifyMessage: false );
-            merge = db.MergeCommits( oursAligned, theirsAligned, new MergeTreeOptions { SkipReuc = true } );
+            oursAligned = ours;
+            theirsAligned = theirs;
         }
-        if( merge.Status == MergeTreeStatus.Conflicts )
+        else
         {
-            monitor.Log( failureLevel, $"""
-                Failed merging {theirsName} into '{oursName}' in '{git.DisplayPath}'. Beyond the package versions, conflicts in:
-                {merge.Conflicts.SelectMany( c => new[] { c.Ancestor, c.Ours, c.Theirs } ).Where( e => e != null ).Select( e => e.Path ).Distinct().Concatenate( Environment.NewLine )}
-                This must be fixed manually.
-                """ );
-            return null;
+            oursAligned = db.CreateCommit( git.Committer, git.Committer, "Aligned package versions.", Align( db, ours.Tree, oursFiles, target ), [ours], prettifyMessage: false );
+            theirsAligned = db.CreateCommit( git.Committer, git.Committer, "Aligned package versions.", Align( db, theirs.Tree, theirsFiles, target ), [theirs], prettifyMessage: false );
         }
-        aligned = alignedVersions;
-        return db.CreateCommit( git.Author, git.Committer, $"Merged {theirsName}.", merge.Tree, [ours, theirs], prettifyMessage: true );
+        return alignedVersions;
     }
 
     sealed record ProjectFile( string Path, FileKind Kind, string Text, bool HasBom, Mode Mode );

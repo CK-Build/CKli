@@ -24,13 +24,19 @@ public sealed partial class BranchModelPlugin
     /// Optional provider of the resolver of the package versions that conflict (see <see cref="HotBranch.Synchronize"/>).
     /// It receives the branch to synchronize.
     /// </param>
+    /// <param name="failOnConflict">
+    /// True to fail without touching anything when a merge conflicts beyond the package versions. By default, the merge is
+    /// left in progress in the working folder, the package versions already aligned: a person resolves the remaining
+    /// conflicts and commits (see <see cref="HotBranch.Synchronize"/>). It requires a <paramref name="versionResolver"/>.
+    /// </param>
     /// <returns>True on success, false on error.</returns>
     public bool SynchronizeBranch( IActivityMonitor monitor,
                                    CKliEnv context,
                                    string branch,
                                    string? mode,
                                    bool all,
-                                   Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver )
+                                   Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver,
+                                   bool failOnConflict = false )
     {
         if( !ParseLink( monitor, mode, allowManual: false, out var linkType ) )
         {
@@ -63,7 +69,7 @@ public sealed partial class BranchModelPlugin
             {
                 continue;
             }
-            if( !b.Synchronize( monitor, linkType, resolver ) )
+            if( !b.Synchronize( monitor, linkType, resolver, prepareMergeOnConflict: resolver != null && !failOnConflict ) )
             {
                 success = false;
                 continue;
