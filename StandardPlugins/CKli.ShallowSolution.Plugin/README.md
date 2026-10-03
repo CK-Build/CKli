@@ -185,10 +185,12 @@ theirs, oursName, theirsName, getResolver, out aligned)` creates the merge commi
 object database (no branch moves, no working folder) for merges that conflict on package versions only — two
 branches built independently both rewrite the references to the World's packages, on the very same lines.
 
-- **The versions are aligned before merging, not repaired afterwards, across the whole repository.** A repository
+- **The versions are aligned before merging, not repaired afterwards, across the whole solution.** A solution
   references a package identifier in one version, so each side has one version per `(package, attribute)`, read
-  from all its project files. Every one that differs between the two sides is set, in all the project files of
-  **both** sides, to what the `IPackageVersionResolver` answers. Both aligned trees are committed as children of
+  from the project files of its solution: the `.slnx` projects and their `Directory.*.props`
+  (`CommonSolution.LoadAllProjectFiles`). A project file that is not in the solution (a template whose references
+  are placeholders) is neither read nor rewritten. Every version that differs between the two sides is set, in the
+  solution's project files of **both** sides, to what the `IPackageVersionResolver` answers. Both aligned trees are committed as children of
   their original commit (so the merge base doesn't change) and merged by git: the version lines have been changed
   the same way on both sides and don't conflict, and since nothing is matched by path, a project file renamed on
   one side and updated on the other merges like any rename. **Whatever still conflicts is a real conflict** and

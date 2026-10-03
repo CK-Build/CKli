@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.ShallowSolution.Plugin;
@@ -20,10 +21,12 @@ namespace CKli.ShallowSolution.Plugin;
 /// version both sides must reference.
 /// </para>
 /// <para>
-/// The versions are aligned before merging rather than repaired afterwards, across the whole repository: a
-/// repository references a package identifier in one version, so each side has one version per package. Every
+/// The versions are aligned before merging rather than repaired afterwards, across the whole solution: a
+/// solution references a package identifier in one version, so each side has one version per package. Every
 /// package whose version differs between the two sides is set to its resolved version in all the project files
-/// of both sides (a text edit of the attribute value: nothing else in the files changes). The two aligned trees
+/// of the solution of both sides (a text edit of the attribute value: nothing else in the files changes). These
+/// are the projects of the ".slnx" and their "Directory.*.props" (CommonSolution.LoadAllProjectFiles): a project
+/// file that is not in the solution, a template for instance, is neither read nor rewritten. The two aligned trees
 /// are then merged by git, renames included: the version lines have been changed the same way on both sides and
 /// don't conflict anymore, so any conflict that remains is a real one. The merge commit has the aligned merge's
 /// tree and the two original commits as its parents.
@@ -114,8 +117,10 @@ public static partial class PackageVersionMerge
                 """ );
             return null;
         }
-        var oursFiles = ReadProjectFiles( git.Repository, ours.Tree );
-        var theirsFiles = ReadProjectFiles( git.Repository, theirs.Tree );
+        // The project files of each side are the ones of its solution: a repository can contain project files
+        // that are not built (a template, for instance) and whose references mean nothing.
+        var oursFiles = ReadSolutionFiles( monitor, git, ours );
+        var theirsFiles = ReadSolutionFiles( monitor, git, theirs );
         var oursVersions = ReadVersions( oursFiles );
         var theirsVersions = ReadVersions( theirsFiles );
         var target = new Dictionary<(string Id, string Attribute), string>( IdComparer.Instance );
@@ -157,32 +162,31 @@ public static partial class PackageVersionMerge
 
     sealed record ProjectFile( string Path, FileKind Kind, string Text, bool HasBom, Mode Mode );
 
-    // All the project files of a tree.
-    static List<ProjectFile> ReadProjectFiles( Repository repository, Tree root )
+    // The project files of the commit's solution (see CommonSolution.LoadAllProjectFiles): none when the commit has no
+    // solution or when it cannot be read.
+    static List<ProjectFile> ReadSolutionFiles( IActivityMonitor monitor, GitRepository git, Commit commit )
     {
         var result = new List<ProjectFile>();
-        Collect( root );
-        return result;
-
-        void Collect( Tree tree )
+        var files = INormalizedFileProvider.GetFiles( commit, useWorkingFolder: false );
+        var solution = files.GetFileInfo( git.DisplayPath.LastPart + ".slnx" );
+        if( solution == null ) return result;
+        XDocument doc;
+        using( var stream = solution.CreateReadStream() )
         {
-            foreach( var e in tree )
-            {
-                if( e.TargetType == TreeEntryTargetType.Tree )
-                {
-                    Collect( (Tree)e.Target );
-                }
-                else if( e.TargetType == TreeEntryTargetType.Blob )
-                {
-                    var kind = GetFileKind( e.Path );
-                    if( kind != FileKind.None )
-                    {
-                        var text = ReadText( (Blob)e.Target, out bool hasBom );
-                        result.Add( new ProjectFile( e.Path, kind, text, hasBom, e.Mode ) );
-                    }
-                }
-            }
+            doc = XDocument.Load( stream );
         }
+        if( doc.Root == null ) return result;
+        CommonSolution.LoadAllProjectFiles( monitor, files, doc.Root, LoadOptions.None, ( _, path, _ ) =>
+        {
+            var kind = GetFileKind( path.Path );
+            if( kind != FileKind.None && commit[path.Path] is { TargetType: TreeEntryTargetType.Blob } e )
+            {
+                var text = ReadText( (Blob)e.Target, out bool hasBom );
+                result.Add( new ProjectFile( path.Path, kind, text, hasBom, e.Mode ) );
+            }
+            return true;
+        } );
+        return result;
     }
 
     // The tree with the target versions applied to its project files.
