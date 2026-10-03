@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.ShallowSolution.Plugin;
 
@@ -19,12 +20,13 @@ namespace CKli.ShallowSolution.Plugin;
 /// version both sides must reference.
 /// </para>
 /// <para>
-/// The versions are aligned before merging rather than repaired afterwards: in the conflicting project files
-/// of both sides, every package whose version differs between the two sides is set to its resolved version
-/// (a text edit of the attribute value: nothing else in the files changes). The two aligned trees are then
-/// merged: the version lines have been changed the same way on both sides and don't conflict anymore, so any
-/// conflict that remains is a real one. The merge commit has the aligned merge's tree and the two original
-/// commits as its parents.
+/// The versions are aligned before merging rather than repaired afterwards, across the whole repository: a
+/// repository references a package identifier in one version, so each side has one version per package. Every
+/// package whose version differs between the two sides is set to its resolved version in all the project files
+/// of both sides (a text edit of the attribute value: nothing else in the files changes). The two aligned trees
+/// are then merged by git, renames included: the version lines have been changed the same way on both sides and
+/// don't conflict anymore, so any conflict that remains is a real one. The merge commit has the aligned merge's
+/// tree and the two original commits as its parents.
 /// </para>
 /// <para>
 /// The project files are the ones <see cref="MutableSolution.UpdatePackages"/> updates: the &lt;PackageVersion&gt;
@@ -66,6 +68,10 @@ public static partial class PackageVersionMerge
     /// <param name="theirsName">What is merged, for the merge commit message "Merged {theirsName}." and the logs ("branch 'X'" or "commit 'sha message'").</param>
     /// <param name="getResolver">Provides the resolver of the conflicting versions.</param>
     /// <param name="aligned">Outputs the package versions that have been aligned (empty when the merge doesn't conflict).</param>
+    /// <param name="failureLevel">
+    /// The level of the log that explains why the merge failed. A caller that only probes whether the merge is possible
+    /// uses a level that doesn't reach the screen.
+    /// </param>
     /// <returns>The merge commit or null if the merge conflicts (beyond package versions) or on error.</returns>
     public static Commit? CreateMergeCommit( IActivityMonitor monitor,
                                              GitRepository git,
@@ -74,7 +80,8 @@ public static partial class PackageVersionMerge
                                              string oursName,
                                              string theirsName,
                                              Func<IPackageVersionResolver?> getResolver,
-                                             out IReadOnlyList<AlignedVersion> aligned )
+                                             out IReadOnlyList<AlignedVersion> aligned,
+                                             LogLevel failureLevel = LogLevel.Error )
     {
         aligned = [];
         var db = git.Repository.ObjectDatabase;
@@ -83,13 +90,15 @@ public static partial class PackageVersionMerge
         {
             return db.CreateCommit( git.Author, git.Committer, $"Merged {theirsName}.", merge.Tree, [ours, theirs], prettifyMessage: true );
         }
-        var conflicts = merge.Conflicts.ToList();
-        var notProjects = conflicts.Where( c => c.Ours == null || c.Theirs == null || GetFileKind( c.Ours.Path ) == FileKind.None )
-                                   .Select( c => (c.Ours ?? c.Theirs ?? c.Ancestor).Path )
-                                   .ToList();
+        // A renamed file appears with its old and its new path: every path of a conflict must be a project file.
+        var notProjects = merge.Conflicts.SelectMany( c => new[] { c.Ancestor, c.Ours, c.Theirs } )
+                                         .Where( e => e != null && GetFileKind( e.Path ) == FileKind.None )
+                                         .Select( e => e.Path )
+                                         .Distinct()
+                                         .ToList();
         if( notProjects.Count > 0 )
         {
-            monitor.Error( $"""
+            monitor.Log( failureLevel, $"""
                 Failed merging {theirsName} into '{oursName}' in '{git.DisplayPath}'. Conflicts in:
                 {notProjects.Concatenate( Environment.NewLine )}
                 This must be fixed manually.
@@ -99,60 +108,110 @@ public static partial class PackageVersionMerge
         var resolver = getResolver();
         if( resolver == null )
         {
-            monitor.Error( $"""
+            monitor.Log( failureLevel, $"""
                 Failed merging {theirsName} into '{oursName}' in '{git.DisplayPath}': the package versions that conflict cannot be resolved (see above).
                 This must be fixed manually.
                 """ );
             return null;
         }
-        var oursTree = TreeDefinition.From( ours.Tree );
-        var theirsTree = TreeDefinition.From( theirs.Tree );
+        var oursFiles = ReadProjectFiles( git.Repository, ours.Tree );
+        var theirsFiles = ReadProjectFiles( git.Repository, theirs.Tree );
+        var oursVersions = ReadVersions( oursFiles );
+        var theirsVersions = ReadVersions( theirsFiles );
+        var target = new Dictionary<(string Id, string Attribute), string>( IdComparer.Instance );
         var alignedVersions = new List<AlignedVersion>();
-        foreach( var c in conflicts )
+        foreach( var (key, o) in oursVersions )
         {
-            var kind = GetFileKind( c.Ours.Path );
-            var oursText = ReadText( git.Repository.Lookup<Blob>( c.Ours.Id ), out bool oursBom );
-            var theirsText = ReadText( git.Repository.Lookup<Blob>( c.Theirs.Id ), out bool theirsBom );
-            var oursVersions = ReadVersions( oursText, kind );
-            var theirsVersions = ReadVersions( theirsText, kind );
-            var target = new Dictionary<(string Id, string Attribute), string>( IdComparer.Instance );
-            foreach( var (key, o) in oursVersions )
+            if( theirsVersions.TryGetValue( key, out var t )
+                && o != t
+                && SVersion.TryParse( o, out var vO )
+                && SVersion.TryParse( t, out var vT ) )
             {
-                if( theirsVersions.TryGetValue( key, out var t )
-                    && o != t
-                    && SVersion.TryParse( o, out var vO )
-                    && SVersion.TryParse( t, out var vT ) )
+                var resolved = resolver.Resolve( key.Id, vO, vT );
+                target.Add( key, resolved.ToString() );
+                if( !alignedVersions.Any( a => a.PackageId.Equals( key.Id, StringComparison.OrdinalIgnoreCase ) ) )
                 {
-                    var resolved = resolver.Resolve( key.Id, vO, vT );
-                    target.Add( key, resolved.ToString() );
-                    if( !alignedVersions.Any( a => a.PackageId.Equals( key.Id, StringComparison.OrdinalIgnoreCase ) ) )
-                    {
-                        alignedVersions.Add( new AlignedVersion( key.Id, vO, vT, resolved ) );
-                    }
+                    alignedVersions.Add( new AlignedVersion( key.Id, vO, vT, resolved ) );
                 }
             }
-            if( target.Count == 0 ) continue;
-            oursTree.Add( c.Ours.Path, CreateBlob( db, Rewrite( oursText, kind, target ), oursBom ), c.Ours.Mode );
-            theirsTree.Add( c.Theirs.Path, CreateBlob( db, Rewrite( theirsText, kind, target ), theirsBom ), c.Theirs.Mode );
         }
         if( alignedVersions.Count > 0 )
         {
             // Each aligned side is a child of its original commit: the merge base stays the same.
-            var oursAligned = db.CreateCommit( git.Committer, git.Committer, "Aligned package versions.", db.CreateTree( oursTree ), [ours], prettifyMessage: false );
-            var theirsAligned = db.CreateCommit( git.Committer, git.Committer, "Aligned package versions.", db.CreateTree( theirsTree ), [theirs], prettifyMessage: false );
+            var oursAligned = db.CreateCommit( git.Committer, git.Committer, "Aligned package versions.", Align( db, ours.Tree, oursFiles, target ), [ours], prettifyMessage: false );
+            var theirsAligned = db.CreateCommit( git.Committer, git.Committer, "Aligned package versions.", Align( db, theirs.Tree, theirsFiles, target ), [theirs], prettifyMessage: false );
             merge = db.MergeCommits( oursAligned, theirsAligned, new MergeTreeOptions { SkipReuc = true } );
         }
         if( merge.Status == MergeTreeStatus.Conflicts )
         {
-            monitor.Error( $"""
+            monitor.Log( failureLevel, $"""
                 Failed merging {theirsName} into '{oursName}' in '{git.DisplayPath}'. Beyond the package versions, conflicts in:
-                {merge.Conflicts.Select( c => (c.Ours ?? c.Theirs ?? c.Ancestor).Path ).Concatenate( Environment.NewLine )}
+                {merge.Conflicts.SelectMany( c => new[] { c.Ancestor, c.Ours, c.Theirs } ).Where( e => e != null ).Select( e => e.Path ).Distinct().Concatenate( Environment.NewLine )}
                 This must be fixed manually.
                 """ );
             return null;
         }
         aligned = alignedVersions;
         return db.CreateCommit( git.Author, git.Committer, $"Merged {theirsName}.", merge.Tree, [ours, theirs], prettifyMessage: true );
+    }
+
+    sealed record ProjectFile( string Path, FileKind Kind, string Text, bool HasBom, Mode Mode );
+
+    // All the project files of a tree.
+    static List<ProjectFile> ReadProjectFiles( Repository repository, Tree root )
+    {
+        var result = new List<ProjectFile>();
+        Collect( root );
+        return result;
+
+        void Collect( Tree tree )
+        {
+            foreach( var e in tree )
+            {
+                if( e.TargetType == TreeEntryTargetType.Tree )
+                {
+                    Collect( (Tree)e.Target );
+                }
+                else if( e.TargetType == TreeEntryTargetType.Blob )
+                {
+                    var kind = GetFileKind( e.Path );
+                    if( kind != FileKind.None )
+                    {
+                        var text = ReadText( (Blob)e.Target, out bool hasBom );
+                        result.Add( new ProjectFile( e.Path, kind, text, hasBom, e.Mode ) );
+                    }
+                }
+            }
+        }
+    }
+
+    // The tree with the target versions applied to its project files.
+    static Tree Align( ObjectDatabase db, Tree tree, List<ProjectFile> files, Dictionary<(string Id, string Attribute), string> target )
+    {
+        var definition = TreeDefinition.From( tree );
+        foreach( var f in files )
+        {
+            var text = Rewrite( f.Text, f.Kind, target );
+            if( text != f.Text )
+            {
+                definition.Add( f.Path, CreateBlob( db, text, f.HasBom ), f.Mode );
+            }
+        }
+        return db.CreateTree( definition );
+    }
+
+    // The versions referenced by the project files of a side: one per package (the first one met).
+    static Dictionary<(string Id, string Attribute), string> ReadVersions( List<ProjectFile> files )
+    {
+        var result = new Dictionary<(string, string), string>( IdComparer.Instance );
+        foreach( var f in files )
+        {
+            foreach( var (key, version) in ReadVersions( f.Text, f.Kind ) )
+            {
+                result.TryAdd( key, version );
+            }
+        }
+        return result;
     }
 
     enum FileKind

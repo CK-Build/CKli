@@ -313,12 +313,14 @@ For each repository where the branch exists, its tip (`GitDevBranch ?? GitBranch
 when that commit is reachable or brings no content (nothing is shown), a **fast-forward**, or a **merge**
 that is computed in the object database only, to tell a clean one from a **conflict**. A merge that conflicts
 on package versions only is computed the way `branch sync` resolves it (`PackageVersionMerge`, with the
-resolver from the branch's `HotGraph`, computed only when such a conflict is found): it is a merge. When the
-`HotGraph` cannot be obtained (a World with issues), it stays a conflict. Conflicts are the
-only outcome that needs someone, so they are the only one that names its repositories (in red);
-**unknown** ones (yellow) are where the commit to integrate cannot be found: a Release or CI link
-without an `ITagCommitProvider`, or a repository whose version tags have issues. Their errors go to a
-monitor that is not bound to the screen (the log file still has them): `ckli issue` is what reports them.
+resolver from the branch's `HotGraph`, requested once per branch when a merge first conflicts): it is a merge.
+When the `HotGraph` cannot be obtained (a World with issues, a solution that cannot be read), the errors that
+explain it are displayed once, followed by a single warning for the branch, and its conflicts stay conflicts.
+Why a probed merge fails is logged as a trace (the log file): the column already says it conflicts.
+Conflicts are the only outcome that needs someone, so they are the only one that names its repositories (in
+red); **unknown** ones (yellow) are where the commit to integrate cannot be found: a Release or CI link
+without an `ITagCommitProvider`, or a repository whose version tags have issues (the errors of the
+`ITagCommitProvider` say which, and `ckli issue` reports them).
 
 - **Only the link to the parent is considered.** The merges of the `origin/` branches that a
   synchronization starts with depend on a fetch: that is `ckli pull`'s business.

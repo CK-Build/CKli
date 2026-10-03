@@ -185,13 +185,15 @@ theirs, oursName, theirsName, getResolver, out aligned)` creates the merge commi
 object database (no branch moves, no working folder) for merges that conflict on package versions only — two
 branches built independently both rewrite the references to the World's packages, on the very same lines.
 
-- **The versions are aligned before merging, not repaired afterwards.** In each conflicting project file, every
-  `(package, attribute)` whose value differs between the two sides is set, on **both** sides, to what the
-  `IPackageVersionResolver` answers. Both aligned trees are committed as children of their original commit (so the
-  merge base doesn't change) and merged: the version lines have been changed the same way on both sides and no
-  longer conflict, so **whatever still conflicts is a real conflict** and fails, as does a conflict in a file that
-  is not a project file. The merge commit has the aligned merge's tree and `[ours, theirs]` as parents, and the
-  same `Merged {theirsName}.` message as `GitRepository.MergeBranchContent`.
+- **The versions are aligned before merging, not repaired afterwards, across the whole repository.** A repository
+  references a package identifier in one version, so each side has one version per `(package, attribute)`, read
+  from all its project files. Every one that differs between the two sides is set, in all the project files of
+  **both** sides, to what the `IPackageVersionResolver` answers. Both aligned trees are committed as children of
+  their original commit (so the merge base doesn't change) and merged by git: the version lines have been changed
+  the same way on both sides and don't conflict, and since nothing is matched by path, a project file renamed on
+  one side and updated on the other merges like any rename. **Whatever still conflicts is a real conflict** and
+  fails, as does a conflict on a path that is not a project file. The merge commit has the aligned merge's tree and
+  `[ours, theirs]` as parents, and the same `Merged {theirsName}.` message as `GitRepository.MergeBranchContent`.
 - **The project files are `MutableSolution.UpdatePackages`' ones**: `<PackageVersion Version>` in a
   `Directory.Packages.props`, `<PackageReference Version|VersionOverride>` in any other `*proj` file and in
   `Directory.Build.props`. `Version` and `VersionOverride` are aligned separately (an override exists to differ).
@@ -199,7 +201,8 @@ branches built independently both rewrite the references to the World's packages
   endings), unlike `MutableSolution`'s `XElement` round trip. Only the identifiers that differ between the two
   sides are touched: aligning the others is the next build's business.
 - **`getResolver` is called only when it is needed**: the merge conflicts, and on project files only. A null
-  resolver (it must have logged why) fails the merge. `CKli.HotZone.Plugin` provides it from the branch's
+  resolver (it must have logged why) fails the merge. Why a merge fails is logged at `failureLevel`, an error by
+  default: `ckli branch list`, that only probes the merges, logs it as a trace. `CKli.HotZone.Plugin` provides it from the branch's
   `HotGraph`, and `HotBranch.Synchronize` fast-forwards the `dev/` branch to the returned commit (which is what
   handles a checked out `dev/`).
 

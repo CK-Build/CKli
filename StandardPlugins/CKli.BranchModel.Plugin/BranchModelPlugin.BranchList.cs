@@ -19,8 +19,8 @@ public sealed partial class BranchModelPlugin
     /// <param name="context">The minimal context.</param>
     /// <param name="versionResolver">
     /// Optional provider of the resolver of the package versions that conflict: with it, a merge that conflicts on
-    /// package versions only is a merge, as it is for "ckli branch sync". It receives the branch and a monitor that is
-    /// not bound to the screen.
+    /// package versions only is a merge, as it is for "ckli branch sync". It receives the branch and is called at most
+    /// once per branch.
     /// </param>
     /// <returns>True on success, false if a solution cannot be read.</returns>
     public bool DisplayBranchList( IActivityMonitor monitor,
@@ -36,31 +36,20 @@ public sealed partial class BranchModelPlugin
         // repositories (that is what "ckli issue" reports).
         var screen = context.Screen;
         var s = screen.ScreenType;
-        // The link commits come from the ITagCommitProvider: a repository whose version tags have issues logs
-        // errors there. Its sync status is simply unknown and "ckli issue" is what reports them, so they go to
-        // a monitor that is not bound to the screen (they still reach the log file).
-        var syncMonitor = new ActivityMonitor( "Computing the synchronization status of the branches." );
         // One row per branch: a multi line TextBlock trims each of its lines, so the indentation of the
         // tree is a Box margin, never spaces in the text.
         var cells = new List<(IRenderable Label, IRenderable? Sync, IRenderable Summary)>();
-        try
+        foreach( var (b, depth) in _namespace.GetDisplayBranches() )
         {
-            foreach( var (b, depth) in _namespace.GetDisplayBranches() )
-            {
-                var label = b.IsRoot
-                            ? s.Text( b.Name )!
-                            : s.Text( $"{b.LinkType.ToCodeString()} {b.Name}" )!;
-                string summary = b.IsRoot
-                                    ? Repositories( repos.Count )
-                                    : GetChangeSummary( monitor, repos, infos, b, reader );
-                cells.Add( (label.Box( marginLeft: 2 * depth, marginRight: 2 ),
-                            GetSyncStatus( syncMonitor, s, infos, b, versionResolver ),
-                            s.Text( summary, ConsoleColor.DarkGray )) );
-            }
-        }
-        finally
-        {
-            syncMonitor.MonitorEnd();
+            var label = b.IsRoot
+                        ? s.Text( b.Name )!
+                        : s.Text( $"{b.LinkType.ToCodeString()} {b.Name}" )!;
+            string summary = b.IsRoot
+                                ? Repositories( repos.Count )
+                                : GetChangeSummary( monitor, repos, infos, b, reader );
+            cells.Add( (label.Box( marginLeft: 2 * depth, marginRight: 2 ),
+                        GetSyncStatus( monitor, s, infos, b, versionResolver ),
+                        s.Text( summary, ConsoleColor.DarkGray )) );
         }
         // A zero width cell is skipped by a HorizontalContent, which would shift the summary of its row into the
         // sync column: when the column exists, an empty cell is its margin. It exists only when needed.
@@ -129,13 +118,32 @@ public sealed partial class BranchModelPlugin
         {
             return null;
         }
+        // The resolver is requested once for the branch, when a merge first conflicts. When it is not available
+        // (the provider has logged why), the branch's conflicts stay conflicts and this is said once.
+        bool resolverRequested = false;
+        IPackageVersionResolver? resolver = null;
+        Func<IPackageVersionResolver?>? getResolver = versionResolver == null
+                                                        ? null
+                                                        : () =>
+                                                        {
+                                                            if( !resolverRequested )
+                                                            {
+                                                                resolverRequested = true;
+                                                                resolver = versionResolver( monitor, b );
+                                                                if( resolver == null )
+                                                                {
+                                                                    monitor.Warn( $"The package versions that conflict in branch '{b}' cannot be resolved (see above): they are counted as conflicts." );
+                                                                }
+                                                            }
+                                                            return resolver;
+                                                        };
         int fastForwards = 0;
         int merges = 0;
         var conflicts = new List<string>();
         var unknowns = new List<string>();
         foreach( var info in infos )
         {
-            switch( GetSyncStatus( monitor, info, b, versionResolver ) )
+            switch( GetSyncStatus( monitor, info, b, getResolver ) )
             {
                 case SyncStatus.FastForward: ++fastForwards; break;
                 case SyncStatus.Merge: ++merges; break;
@@ -165,12 +173,12 @@ public sealed partial class BranchModelPlugin
     /// Classifies the branch <paramref name="b"/> of a repository the same way <see cref="HotBranch.Synchronize"/>
     /// integrates its <see cref="HotBranch.GetLinkCommit"/>: nothing to do when the commit is already reachable or
     /// brings no content, a fast-forward, or a merge that is computed (in the object database only) to detect a conflict.
-    /// With a <paramref name="versionResolver"/>, a merge that conflicts on package versions only is a merge.
+    /// With a <paramref name="getResolver"/>, a merge that conflicts on package versions only is a merge.
     /// </summary>
     SyncStatus? GetSyncStatus( IActivityMonitor monitor,
                                BranchModelInfo info,
                                BranchName b,
-                               Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver )
+                               Func<IPackageVersionResolver?>? getResolver )
     {
         Throw.DebugAssert( b.Parent != null );
         var hb = info.Branches[b.Index];
@@ -191,16 +199,18 @@ public sealed partial class BranchModelPlugin
         if( tip.Tree.Sha == linkCommit.Tree.Sha ) return SyncStatus.UpToDate;
         var merge = git.ObjectDatabase.MergeCommits( tip, linkCommit, new MergeTreeOptions { SkipReuc = true, FailOnConflict = true } );
         if( merge.Tree != null ) return SyncStatus.Merge;
-        if( versionResolver == null ) return SyncStatus.Conflict;
+        if( getResolver == null ) return SyncStatus.Conflict;
         // The same aligned merge as the synchronization (its objects are left unreferenced in the object database).
+        // A failure is a conflict that the column displays: its explanation goes to the log file only.
         return PackageVersionMerge.CreateMergeCommit( monitor,
                                                       info.Repo.GitRepository,
                                                       tip,
                                                       linkCommit,
                                                       b.Name,
                                                       $"commit '{linkCommit.Sha.AsSpan( 0, 7 )} {linkCommit.MessageShort}'",
-                                                      () => versionResolver( monitor, b ),
-                                                      out _ ) != null
+                                                      getResolver,
+                                                      out _,
+                                                      failureLevel: CK.Core.LogLevel.Trace ) != null
                 ? SyncStatus.Merge
                 : SyncStatus.Conflict;
     }
