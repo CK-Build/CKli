@@ -84,7 +84,9 @@ public sealed partial class World
 
     /// <summary>
     /// Pulls the <paramref name="repos"/>: this is what "ckli pull" does on the repositories (fetch and merge of the
-    /// branches that track a remote one, then the tags). Any merge conflict is an error.
+    /// branches that track a remote one, then the tags). The sides of a merge that conflicts are aligned by the
+    /// <see cref="MergeAssistant"/> when possible; a conflict that remains is not merged (it is displayed) and
+    /// fails the pull: nothing is left in progress.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="repos">The repositories to pull.</param>
@@ -98,6 +100,15 @@ public sealed partial class World
                                  int maxDop = 0,
                                  bool continueOnError = false )
     {
-        return CKli.CKliPull.DoPullAsync( monitor, continueOnError, repos, withTags, maxDop, _scopeAlive );
+        return CKli.CKliPull.DoPullAsync( monitor,
+                                          this,
+                                          _stackRepository.Context.Screen,
+                                          repos,
+                                          withTags,
+                                          maxDop,
+                                          continueOnError,
+                                          branch: null,
+                                          dryRun: false,
+                                          _scopeAlive );
     }
 }

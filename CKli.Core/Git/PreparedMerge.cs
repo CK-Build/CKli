@@ -6,11 +6,11 @@ using System.Linq;
 namespace CKli.Core;
 
 /// <summary>
-/// A merge left in progress in the working folder of a repository, for a person to resolve its conflicts and commit it
-/// (see <see cref="GitRepository.PrepareMerge"/>).
+/// A merge that conflicts: either left in progress in the working folder of a repository, for a person to resolve its
+/// conflicts and commit it (see <see cref="GitRepository.PrepareMerge"/>), or not merged at all (see <see cref="DisplayNotMerged"/>).
 /// </summary>
 /// <param name="Repo">The repository.</param>
-/// <param name="TargetBranch">The branch that receives the merge: it is checked out.</param>
+/// <param name="TargetBranch">The branch that receives the merge: it is checked out when the merge is in progress.</param>
 /// <param name="Merged">What is merged: "branch 'X'" or "commit 'sha message'".</param>
 /// <param name="Conflicts">The paths that are in conflict.</param>
 public sealed record PreparedMerge( Repo Repo, string TargetBranch, string Merged, IReadOnlyList<string> Conflicts )
@@ -50,12 +50,31 @@ public sealed record PreparedMerge( Repo Repo, string TargetBranch, string Merge
     }
 
     /// <summary>
-    /// Displays the result of a dry run: the count of each outcome and the merges that would be left in progress.
+    /// Displays the merges that conflict and are not merged, if any: their branch keeps its own commits and doesn't
+    /// receive the remote ones.
     /// </summary>
     /// <param name="screen">The screen.</param>
-    /// <param name="outcomes">The predicted outcomes, one per repository.</param>
+    /// <param name="merges">The merges that are not done.</param>
+    public static void DisplayNotMerged( IScreen screen, IReadOnlyList<PreparedMerge> merges )
+    {
+        if( merges.Count == 0 ) return;
+        var s = screen.ScreenType;
+        screen.Display( s.Text( $"{(merges.Count == 1 ? "A merge conflicts and is" : $"{merges.Count} merges conflict and are")} not merged: 'ckli pull --branch <name>' leaves the merge of the branch you work on in progress." )!
+                         .AddBelow( merges.Select( m => m.ToRenderable( s ) ) ) );
+    }
+
+    /// <summary>
+    /// Displays the result of a dry run: the count of each outcome, the merges that would be left in progress and the
+    /// ones that would not be merged.
+    /// </summary>
+    /// <param name="screen">The screen.</param>
+    /// <param name="outcomes">The predicted outcomes, one per merge.</param>
     /// <param name="conflicts">The merges that would be left in progress.</param>
-    public static void DisplayDryRun( IScreen screen, IReadOnlyList<MergeOutcome> outcomes, IReadOnlyList<PreparedMerge> conflicts )
+    /// <param name="notMerged">The merges that would conflict and not be merged.</param>
+    public static void DisplayDryRun( IScreen screen,
+                                      IReadOnlyList<MergeOutcome> outcomes,
+                                      IReadOnlyList<PreparedMerge> conflicts,
+                                      IReadOnlyList<PreparedMerge>? notMerged = null )
     {
         var s = screen.ScreenType;
         var counts = new List<string>();
@@ -70,6 +89,11 @@ public sealed record PreparedMerge( Repo Repo, string TargetBranch, string Merge
         {
             display = display.AddBelow( s.Text( $"{(conflicts.Count == 1 ? "A merge would be" : $"{conflicts.Count} merges would be")} left in progress:" ),
                                         s.Unit.AddBelow( conflicts.Select( m => m.ToRenderable( s ) ) ) );
+        }
+        if( notMerged is { Count: > 0 } )
+        {
+            display = display.AddBelow( s.Text( $"{(notMerged.Count == 1 ? "A merge would conflict and not be" : $"{notMerged.Count} merges would conflict and not be")} merged:" ),
+                                        s.Unit.AddBelow( notMerged.Select( m => m.ToRenderable( s ) ) ) );
         }
         screen.Display( display );
 

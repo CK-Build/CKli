@@ -144,7 +144,7 @@ of the last log file.
 The `Log/` folder is `%LocalAppData%/CKli/Out-of-Stack-Logs/` when CKli doesn't start is a Stack folder, otherwise
 each Stack keeps its own logs in their `.PublicStack/Logs` (or `.PrivateStack/Logs`). 
 
-### `pull --with-tags --all --continue-on-error --max-dop <n>`
+### `pull --branch,-b <name> --with-tags --all --continue-on-error --dry-run,-d --max-dop <n>`
 
 Pulls (fetch-merge) the Stack repository and all current Repos' local branches that track a remote branch.
 By default, remote tags are safely fetched, preserving local tags (see `cki tag fetch`). When `--with-tags`
@@ -152,15 +152,36 @@ is specified, a `ckli tag pull *` is done that blindly replaces local tags.
 
 By default, the current directory selects the Repos unless `--all` is specified.
 
-Any merge conflict is an error. Unless `--continue-on-error` is specified, the first error stops the operation.
-This applies to the Stack repository too: no side of a Stack file is ever dropped to resolve a conflict. A
-file that is derived from others declares how it merges in the Stack's `.gitattributes` (the Publish plugin
-declares its `Published/index.json` as `merge=union`), and the paths that a merge commit changed are
-available to the plugins as `StackRepository.MergedPaths` so that they can rebuild such a file.
+The Repos are independent: each of them is fetched and its merges that don't conflict are done in parallel
+(`--max-dop <n>` limits the parallelism). Unless `--continue-on-error` is specified, the first error stops this
+phase. The merges that conflict are handled last, all of them and one after the other, once the World is settled:
 
-`--max-dop <n>` limits the parallelism.
+- The **merge assistant** of the World (the HotZone plugin) aligns what it knows how to align: the package
+  versions that both sides rewrote are resolved the way a build of the branch would update them, exactly like
+  `ckli branch sync` does. A merge that conflicted on the package versions only is then committed.
+- A merge that still conflicts is **left in progress** in the working folder when its branch is the one named by
+  `--branch <name>`: the `dev/<name>` branch when it exists (locally or on the remote), else `<name>`. That branch
+  is checked out for this (its working folder must be clean), and the person resolves the conflicts and commits
+  with any Git tool, or aborts with `git merge --abort`.
+- On any other branch (and on every branch without `--branch`), the merge is **not merged**: the branch keeps its
+  own commits and doesn't receive the remote ones.
 
-A pull (without tags) is implicitly executed first by `ckli push`. 
+The merges left in progress and the ones that are not merged are displayed, and the pull fails: it is not complete.
+Relying on the checked out branch would make the result depend on where each repository happens to be: the
+`--branch` option says where the person works.
+
+`--dry-run` fetches the Repos and displays what the merges would do (the count of each outcome, the merges that
+would be left in progress and the ones that would not be merged): no branch moves and no tag changes. It fails
+when a merge would conflict.
+
+The Stack repository is pulled first and a conflict there is always an error: no side of a Stack file is ever
+dropped to resolve a conflict, and a merge left in progress in the Stack would prevent the World (and its plugins)
+from being opened. A file that is derived from others declares how it merges in the Stack's `.gitattributes`
+(the Publish plugin declares its `Published/index.json` as `merge=union`), and the paths that a merge commit
+changed are available to the plugins as `StackRepository.MergedPaths` so that they can rebuild such a file.
+
+A pull (without tags) is implicitly executed first by `ckli push` (with its own `--branch`) and by a publication
+(without `--branch`: a publication fails on a conflict, it never leaves a merge in progress).
 
 ### `fetch --all --with-tags --max-dop <n>`
 Fetches all branches (and optionally the tags that are associated to any fetched objects) in the current Repos.
@@ -182,9 +203,10 @@ When applied to multiple Repos, a warning is emitted if the branch doesn't exist
 
 A branch in the `local/` or `building/` namespace cannot be pushed (see `ckli push`).
 
-### `push --stack-only --all --continue-on-error --max-dop <n>`
+### `push --branch,-b <name> --stack-only --all --continue-on-error --max-dop <n>`
 Pushes the Stack repository and all Repo's local branches that track a remote branch.
-A pull is done before: it must be successful for the actual push to be done.
+A pull is done before: it must be successful for the actual push to be done. A merge of this pull that conflicts
+is handled as `ckli pull` does: left in progress on the branch named by `--branch <name>`, not merged elsewhere.
 
 The Repos are independent: they are pulled and then pushed in parallel and each of them is pushed by a
 single network operation (all its branches at once). `--max-dop <n>` limits the parallelism of both phases.

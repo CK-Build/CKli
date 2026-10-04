@@ -100,6 +100,7 @@ public sealed partial class World
     readonly PluginMachinery? _pluginMachinery;
     PluginCollection? _plugins;
     RepoInfoPluginBase? _firstRepoInfoPlugin;
+    IMergeAssistant? _mergeAssistant;
 
     // Used to carry the Executing command and cancellation token to the PrimaryPluginContext.
     Command? _executingCommand;
@@ -248,6 +249,7 @@ public sealed partial class World
         // that have been instantiated may have registered themselves here. Such a reference would prevent the
         // plugins from being unloaded.
         _firstRepoInfoPlugin = null;
+        _mergeAssistant = null;
         if( _plugins != null )
         {
             _plugins.Commands.Clear();

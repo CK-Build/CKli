@@ -29,6 +29,23 @@ public sealed partial class World
         return previous;
     }
 
+    /// <summary>
+    /// Gets the <see cref="IMergeAssistant"/> that a plugin registered, if any.
+    /// </summary>
+    public IMergeAssistant? MergeAssistant => _mergeAssistant;
+
+    /// <summary>
+    /// Registers the <see cref="IMergeAssistant"/> of this World. This is typically called by a plugin
+    /// from its <see cref="PluginBase.Initialize(IActivityMonitor)"/>: there can be only one.
+    /// </summary>
+    /// <param name="assistant">The merge assistant.</param>
+    public void SetMergeAssistant( IMergeAssistant assistant )
+    {
+        Throw.CheckNotNullArgument( assistant );
+        Throw.CheckState( "There can be only one merge assistant.", _mergeAssistant == null );
+        _mergeAssistant = assistant;
+    }
+
     internal RepoInfoPluginBase FindRepoInfoPlugin( Type repoInfoType )
     {
         Throw.DebugAssert( typeof( RepoInfo ).IsAssignableFrom( repoInfoType ) );

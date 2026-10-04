@@ -15,9 +15,12 @@ sealed class CKliPush : Command
                 """
                 Pushes the Stack repository and all Repo's local branches that track a remote branch.
                 A pull is done before: it must be successful for the actual push to be done.
+                A merge of this pull that conflicts is left in progress on the branch named by --branch (see 'ckli pull').
                 """,
                 [],
-                [],
+                [
+                    (["--branch", "-b"], "The branch you work on: a merge that conflicts there is left in progress (its \"dev/\" branch when it exists).", false),
+                ],
                 [
                     (["--stack-only"], "Only push the Stack repository, not the Repos."),
                     (["--all"], "Consider all the Repos' of the current World (even if current path is in a Repo)."),
@@ -33,6 +36,7 @@ sealed class CKliPush : Command
                                                                     CommandLineArguments cmdLine,
                                                                     CancellationToken scopeAlive )
     {
+        string? branch = cmdLine.EatSingleOption( "--branch", "-b" );
         bool stackOnly = cmdLine.EatFlag( "--stack-only" );
         bool all = cmdLine.EatFlag( "--all" );
         bool continueOnError = cmdLine.EatFlag( "--continue-on-error" );
@@ -46,7 +50,7 @@ sealed class CKliPush : Command
         {
             return ValueTask.FromResult( false );
         }
-        return new ValueTask<bool>( PushAsync( monitor, this, context, stackOnly, all, continueOnError, maxDop, scopeAlive ) );
+        return new ValueTask<bool>( PushAsync( monitor, this, context, stackOnly, all, continueOnError, maxDop, branch, scopeAlive ) );
     }
 
     static async Task<bool> PushAsync( IActivityMonitor monitor,
@@ -56,6 +60,7 @@ sealed class CKliPush : Command
                                        bool all,
                                        bool continueOnError,
                                        int maxDop,
+                                       string? branch,
                                        CancellationToken scopeAlive )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
@@ -88,7 +93,7 @@ sealed class CKliPush : Command
                     // Instead of working branch per branch, we pull (fetch-merge) all branches
                     // first and then push them (CKliPull.DoPullAsync fetches all remote branches and then
                     // merges them).
-                    if( await CKliPull.DoPullAsync( monitor, continueOnError, repos, withTags: false, maxDop, scopeAlive )
+                    if( await CKliPull.DoPullAsync( monitor, world, context.Screen, repos, withTags: false, maxDop, continueOnError, branch, dryRun: false, scopeAlive )
                                       .ConfigureAwait( false ) )
                     {
                         // Repositories are independent: they are pushed in parallel, exactly like they have

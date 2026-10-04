@@ -190,8 +190,8 @@ plugin adds its own, and its commands appear in `ckli --help` the same way.
 | **`plugin`**<br/>`add` `compile` `create` `disable` `enable` `info` `remove` `set` `unset` | Manages the plugins of the current World. | [intrinsic](CKli.Core/CKliCommands/README.md#plugin-commands-info-set-unset-create-add-remove-enable) |
 | **`publish`** | Build-Test-Package and publish all the artifacts. | [`Build`](StandardPlugins/CKli.Build.Plugin/README.md#commands) and [`Publish`](StandardPlugins/CKli.Publish.Plugin/README.md) |
 | **`*publish`** | Upstream closure publish: publishes the producers of the current repositories. | [`Build`](StandardPlugins/CKli.Build.Plugin/README.md#commands) and [`Publish`](StandardPlugins/CKli.Publish.Plugin/README.md) |
-| **`pull`** | Pulls the Stack repository and all Repo's local branches that track a remote branch. | [intrinsic](CKli.Core/CKliCommands/README.md#pull---with-tags---all---continue-on-error---max-dop-n) |
-| **`push`** | Pushes the Stack repository and all Repo's local branches that track a remote branch. | [intrinsic](CKli.Core/CKliCommands/README.md#push---stack-only---all---continue-on-error---max-dop-n) |
+| **`pull`** | Pulls the Stack repository and all Repo's local branches that track a remote branch. | [intrinsic](CKli.Core/CKliCommands/README.md#pull---branch-b-name---with-tags---all---continue-on-error---dry-run-d---max-dop-n) |
+| **`push`** | Pushes the Stack repository and all Repo's local branches that track a remote branch. | [intrinsic](CKli.Core/CKliCommands/README.md#push---branch-b-name---stack-only---all---continue-on-error---max-dop-n) |
 | **`remote`**<br/>`stack` | Operations on the remote repositories rather than on their local clones. | [intrinsic](CKli.Core/CKliCommands/README.md#remote-stack-migrate-newurl) |
 | **`repo`**<br/>`add` `create` `remove` | Adds, creates and removes the Repositories of the current World. | [intrinsic](CKli.Core/CKliCommands/README.md#repo-add-url---allow-lts) |
 | **`status`** | Lists the World's Repos, or every Stack that exists locally when outside a Stack. | [intrinsic](CKli.Core/CKliCommands/README.md#status---by-branch---all---skip-pull-stack) |

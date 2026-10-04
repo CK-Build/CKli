@@ -723,13 +723,8 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
-    /// Calls <see cref="MergeTrackedBranch(IActivityMonitor, ref Branch, bool)"/> for each existing branch that has a remote tracked branch
-    /// on 'origin' (or on any remote if <paramref name="fromAllRemotes"/> is true).
-    /// <para>
-    /// This supports the "Automatic Remote Origin Branch Association Strategy" (AROBAS): any existing local branch (refs/heads/XXX) that
-    /// is currently not tracking and for which a "origin" branch ("refs/remotes/origin/XXX") exists is automatically configured to track it
-    /// (and the remote is merged into the local branch).
-    /// </para>
+    /// Calls <see cref="MergeTrackedBranch(IActivityMonitor, ref Branch)"/> for each branch of
+    /// <see cref="GetTrackedBranches(IActivityMonitor, bool, string?)"/>.
     /// <para>
     /// This (the MergeTrackedBranch method actually) handles the currently checked out branch transparently.
     /// </para>
@@ -739,20 +734,46 @@ public sealed partial class GitRepository : IDisposable
     /// <param name="fromAllRemotes">True to consider all remotes, not only 'origin'.</param>
     /// <param name="branchSpec">
     /// Optional branch name filter that applies to the local branch name. Example: "fix/v3.*".
-    /// See <see cref="FetchRemoteBranches(IActivityMonitor, bool, string?, bool)"/>.
+    /// See <see cref="FetchRemoteBranches(IActivityMonitor, bool, string?, bool, CancellationToken)"/>.
     /// </param>
     /// <returns>True on success, false otherwise.</returns>
     public bool MergeRemoteBranches( IActivityMonitor monitor, bool continueOnError = false, bool fromAllRemotes = false, string? branchSpec = null )
+    {
+        bool success = true;
+        foreach( var b in GetTrackedBranches( monitor, fromAllRemotes, branchSpec ) )
+        {
+            var refB = b;
+            success &= MergeTrackedBranch( monitor, ref refB );
+            if( !success && !continueOnError ) return false;
+        }
+        return success;
+    }
+
+    /// <summary>
+    /// Gets the local branches that track a remote branch on 'origin' (or on any remote if <paramref name="fromAllRemotes"/>
+    /// is true): these are the branches that a pull merges.
+    /// <para>
+    /// This supports the "Automatic Remote Origin Branch Association Strategy" (AROBAS): any existing local branch (refs/heads/XXX) that
+    /// is currently not tracking and for which a "origin" branch ("refs/remotes/origin/XXX") exists is automatically configured to track it.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="fromAllRemotes">True to consider all remotes, not only 'origin'.</param>
+    /// <param name="branchSpec">
+    /// Optional branch name filter that applies to the local branch name. Example: "fix/v3.*".
+    /// See <see cref="FetchRemoteBranches(IActivityMonitor, bool, string?, bool, CancellationToken)"/>.
+    /// </param>
+    /// <returns>The tracking branches.</returns>
+    public List<Branch> GetTrackedBranches( IActivityMonitor monitor, bool fromAllRemotes = false, string? branchSpec = null )
     {
         if( string.IsNullOrEmpty( branchSpec ) )
         {
             branchSpec = null;
         }
-        bool success = true;
-
+        var result = new List<Branch>();
         var snapshot = _git.Branches.ToDictionary( b => b.CanonicalName );
         // First pass on all the branches that have an associated tracked branch:
-        // - The ones that are tracking a "refs/remote/" branch (that satisfies the optional branchSpec) => MergeTrackedBranch
+        // - The ones that are tracking a "refs/remote/" branch (that satisfies the optional branchSpec) are selected.
         // - The local and tracked branches are removed from the dictionary (they have been handled).
         foreach( var b in snapshot.Values.ToArray() )
         {
@@ -765,23 +786,18 @@ public sealed partial class GitRepository : IDisposable
                     && (fromAllRemotes || tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.Ordinal ))
                     && (branchSpec == null || FilterBranchSpec( branchSpec, b.CanonicalName )) )
                 {
-                    var refB = b;
-                    success &= MergeTrackedBranch( monitor, ref refB );
-                    // Leaving this loop early leaves the not yet visited tracked branches (and their remote)
-                    // in the snapshot: the second pass below would then consider them as untracked ones.
-                    // The first error stops the whole operation, so we must not fall into it.
-                    if( !success && !continueOnError ) return false;
+                    result.Add( b );
                 }
             }
         }
         // Handles "Automatic Remote Origin Branch Association Strategy" in unhandled branches.
-        foreach( var (name,branch) in snapshot )
+        foreach( var (name, branch) in snapshot )
         {
             var n = name.AsSpan();
             if( n.StartsWith( "refs/remotes/origin/", StringComparison.Ordinal ) )
             {
                 Throw.DebugAssert( "refs/remotes/origin/".Length == 20 );
-                var localName = $"refs/heads/{n.Slice(20)}";
+                var localName = $"refs/heads/{n.Slice( 20 )}";
                 if( snapshot.TryGetValue( localName, out var b ) )
                 {
                     Throw.DebugAssert( b.TrackedBranch == null );
@@ -789,14 +805,12 @@ public sealed partial class GitRepository : IDisposable
                     {
                         b = _git.Branches.Update( b, u => u.TrackedBranch = name );
                         monitor.Info( $"Creating local branch on remote 'origin/{n.Slice( 20 )}' in repository '{_displayPath}'." );
-                        success &= MergeTrackedBranch( monitor, ref b );
-                        if( !success && !continueOnError ) break;
+                        result.Add( b );
                     }
                 }
             }
-
         }
-        return success;
+        return result;
 
         static bool FilterBranchSpec( ReadOnlySpan<char> branchSpec, ReadOnlySpan<char> n )
         {
@@ -806,7 +820,7 @@ public sealed partial class GitRepository : IDisposable
             {
                 return n.StartsWith( branchSpec[0..^2] );
             }
-            return n.Equals( branchSpec, StringComparison.Ordinal ); 
+            return n.Equals( branchSpec, StringComparison.Ordinal );
         }
     }
 
