@@ -653,6 +653,14 @@ does not write them in the event: it registers a step with `AddCreationStep`. Th
 accepted the creation, in the new World's folders (`CreateLTSEventArgs.LTSWorldName`'s `SharedDataFolder` and
 `LocalDataFolder`), and both folders are deleted if anything fails.
 
+`WorldEvents.StackMerged` is raised when `World.PullStackAsync` (the pull of the Stack by a command whose World
+is running, a publication under its lock) created a merge commit: `StackMergedEventArgs.MergedPaths` are the
+files it changed. A conflicting Stack merge is always an error, so a merge commit only exists when no file
+conflicted, or when the conflicting ones declare how they merge in the Stack's `.gitattributes` (`merge=union`):
+such a file is derived from others and its owner rebuilds it here. The pull done when the Stack is opened
+happens before any plugin exists: its merge is `StackRepository.MergedPaths`, read in `Initialize`.
+`PullStackAsync` refuses incoming commits that change the running World's definition file or its plugins.
+
 ## Plugin configuration
 
 Each plugin has an XML element in the World definition file under `<Plugins>`:
