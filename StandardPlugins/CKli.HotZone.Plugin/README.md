@@ -113,11 +113,24 @@ number of conflicts, above the paths in conflict.
 A merge is left in progress: resolve its conflicts and commit it (or abort it).
 > X-Core  ⎇ dev/sierra ← branch 'dev/stable'  1 conflict
 │ Conflict.txt
-``` Only these two commands prepare
-merges: `branch open`, `branch switch --create` and the roadmap fail on a conflict.
+``` These two commands and `ckli pull`/`ckli push` (see below) prepare merges: `branch open`,
+`branch switch --create` and the roadmap fail on a conflict.
 
 The roadmap doesn't need this: its `Synchronize` call (`BuildPlugin.RoadmapExecutor`) runs right after
 `EnsureExists` created the branch at its start commit, which is the link commit itself.
+
+## How: the merge assistant of `pull` and `push`
+
+`ckli pull` and `ckli push` are intrinsic commands: Core merges the tracked branches and knows nothing about
+package versions nor about the `dev/` branches. `HotZonePlugin` is the World's `IMergeAssistant`
+(`World.SetMergeAssistant`, in its `Initialize`, `HotZonePlugin.MergeAssistant.cs`): once the merges that don't
+conflict are done, the pull opens an `IMergeSession` and asks it, for each merge that conflicts:
+
+- `GetAligner`: the `PackageVersionMerge` aligner of the target branch, whose resolver is the branch's `HotGraph`
+  (the CI one, computed once per branch for the whole session by the same `CreateVersionResolverProvider` as
+  `branch sync`). A branch that is not in the branch model (a `fix/` one) gets no aligner.
+- `GetWorkingBranch`: what `--branch <name>` means in the repository: `dev/<name>` when it exists (locally or on
+  the remote), else `<name>`. A name that is not a branch of the branch model is taken literally.
 
 ## How: the Fix Workflow
 

@@ -189,7 +189,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             {
                 return true;
             }
-            monitor.Error( "A publication starts from the remote state of the World and it could not be pulled (see above). Run 'ckli pull' to handle it, then publish again." );
+            monitor.Error( "A publication starts from the remote state of the World and it could not be pulled (see above). Run 'ckli pull --branch <branch>' to handle it (a merge that conflicts is left in progress on that branch), then publish again." );
             return false;
         }
 
