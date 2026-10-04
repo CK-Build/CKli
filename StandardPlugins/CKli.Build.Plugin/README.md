@@ -201,8 +201,16 @@ Three decisions worth keeping:
 - **The lock covers the whole command, not the publication step.** The roadmap decides which versions are produced
   from what the remotes currently carry, so a lock taken after that decision would be protecting a decision
   already made on state somebody else has moved.
+- **A publication starts by pulling the World, once the lock is held.** The Stack (`World.PullStackAsync`), where
+  the profile is written, then every repository (`World.PullAsync`, what `ckli pull` does). A publication made on
+  a stale Stack would take the profile version (the next free Patch of the day) that a teammate's publication
+  already took, and its Stack could not be pushed. Any conflict fails the command and nothing is left in
+  progress: `ckli pull` handles it. A remote Stack that changed this World's definition file or its plugins cannot
+  be pulled under the running World either: that is an error that asks for a `ckli pull` first. `build` and
+  `*build` never touch the remotes.
 - **`--dry-run` takes no lock.** It publishes nothing; making the team wait for a preview would be a lock
-  protecting nothing.
+  protecting nothing. It pulls like the real publication, so that its verdict is the one the publication would
+  reach.
 - **A lock held by somebody else is an error, never a wait.** The message names the holder, when they took it and
   when it frees itself. `ckli publish` is interactive: a silent wait of unknown length is worse than being told.
 

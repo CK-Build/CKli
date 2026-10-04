@@ -57,39 +57,31 @@ public sealed class PublishPlugin : PrimaryPluginBase
         // Sync: this handler is file IO and git, there is nothing to await. The event is a PerfectEvent,
         // so this choice is ours alone - another listener can take the Async or ParallelAsync slot.
         _versionTag.VersionDeprecated.Sync += OnVersionDeprecated;
+        World.Events.StackMerged.Sync += OnStackMerged;
     }
 
-    /// <summary>
-    /// The line of the Stack's ".gitattributes" that lets git merge the <see cref="PublishedFolder.IndexFileName"/>
-    /// of every World: "**/Published/index.json merge=union".
-    /// </summary>
-    public const string IndexMergeAttributeLine = "**/Published/" + PublishedFolder.IndexFileName + " merge=union";
-
-    /// <summary>
-    /// The index of a Published folder is derived from its profile files, and two developers publishing on the
-    /// same branch both add their version at the top of the same list: a regular merge of the Stack conflicts
-    /// there (and only there, since every profile is a new file).
-    /// <para>
-    /// So the Stack's ".gitattributes" declares the index as a <c>merge=union</c> file: the merge keeps the lines of
-    /// both sides and never conflicts. The result is not an index (its order and even its Json may be broken), so
-    /// every index that a merge of the Stack touched (<see cref="StackRepository.MergedPaths"/>) is rebuilt here
-    /// from its profiles and committed, before anything can push it.
-    /// </para>
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <returns>True on success, false on error.</returns>
-    protected override bool Initialize( IActivityMonitor monitor )
+    void OnStackMerged( IActivityMonitor monitor, StackMergedEventArgs e )
     {
+        if( RebuildMergedIndexes( monitor, e.MergedPaths, out bool success ) && !success )
+        {
+            e.SetFailed();
+        }
+    }
+
+    // Rebuilds and commits the index of every World's Published folder that the merge touched.
+    // Returns false when no index has been touched (success is then true).
+    bool RebuildMergedIndexes( IActivityMonitor monitor, ImmutableArray<NormalizedPath> mergedPaths, out bool success )
+    {
+        success = true;
         var stack = World.StackRepository;
-        bool attributeAdded = EnsureIndexMergeAttribute( monitor, stack );
         var rebuilt = new List<string>();
-        if( stack.MergedPaths.Length > 0 )
+        if( mergedPaths.Length > 0 )
         {
             foreach( var worldName in stack.WorldNames )
             {
                 var folderPath = worldName.SharedDataFolder.AppendPart( "Published" );
                 if( Directory.Exists( folderPath )
-                    && stack.MergedPaths.Any( p => stack.StackWorkingFolder.Combine( p ).StartsWith( folderPath ) ) )
+                    && mergedPaths.Any( p => stack.StackWorkingFolder.Combine( p ).StartsWith( folderPath ) ) )
                 {
                     try
                     {
@@ -105,12 +97,38 @@ public sealed class PublishPlugin : PrimaryPluginBase
                 }
             }
         }
-        if( rebuilt.Count > 0 )
-        {
-            var what = $"Rebuilt the '{PublishedFolder.IndexFileName}' of '{rebuilt.Concatenate( "', '" )}' after a merge of the Stack.";
-            monitor.Info( what );
-            return stack.GitRepository.Commit( monitor, what ) != CommitResult.Error;
-        }
+        if( rebuilt.Count == 0 ) return false;
+        var what = $"Rebuilt the '{PublishedFolder.IndexFileName}' of '{rebuilt.Concatenate( "', '" )}' after a merge of the Stack.";
+        monitor.Info( what );
+        success = stack.GitRepository.Commit( monitor, what ) != CommitResult.Error;
+        return true;
+    }
+
+    /// <summary>
+    /// The line of the Stack's ".gitattributes" that lets git merge the <see cref="PublishedFolder.IndexFileName"/>
+    /// of every World: "**/Published/index.json merge=union".
+    /// </summary>
+    public const string IndexMergeAttributeLine = "**/Published/" + PublishedFolder.IndexFileName + " merge=union";
+
+    /// <summary>
+    /// The index of a Published folder is derived from its profile files, and two developers publishing on the
+    /// same branch both add their version at the top of the same list: a regular merge of the Stack conflicts
+    /// there (and only there, since every profile is a new file).
+    /// <para>
+    /// So the Stack's ".gitattributes" declares the index as a <c>merge=union</c> file: the merge keeps the lines of
+    /// both sides and never conflicts. The result is not an index (its order and even its Json may be broken), so
+    /// every index that a merge of the Stack touched is rebuilt from its profiles and committed, before anything
+    /// can push it: the merge done when the Stack has been opened (<see cref="StackRepository.MergedPaths"/>) is
+    /// handled here, a later one by the <see cref="WorldEvents.StackMerged"/> event.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>True on success, false on error.</returns>
+    protected override bool Initialize( IActivityMonitor monitor )
+    {
+        var stack = World.StackRepository;
+        bool attributeAdded = EnsureIndexMergeAttribute( monitor, stack );
+        if( RebuildMergedIndexes( monitor, stack.MergedPaths, out bool success ) ) return success;
         if( attributeAdded )
         {
             return stack.GitRepository.Commit( monitor, $"The Published '{PublishedFolder.IndexFileName}' files are merged by union." ) != CommitResult.Error;
@@ -244,7 +262,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
         // The generic "Automatic pre-push commit." of PushChanges would say nothing about this: the
         // profiles that disappear from the Stack deserve a commit that names the reason.
         World.StackRepository.GitRepository.Commit( monitor, what );
-        World.StackRepository.PushChanges( monitor );
+        PushStack( monitor, World );
     }
 
     /// <summary>
@@ -317,7 +335,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                     return false;
                 }
             }
-            world.StackRepository.PushChanges( monitor );
+            bool stackPushed = PushStack( monitor, world );
 
             // Instead of complicating FixPublisher with this capability that makes sense only for a
             // successful fix publish, we implement this here as a post-operation: intermediate
@@ -337,8 +355,17 @@ public sealed class PublishPlugin : PrimaryPluginBase
                 }
             }
             FixWorkflow.DeleteCurrent( monitor, world );
-            return true;
+            return stackPushed;
         }
+    }
+
+    // The publication is done when the Stack is pushed: a Stack that cannot be pushed keeps its profiles locally
+    // and the remotes don't describe what has been published. This is an error, not something to ignore.
+    static bool PushStack( IActivityMonitor monitor, World world )
+    {
+        if( world.StackRepository.PushChanges( monitor ) ) return true;
+        monitor.Error( "The publication is done but the Stack could not be pushed (see above): its published profiles are only local. Run 'ckli push --stack-only' to share them." );
+        return false;
     }
 
 
@@ -393,7 +420,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                    + $"'{created.Select( p => p.Version.ToString() ).Concatenate( "', '" )}'.";
         monitor.Info( ScreenType.CKliScreenTag, what );
         World.StackRepository.GitRepository.Commit( monitor, what );
-        World.StackRepository.PushChanges( monitor );
+        PushStack( monitor, World );
     }
 
     async Task OnRoadmapBuildAsync( IActivityMonitor monitor, RoadmapBuildEventArgs e, CancellationToken cancellation )
@@ -480,7 +507,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                             {
                                 monitor.Error( $"While saving the published profile '{profileVersion}'.", ex );
                             }
-                            World.StackRepository.PushChanges( monitor );
+                            if( !PushStack( monitor, World ) ) e.SetFailed();
                         }
                     }
                 }

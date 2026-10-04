@@ -177,9 +177,25 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// </summary>
     async Task<bool> UnderPublishLockAsync( IActivityMonitor monitor, bool dryRun, Func<Task<bool>> work )
     {
+        // A publication works on the remote state: the Stack (where its profile is written) and the repositories
+        // are pulled once the lock is held, so that nobody can move them between the pull and the publication.
+        // Any conflict fails the publication: it never leaves a merge in progress behind it.
+        async Task<bool> PullAsync( IActivityMonitor monitor )
+        {
+            var repos = World.GetAllDefinedRepo( monitor );
+            if( repos != null
+                && await World.PullStackAsync( monitor ).ConfigureAwait( false )
+                && await World.PullAsync( monitor, repos ).ConfigureAwait( false ) )
+            {
+                return true;
+            }
+            monitor.Error( "A publication starts from the remote state of the World and it could not be pulled (see above). Run 'ckli pull' to handle it, then publish again." );
+            return false;
+        }
+
         // A --dry-run only displays what would happen: it publishes nothing, so making the team wait for it
-        // would be a lock protecting nothing.
-        if( dryRun ) return await work().ConfigureAwait( false );
+        // would be a lock protecting nothing. It pulls like the real publication so that its verdict is the same.
+        if( dryRun ) return await PullAsync( monitor ).ConfigureAwait( false ) && await work().ConfigureAwait( false );
 
         var lockName = $"{World.Name.FullName}-{PublishLockName}";
         if( !World.StackRepository.GetLock( monitor, lockName, out var theLock ) )
@@ -210,7 +226,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         _publishLease = lease;
         try
         {
-            return await work().ConfigureAwait( false );
+            return await PullAsync( monitor ).ConfigureAwait( false ) && await work().ConfigureAwait( false );
         }
         finally
         {

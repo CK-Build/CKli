@@ -480,9 +480,12 @@ the outside**, including another World, with `PublishedIndex.Parse` and without 
   profile is a new file. The plugin's `Initialize` makes sure the Stack's `.gitattributes` holds
   `IndexMergeAttributeLine` (`**/Published/index.json merge=union`): the merge then keeps the lines of both
   sides, CKli's pull as well as a plain `git pull`. The union is not an index (its order and even its Json
-  may be broken), so the same `Initialize` calls `RebuildIndex` on every World's Published folder that a
-  merge of the Stack touched (`StackRepository.MergedPaths`) and commits the result before anything can
-  push it.
+  may be broken), so `RebuildIndex` is called on every World's Published folder that a merge of the Stack
+  touched and the result is committed before anything can push it: by `Initialize` for the merge done when
+  the Stack was opened (`StackRepository.MergedPaths`), by the `World.Events.StackMerged` handler for a later
+  one (the pull a publication does under its lock).
+- **A Stack that cannot be pushed fails the publication.** The publication itself is done, but the remotes
+  don't describe it: the error asks for a `ckli push --stack-only`.
 
 The suffix that separates a branch's CI builds from its regular versions (`alpha-ci`, `explo/spike-ci`,
 `(stable-ci)`) cannot collide with a branch name, and that guarantee is enforced on this side: an
