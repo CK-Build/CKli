@@ -202,15 +202,13 @@ public sealed partial class BranchModelPlugin
         if( getResolver == null ) return SyncStatus.Conflict;
         // The same aligned merge as the synchronization (its objects are left unreferenced in the object database).
         // A failure is a conflict that the column displays: its explanation goes to the log file only.
-        return PackageVersionMerge.CreateMergeCommit( monitor,
-                                                      info.Repo.GitRepository,
-                                                      tip,
-                                                      linkCommit,
-                                                      b.Name,
-                                                      $"commit '{linkCommit.Sha.AsSpan( 0, 7 )} {linkCommit.MessageShort}'",
-                                                      getResolver,
-                                                      out _,
-                                                      failureLevel: CK.Core.LogLevel.Trace ) != null
+        var repoGit = info.Repo.GitRepository;
+        return repoGit.CreateMergeCommit( monitor,
+                                          tip,
+                                          linkCommit,
+                                          $"commit '{linkCommit.Sha.AsSpan( 0, 7 )} {linkCommit.MessageShort}'",
+                                          PackageVersionMerge.CreateAligner( repoGit, getResolver ),
+                                          out _ ) != null
                 ? SyncStatus.Merge
                 : SyncStatus.Conflict;
     }

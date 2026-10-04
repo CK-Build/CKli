@@ -92,7 +92,7 @@ cleanly. The aligned merge itself is `ShallowSolution`'s
 package versions is a real conflict.
 
 A real conflict needs a person, and a person needs a merge to work on: by default, `branch sync` leaves the merge
-in progress in the working folder (`PackageVersionMerge.PrepareMerge`), its package versions already aligned, so that
+in progress in the working folder (`GitRepository.PrepareMerge`), its package versions already aligned, so that
 any Git tool shows only the real conflicts. The `dev/` branch is checked out for this (the person is about to work
 on that merge), `ckli status` shows `(merging, N conflicts)`, and the merge that the person commits has the two
 original commits as parents; aborting it restores the branch as it was. The synchronization of that repository

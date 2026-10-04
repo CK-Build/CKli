@@ -180,41 +180,34 @@ multi-repository update.
 
 ### `PackageVersionMerge`
 
-The other writing side, and it writes **objects only**: `PackageVersionMerge.CreateMergeCommit(monitor, git, ours,
-theirs, oursName, theirsName, getResolver, out aligned)` creates the merge commit of `theirs` into `ours` in the
-object database (no branch moves, no working folder) for merges that conflict on package versions only — two
-branches built independently both rewrite the references to the World's packages, on the very same lines.
+The other writing side, and it writes **objects only**: `PackageVersionMerge.CreateAligner(git, getResolver, onAligned)`
+is the [`MergeSidesAligner`](../../CKli.Core/README.md#merges-predicted-committed-or-left-in-progress) that the merges of
+`GitRepository` (`PredictMerge`, `CreateMergeCommit`, `PrepareMerge`) call when a merge conflicts. Two branches built
+independently both rewrite the references to the World's packages, on the very same lines: git cannot merge them, but
+an `IPackageVersionResolver` knows the version both sides must reference. Core does the merge; this only rewrites its
+two sides.
 
 - **The versions are aligned before merging, not repaired afterwards, across the whole solution.** A solution
   references a package identifier in one version, so each side has one version per `(package, attribute)`, read
   from the project files of its solution: the `.slnx` projects and their `Directory.*.props`
   (`CommonSolution.LoadAllProjectFiles`). A project file that is not in the solution (a template whose references
   are placeholders) is neither read nor rewritten. Every version that differs between the two sides is set, in the
-  solution's project files of **both** sides, to what the `IPackageVersionResolver` answers. Both aligned trees are committed as children of
-  their original commit (so the merge base doesn't change) and merged by git: the version lines have been changed
-  the same way on both sides and don't conflict, and since nothing is matched by path, a project file renamed on
-  one side and updated on the other merges like any rename. **Whatever still conflicts is a real conflict** and
-  fails, as does a conflict on a path that is not a project file. The merge commit has the aligned merge's tree and
-  `[ours, theirs]` as parents, and the same `Merged {theirsName}.` message as `GitRepository.MergeBranchContent`.
+  solution's project files of **both** sides, to what the `IPackageVersionResolver` answers. Both aligned trees are
+  committed as children of their original commit (so the merge base doesn't change) and merged by git: the version
+  lines have been changed the same way on both sides and don't conflict, and since nothing is matched by path, a
+  project file renamed on one side and updated on the other merges like any rename. **Whatever still conflicts is a
+  real conflict.** The merge commit (or the merge left in progress) has `[ours, theirs]`, the original commits, as
+  parents.
 - **The project files are `MutableSolution.UpdatePackages`' ones**: `<PackageVersion Version>` in a
   `Directory.Packages.props`, `<PackageReference Version|VersionOverride>` in any other `*proj` file and in
   `Directory.Build.props`. `Version` and `VersionOverride` are aligned separately (an override exists to differ).
 - **It is a text edit of the attribute value**: nothing else changes in the files (layout, encoding, BOM, line
   endings), unlike `MutableSolution`'s `XElement` round trip. Only the identifiers that differ between the two
   sides are touched: aligning the others is the next build's business.
-- **`getResolver` is called only when it is needed**: the merge conflicts, and on project files only. A null
-  resolver (it must have logged why) fails the merge. Why a merge fails is logged at `failureLevel`, an error by
-  default: `ckli branch list`, that only probes the merges, logs it as a trace. `CKli.HotZone.Plugin` provides it from the branch's
-  `HotGraph`, and `HotBranch.Synchronize` fast-forwards the `dev/` branch to the returned commit (which is what
-  handles a checked out `dev/`).
-- **`PrepareMerge(monitor, git, target, theirs, theirsName, getResolver, out conflicts)`** is for the merges that
-  still conflict: it leaves the merge **in progress in the working folder**, for a person to resolve with any Git
-  tool. The `target` branch is checked out with its versions aligned (detached), the aligned `theirs` is merged
-  without committing (the working folder and the index hold the merge, with conflict markers only where the conflicts
-  are real), then `HEAD` is the `target` branch again (only the reference moves) and `MERGE_HEAD`, `ORIG_HEAD` and
-  `MERGE_MSG` are the ones of a merge of the **original** commits. The merge that the person commits has the two
-  original commits as parents; the aligned commits stay unreferenced. `git merge --abort` restores the `target` as it
-  was. The working folder must be clean, and without a resolver nothing is aligned.
+- **`getResolver` is called only when it is needed**: at least one conflict is in a project file and, when the
+  merge must resolve every conflict to be committed (`mustResolveAll`), all of them are. A null resolver (it must
+  have logged why) aligns nothing: the package versions conflict too. `onAligned` receives the versions that have
+  been aligned. `CKli.HotZone.Plugin` provides the resolver from the branch's `HotGraph`.
 
 ### Package mappings: `IPackageMapping`, `PackageMapper`, `BrutalPackageMapper`, `PackageBounds`
 

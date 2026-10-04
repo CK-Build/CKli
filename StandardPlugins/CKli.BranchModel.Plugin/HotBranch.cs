@@ -3,6 +3,7 @@ using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using LibGit2Sharp;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
@@ -483,22 +484,15 @@ public sealed class HotBranch
     {
         conflict = null;
         var git = Repo.GitRepository;
-        var d = git.Repository.ObjectDatabase.CalculateHistoryDivergence( other, targetTip );
-        if( d.AheadBy is 0 ) return MergeOutcome.UpToDate;
-        if( d.BehindBy is 0 ) return MergeOutcome.FastForward;
-        if( targetTip.Tree.Sha == other.Tree.Sha ) return MergeOutcome.UpToDate;
-        if( PackageVersionMerge.PredictMerge( monitor,
-                                              git,
-                                              targetTip,
-                                              other,
-                                              () => versionResolver?.Invoke( monitor ),
-                                              out var conflicts,
-                                              out _ ) )
+        var aligner = versionResolver != null
+                        ? PackageVersionMerge.CreateAligner( git, () => versionResolver( monitor ) )
+                        : null;
+        var outcome = git.PredictMerge( monitor, targetTip, other, aligner, out var conflicts );
+        if( outcome == MergeOutcome.Conflict )
         {
-            return MergeOutcome.Merge;
+            conflict = new PreparedMerge( Repo, targetName, otherName, conflicts );
         }
-        conflict = new PreparedMerge( Repo, targetName, otherName, conflicts );
-        return MergeOutcome.Conflict;
+        return outcome;
     }
 
     /// <summary>
@@ -515,7 +509,7 @@ public sealed class HotBranch
     /// </param>
     /// <param name="onPreparedMerge">
     /// Not null to leave the merge in progress in the working folder when it conflicts beyond the package versions (requires
-    /// a <paramref name="versionResolver"/>, see <see cref="PackageVersionMerge.PrepareMerge"/>): the "dev/" branch is
+    /// a <paramref name="versionResolver"/>, see <see cref="GitRepository.PrepareMerge"/>): the "dev/" branch is
     /// checked out, this receives the <see cref="PreparedMerge"/> and a person resolves the remaining conflicts and commits.
     /// The synchronization fails.
     /// </param>
@@ -617,22 +611,28 @@ public sealed class HotBranch
         var otherName = otherBranch != null
                             ? $"branch '{otherBranch.FriendlyName}'"
                             : $"commit '{other.Sha.AsSpan( 0, 7 )} {other.MessageShort}'";
-        var merge = PackageVersionMerge.CreateMergeCommit( monitor,
-                                                           git,
-                                                           target.Tip,
-                                                           other,
-                                                           target.FriendlyName,
-                                                           otherName,
-                                                           () => versionResolver( monitor ),
-                                                           out var aligned,
-                                                           // When the merge is prepared, its conflicts are reported.
-                                                           onPreparedMerge != null ? CK.Core.LogLevel.Trace : CK.Core.LogLevel.Error );
+        var aligned = new List<PackageVersionMerge.AlignedVersion>();
+        var merge = git.CreateMergeCommit( monitor,
+                                           target.Tip,
+                                           other,
+                                           otherName,
+                                           PackageVersionMerge.CreateAligner( git, () => versionResolver( monitor ), aligned.AddRange ),
+                                           out var conflicts );
         if( merge == null )
         {
-            // Nothing is merged until the person commits the merge: this fails either way.
-            if( onPreparedMerge != null )
+            if( conflicts.Count > 0 )
             {
-                PrepareMerge( monitor, target, other, otherName, versionResolver, onPreparedMerge );
+                // When the merge is prepared, its conflicts are reported.
+                monitor.Log( onPreparedMerge != null ? CK.Core.LogLevel.Trace : CK.Core.LogLevel.Error, $"""
+                    Failed merging {otherName} into '{target.FriendlyName}' in '{Repo.DisplayPath}'. Conflicts in:
+                    {conflicts.Concatenate( Environment.NewLine )}
+                    This must be fixed manually.
+                    """ );
+                // Nothing is merged until the person commits the merge: this fails either way.
+                if( onPreparedMerge != null )
+                {
+                    PrepareMerge( monitor, target, other, otherName, versionResolver, onPreparedMerge );
+                }
             }
             return false;
         }
@@ -648,7 +648,7 @@ public sealed class HotBranch
         return git.MergeBranchContent( monitor, ref target, merge );
     }
 
-    // Leaves the merge in progress in the working folder (see PackageVersionMerge.PrepareMerge): the target branch is
+    // Leaves the merge in progress in the working folder (see GitRepository.PrepareMerge): the target branch is
     // checked out first. On success, the command reports the PreparedMerge (the log file has the details); a failure
     // is logged as an error.
     void PrepareMerge( IActivityMonitor monitor,
@@ -665,7 +665,7 @@ public sealed class HotBranch
             monitor.Info( $"'{target.FriendlyName}' is checked out in '{Repo.DisplayPath}' to resolve its conflicts." );
             target = git.Repository.Branches[target.FriendlyName];
         }
-        if( PackageVersionMerge.PrepareMerge( monitor, git, target, other, otherName, () => versionResolver( monitor ), out var conflicts ) )
+        if( git.PrepareMerge( monitor, target, other, otherName, PackageVersionMerge.CreateAligner( git, () => versionResolver( monitor ) ), out var conflicts ) )
         {
             monitor.Info( $"""
                 Merging {otherName} into '{target.FriendlyName}' in '{Repo.DisplayPath}' conflicts beyond the package versions.
