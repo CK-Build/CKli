@@ -44,6 +44,16 @@ public sealed partial class PublishedFolder
     /// <returns>The utf-8 Json bytes.</returns>
     public byte[] CreateIndexUtf8Bytes() => CreateIndex().ToUtf8Bytes();
 
+    /// <summary>
+    /// Rewrites the <see cref="IndexFilePath"/> from the profile files, whatever it currently contains.
+    /// <para>
+    /// <see cref="Save"/> does this whenever a profile changes. This is for an index that changed without
+    /// its profiles going through this folder: the merge of two Stacks merges the index file line by line,
+    /// which is not an index (its order and even its Json may be broken).
+    /// </para>
+    /// </summary>
+    public void RebuildIndex() => WriteIndex();
+
     // Called by Save once the profile files are up to date: the index reflects them, so it is written last
     // and only when at least one of them actually changed.
     void WriteIndex() => File.WriteAllBytes( IndexFilePath, CreateIndexUtf8Bytes() );

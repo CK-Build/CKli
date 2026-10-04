@@ -475,6 +475,14 @@ the outside**, including another World, with `PublishedIndex.Parse` and without 
   `PublishedIndex.Read` checks each group name against the versions it holds.
 - `IndexFileName` here is `PublishedIndex.IndexFileName`, and `IndexFilePath` is that name at the
   `RootPath`.
+- **The index merges by union.** Two developers who publish on the same branch both add their version at
+  the top of the same list, so a regular merge of the Stack conflicts there - and only there, since every
+  profile is a new file. The plugin's `Initialize` makes sure the Stack's `.gitattributes` holds
+  `IndexMergeAttributeLine` (`**/Published/index.json merge=union`): the merge then keeps the lines of both
+  sides, CKli's pull as well as a plain `git pull`. The union is not an index (its order and even its Json
+  may be broken), so the same `Initialize` calls `RebuildIndex` on every World's Published folder that a
+  merge of the Stack touched (`StackRepository.MergedPaths`) and commits the result before anything can
+  push it.
 
 The suffix that separates a branch's CI builds from its regular versions (`alpha-ci`, `explo/spike-ci`,
 `(stable-ci)`) cannot collide with a branch name, and that guarantee is enforced on this side: an

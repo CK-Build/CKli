@@ -59,6 +59,86 @@ public sealed class PublishPlugin : PrimaryPluginBase
         _versionTag.VersionDeprecated.Sync += OnVersionDeprecated;
     }
 
+    /// <summary>
+    /// The line of the Stack's ".gitattributes" that lets git merge the <see cref="PublishedFolder.IndexFileName"/>
+    /// of every World: "**/Published/index.json merge=union".
+    /// </summary>
+    public const string IndexMergeAttributeLine = "**/Published/" + PublishedFolder.IndexFileName + " merge=union";
+
+    /// <summary>
+    /// The index of a Published folder is derived from its profile files, and two developers publishing on the
+    /// same branch both add their version at the top of the same list: a regular merge of the Stack conflicts
+    /// there (and only there, since every profile is a new file).
+    /// <para>
+    /// So the Stack's ".gitattributes" declares the index as a <c>merge=union</c> file: the merge keeps the lines of
+    /// both sides and never conflicts. The result is not an index (its order and even its Json may be broken), so
+    /// every index that a merge of the Stack touched (<see cref="StackRepository.MergedPaths"/>) is rebuilt here
+    /// from its profiles and committed, before anything can push it.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>True on success, false on error.</returns>
+    protected override bool Initialize( IActivityMonitor monitor )
+    {
+        var stack = World.StackRepository;
+        bool attributeAdded = EnsureIndexMergeAttribute( monitor, stack );
+        var rebuilt = new List<string>();
+        if( stack.MergedPaths.Length > 0 )
+        {
+            foreach( var worldName in stack.WorldNames )
+            {
+                var folderPath = worldName.SharedDataFolder.AppendPart( "Published" );
+                if( Directory.Exists( folderPath )
+                    && stack.MergedPaths.Any( p => stack.StackWorkingFolder.Combine( p ).StartsWith( folderPath ) ) )
+                {
+                    try
+                    {
+                        new PublishedFolder( folderPath ).RebuildIndex();
+                        rebuilt.Add( folderPath.RemovePrefix( stack.StackWorkingFolder ).Path );
+                    }
+                    catch( Exception ex )
+                    {
+                        // Failing the plugins would not protect anything: the World would work without them and
+                        // still be able to push the Stack.
+                        monitor.Error( $"While rebuilding the '{PublishedFolder.IndexFileName}' of '{folderPath}' after a merge of the Stack.", ex );
+                    }
+                }
+            }
+        }
+        if( rebuilt.Count > 0 )
+        {
+            var what = $"Rebuilt the '{PublishedFolder.IndexFileName}' of '{rebuilt.Concatenate( "', '" )}' after a merge of the Stack.";
+            monitor.Info( what );
+            return stack.GitRepository.Commit( monitor, what ) != CommitResult.Error;
+        }
+        if( attributeAdded )
+        {
+            return stack.GitRepository.Commit( monitor, $"The Published '{PublishedFolder.IndexFileName}' files are merged by union." ) != CommitResult.Error;
+        }
+        return true;
+
+        static bool EnsureIndexMergeAttribute( IActivityMonitor monitor, StackRepository stack )
+        {
+            var path = stack.StackWorkingFolder.AppendPart( ".gitattributes" );
+            var content = File.Exists( path ) ? File.ReadAllText( path ) : "";
+            if( content.Split( '\n' ).Any( l => l.Trim() == IndexMergeAttributeLine ) )
+            {
+                return false;
+            }
+            monitor.Info( $"Adding '{IndexMergeAttributeLine}' to '{path}'." );
+            if( content.Length > 0 && !content.EndsWith( '\n' ) ) content += "\r\n";
+            content += $"""
+
+                # The Published index is derived from the profile files: a merge keeps the lines of both sides
+                # and the Publish plugin rebuilds it.
+                {IndexMergeAttributeLine}
+
+                """.ReplaceLineEndings( "\r\n" );
+            File.WriteAllText( path, content );
+            return true;
+        }
+    }
+
     // The Published folder is bound to the World: what the default World has published so far now belongs to the new
     // Long Term Support world (its versions are the ones below the cut). The default World starts with an empty
     // folder - with its index, so that a reader tells "nothing published yet" from "no such folder" - waiting for
