@@ -95,6 +95,7 @@ public sealed partial class StackRepository : IDisposable
     ImmutableArray<LocalWorldName> _worldNames;
     World? _world;
     NormalizedPath _localFolderPath;
+    readonly ImmutableArray<NormalizedPath> _mergedPaths;
 
     /// <summary>
     /// Internal access to the CKliEnv: this is only used to obtain the <see cref="CKliEnv.Committer"/> when
@@ -118,7 +119,20 @@ public sealed partial class StackRepository : IDisposable
     public GitRepository GitRepository => _git;
 
     /// <summary>
-    /// Gets the path of the ".PrivateStack" or ".PublicStack". 
+    /// Gets the paths, relative to the <see cref="StackWorkingFolder"/>, that the pull done when this Stack was
+    /// opened changed through a merge commit.
+    /// <para>
+    /// This is empty when the Stack has not been pulled, was up to date or has been fast-forwarded: every file
+    /// is then exactly what one side committed. A merge commit only exists when the remote and the local Stack
+    /// have both moved and no file conflicted, except the ones whose merge is declared in the Stack's
+    /// ".gitattributes" (like <c>merge=union</c>): a file that is derived from others is merged that way and
+    /// is expected to be rebuilt by its owner from these paths.
+    /// </para>
+    /// </summary>
+    public ImmutableArray<NormalizedPath> MergedPaths => _mergedPaths;
+
+    /// <summary>
+    /// Gets the path of the ".PrivateStack" or ".PublicStack".
     /// </summary>
     public NormalizedPath StackWorkingFolder => _git.WorkingFolder;
 
@@ -768,9 +782,14 @@ public sealed partial class StackRepository : IDisposable
         return !push || PushChanges( monitor );
     }
 
-    StackRepository( GitRepository git, in NormalizedPath stackRoot, CKliEnv context, string stackName )
+    StackRepository( GitRepository git,
+                     in NormalizedPath stackRoot,
+                     CKliEnv context,
+                     string stackName,
+                     ImmutableArray<NormalizedPath> mergedPaths = default )
     {
         _git = git;
+        _mergedPaths = mergedPaths.IsDefault ? ImmutableArray<NormalizedPath>.Empty : mergedPaths;
         _stackRoot = stackRoot;
         _context = context;
         _stackName = stackName;
@@ -847,10 +866,13 @@ public sealed partial class StackRepository : IDisposable
                     else
                     {
                         var b = git.EnsureBranch( monitor, stackBranchName );
+                        var mergedPaths = ImmutableArray<NormalizedPath>.Empty;
+                        // A conflicting merge is an error: no side of a Stack file is silently dropped. A file that
+                        // can be merged by its owner (a derived file) declares it in the Stack's .gitattributes.
                         if( git.Checkout( monitor, b )
-                            && (skipPullStack || git.FetchMergeHead( monitor, LibGit2Sharp.MergeFileFavor.Theirs )) )
+                            && (skipPullStack || git.FetchMergeHead( monitor, out mergedPaths )) )
                         {
-                            return new StackRepository( git, stackRoot, context, stackNameFromUrl );
+                            return new StackRepository( git, stackRoot, context, stackNameFromUrl, mergedPaths );
                         }
                         error = true;
                     }

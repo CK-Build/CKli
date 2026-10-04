@@ -3,6 +3,7 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
@@ -1566,6 +1567,30 @@ public sealed partial class GitRepository : IDisposable
                                 MergeFileFavor mergeFileFavor = MergeFileFavor.Normal,
                                 FastForwardStrategy fastForwardStrategy = FastForwardStrategy.Default )
     {
+        return FetchMergeHead( monitor, out _, mergeFileFavor, fastForwardStrategy );
+    }
+
+    /// <summary>
+    /// Same as <see cref="FetchMergeHead(IActivityMonitor, MergeFileFavor, FastForwardStrategy)"/> but also
+    /// returns the paths that a merge commit changed in the working folder.
+    /// <para>
+    /// <paramref name="mergedPaths"/> is empty unless a merge commit has been created: when the head was up to
+    /// date or has been fast-forwarded, every file is exactly what one side committed. Otherwise, these are the
+    /// files that differ between the previous head and the merge commit, relative to the <see cref="WorkingFolder"/>
+    /// (a renamed file appears with both its old and its new path).
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="mergedPaths">The paths changed by the merge commit.</param>
+    /// <param name="mergeFileFavor">How merge must be done.</param>
+    /// <param name="fastForwardStrategy">The fast forward strategy to apply.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool FetchMergeHead( IActivityMonitor monitor,
+                                out ImmutableArray<NormalizedPath> mergedPaths,
+                                MergeFileFavor mergeFileFavor = MergeFileFavor.Normal,
+                                FastForwardStrategy fastForwardStrategy = FastForwardStrategy.Default )
+    {
+        mergedPaths = ImmutableArray<NormalizedPath>.Empty;
         if( _git.Head.TrackedBranch == null )
         {
             monitor.Warn( $"There is no tracking branch for the '{DisplayPath}/{CurrentBranchName}' branch. Skip pulling from the remote." );
@@ -1579,6 +1604,7 @@ public sealed partial class GitRepository : IDisposable
 
         try
         {
+            var before = _git.Head.Tip;
             var result = Commands.Pull( _git, _committer, new PullOptions
             {
                 FetchOptions = new FetchOptions
@@ -1601,6 +1627,15 @@ public sealed partial class GitRepository : IDisposable
             {
                 monitor.Error( $"Unable to pull '{DisplayPath}/{CurrentBranchName}'. Merge conflicts must be manually fixed." );
                 return false;
+            }
+            if( result.Status == MergeStatus.NonFastForward && before != null )
+            {
+                var changes = _git.Diff.Compare<TreeChanges>( before.Tree, result.Commit.Tree );
+                mergedPaths = changes.SelectMany( c => c.Status == ChangeKind.Renamed
+                                                        ? new[] { c.OldPath, c.Path }
+                                                        : new[] { c.Path } )
+                                     .Select( p => new NormalizedPath( p ) )
+                                     .ToImmutableArray();
             }
             return true;
         }

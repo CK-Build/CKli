@@ -153,6 +153,10 @@ is specified, a `ckli tag pull *` is done that blindly replaces local tags.
 By default, the current directory selects the Repos unless `--all` is specified.
 
 Any merge conflict is an error. Unless `--continue-on-error` is specified, the first error stops the operation.
+This applies to the Stack repository too: no side of a Stack file is ever dropped to resolve a conflict. A
+file that is derived from others declares how it merges in the Stack's `.gitattributes` (the Publish plugin
+declares its `Published/index.json` as `merge=union`), and the paths that a merge commit changed are
+available to the plugins as `StackRepository.MergedPaths` so that they can rebuild such a file.
 
 `--max-dop <n>` limits the parallelism.
 
