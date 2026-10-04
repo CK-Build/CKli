@@ -465,6 +465,27 @@ prefix; two that disagree would both acquire and neither would see the other. Th
 warning — it is the one place where the failure is visible at all. See
 [`LockPrefix`](#lockprefix-the-reference-namespace-that-locks-the-stack).
 
+### Merges: predicted, committed or left in progress
+
+`GitRepository` merges a commit into another in three ways, all built on the same in-memory merge of the two
+trees (no branch moves until the caller decides):
+
+- `PredictMerge` answers a `MergeOutcome` (`UpToDate`, `FastForward`, `Merge`, `Conflict` or `Failed`) and the
+  paths that would conflict. It is what a `--dry-run` displays.
+- `CreateMergeCommit` creates the merge commit in the object database (message `Merged {theirsName}.`, the two
+  original commits as parents) or answers the conflicting paths.
+- `PrepareMerge` leaves a conflicting merge **in progress in the working folder** of the checked out target
+  branch, for a person to resolve with any Git tool: `MERGE_HEAD`, `ORIG_HEAD` and `MERGE_MSG` are the ones of a
+  merge of the original commits and `git merge --abort` restores the branch. `PreparedMerge` describes it and
+  displays the merges left in progress (or, for a dry run, the ones that would be).
+
+When the merge conflicts, a `MergeSidesAligner` may rewrite its two sides first: the rewritten commits are
+children of the originals (the merge base doesn't change) and only exist in the object database, and the merge
+that follows has the original commits as parents. This is how a plugin takes part in a merge without Core knowing
+what it aligns: `CKli.ShallowSolution.Plugin`'s `PackageVersionMerge.CreateAligner` aligns the package versions
+that two independently built branches both rewrote. Its `mustResolveAll` parameter tells it whether the merge
+will only be committed if nothing conflicts anymore, so that it can skip a costly alignment that cannot succeed.
+
 ---
 
 # Secrets, keys and PATs
