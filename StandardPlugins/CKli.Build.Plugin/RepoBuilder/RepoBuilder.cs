@@ -22,6 +22,36 @@ namespace CKli.Build.Plugin;
 /// </summary>
 public class RepoBuilder : RepoInfo
 {
+    /// <summary>
+    /// Tags the error that concludes a failed "dotnet build" step of <see cref="BuildAsync"/>.
+    /// </summary>
+    public static readonly CKTrait DotNetBuildFailedTag = ActivityMonitor.Tags.Register( "DotNetBuildFailed" );
+
+    /// <summary>
+    /// Tags the error that concludes a failed "dotnet test" step of <see cref="BuildAsync"/>.
+    /// </summary>
+    public static readonly CKTrait DotNetTestFailedTag = ActivityMonitor.Tags.Register( "DotNetTestFailed" );
+
+    /// <summary>
+    /// Tags the error that concludes a failed "dotnet pack" step of <see cref="BuildAsync"/>.
+    /// </summary>
+    public static readonly CKTrait DotNetPackFailedTag = ActivityMonitor.Tags.Register( "DotNetPackFailed" );
+
+    /// <summary>
+    /// Gets the failed step that the tags of a concluding error name ("dotnet build", "dotnet test" or
+    /// "dotnet pack"), or null when they name none: a display that already names the repository says
+    /// the step rather than repeating that error.
+    /// </summary>
+    /// <param name="tags">The tags of an error.</param>
+    /// <returns>The failed step or null.</returns>
+    public static string? GetFailedStep( CKTrait tags ) => tags.Overlaps( DotNetBuildFailedTag )
+                                                            ? "dotnet build"
+                                                            : tags.Overlaps( DotNetTestFailedTag )
+                                                                ? "dotnet test"
+                                                                : tags.Overlaps( DotNetPackFailedTag )
+                                                                    ? "dotnet pack"
+                                                                    : null;
+
     readonly RepositoryBuilderPlugin _repositoryBuilder;
     readonly ArtifactHandlerPlugin _artifactHandler;
     readonly RepoArtifactInfo _repoArtifact;
@@ -289,15 +319,15 @@ public class RepoBuilder : RepoInfo
         }
         if( !buildSuccess )
         {
-            monitor.Error( $"Dotnet build fails for '{buildInfo.Repo.DisplayPath}'." );
+            monitor.Error( DotNetBuildFailedTag, $"Dotnet build fails for '{buildInfo.Repo.DisplayPath}'." );
         }
         else if( !testSuccess )
         {
-            monitor.Error( $"Dotnet test fails for '{buildInfo.Repo.DisplayPath}'." );
+            monitor.Error( DotNetTestFailedTag, $"Dotnet test fails for '{buildInfo.Repo.DisplayPath}'." );
         }
         else if( !packSuccess )
         {
-            monitor.Error( $"Dotnet pack fails for '{buildInfo.Repo.DisplayPath}'." );
+            monitor.Error( DotNetPackFailedTag, $"Dotnet pack fails for '{buildInfo.Repo.DisplayPath}'." );
         }
         // Cancellation has no error message.
         return false;

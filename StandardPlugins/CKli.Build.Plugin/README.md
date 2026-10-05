@@ -539,13 +539,16 @@ been computed and is not a dry-run:
   [`build --focus`](#build---focus-working-in-a-pivot-and-its-upstreams).
 - **Each build displays its outcome as one row** (`DisplayOutcome`), as soon as it completes: the repository
   (`Repo.ToInlineNameRenderable`: linked, with its `✱` dirty marker), the target `⏚/vX` and either the number of
-  produced packages (`built: 3 packages.`, or `already built:` for a skipped build) or `build failed.`, followed by
-  the warnings and errors of that build:
+  produced packages (`built: 3 packages.`, or `already built:` for a skipped build) or the failure, followed by the
+  warnings and errors of that build:
   ```
    i  Core/Basic/CK-Monitoring ⏚/v27.1.0-mike.0.ci.3 built: 2 packages.
-   E  ✱ Misc/CK-Mailer ⏚/v14.0.0-juliet.0.ci.8 build failed.
-       E  Dotnet build fails for 'Misc/CK-Mailer'.
+   E  ✱ Misc/CK-Mailer ⏚/v14.0.0-juliet.0.ci.8 dotnet build failed.
   ```
+  The failure is the `RepoBuilder` step that failed (`dotnet build`, `dotnet test` or `dotnet pack`), read from the
+  tag of the error that concludes it (`RepoBuilder.GetFailedStep`): that error names the repository for the other
+  commands that build (`fix build`, `issue --fix`, the rebuilds), the row doesn't repeat it. Any other failure is
+  `build failed.` with its errors below.
   The build's monitor (a pool monitor, or the command's one for a single build) carries the
   `ScreenType.NoScreenTag` while it builds and its warnings and errors are collected (`CollectEntries`): the
   screen logger doesn't echo them on their own, the row displays them. This holds for every failure, wherever it

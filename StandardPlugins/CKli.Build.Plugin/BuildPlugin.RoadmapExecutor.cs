@@ -358,6 +358,10 @@ public sealed partial class BuildPlugin
         /// the produced package count or the failure, followed by the warnings and errors of the build. The build's
         /// monitor carries the <see cref="ScreenType.NoScreenTag"/>: they are not displayed elsewhere.
         /// <para>
+        /// The error that concludes a failed <see cref="RepoBuilder"/> step names the repository: the row says the
+        /// step instead (<see cref="RepoBuilder.GetFailedStep(CKTrait)"/>) and this error is not repeated.
+        /// </para>
+        /// <para>
         /// A build that failed without an error has been stopped (by "--focus" or the cancellation): it has
         /// nothing to say.
         /// </para>
@@ -375,8 +379,16 @@ public sealed partial class BuildPlugin
             IRenderable outcome;
             if( result == null )
             {
+                string? failedStep = null;
+                var shown = new List<ActivityMonitorSimpleCollector.Entry>( entries.Count );
+                foreach( var e in entries )
+                {
+                    if( failedStep == null && (failedStep = RepoBuilder.GetFailedStep( e.Tags )) != null ) continue;
+                    shown.Add( e );
+                }
+                entries = shown;
                 outcome = s.Text( $"⏚/v{build.TargetVersion}", ConsoleColor.Red ).Box( marginLeft: 1 )
-                           .AddRight( s.Text( "build failed.", ConsoleColor.Red ).Box( marginLeft: 1 ) );
+                           .AddRight( s.Text( $"{failedStep ?? "build"} failed.", ConsoleColor.Red ).Box( marginLeft: 1 ) );
             }
             else
             {
