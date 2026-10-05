@@ -97,10 +97,10 @@ public sealed partial class BranchModelPlugin
 
         static string LinkDescription( BranchLinkType link ) => link switch
         {
-            BranchLinkType.Manual => ": nothing is propagated from the parent.",
-            BranchLinkType.Regular => ": a version built on the parent is merged.",
-            BranchLinkType.CI => " (the default): any commit built on the parent is merged.",
-            _ => """: every commit of the parent's "dev/" branch is merged."""
+            BranchLinkType.Manual => ": nothing is synchronized from the parent.",
+            BranchLinkType.Regular => ": the parent's last regular version is merged.",
+            BranchLinkType.CI => " (the default): the parent's last version, regular or CI, is merged.",
+            _ => """: the parent's "dev/" branch is merged."""
         };
     }
 
