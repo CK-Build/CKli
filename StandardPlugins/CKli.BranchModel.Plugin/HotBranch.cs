@@ -250,7 +250,7 @@ public sealed class HotBranch
     ///     regular tip otherwise) - this is what <see cref="Synchronize"/> would have merged.
     ///     </item>
     ///     <item>
-    ///     <see cref="BranchLinkType.Release"/> and <see cref="BranchLinkType.CI"/>: the last built commit of
+    ///     <see cref="BranchLinkType.Regular"/> and <see cref="BranchLinkType.CI"/>: the last built commit of
     ///     the closest existing branch (CI builds are considered only for the CI link), obtained from the
     ///     <see cref="BranchModelPlugin.SetTagCommitProvider(ITagCommitProvider)"/>. When no provider has been
     ///     set (a World without the VersionTag plugin) this falls back on the closest existing branch's tip;
@@ -309,7 +309,7 @@ public sealed class HotBranch
     ///     <see cref="BranchLinkType.Full"/>: the parent's "dev/" tip when it exists, its regular tip otherwise.
     ///     </item>
     ///     <item>
-    ///     <see cref="BranchLinkType.Release"/> and <see cref="BranchLinkType.CI"/>: the last built commit of the
+    ///     <see cref="BranchLinkType.Regular"/> and <see cref="BranchLinkType.CI"/>: the last built commit of the
     ///     parent (CI builds are considered only for the CI link), obtained from the
     ///     <see cref="BranchModelPlugin.SetTagCommitProvider(ITagCommitProvider)"/> that must have been set.
     ///     </item>
@@ -330,13 +330,13 @@ public sealed class HotBranch
     public Commit? GetLinkCommit( IActivityMonitor monitor, HotBranch parent, BranchLinkType linkType )
     {
         Throw.CheckArgument( parent.Exists && parent.Repo == Repo );
-        Throw.CheckArgument( linkType is BranchLinkType.Release or BranchLinkType.CI or BranchLinkType.Full );
+        Throw.CheckArgument( linkType is BranchLinkType.Regular or BranchLinkType.CI or BranchLinkType.Full );
         if( linkType is BranchLinkType.Full )
         {
             return (parent.GitDevBranch ?? parent.GitBranch).Tip;
         }
         var commitProvider = _info._plugin.TagCommitProvider;
-        Throw.CheckState( "Required for BranchLinkType Release or CI.", commitProvider != null );
+        Throw.CheckState( "Required for BranchLinkType Regular or CI.", commitProvider != null );
         return commitProvider.GetCommit( monitor, parent, linkType is BranchLinkType.CI )?.Commit;
     }
 

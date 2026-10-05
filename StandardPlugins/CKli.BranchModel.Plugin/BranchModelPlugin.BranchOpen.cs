@@ -26,7 +26,7 @@ public sealed partial class BranchModelPlugin
                             [Description( "Branch name to open." )]
                             string branchName,
                             [Description( """
-                                Specifies the link (Manual, Release, CI or Full) to the parent branch.
+                                Specifies the link (Manual, Regular, CI or Full) to the parent branch.
                                 Defaults to CI for a new branch: an already opened branch keeps its current link type.
                                 """ )]
                             string? link = null,
@@ -133,7 +133,7 @@ public sealed partial class BranchModelPlugin
                 || sMode.Length > 0
                 || (!allowManual && linkType is BranchLinkType.Manual) )
             {
-                monitor.Error( $"Invalid link type '{link}'. Must be {(allowManual ? "Manual, Release, CI or Full." : "Release, CI or Full.")}" );
+                monitor.Error( $"Invalid link type '{link}'. Must be {(allowManual ? "Manual, Regular, CI or Full." : "Regular, CI or Full.")}" );
                 return false;
             }
         }

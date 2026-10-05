@@ -19,7 +19,7 @@ public sealed partial class BranchModelPlugin
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The minimal context.</param>
     /// <param name="branch">The branch name to synchronize.</param>
-    /// <param name="mode">Specifies the mode (Release, CI or Full). Overrides the configured mode.</param>
+    /// <param name="mode">Specifies the mode (Regular, CI or Full). Overrides the configured mode.</param>
     /// <param name="all">Consider all the Repos of the current World (even if current path is in a Repo).</param>
     /// <param name="versionResolver">
     /// Optional provider of the resolver of the package versions that conflict (see <see cref="HotBranch.Synchronize"/>).

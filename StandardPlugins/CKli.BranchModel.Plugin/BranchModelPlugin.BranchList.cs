@@ -69,7 +69,7 @@ public sealed partial class BranchModelPlugin
         // they are display only: this legend spells the names that the configuration and "--link" take.
         screen.Display( s.Text( "" )! );
         screen.Display( s.Text( "Links:" )! );
-        foreach( var link in new[] { BranchLinkType.Manual, BranchLinkType.Release, BranchLinkType.CI, BranchLinkType.Full } )
+        foreach( var link in new[] { BranchLinkType.Manual, BranchLinkType.Regular, BranchLinkType.CI, BranchLinkType.Full } )
         {
             screen.Display( s.Text( $"{link.ToCodeString()} {link}{LinkDescription( link )}" )!.Box( marginLeft: 2 ) );
         }
@@ -78,7 +78,7 @@ public sealed partial class BranchModelPlugin
         static string LinkDescription( BranchLinkType link ) => link switch
         {
             BranchLinkType.Manual => ": nothing is propagated from the parent.",
-            BranchLinkType.Release => ": a version built on the parent is merged.",
+            BranchLinkType.Regular => ": a version built on the parent is merged.",
             BranchLinkType.CI => " (the default): any commit built on the parent is merged.",
             _ => """: every commit of the parent's "dev/" branch is merged."""
         };
@@ -185,7 +185,7 @@ public sealed partial class BranchModelPlugin
         if( !hb.Exists ) return null;
         var parent = info.GetClosestExistingBranch( b.Parent );
         if( parent == null ) return null;
-        // Without a provider, Release and CI links cannot be honored (Synchronize would throw).
+        // Without a provider, Regular and CI links cannot be honored (Synchronize would throw).
         if( b.LinkType is not BranchLinkType.Full && TagCommitProvider == null ) return SyncStatus.Unknown;
         var linkCommit = hb.GetLinkCommit( monitor, parent, b.LinkType );
         if( linkCommit == null ) return SyncStatus.Unknown;

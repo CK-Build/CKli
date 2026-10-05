@@ -6,7 +6,7 @@ namespace CKli.BranchModel.Plugin;
 /// Provides the current, last built, <see cref="ITagCommit"/> for a <see cref="HotBranch"/>.
 /// <para>
 /// An implementation must be set by <see cref="BranchModelPlugin.SetTagCommitProvider(ITagCommitProvider)"/> to support
-/// the <see cref="BranchLinkType.Release"/> and <see cref="BranchLinkType.CI"/> links in <see cref="HotBranch.GetLinkCommit"/>
+/// the <see cref="BranchLinkType.Regular"/> and <see cref="BranchLinkType.CI"/> links in <see cref="HotBranch.GetLinkCommit"/>
 /// (and therefore in <see cref="HotBranch.Synchronize(IActivityMonitor, BranchLinkType)"/>).
 /// </para>
 /// </summary>

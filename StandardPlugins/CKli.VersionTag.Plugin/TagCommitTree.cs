@@ -16,7 +16,7 @@ namespace CKli.VersionTag.Plugin;
 /// <list type="number">
 ///     <item>
 ///     This provides the "Last Build" for any <see cref="BranchName"/> regardless of merges with other branches.
-///     This is the basics of the branch synchronization for <see cref="BranchLinkType.CI"/> and <see cref="BranchLinkType.Release"/>.
+///     This is the basics of the branch synchronization for <see cref="BranchLinkType.CI"/> and <see cref="BranchLinkType.Regular"/>.
 ///     </item>
 ///     <item>
 ///     This can compute the "Best Build" to use from any <see cref="BranchName"/>.

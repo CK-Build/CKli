@@ -18,7 +18,7 @@ public sealed partial class HotZonePlugin
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The minimal context.</param>
     /// <param name="branch">The branch name to synchronize.</param>
-    /// <param name="mode">Specifies the mode (Release, CI or Full). Overrides the configured mode.</param>
+    /// <param name="mode">Specifies the mode (Regular, CI or Full). Overrides the configured mode.</param>
     /// <param name="all">Consider all the Repos of the current World (even if current path is in a Repo).</param>
     /// <param name="dryRun">True to only display what the synchronization would do.</param>
     /// <returns>True on success, false on error.</returns>
@@ -35,7 +35,7 @@ public sealed partial class HotZonePlugin
                             CKliEnv context,
                             [Description( "Branch name to synchronize." )]
                             string branch,
-                            [Description( "Specifies the mode (Release, CI or Full). Overrides the configured link type." )]
+                            [Description( "Specifies the mode (Regular, CI or Full). Overrides the configured link type." )]
                             string? mode = null,
                             [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
                             bool all = false,

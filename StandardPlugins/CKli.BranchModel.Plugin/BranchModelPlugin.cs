@@ -172,7 +172,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
 
     /// <summary>
     /// Sets the <see cref="ITagCommitProvider"/> required to support <see cref="HotBranch.Synchronize(IActivityMonitor, BranchLinkType)"/>
-    /// with <see cref="BranchLinkType.Release"/> and <see cref="BranchLinkType.CI"/>.
+    /// with <see cref="BranchLinkType.Regular"/> and <see cref="BranchLinkType.CI"/>.
     /// </summary>
     /// <param name="commitProvider">The commit provider.</param>
     /// <remarks>

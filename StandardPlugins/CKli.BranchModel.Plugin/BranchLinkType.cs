@@ -20,13 +20,13 @@ public enum BranchLinkType
     Manual,
 
     /// <summary>
-    /// Restricted propagation ("|>"): the "dev/" child branch is synchronized with the parent branch (a stable or a prerelease
-    /// must be built on the parent branch to impact the child).
+    /// Restricted propagation ("|>"): the "dev/" child branch is synchronized with the parent branch (a regular
+    /// version - stable, prerelease or exploratory - must be built on the parent branch to impact the child).
     /// <para>
-    /// Commits of stable or prerelease versions are merged into the "dev/" child branch, CI builds of the parent branch are ignored. 
+    /// Commits of regular versions are merged into the "dev/" child branch, CI builds of the parent branch are ignored.
     /// </para>
     /// </summary>
-    Release,
+    Regular,
 
     /// <summary>
     /// This is the default link ("->"): the "dev/" child branch is synchronized with the "dev/" parent branch but only on built commits
@@ -63,7 +63,7 @@ public static class BranchLinkTypeExtensions
     {
         BranchLinkType.Full => "=>",
         BranchLinkType.CI => "->",
-        BranchLinkType.Release => "|>",
+        BranchLinkType.Regular => "|>",
         BranchLinkType.Manual => "|✋",
         _ => ""
     };
@@ -79,11 +79,15 @@ public static class BranchLinkTypeExtensions
         var h = s;
         return TryMatchLinkType( ref h, out var t ) && h.IsEmpty
                 ? t
-                : throw new InvalidDataException( "Expected 'Manual', 'Release', 'CI', 'Full'." );
+                : throw new InvalidDataException( "Expected 'Manual', 'Regular', 'CI', 'Full'." );
     }
 
     /// <summary>
-    /// Tries to parse "Manual", "Release", "CI", "Full".
+    /// Tries to parse "Manual", "Regular", "CI", "Full".
+    /// <para>
+    /// "Release" is also accepted and read as <see cref="BranchLinkType.Regular"/>, so that a World definition
+    /// file that spells it this way still loads (the configuration is rewritten with "Regular").
+    /// </para>
     /// </summary>
     /// <param name="h">This head.</param>
     /// <param name="t">The matched type.</param>
@@ -100,9 +104,10 @@ public static class BranchLinkTypeExtensions
             t = BranchLinkType.Full;
             return true;
         }
-        if( h.TryMatch( "release", StringComparison.OrdinalIgnoreCase ) )
+        if( h.TryMatch( "regular", StringComparison.OrdinalIgnoreCase )
+            || h.TryMatch( "release", StringComparison.OrdinalIgnoreCase ) )
         {
-            t = BranchLinkType.Release;
+            t = BranchLinkType.Regular;
             return true;
         }
         if( h.TryMatch( "manual", StringComparison.OrdinalIgnoreCase ) )
