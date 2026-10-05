@@ -1,6 +1,7 @@
 using CK.Core;
 using NUnit.Framework;
 using Shouldly;
+using System;
 using System.IO;
 using System.Linq;
 using static CK.Testing.MonitorTestHelper;
@@ -45,10 +46,13 @@ public class NuGetHelperTests
 
         package.PackageId.ShouldBe( "CK.Testing.NUnit" );
         package.Version.ShouldBe( last );
-        // Distinct(): a package identifier appears once per dependency group that requires it.
-        package.Dependencies.Select( d => d.Package.PackageId )
-                            .Distinct()
-                            .ShouldBe( ["CK.Testing.Monitoring", "NUnit"], ignoreOrder: true );
+        // The last version is whatever the CK stack has published: its CK.Testing dependency moves (CK.Testing or
+        // CK.Testing.Monitoring), NUnit stays. Distinct(): a package identifier appears once per dependency group
+        // that requires it.
+        var ids = package.Dependencies.Select( d => d.Package.PackageId ).Distinct().ToList();
+        ids.Count.ShouldBe( 2 );
+        ids.ShouldContain( "NUnit" );
+        ids.ShouldContain( id => id.StartsWith( "CK.Testing", StringComparison.Ordinal ) );
         // Whichever version happens to be cached here, a modern package has no flat dependency list:
         // every dependency comes from a framework qualified <group>.
         package.Dependencies.ShouldAllBe( d => d.TargetFramework.Length > 0 );
