@@ -775,7 +775,7 @@ Consequences worth knowing:
 - **The migration is one-time and self-healing.** `MigrateToCKliVersionProperty` converts a solution created
   before the property existed. It must add the `<Import>` to `Directory.Build.props` **and** rewrite the
   versions - doing only the latter would leave `$(CKliVersion)` undefined and nothing would restore. For a
-  LTS World it also transfers the implicit pin the literal version used to carry to the definition file's
+  LTS World it also transfers the implicit pin that a literal version carries to the definition file's
   `CKliVersion` attribute, so the migration loses nothing. It is skipped for the `CKli` Stack itself, whose
   plugin solution uses project references and has no `Directory.Packages.props`.
 
@@ -826,17 +826,17 @@ A namespace with no description at all is valid — it is up to the help rendere
 
 ## The two help modes
 
-`ckli --help` used to list all 55 commands with every option and flag: 382 lines, of which the options and flags alone
-were 181. It is now **collapsed**: one line per depth 1 item, plus one row of child names below each namespace so that
+Listing all 55 commands with every option and flag takes 382 lines, of which the options and flags alone are 181. So
+`ckli --help` is **collapsed**: one line per depth 1 item, plus one row of child names below each namespace so that
 the map still names every command. 43 lines.
 
 The rule is simply **collapsed if and only if no help path was given**. Any `--help` that names something — a namespace
-(`ckli tag --help`) or a command (`ckli tag push --help`) — displays that whole subtree in full, exactly as before;
+(`ckli tag --help`) or a command (`ckli tag push --help`) — displays that whole subtree in full, with every option and flag;
 the largest namespace of this stack is 58 lines, so there is nothing to collapse there.
 
 What the collapsed line shows is `CommandNamespaceItem.Summary`: the **authored** `Summary` of each description part
 (`[Description( "…", Summary = "…" )]`, `[CommandNamespace( …, Summary = "…" )]`, or the `summary:` argument of a
-`Command` constructor — it is the last parameter and defaults to null, so no existing command had to change). When a
+`Command` constructor — it is the last parameter and defaults to null, so a command without one needs no change). When a
 part has none, its whole `Text` is used with its line breaks collapsed: nothing is ever dropped, the line is just longer
 until someone writes a summary. Deliberately **not** the first line of the description — most of them are prose whose
 first line stops mid-sentence.
@@ -897,7 +897,7 @@ public Task<bool> StarPublishAsync( IActivityMonitor monitor,
                                 [Description( "Maximal Degree of Parallelism. Defaults to 4." )]
                                 string? maxDop = null,
                                 [Description( "Build regular exploratory, prerelease or stable versions instead of CI versions." )]
-                                [OptionName( "--release" )]
+                                [OptionName( "--regular" )]
                                 bool release = false,
                                 [Description( "Build a ci.0 version when a released version is already available on the commit (a ci.1 from another branch's version)." )]
                                 [OptionName( "--ci.0" )]

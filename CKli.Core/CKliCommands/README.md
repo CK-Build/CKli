@@ -393,7 +393,7 @@ adjust it through the `WorldEvents.CreateLTS` event. The
 uses it to split the version range — the new World keeps the versions produced so far and the default World
 starts a new Major above them — and to reduce the new World's branch model to its root branch.
 
-The World must be **fully published** for this to be possible — publishing it first (`ckli publish --release`) is
+The World must be **fully published** for this to be possible — publishing it first (`ckli publish --regular`) is
 the user's job: no version or branch issue anywhere, every repository currently offering a published version (no
 `+fake`, no `+deprecated`), no pending `local/` or `building/` release left anywhere, **no `dev/` root branch at
 all** (neither local nor on the remote: a publication integrates and deletes it), and every root branch equal to
