@@ -45,8 +45,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     const string _dBranch = "Specify the branch to consider. By default, the current head is considered when in a Repo.";
     const string _oBranch = "--branch,-b";
     const string _dMaxDoP = "Maximal Degree of Parallelism of the builds and of the publications. Defaults to 4.";
-    const string _dRelease = "Build regular exploratory, prerelease or stable versions instead of CI versions.";
-    const string _oRelease = "--release";
+    const string _dRegular = "Build regular exploratory, prerelease or stable versions instead of CI versions.";
+    const string _oRegular = "--regular";
     const string _dCIForce = "Build a ci.0 version when a released version is already available on the commit (a ci.1 from another branch's version).";
     const string _oCIForce = "--ci.0";
     const string _dSkipTests = "Don't run tests even if they have never locally run on the commit.";
@@ -245,7 +245,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="context"></param>
     /// <param name="branch"></param>
     /// <param name="maxDop"></param>
-    /// <param name="release"></param>
+    /// <param name="regular"></param>
     /// <param name="ciForce"></param>
     /// <param name="skipTests"></param>
     /// <param name="forceTests"></param>
@@ -263,9 +263,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                   string? branch = null,
                                   [Description( _dMaxDoP )]
                                   string? maxDop = null,
-                                  [Description( _dRelease )]
-                                  [OptionName( _oRelease )]
-                                  bool release = false,
+                                  [Description( _dRegular )]
+                                  [OptionName( _oRegular )]
+                                  bool regular = false,
                                   [Description( _dCIForce )]
                                   [OptionName(_oCIForce)]
                                   bool ciForce = false,
@@ -281,20 +281,20 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                   [Description( """
                                                 Focus on the current repositories: their upstreams that need a build are built too
                                                 (they are skipped otherwise), they are built before any other repository and the
-                                                build stops at the first failure. CI only: incompatible with '--release'.
+                                                build stops at the first failure. CI only: incompatible with '--regular'.
                                                 """ )]
                                   [OptionName( _oFocus )]
                                   bool focus = false )
     {
-        if( !CheckReleaseAndCIForce( monitor, release, ciForce ) ) return Task.FromResult( false );
+        if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
         // In a non-CI build only the pivots are read from their "dev/" branch: the work in progress of an upstream
         // would be invisible, and this is precisely what "--focus" is about.
-        if( release && focus )
+        if( regular && focus )
         {
-            monitor.Error( $"'{_oRelease}' and '{_oFocus}' are exclusive: '{_oFocus}' needs the \"dev/\" branches of the upstreams that only a CI build considers." );
+            monitor.Error( $"'{_oRegular}' and '{_oFocus}' are exclusive: '{_oFocus}' needs the \"dev/\" branches of the upstreams that only a CI build considers." );
             return Task.FromResult( false );
         }
-        return release
+        return regular
             ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: false )
             : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: false, focus );
     }
@@ -306,7 +306,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="context"></param>
     /// <param name="branch"></param>
     /// <param name="maxDop"></param>
-    /// <param name="release"></param>
+    /// <param name="regular"></param>
     /// <param name="ciForce"></param>
     /// <param name="skipTests"></param>
     /// <param name="forceTests"></param>
@@ -323,9 +323,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                     string? branch = null,
                                     [Description( _dMaxDoP )]
                                     string? maxDop = null,
-                                    [Description( _dRelease )]
-                                    [OptionName( _oRelease )]
-                                    bool release = false,
+                                    [Description( _dRegular )]
+                                    [OptionName( _oRegular )]
+                                    bool regular = false,
                                     [Description( _dCIForce )]
                                     [OptionName(_oCIForce)]
                                     bool ciForce = false,
@@ -339,8 +339,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                     [Description( "Publish all the Repos, not only the current repositories and their consumers." )]
                                     bool all = false )
     {
-        if( !CheckReleaseAndCIForce( monitor, release, ciForce ) ) return Task.FromResult( false );
-        return UnderPublishLockAsync( monitor, dryRun, () => release
+        if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
+        return UnderPublishLockAsync( monitor, dryRun, () => regular
           ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: true )
           : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: true ) );
     }
@@ -352,7 +352,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="context"></param>
     /// <param name="branch"></param>
     /// <param name="maxDop"></param>
-    /// <param name="release"></param>
+    /// <param name="regular"></param>
     /// <param name="ciForce"></param>
     /// <param name="skipTests"></param>
     /// <param name="forceTests"></param>
@@ -372,9 +372,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                       string? branch = null,
                                       [Description( _dMaxDoP )]
                                       string? maxDop = null,
-                                      [Description( _dRelease )]
-                                      [OptionName( _oRelease )]
-                                      bool release = false,
+                                      [Description( _dRegular )]
+                                      [OptionName( _oRegular )]
+                                      bool regular = false,
                                       [Description( _dCIForce )]
                                       [OptionName(_oCIForce)]
                                       bool ciForce = false,
@@ -388,8 +388,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                       [Description( "Build all the Repos, not only the ones that consume or produce the current repositories." )]
                                       bool all = false )
     {
-        if( !CheckReleaseAndCIForce( monitor, release, ciForce ) ) return Task.FromResult( false );
-        return release
+        if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
+        return regular
          ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: false )
          : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: false );
     }
@@ -401,7 +401,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="context"></param>
     /// <param name="branch"></param>
     /// <param name="maxDop"></param>
-    /// <param name="release"></param>
+    /// <param name="regular"></param>
     /// <param name="ciForce"></param>
     /// <param name="skipTests"></param>
     /// <param name="forceTests"></param>
@@ -421,9 +421,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                         string? branch = null,
                                         [Description( _dMaxDoP )]
                                         string? maxDop = null,
-                                        [Description( _dRelease )]
-                                        [OptionName( _oRelease )]
-                                        bool release = false,
+                                        [Description( _dRegular )]
+                                        [OptionName( _oRegular )]
+                                        bool regular = false,
                                         [Description( _dCIForce )]
                                         [OptionName(_oCIForce)]
                                         bool ciForce = false,
@@ -437,19 +437,18 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                         [Description( "Publish all the Repos, not only the ones that consume or produce the current repositories." )]
                                         bool all = false )
     {
-        if( !CheckReleaseAndCIForce( monitor, release, ciForce ) ) return Task.FromResult( false );
-        return UnderPublishLockAsync( monitor, dryRun, () => release
+        if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
+        return UnderPublishLockAsync( monitor, dryRun, () => regular
          ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: true )
          : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: true ) );
     }
 
-    // "--ci.0" asks for a CI version: it cannot be combined with "--release". Before CI became the default
-    // this couldn't be expressed ("--ci.0" simply implied "--ci"), it now has to be refused explicitly.
-    static bool CheckReleaseAndCIForce( IActivityMonitor monitor, bool release, bool ciForce )
+    // "--ci.0" asks for a CI version: it cannot be combined with "--regular", which asks for the opposite.
+    static bool CheckRegularAndCIForce( IActivityMonitor monitor, bool regular, bool ciForce )
     {
-        if( release && ciForce )
+        if( regular && ciForce )
         {
-            monitor.Error( $"'{_oRelease}' and '{_oCIForce}' are exclusive: '{_oCIForce}' builds a CI version." );
+            monitor.Error( $"'{_oRegular}' and '{_oCIForce}' are exclusive: '{_oCIForce}' builds a CI version." );
             return false;
         }
         return true;
@@ -496,9 +495,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     {
         if( skipTests )
         {
-            monitor.Info( ScreenType.CKliScreenTag, $"The --skip-tests option is ignored when building a release version ('{_oRelease}')." );
+            monitor.Info( ScreenType.CKliScreenTag, $"The --skip-tests option is ignored when building a regular version ('{_oRegular}')." );
         }
-        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.Release, mustPublish: publish, branch, all, dryRun );
+        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.Regular, mustPublish: publish, branch, all, dryRun );
         if( roadmap == null || !ParseInteger( monitor, "--max-dop", maxDop, out var vMaDxDop, 4 ) )
         {
             return Task.FromResult( false );
@@ -594,7 +593,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         // When --all is specified, all the repositories are pivots and the actual branch name considered by
         // the hot graph will be the most instable one of all the repositories (but at least as stable as the
         // branchName resolved above of course).
-        var hotGraph = _hotZone.GetHotGraph( monitor, branchName, ciBuildMode != CIBuildMode.Release, pivots );
+        var hotGraph = _hotZone.GetHotGraph( monitor, branchName, ciBuildMode != CIBuildMode.Regular, pivots );
         if( hotGraph == null ) return null;
 
         if( focus && !hotGraph.HasPivots )

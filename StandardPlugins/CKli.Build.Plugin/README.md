@@ -108,13 +108,13 @@ All build-family commands share a common set of options (declared once as `const
 |---|---|
 | `--branch,-b <name>` | Branch to consider. Defaults to the current HEAD (a `dev/` prefix is stripped); if multiple pivot Repos are selected and their checked-out branches differ, it must be specified explicitly. |
 | `--max-dop <n>` (positional `maxDop`) | Maximal degree of parallelism for the build and, for `publish`/`*publish`, for the publication (see [the parallel publication](../CKli.Publish.Plugin/README.md#the-parallel-publication-step-3)). Defaults to 4. |
-| `--release` | Build regular exploratory/prerelease/stable versions instead of CI (`dev/` branch) versions. **The build commands are in CI by default**: this flag is what asks for the integrating, releasing mode. |
-| `--ci.0` | Forces a CI version even when a *published* regular version is already available on the commit. It is not needed to switch a pending `local/` release to CI - a plain CI build rolls that one (see `RollingLocal` below). Exclusive with `--release`, which asks for the opposite. |
-| `skipTests` | Don't run tests even if they never ran locally on the commit (ignored - with a warning - for `--release` builds). |
+| `--regular` | Build regular exploratory/prerelease/stable versions instead of CI (`dev/` branch) versions. **The build commands are in CI by default**: this flag is what asks for the integrating, releasing mode. |
+| `--ci.0` | Forces a CI version even when a *published* regular version is already available on the commit. It is not needed to switch a pending `local/` release to CI - a plain CI build rolls that one (see `RollingLocal` below). Exclusive with `--regular`, which asks for the opposite. |
+| `skipTests` | Don't run tests even if they never ran locally on the commit (ignored - with a warning - for `--regular` builds). |
 | `forceTests` | Run tests even if they already ran successfully on the commit. Mutually exclusive with `skipTests`. |
 | `--dry-run,-d` | Only compute and display the roadmap; no build/publish is performed (`OnRoadmapBuild` is still raised, with `Roadmap.DryRun == true`). |
 | `all` | Consider all Repos of the World as pivots, not only the ones reachable from the current directory. |
-| `--focus` | `build` only. The pivots' upstreams are built too, the pivots are built before anything else and the build stops at the first failure - see [below](#build---focus-working-in-a-pivot-and-its-upstreams). CI only: exclusive with `--release`. |
+| `--focus` | `build` only. The pivots' upstreams are built too, the pivots are built before anything else and the build stops at the first failure - see [below](#build---focus-working-in-a-pivot-and-its-upstreams). CI only: exclusive with `--regular`. |
 
 | `[CommandPath]` | Method | Description |
 |---|---|---|
@@ -132,10 +132,10 @@ All build-family commands share a common set of options (declared once as `const
 (`*` commands include upstream producers as pivots); `publish`/`*publish` additionally set `mustPublish: true`. All four
 funnel into the same `DoCIAsync`/`DoNonCIAsync` → `ComputeAndDisplayRoadmap` → `DoRunAsync` pipeline described below.
 
-**All four are in CI by default**: `DoCIAsync` is what runs when no mode flag is given, and only `--release` selects
+**All four are in CI by default**: `DoCIAsync` is what runs when no mode flag is given, and only `--regular` selects
 `DoNonCIAsync`. That is deliberate - the release path is the irreversible one (it integrates `dev/` into the base
 branch, deletes the remote `dev/` and, for `publish`, creates the actual release), so it is the one that has to be
-asked for by name. `--release` and `--ci.0` are mutually exclusive and refused together
+asked for by name. `--regular` and `--ci.0` are mutually exclusive and refused together
 (`BuildPlugin.CheckReleaseAndCIForce`).
 
 ### `build --focus`: working in a pivot and its upstreams
@@ -174,7 +174,7 @@ exist"*.
 
 Two combinations are handled up front:
 
-- **`--release` is refused.** A non-CI build reads only the pivots from their `dev/` branch
+- **`--regular` is refused.** A non-CI build reads only the pivots from their `dev/` branch
   (`HotZonePlugin.GetHotGraph`), so the work in progress of an upstream would be invisible - precisely what `--focus`
   is about. `--ci.0` is fine.
 - **Without pivots** (the World root, `--all`) every repository is in scope: `--focus` is ignored with a warning.
@@ -342,7 +342,7 @@ to do, and it is the only step that could move a tip away from what the report d
 | `narrow` | Keep the update to the pivots and their upstreams: don't bring the downstreams of an updated repository in. |
 | `noFetch` | Don't fetch first. The analysis is then only as fresh as the last fetch - and the divergence refusal cannot fire. |
 | `--max-dop <n>` (positional `maxDop`) | Limits the parallelism of the fetch. Unbounded by default, exactly as for `ckli fetch`. Refused with `--no-fetch`: it would silently do nothing. |
-| `ci` | Consider the **CI published profiles** of the World References. This is the only `--ci` left in the stack and it is unrelated to the build commands' mode (which is CI by default, `--release` for the other one): nothing is built here, and the graph is always computed with `isCIBuild: false`. A published folder holds at most one alive CI profile per branch and it is newer than every non-CI publication of that branch, so the one that is there simply applies - there is no "is it superseded" question to answer. |
+| `ci` | Consider the **CI published profiles** of the World References. This is the only `--ci` left in the stack and it is unrelated to the build commands' mode (which is CI by default, `--regular` for the other one): nothing is built here, and the graph is always computed with `isCIBuild: false`. A published folder holds at most one alive CI profile per branch and it is newer than every non-CI publication of that branch, so the one that is there simply applies - there is no "is it superseded" question to answer. |
 | `with-nuget` | Let the World's NuGet feeds answer the identifiers no World Reference anchors. Without it no feed is queried and the References are the only source. |
 | `prerelease` / `stable` | Override the stable/not filter of the feeds. Mutually exclusive, and both require `--with-nuget`. |
 | `allowDowngrade` | Apply the updates that move a version **down**. A World Reference may legitimately pin lower than what this World references - alignment is the point - but without this flag a map containing a downgrade reports and writes nothing. |
@@ -414,7 +414,7 @@ For every `HotGraph.Solution` (ordered topologically, `OrderedSolutions`), a `Ro
 | `DependencyUpdate` | A package reference must move to a version coming from `<VersionTag>` plugin configuration or from cross-repo discrepancy resolution ("C"/"D" updates - "U" updates from already-built upstream packages are, by themselves, skippable). |
 | `CodeChange` | The commit's own code changed since the last build (conventional-commit/version-tag driven). |
 | `CI0` | `--ci.0` is used, there is no other reason to build, and the last version is a *published* non-CI build with no `ci.0` yet on this commit - forces a `ci.0` rebuild, opening a new version line above the published one. From another branch's version (the first build of a prerelease branch on a stable commit) the version cannot be a `ci.0`, which is always on the branch of its base: it gets its own commit, becomes a `ci.1`, and the roadmap displays `(CI0+branch)`. |
-| `RollingLocal` | A CI build is done (the default mode is enough), there is no other reason to build, and the last version is a release build still pending as a `local/`/`building/` release - the CI version takes its place on the same commit. |
+| `RollingLocal` | A CI build is done (the default mode is enough), there is no other reason to build, and the last version is a regular build still pending as a `local/`/`building/` release - the CI version takes its place on the same commit. |
 
 `CI0` and `RollingLocal` are the two halves of "the commit already carries a version, build it in CI anyway", split
 on whether that version is published. Both are guarded by `buildReason == None`, so each can only ever be the *sole*
@@ -423,10 +423,10 @@ reason to build.
 **Why `RollingLocal` needs no flag.** A pending `local/` release is unpublished by construction: nothing consumed it,
 so there is no version line to protect. `TagCommit.CanBearVersion` already sanctions exactly this - its "rolling local
 build" case (`IsBuildingOrLocal && Version.BranchName == version.BranchName`) lets the CI version take the commit, and
-`ApplyReleaseBuildTag` destroys the old one through `DestroyLocalReleases`. Before `RollingLocal` existed that
-permission was simply never exercised from a plain CI build: no reason to build was ever produced, it answered
-*"There is nothing to build"* and returned true, and only `--ci.0` got there. A developer who ran a
-`ckli build --release` by mistake had no way to learn that. Destroying the pending release is a side effect the user did not name, so the
+`ApplyReleaseBuildTag` destroys the old one through `DestroyLocalReleases`. `RollingLocal` is what exercises that
+permission from a plain CI build: without a reason to build, a commit carrying a pending release would answer
+*"There is nothing to build"*, and a developer who ran a `ckli build --regular` by mistake would be stuck with its
+version. Destroying the pending release is a side effect the user did not name, so the
 roadmap `monitor.Warn`s it - only when `RollingLocal` is the sole reason, since superseding a `local/` release while
 building for any other reason is the ordinary rolling local build and needs no warning.
 
@@ -658,7 +658,7 @@ roadmap executor, targets are built **sequentially**, in `workflow.Targets` orde
 
 | Type | Role |
 |---|---|
-| `CIBuildMode` (internal enum: `Release`, `CI`, `CIForce`) | Distinguishes `--release` builds from the default CI ones and from `--ci.0`; threaded through `Roadmap`/`BuildSolution` decisions. `CI` is the default, so `Release` is the exceptional member. |
+| `CIBuildMode` (internal enum: `Regular`, `CI`, `CIForce`) | Distinguishes `--regular` builds from the default CI ones and from `--ci.0`; threaded through `Roadmap`/`BuildSolution` decisions. `CI` is the default, so `Regular` is the exceptional member. |
 | `PublishableStatus` | See above - ordered enum combined by taking the maximum across solutions. |
 | `BuilderFunction` (delegate) | The pluggable "actually build this repo" seam used by `CoreBuildAsync`/`SetBuilderFunction`. |
 | `FixPackageMapper` | Patch-tolerant `IPackageMapping` used only by the fix workflow. |

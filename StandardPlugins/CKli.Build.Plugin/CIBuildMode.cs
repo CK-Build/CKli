@@ -3,10 +3,10 @@ namespace CKli.Build.Plugin;
 enum CIBuildMode
 {
     /// <summary>
-    /// "--release": builds regular exploratory, prerelease or stable versions.
+    /// "--regular": builds regular exploratory, prerelease or stable versions.
     /// This is the exception: the build commands are in CI by default.
     /// </summary>
-    Release,
+    Regular,
 
     /// <summary>
     /// The default: builds CI versions.

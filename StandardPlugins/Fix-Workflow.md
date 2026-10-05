@@ -27,7 +27,7 @@ to do the same thing.
 **There is no CI fix build.** `fix build` produces `local/` versions in the developer's own `$Local`
 feed and `fix publish` produces the real ones; nothing in between publishes an intermediate CI
 version of a fix. So the fix commands take no mode flag at all — unlike `build`/`publish`, which are
-in CI by default and need `--release` for the releasing mode, a fix is always a release build.
+in CI by default and need `--regular` for the regular mode, a fix is always a regular build.
 Sharing work in progress is [`fix push`](#sharing-a-fix-in-progress)'s job instead.
 
 ## How it works

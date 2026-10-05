@@ -75,7 +75,7 @@ public sealed partial class Roadmap
             }
         }
         _orderedSolutions = ImmutableCollectionsMarshal.AsImmutableArray( buildSolutions );
-        _packageMapping = new Mapping( packageUpdater, _orderedSolutions, _ciBuildMode != CIBuildMode.Release );
+        _packageMapping = new Mapping( packageUpdater, _orderedSolutions, _ciBuildMode != CIBuildMode.Regular );
         _pivots = ImmutableCollectionsMarshal.AsImmutableArray( pivots );
         _buildSolutions = new BuildSolutionList( this );
     }
@@ -179,7 +179,7 @@ public sealed partial class Roadmap
     /// <summary>
     /// Gets whether this is a build on the "dev/" branch (produces CI packages).
     /// </summary>
-    public bool IsCIBuild => _ciBuildMode != CIBuildMode.Release;
+    public bool IsCIBuild => _ciBuildMode != CIBuildMode.Regular;
 
     /// <summary>
     /// Gets whether this is a "--focus" build: the upstreams of the <see cref="HotGraph.Pivots"/> are

@@ -240,7 +240,7 @@ public sealed partial class VersionTagPlugin
             {
                 monitor.Error( $"""
                     {(withDev.Count > 1 ? $"{withDev.Count} repositories have" : "Repository has")} a '{devName}' branch (locally or on the remote): {withDev.Concatenate()}.
-                    A Long Term Support world starts from a fully published World: publish it first ("ckli publish --release").
+                    A Long Term Support world starts from a fully published World: publish it first ("ckli publish --regular").
                     """ );
                 (causes ??= new List<string>()).Add( $"a '{devName}' branch" );
             }
