@@ -136,10 +136,32 @@ public sealed class Repo
     {
         // The style is carried by the outer box, so it covers the dirty marker and the 2 columns that stand
         // for it when the repository is clean - not only the name.
-        IRenderable r = ToLinkedNameRenderable( screenType, TextStyle.None );
+        IRenderable r = ToInlineNameRenderable( screenType, TextStyle.None );
         r = GitStatus.IsDirty
-                ? r.Box( paddingRight: 1 ).AddLeft( screenType.Text( "✱" ).Box( paddingRight: 1 ) )
+                ? r.Box( paddingRight: 1 )
                 : r.Box( paddingLeft: 2, paddingRight: 1 );
+        return r.Box( style: style );
+    }
+
+    /// <summary>
+    /// Returns the <see cref="ToLinkedNameRenderable(ScreenType, TextStyle)"/> preceded by the "✱" marker when this
+    /// repository <see cref="GitRepository.SimpleStatusInfo.IsDirty">is dirty</see>, without the alignment gutter
+    /// that stands for it when it is not: a display that lists repositories inline uses this one so that a dirty
+    /// repository is visible there too.
+    /// <para>
+    /// This is the inner half of <see cref="ToNameRenderable(ScreenType, TextStyle)"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="screenType">The screen type.</param>
+    /// <param name="style">The style of the name and of the dirty marker.</param>
+    /// <returns>The renderable.</returns>
+    public IRenderable ToInlineNameRenderable( ScreenType screenType, TextStyle style )
+    {
+        IRenderable r = ToLinkedNameRenderable( screenType, TextStyle.None );
+        if( GitStatus.IsDirty )
+        {
+            r = r.AddLeft( screenType.Text( "✱" ).Box( paddingRight: 1 ) );
+        }
         return r.Box( style: style );
     }
 
@@ -147,8 +169,9 @@ public sealed class Repo
     /// Returns the bare <see cref="DisplayPath"/> with its link to <see cref="WorkingFolder"/>: no dirty marker
     /// and no alignment gutter, so that it can appear inside a sentence or in a comma separated list.
     /// <para>
-    /// This is the inner half of <see cref="ToNameRenderable(ScreenType, TextStyle)"/>: a display that lists
-    /// repositories inline uses this one rather than a third rendering of a repository name.
+    /// This is the innermost part of <see cref="ToInlineNameRenderable(ScreenType, TextStyle)"/> and
+    /// <see cref="ToNameRenderable(ScreenType, TextStyle)"/>: a display that must not show the dirty marker uses
+    /// this one rather than another rendering of a repository name.
     /// </para>
     /// </summary>
     /// <param name="screenType">The screen type.</param>
