@@ -19,7 +19,7 @@ public sealed partial class BranchModelPlugin
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The minimal context.</param>
     /// <param name="branch">The branch name to synchronize.</param>
-    /// <param name="mode">Specifies the mode (Regular, CI or Full). Overrides the configured mode.</param>
+    /// <param name="link">Optional link type (Regular, CI or Full) to synchronize with instead of the configured one.</param>
     /// <param name="all">Consider all the Repos of the current World (even if current path is in a Repo).</param>
     /// <param name="versionResolver">
     /// Optional provider of the resolver of the package versions that conflict (see <see cref="HotBranch.Synchronize"/>).
@@ -34,12 +34,12 @@ public sealed partial class BranchModelPlugin
     public bool SynchronizeBranch( IActivityMonitor monitor,
                                    CKliEnv context,
                                    string branch,
-                                   string? mode,
+                                   string? link,
                                    bool all,
                                    Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver,
                                    bool dryRun = false )
     {
-        if( !ParseLink( monitor, mode, allowManual: false, out var linkType ) )
+        if( !ParseLink( monitor, link, allowManual: false, out var linkType ) )
         {
             return false;
         }

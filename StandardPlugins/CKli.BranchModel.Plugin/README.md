@@ -245,11 +245,11 @@ branch doesn't exist), `Synchronize` and `Close` pass the parent.
 
 | `[CommandPath]` | Purpose |
 |---|---|
-| `branch list` | **Handled by [`CKli.HotZone.Plugin`](../CKli.HotZone.Plugin/README.md#how-branch-sync-and-branch-list), implemented here** (`DisplayBranchList`). Displays the opened branches of the World as an indented tree (`BranchNamespace.GetDisplayBranches`), each one prefixed by its link type's compact code, followed by the legend that maps each code to the name the configuration and `--link` use. A last column summarizes where each branch has changes and, when a branch is behind its link, a column before it tells what `branch sync` would do: see [What `branch list` reads](#what-branch-list-reads). World-global: it reports the `BranchNamespace`, not the Git branches of the repositories (that is `ckli issue`). |
-| `branch open <branchName> [--link] [--parent]` | Opens (or updates the link type of) a pre-release or `explo/` branch: updates the `BranchNamespace`, then creates/synchronizes the corresponding `dev/` branch in every repo under the current path and checks it out. `--link` (`Manual`/`Regular`/`CI`/`Full`) defaults to `CI` for a new branch and leaves an already opened branch's link type unchanged. |
+| `branch list [--link/-l]` | **Handled by [`CKli.HotZone.Plugin`](../CKli.HotZone.Plugin/README.md#how-branch-sync-and-branch-list), implemented here** (`DisplayBranchList`). Displays the opened branches of the World as an indented tree (`BranchNamespace.GetDisplayBranches`), each one prefixed by its link type's compact code, followed by the legend that maps each code to the name the configuration and `--link` use. A column summarizes where each branch has changes and, between a branch and its parent, a `↖` line tells what `branch close` would merge into the parent and a `↘` line what `branch sync` would merge into the branch: see [What `branch list` reads](#what-branch-list-reads). `--link` (`Regular`/`CI`/`Full`) predicts the synchronizations with that link instead of each branch's configured one. World-global: it reports the `BranchNamespace`, not the Git branches of the repositories (that is `ckli issue`). |
+| `branch open <branchName> [--link/-l] [--parent]` | Opens (or updates the link type of) a pre-release or `explo/` branch: updates the `BranchNamespace`, then creates/synchronizes the corresponding `dev/` branch in every repo under the current path and checks it out. `--link` (`Manual`/`Regular`/`CI`/`Full`) defaults to `CI` for a new branch and leaves an already opened branch's link type unchanged. |
 | `branch close <branchName> [--discard] [--dry-run/-d]` | **Handled by [`CKli.HotZone.Plugin`](../CKli.HotZone.Plugin/README.md#how-branch-sync-and-branch-list), implemented here** (`CloseBranch`). Integrates the branch into the `dev/` branch of its closest *existing parent* branch (via `HotBranch.Close`) in the repos under the current path, and removes it from the namespace once no repo of the World has it anymore. See [Closing a branch](#closing-a-branch). `--discard` skips the Git-side integration and only edits the namespace: it must be run at the World root. `--dry-run` merges and deletes nothing: it displays what the close would do and fails when the close would fail. |
 | `branch switch <branch> [--create/-c] [--all]` | Checks out `branch` (or its `dev/` branch if it exists) in the current/all repos; `--create` first ensures the branch exists and synchronizes it. |
-| `branch sync <branch> [mode] [--all] [--dry-run/-d]` | **Handled by [`CKli.HotZone.Plugin`](../CKli.HotZone.Plugin/README.md#how-branch-sync-and-branch-list), implemented here** (`SynchronizeBranch`): the package versions that conflict are resolved the way a build of the branch updates them. When other conflicts remain, the merge is left in progress in the working folder, the versions already aligned (the `dev/` branch is checked out, `ckli status` shows `(merging, N conflicts)`): resolve the conflicts and commit the merge with any Git tool, or abort it. `--dry-run` merges nothing: it displays what the synchronization would do (from the local branches) and fails when the synchronization would fail. Runs `HotBranch.Synchronize` for `branch` in the current/all repos, optionally overriding the configured `LinkType` with `mode` (`Regular`/`CI`/`Full`). A repository with issues is skipped and fails the command; the others are still synchronized. When `branch` (or its `dev/`) was checked out, its `dev/` branch is checked out afterwards: a merge can create it, and the auto fix of a useless `dev/` moves the checkout to the base branch. |
+| `branch sync <branch> [--link/-l] [--all] [--dry-run/-d]` | **Handled by [`CKli.HotZone.Plugin`](../CKli.HotZone.Plugin/README.md#how-branch-sync-and-branch-list), implemented here** (`SynchronizeBranch`): the package versions that conflict are resolved the way a build of the branch updates them. When other conflicts remain, the merge is left in progress in the working folder, the versions already aligned (the `dev/` branch is checked out, `ckli status` shows `(merging, N conflicts)`): resolve the conflicts and commit the merge with any Git tool, or abort it. `--dry-run` merges nothing: it displays what the synchronization would do (from the local branches) and fails when the synchronization would fail. Runs `HotBranch.Synchronize` for `branch` in the current/all repos, optionally overriding the configured `LinkType` with `--link` (`Regular`/`CI`/`Full`). A repository with issues is skipped and fails the command; the others are still synchronized. When `branch` (or its `dev/`) was checked out, its `dev/` branch is checked out afterwards: a merge can create it, and the auto fix of a useless `dev/` moves the checkout to the base branch. |
 | `commit <message> [--all]` | Commits any pending changes in the current/all repos (no-op if nothing changed). |
 
 All commands accept the standard `IActivityMonitor` + `CKliEnv` prefix; repository selection
@@ -295,6 +295,7 @@ Opened branches of 'Test':
 Branch        Repositories
 stable        4 repositories
   => bravo    No change, 4 unchanged.
+       ↖ 2 fast-forwards
     => alpha  X-Core and 1 other repository, 2 unchanged, weight: 3 repositories, 3 projects.
 ```
 
@@ -318,36 +319,45 @@ above, X-Middle is unchanged but weighs, since it is updated with X-Core's new v
   World with issues. The relation is computed from the shallow solutions alone, with the HotGraph's project
   name to package identifier heuristic (an explicitly non packable project produces nothing).
 
-When at least one branch is not up to date with its link, a **Branch sync** column between the branch and
-its summary tells what `ckli branch sync` would do to it:
+The edge between a branch and its parent carries what the two merges between them would do, right above the
+branch and aligned on its name: `↖` what `ckli branch close` would merge into the parent, then `↘` what
+`ckli branch sync` would merge into the branch. The arrows point at the branch that receives the merge:
 
 ```
 Opened branches of 'Test':
-Branch       Branch sync                                       Repositories
-stable                                                         4 repositories
-  => sierra  1 fast-forward, 1 merge, 1 conflict (X-Conflict)  X-Merge, X-Conflict, 2 unchanged, weight: 2 repositories, 2 projects.
+Branch       Repositories
+stable       4 repositories
+     ↖ 1 merge, 1 conflict (X-Conflict)
+     ↘ 1 fast-forward, 1 merge, 1 conflict (X-Conflict)
+  => sierra  X-Merge, X-Conflict, 2 unchanged, weight: 2 repositories, 2 projects.
 ```
 
-The header is the table's first row (underlined): `ColumnDefinition` has a header but `TableLayout` doesn't
-implement it yet.
+A line appears only when its merge has something to do somewhere, so an up to date branch keeps a single row,
+and the `Merges:` legend that names the two commands appears only when there is at least one line. The merge
+lines are single cells that span the whole table line: they don't widen the `Branch` column. The header is the
+table's first row (underlined): `ColumnDefinition` has a header but `TableLayout` doesn't implement it.
 
-For each repository where the branch exists, its tip (`GitDevBranch ?? GitBranch`) is compared with the
-`HotBranch.GetLinkCommit` of its closest existing parent, in the order `Synchronize` merges it: up to date
-when that commit is reachable or brings no content (nothing is shown), a **fast-forward**, or a **merge**
-that is computed in the object database only, to tell a clean one from a **conflict**. A merge that conflicts
-on package versions only is computed the way `branch sync` resolves it (`PackageVersionMerge`, with the
-resolver from the branch's `HotGraph`, requested once per branch when a merge first conflicts): it is a merge.
-When the `HotGraph` cannot be obtained (a World with issues, a solution that cannot be read), the errors that
-explain it are displayed once, followed by a single warning for the branch, and its conflicts stay conflicts.
-Why a probed merge fails is logged as a trace (the log file): the column already says it conflicts.
-Conflicts are the only outcome that needs someone, so they are the only one that names its repositories (in
-red); **unknown** ones (yellow) are where the commit to integrate cannot be found: a Regular or CI link
+Both lines are the commands' own predictions, computed in the object database only, in every repository where
+the branch and a parent exist: `HotBranch.PredictClose` (the branch's tip into the `dev/` branch of its closest
+existing parent) and `HotBranch.PredictSynchronize` (the link commit into the branch's `dev/` branch). Each
+repository is up to date (nothing to merge: nothing is shown), a **fast-forward**, a **merge**, or a
+**conflict**. A merge that conflicts on package versions only is computed the way the command resolves it
+(`PackageVersionMerge`, with the resolver from the `HotGraph` of the branch that receives the merge, requested
+once per branch when a merge first conflicts): it is a merge. When the `HotGraph` cannot be obtained (a World
+with issues, a solution that cannot be read), the errors that explain it are displayed once, followed by a
+single warning for the branch, and its conflicts stay conflicts. Conflicts are the only outcome that needs
+someone, so they are the only one that names its repositories (in red); **unknown** ones (yellow) are where the
+merge cannot be computed, typically because the commit to integrate cannot be found: a Regular or CI link
 without an `ITagCommitProvider`, or a repository whose version tags have issues (the errors of the
 `ITagCommitProvider` say which, and `ckli issue` reports them).
 
+- **`--link` changes the `↘` lines only.** It predicts the synchronizations with that link type instead of each
+  branch's configured one, exactly like `branch sync --link`, and it cannot be `Manual`. A close doesn't
+  depend on the link: it always merges the whole branch.
 - **Only the link to the parent is considered.** The merges of the `origin/` branches that a
   synchronization starts with depend on a fetch: that is `ckli pull`'s business.
-- `Manual` links propagate nothing and the root has no parent: their cell is always empty.
+- `Manual` links propagate nothing (without `--link`, they have no `↘` line) and the root has no parent: it
+  has no edge.
 
 ### Issue detection: `World.Events.Issue` and `ckli issue`
 

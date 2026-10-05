@@ -7,7 +7,7 @@ using System.Collections.Generic;
 
 namespace CKli.HotZone.Plugin;
 
-// "ckli branch sync" and "ckli branch list" are implemented by the BranchModel plugin: they are handled here because
+// "ckli branch sync", "ckli branch close" and "ckli branch list" are implemented by the BranchModel plugin: they are handled here because
 // the package versions that conflict when merging a branch's link are resolved like a build of the branch would
 // update them, and that needs the branch's HotGraph.
 public sealed partial class HotZonePlugin
@@ -18,7 +18,7 @@ public sealed partial class HotZonePlugin
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The minimal context.</param>
     /// <param name="branch">The branch name to synchronize.</param>
-    /// <param name="mode">Specifies the mode (Regular, CI or Full). Overrides the configured mode.</param>
+    /// <param name="link">Optional link type (Regular, CI or Full) to synchronize with instead of the configured one.</param>
     /// <param name="all">Consider all the Repos of the current World (even if current path is in a Repo).</param>
     /// <param name="dryRun">True to only display what the synchronization would do.</param>
     /// <returns>True on success, false on error.</returns>
@@ -35,15 +35,16 @@ public sealed partial class HotZonePlugin
                             CKliEnv context,
                             [Description( "Branch name to synchronize." )]
                             string branch,
-                            [Description( "Specifies the mode (Regular, CI or Full). Overrides the configured link type." )]
-                            string? mode = null,
+                            [Description( "Link type (Regular, CI or Full) to synchronize with instead of the configured one." )]
+                            [OptionName( "--link,-l" )]
+                            string? link = null,
                             [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
                             bool all = false,
                             [Description( "Displays what the synchronization would do without merging anything." )]
                             [OptionName( "--dry-run,-d" )]
                             bool dryRun = false )
     {
-        return _branchModel.SynchronizeBranch( monitor, context, branch, mode, all, CreateVersionResolverProvider(), dryRun );
+        return _branchModel.SynchronizeBranch( monitor, context, branch, link, all, CreateVersionResolverProvider(), dryRun );
     }
 
     /// <summary>
@@ -82,25 +83,31 @@ public sealed partial class HotZonePlugin
     }
 
     /// <summary>
-    /// Displays the opened branches of the World and, for each of them, what "ckli branch sync" would do and the
-    /// repositories where it has changes.
+    /// Displays the opened branches of the World, the repositories where each of them has changes and what
+    /// "ckli branch close" and "ckli branch sync" would merge.
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The minimal context.</param>
-    /// <returns>True on success, false if a solution cannot be read.</returns>
+    /// <param name="link">Optional link type (Regular, CI or Full) that the synchronization predictions consider instead of the configured ones.</param>
+    /// <returns>True on success, false if the link is invalid or a solution cannot be read.</returns>
     [Description( """
         Displays the opened branches of the World and how each one is linked to its parent.
         For each branch, the repositories where it has changes are summarized by their tips (the ones that have no
         upstream repository where the branch has changes), the number of repositories where the branch is opened
         without changes and the weight of the branch: the number of repositories and projects that a build of the
         branch touches (the ones with changes and all their downstreams).
-        When a branch is behind its link, a "Branch sync" column tells what "ckli branch sync" would do: the number of
-        fast-forwards and merges, and the repositories where the merge conflicts.
+        Between a branch and its parent, "↖" tells what "ckli branch close" would merge into the parent and "↘" what
+        "ckli branch sync" would merge into the branch: the number of fast-forwards and merges, and the repositories
+        where the merge conflicts.
         """ )]
     [CommandPath( "branch list" )]
-    public bool BranchList( IActivityMonitor monitor, CKliEnv context )
+    public bool BranchList( IActivityMonitor monitor,
+                            CKliEnv context,
+                            [Description( "Link type (Regular, CI or Full) that the synchronization predictions consider instead of the configured ones." )]
+                            [OptionName( "--link,-l" )]
+                            string? link = null )
     {
-        return _branchModel.DisplayBranchList( monitor, context, CreateVersionResolverProvider() );
+        return _branchModel.DisplayBranchList( monitor, context, link, CreateVersionResolverProvider() );
     }
 
     /// <summary>

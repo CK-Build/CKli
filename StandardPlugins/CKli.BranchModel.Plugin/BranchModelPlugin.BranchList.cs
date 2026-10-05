@@ -12,66 +12,86 @@ public sealed partial class BranchModelPlugin
 {
     /// <summary>
     /// Implements "ckli branch list" (the command is handled by the HotZone plugin, that provides the
-    /// <paramref name="versionResolver"/>): displays the opened branches of the World and, for each of them, what
-    /// "ckli branch sync" would do and the repositories where it has changes.
+    /// <paramref name="versionResolver"/>): displays the opened branches of the World, the repositories where each of
+    /// them has changes and, on the edge between a branch and its parent, what "ckli branch close" would merge into
+    /// the parent (↖) and what "ckli branch sync" would merge into the branch (↘).
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The minimal context.</param>
+    /// <param name="link">
+    /// Optional link type (Regular, CI or Full) that the synchronization predictions consider instead of each
+    /// branch's configured one, like the "--link" of "ckli branch sync".
+    /// </param>
     /// <param name="versionResolver">
     /// Optional provider of the resolver of the package versions that conflict: with it, a merge that conflicts on
-    /// package versions only is a merge, as it is for "ckli branch sync". It receives the branch and is called at most
-    /// once per branch.
+    /// package versions only is a merge, as it is for "ckli branch sync" and "ckli branch close". It receives the
+    /// branch that the merge goes into and is called at most once per branch.
     /// </param>
-    /// <returns>True on success, false if a solution cannot be read.</returns>
+    /// <returns>True on success, false if the link is invalid or a solution cannot be read.</returns>
     public bool DisplayBranchList( IActivityMonitor monitor,
                                    CKliEnv context,
+                                   string? link,
                                    Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver )
     {
+        if( !ParseLink( monitor, link, allowManual: false, out var applyLink ) )
+        {
+            return false;
+        }
         var repos = World.GetAllDefinedRepo( monitor );
         if( repos == null ) return false;
         var infos = repos.Select( r => Get( monitor, r ) ).ToArray();
         var reader = new SolutionReader( _shallowSolution );
+        var resolvers = new ResolverCache( versionResolver );
 
         // The branch model is World global: this displays the BranchNamespace, not the Git branches of the
         // repositories (that is what "ckli issue" reports).
         var screen = context.Screen;
         var s = screen.ScreenType;
-        // One row per branch: a multi line TextBlock trims each of its lines, so the indentation of the
-        // tree is a Box margin, never spaces in the text.
-        var cells = new List<(IRenderable Label, IRenderable? Sync, IRenderable Summary)>();
+        // A branch row is split in 2 columns (the branch and its repositories). The merge rows are single cells
+        // that span the whole line: they don't widen the branch column. A multi line TextBlock trims each of its
+        // lines, so the indentation of the tree is a Box margin, never spaces in the text.
+        var rows = new List<IRenderable>();
+        bool hasMerges = false;
         foreach( var (b, depth) in _namespace.GetDisplayBranches() )
         {
+            if( !b.IsRoot )
+            {
+                // The edge between the branch and its parent, right above the branch: the close goes up into the
+                // parent, the synchronization comes down into the branch. They are aligned on the branch's name.
+                var close = GetMergeLine( s, "↖", infos, info => PredictClose( monitor, info, b, resolvers ) );
+                var sync = GetMergeLine( s, "↘", infos, info => PredictSynchronize( monitor, info, b, applyLink, resolvers ) );
+                if( close != null ) rows.Add( close.Box( marginLeft: 2 * depth + 3 ) );
+                if( sync != null ) rows.Add( sync.Box( marginLeft: 2 * depth + 3 ) );
+                hasMerges |= close != null || sync != null;
+            }
             var label = b.IsRoot
                         ? s.Text( b.Name )!
                         : s.Text( $"{b.LinkType.ToCodeString()} {b.Name}" )!;
             string summary = b.IsRoot
                                 ? Repositories( repos.Count )
                                 : GetChangeSummary( monitor, repos, infos, b, reader );
-            cells.Add( (label.Box( marginLeft: 2 * depth, marginRight: 2 ),
-                        GetSyncStatus( monitor, s, infos, b, versionResolver ),
-                        s.Text( summary, ConsoleColor.DarkGray )) );
+            rows.Add( label.Box( marginLeft: 2 * depth, marginRight: 2 ).AddRight( s.Text( summary, ConsoleColor.DarkGray ) ) );
         }
-        // A zero width cell is skipped by a HorizontalContent, which would shift the summary of its row into the
-        // sync column: when the column exists, an empty cell is its margin. It exists only when needed.
-        bool hasSyncColumn = cells.Any( c => c.Sync != null );
-        var rows = cells.Select( c => hasSyncColumn
-                                        ? c.Label.AddRight( c.Sync ?? s.EmptyString.Box( marginRight: 2 ), c.Summary )
-                                        : c.Label.AddRight( c.Summary ) );
         // The ColumnDefinition headers are not implemented by the TableLayout: the header is its first row.
-        IRenderable header = s.Text( "Branch", TextEffect.Underline ).Box( marginRight: 2 );
-        header = hasSyncColumn
-                    ? header.AddRight( s.Text( "Branch sync", TextEffect.Underline ).Box( marginRight: 2 ),
-                                       s.Text( "Repositories", TextEffect.Underline ) )
-                    : header.AddRight( s.Text( "Repositories", TextEffect.Underline ) );
+        var header = s.Text( "Branch", TextEffect.Underline ).Box( marginRight: 2 )
+                        .AddRight( s.Text( "Repositories", TextEffect.Underline ) );
         screen.Display( s.Text( $"Opened branches of '{World.Name}':" )!
                          .AddBelow( s.Unit.AddBelow( rows.Prepend( header ) ).TableLayout() ) );
         // The codes are compact on purpose (they align in a column and read as a propagation gradient) but
         // they are display only: this legend spells the names that the configuration and "--link" take.
         screen.Display( s.Text( "" )! );
         screen.Display( s.Text( "Links:" )! );
-        foreach( var link in new[] { BranchLinkType.Manual, BranchLinkType.Regular, BranchLinkType.CI, BranchLinkType.Full } )
+        foreach( var l in new[] { BranchLinkType.Manual, BranchLinkType.Regular, BranchLinkType.CI, BranchLinkType.Full } )
         {
-            screen.Display( s.Text( $"{link.ToCodeString()} {link}{LinkDescription( link )}" )!.Box( marginLeft: 2 ) );
+            screen.Display( s.Text( $"{l.ToCodeString()} {l}{LinkDescription( l )}" )!.Box( marginLeft: 2 ) );
+        }
+        if( hasMerges )
+        {
+            string syncCommand = applyLink is BranchLinkType.None ? "ckli branch sync" : $"ckli branch sync --link {applyLink}";
+            screen.Display( s.Text( "" )! );
+            screen.Display( s.Text( "Merges:" )! );
+            screen.Display( s.Text( """↖ "ckli branch close": what closing the branch would merge into its parent.""" )!.Box( marginLeft: 2 ) );
+            screen.Display( s.Text( $"""↘ "{syncCommand}": what synchronizing the branch would merge into it.""" )!.Box( marginLeft: 2 ) );
         }
         return reader.Success;
 
@@ -87,68 +107,24 @@ public sealed partial class BranchModelPlugin
     static string Repositories( int count ) => count == 1 ? "1 repository" : $"{count} repositories";
 
     /// <summary>
-    /// What "ckli branch sync" would do to the branch from its link, for each repository where the branch exists.
+    /// Summarizes the outcomes of a merge across the repositories, prefixed by its <paramref name="arrow"/>: the number
+    /// of fast-forwards and merges, and the repositories where the merge conflicts or cannot be computed (the commit to
+    /// integrate cannot be found, for instance). Null when there is nothing to merge anywhere.
     /// </summary>
-    enum SyncStatus
+    static IRenderable? GetMergeLine( ScreenType s, string arrow, BranchModelInfo[] infos, Func<BranchModelInfo, MergeOutcome?> predict )
     {
-        UpToDate,
-        FastForward,
-        Merge,
-        Conflict,
-        Unknown
-    }
-
-    /// <summary>
-    /// Summarizes what "ckli branch sync" would do to the (non root) branch <paramref name="b"/> across the repositories:
-    /// the number of fast-forwards and merges, and the repositories where the merge conflicts or where the commit to
-    /// integrate cannot be found. This is empty when the branch is up to date everywhere, when its link propagates
-    /// nothing (<see cref="BranchLinkType.Manual"/>) and for the root branch: null is returned.
-    /// <para>
-    /// Only the link to the parent is considered: the merges of the remote branches that a synchronization starts
-    /// with depend on a fetch, that is the business of "ckli pull".
-    /// </para>
-    /// </summary>
-    IRenderable? GetSyncStatus( IActivityMonitor monitor,
-                                ScreenType s,
-                                BranchModelInfo[] infos,
-                                BranchName b,
-                                Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver )
-    {
-        if( b.IsRoot || b.LinkType is BranchLinkType.Manual or BranchLinkType.None )
-        {
-            return null;
-        }
-        // The resolver is requested once for the branch, when a merge first conflicts. When it is not available
-        // (the provider has logged why), the branch's conflicts stay conflicts and this is said once.
-        bool resolverRequested = false;
-        IPackageVersionResolver? resolver = null;
-        Func<IPackageVersionResolver?>? getResolver = versionResolver == null
-                                                        ? null
-                                                        : () =>
-                                                        {
-                                                            if( !resolverRequested )
-                                                            {
-                                                                resolverRequested = true;
-                                                                resolver = versionResolver( monitor, b );
-                                                                if( resolver == null )
-                                                                {
-                                                                    monitor.Warn( $"The package versions that conflict in branch '{b}' cannot be resolved (see above): they are counted as conflicts." );
-                                                                }
-                                                            }
-                                                            return resolver;
-                                                        };
         int fastForwards = 0;
         int merges = 0;
         var conflicts = new List<string>();
         var unknowns = new List<string>();
         foreach( var info in infos )
         {
-            switch( GetSyncStatus( monitor, info, b, getResolver ) )
+            switch( predict( info ) )
             {
-                case SyncStatus.FastForward: ++fastForwards; break;
-                case SyncStatus.Merge: ++merges; break;
-                case SyncStatus.Conflict: conflicts.Add( info.Repo.DisplayPath.Path ); break;
-                case SyncStatus.Unknown: unknowns.Add( info.Repo.DisplayPath.Path ); break;
+                case MergeOutcome.FastForward: ++fastForwards; break;
+                case MergeOutcome.Merge: ++merges; break;
+                case MergeOutcome.Conflict: conflicts.Add( info.Repo.DisplayPath.Path ); break;
+                case MergeOutcome.Failed: unknowns.Add( info.Repo.DisplayPath.Path ); break;
             }
         }
         var parts = new List<IRenderable>();
@@ -161,56 +137,76 @@ public sealed partial class BranchModelPlugin
             return null;
         }
         // A TextBlock trims its content: the separators' spaces are margins.
-        IRenderable cell = parts[0];
+        IRenderable line = s.Text( arrow, ConsoleColor.DarkGray ).AddRight( parts[0].Box( marginLeft: 1 ) );
         for( int i = 1; i < parts.Count; ++i )
         {
-            cell = cell.AddRight( s.Text( ",", ConsoleColor.DarkGray ), parts[i].Box( marginLeft: 1 ) );
+            line = line.AddRight( s.Text( ",", ConsoleColor.DarkGray ), parts[i].Box( marginLeft: 1 ) );
         }
-        return cell.Box( marginRight: 2 );
+        return line;
     }
 
     /// <summary>
-    /// Classifies the branch <paramref name="b"/> of a repository the same way <see cref="HotBranch.Synchronize"/>
-    /// integrates its <see cref="HotBranch.GetLinkCommit"/>: nothing to do when the commit is already reachable or
-    /// brings no content, a fast-forward, or a merge that is computed (in the object database only) to detect a conflict.
-    /// With a <paramref name="getResolver"/>, a merge that conflicts on package versions only is a merge.
+    /// What "ckli branch close" would merge into the closest existing parent of the (non root) branch <paramref name="b"/>
+    /// in a repository: null when the branch or its parent doesn't exist there.
     /// </summary>
-    SyncStatus? GetSyncStatus( IActivityMonitor monitor,
-                               BranchModelInfo info,
-                               BranchName b,
-                               Func<IPackageVersionResolver?>? getResolver )
+    static MergeOutcome? PredictClose( IActivityMonitor monitor, BranchModelInfo info, BranchName b, ResolverCache resolvers )
     {
         Throw.DebugAssert( b.Parent != null );
         var hb = info.Branches[b.Index];
         if( !hb.Exists ) return null;
         var parent = info.GetClosestExistingBranch( b.Parent );
         if( parent == null ) return null;
-        // Without a provider, Regular and CI links cannot be honored (Synchronize would throw).
-        if( b.LinkType is not BranchLinkType.Full && TagCommitProvider == null ) return SyncStatus.Unknown;
-        var linkCommit = hb.GetLinkCommit( monitor, parent, b.LinkType );
-        if( linkCommit == null ) return SyncStatus.Unknown;
+        return hb.PredictClose( monitor, resolvers.For( parent.BranchName ), out _ );
+    }
 
-        var git = info.Repo.GitRepository.Repository;
-        var tip = (hb.GitDevBranch ?? hb.GitBranch).Tip;
-        var d = git.ObjectDatabase.CalculateHistoryDivergence( tip, linkCommit );
-        if( d.BehindBy is 0 ) return SyncStatus.UpToDate;
-        if( d.AheadBy is 0 ) return SyncStatus.FastForward;
-        // Diverged with the same content: Synchronize creates no empty merge commit.
-        if( tip.Tree.Sha == linkCommit.Tree.Sha ) return SyncStatus.UpToDate;
-        var merge = git.ObjectDatabase.MergeCommits( tip, linkCommit, new MergeTreeOptions { SkipReuc = true, FailOnConflict = true } );
-        if( merge.Tree != null ) return SyncStatus.Merge;
-        if( getResolver == null ) return SyncStatus.Conflict;
-        // The same aligned merge as the synchronization (its objects are left unreferenced in the object database).
-        // A failure is a conflict that the column displays: its explanation goes to the log file only.
-        var repoGit = info.Repo.GitRepository;
-        return repoGit.CreateMergeCommit( monitor,
-                                          tip,
-                                          linkCommit,
-                                          $"commit '{linkCommit.Sha.AsSpan( 0, 7 )} {linkCommit.MessageShort}'",
-                                          PackageVersionMerge.CreateAligner( repoGit, getResolver ),
-                                          out _ ) != null
-                ? SyncStatus.Merge
-                : SyncStatus.Conflict;
+    /// <summary>
+    /// What "ckli branch sync" would merge into the (non root) branch <paramref name="b"/> in a repository from its
+    /// link (or the <paramref name="applyLink"/> override): null when the branch or its parent doesn't exist there,
+    /// and when the link propagates nothing (<see cref="BranchLinkType.Manual"/>).
+    /// <para>
+    /// Only the link to the parent is considered: the merges of the remote branches that a synchronization starts
+    /// with depend on a fetch, that is the business of "ckli pull".
+    /// </para>
+    /// </summary>
+    MergeOutcome? PredictSynchronize( IActivityMonitor monitor, BranchModelInfo info, BranchName b, BranchLinkType applyLink, ResolverCache resolvers )
+    {
+        Throw.DebugAssert( b.Parent != null );
+        var linkType = applyLink is BranchLinkType.None ? b.LinkType : applyLink;
+        if( linkType is BranchLinkType.Manual or BranchLinkType.None ) return null;
+        var hb = info.Branches[b.Index];
+        if( !hb.Exists ) return null;
+        if( info.GetClosestExistingBranch( b.Parent ) == null ) return null;
+        // Without a provider, Regular and CI links cannot be honored (the link commit cannot be found).
+        if( linkType is not BranchLinkType.Full && TagCommitProvider == null ) return MergeOutcome.Failed;
+        return hb.PredictSynchronize( monitor, linkType, resolvers.For( b ), out _ );
+    }
+
+    /// <summary>
+    /// Requests the resolver of the package versions that conflict once per branch that a merge goes into, when a
+    /// merge first conflicts. When it is not available (the provider has logged why), the conflicts stay conflicts
+    /// and this is said once.
+    /// </summary>
+    sealed class ResolverCache( Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? provider )
+    {
+        readonly Dictionary<BranchName, IPackageVersionResolver?> _resolvers = new();
+
+        public Func<IActivityMonitor, IPackageVersionResolver?>? For( BranchName b )
+        {
+            if( provider == null ) return null;
+            return monitor =>
+            {
+                if( !_resolvers.TryGetValue( b, out var resolver ) )
+                {
+                    resolver = provider( monitor, b );
+                    if( resolver == null )
+                    {
+                        monitor.Warn( $"The package versions that conflict when merging into '{b}' cannot be resolved (see above): they are counted as conflicts." );
+                    }
+                    _resolvers.Add( b, resolver );
+                }
+                return resolver;
+            };
+        }
     }
 
     /// <summary>

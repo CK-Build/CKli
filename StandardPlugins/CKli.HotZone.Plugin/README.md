@@ -100,7 +100,8 @@ fails until the merge is committed: the next `branch sync` then finds it up to d
 merges nothing: it computes the merges in the object database (`HotBranch.PredictSynchronize`, from the local
 branches: the merges of the remote branches depend on a fetch and are not predicted), displays a summary of their
 outcomes and the merges that would be left in progress, and returns what the synchronization would return - so
-that a script can test it. `branch close --dry-run` does the same with `HotBranch.PredictClose`. The reading of the
+that a script can test it. `branch close --dry-run` does the same with `HotBranch.PredictClose`, and `branch list`
+displays both predictions for every branch, each one resolved with the `HotGraph` of the branch that receives the merge. The reading of the
 branch model is not inert, though: the `AutoFixDevBranch` repairs still happen. `branch close` prepares its merge the same way, on the parent's `dev/` branch: the
 branch stays opened until the merge is committed and the close is run again.
 
