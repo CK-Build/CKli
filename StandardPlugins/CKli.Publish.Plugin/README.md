@@ -236,7 +236,7 @@ parallel publication keeps exactly that:
   release. So the published set still always contains every upstream of every published repository — it may only
   contain more of the failed repository's siblings than a sequential publication would have.
 - **The screen sees what it saw before.** Each publication runs on its own pooled monitor, which is bound to no
-  screen: what the publisher would have displayed (warnings, errors, `ScreenType.CKliScreenTag` infos) is
+  screen: what the publisher would have displayed (warnings, errors, `ScreenType.ScreenTag` infos) is
   collected and relayed to the command's monitor when the publication ends, followed by
   *"Unable to publish 'X'."* on failure.
 

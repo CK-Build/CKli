@@ -495,7 +495,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     {
         if( skipTests )
         {
-            monitor.Info( ScreenType.CKliScreenTag, $"The --skip-tests option is ignored when building a regular version ('{_oRegular}')." );
+            monitor.Info( ScreenType.ScreenTag, $"The --skip-tests option is ignored when building a regular version ('{_oRegular}')." );
         }
         var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.Regular, mustPublish: publish, branch, all, dryRun );
         if( roadmap == null || !ParseInteger( monitor, "--max-dop", maxDop, out var vMaDxDop, 4 ) )
@@ -580,7 +580,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                 """ );
                 return null;
             }
-            monitor.Info( ScreenType.CKliScreenTag, $"Selecting --branch '{branch}'." );
+            monitor.Info( ScreenType.ScreenTag, $"Selecting --branch '{branch}'." );
         }
         // If we are not on a known branch (defined by the Branch Model), give up.
         var branchName = _branchModel.BranchNamespace.FindRequired( monitor, branch );

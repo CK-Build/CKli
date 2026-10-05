@@ -108,13 +108,13 @@ public sealed partial class VersionTagPlugin
                                                branch,
                                                $"Empty commit carrying the 'v{futureFake}+fake' version tag." );
             if( newTarget == null ) return false;
-            monitor.Info( ScreenType.CKliScreenTag,
+            monitor.Info( ScreenType.ScreenTag,
                           $"Commit '{target.Sha.AsSpan( 0, 7 )}' already carries 'v{onTip.Version}': "
                           + $"an empty commit has been created on '{branch}' to carry the new version tag." );
             target = newTarget;
         }
         repo.GitRepository.Repository.Tags.Add( $"v{futureFake}+fake", target, allowOverwrite: false );
-        monitor.Info( ScreenType.CKliScreenTag, $"Tag 'v{futureFake}+fake' created on '{branch}'." );
+        monitor.Info( ScreenType.ScreenTag, $"Tag 'v{futureFake}+fake' created on '{branch}'." );
         return true;
 
         // Creates an empty commit (same tree as the branch tip) on the branch and moves its ref, without

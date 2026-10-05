@@ -258,7 +258,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
         var what = expired
                     ? $"Removed {count} published profile(s) after the expiration of '{e.Origin}'."
                     : $"Deprecated {count} published profile(s) after the deprecation of '{e.Origin}'.";
-        monitor.Info( ScreenType.CKliScreenTag, what );
+        monitor.Info( ScreenType.ScreenTag, what );
         // The generic "Automatic pre-push commit." of PushChanges would say nothing about this: the
         // profiles that disappear from the Stack deserve a commit that names the reason.
         World.StackRepository.GitRepository.Commit( monitor, what );
@@ -418,7 +418,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
         }
         var what = $"Added {created.Length} published profile(s) superseded by the fix of '{fixWorkflow}': "
                    + $"'{created.Select( p => p.Version.ToString() ).Concatenate( "', '" )}'.";
-        monitor.Info( ScreenType.CKliScreenTag, what );
+        monitor.Info( ScreenType.ScreenTag, what );
         World.StackRepository.GitRepository.Commit( monitor, what );
         PushStack( monitor, World );
     }

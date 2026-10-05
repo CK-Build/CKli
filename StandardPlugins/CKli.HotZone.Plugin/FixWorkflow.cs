@@ -116,7 +116,7 @@ public sealed partial class FixWorkflow
         {
             monitor.Error( ActivityMonitor.Tags.ToBeInvestigated, $"While loading '{path}'.", ex );
         }
-        monitor.Error( ScreenType.CKliScreenTag,
+        monitor.Error( ScreenType.ScreenTag,
                        "An error occurred while loading current workflow. See logs." );
         return false;
     }
@@ -189,7 +189,7 @@ public sealed partial class FixWorkflow
     {
         if( File.Exists( fileWorkflowPath ) )
         {
-            monitor.Info( ScreenType.CKliScreenTag, $"Deleting current Fix Workflow for world '{world.Name}'." );
+            monitor.Info( ScreenType.ScreenTag, $"Deleting current Fix Workflow for world '{world.Name}'." );
             FileHelper.DeleteFile( monitor, fileWorkflowPath );
         }
     }

@@ -242,7 +242,7 @@ abstract class BasePublisher
             // If the cleanup fails, we still consider this release done.
             _artifactHandler.DestroyLocalRelease( monitor, repo, version, content, removeFromNuGetGlobalCache: false );
         }
-        monitor.Info( ScreenType.CKliScreenTag, $"Published {content.Produced.Length} packages of '{repo.DisplayPath}/{version}'." );
+        monitor.Info( ScreenType.ScreenTag, $"Published {content.Produced.Length} packages of '{repo.DisplayPath}/{version}'." );
         return true;
     }
 

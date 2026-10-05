@@ -95,7 +95,7 @@ public sealed partial class BranchModelPlugin
         if( namespaceChanged )
         {
             var added = ns.Branches.Length > _namespace.Branches.Length;
-            monitor.Info( ScreenType.CKliScreenTag, $"""
+            monitor.Info( ScreenType.ScreenTag, $"""
                 {(added ? "Added new" : "Updated")} branch model:
                 {newBranch.ToParentedString()}
                 """ );

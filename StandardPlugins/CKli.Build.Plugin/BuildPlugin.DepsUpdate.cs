@@ -512,7 +512,7 @@ public sealed partial class BuildPlugin
                     """ );
                 return null;
             }
-            monitor.Info( ScreenType.CKliScreenTag, $"Selecting --branch '{branch}'." );
+            monitor.Info( ScreenType.ScreenTag, $"Selecting --branch '{branch}'." );
         }
         return _branchModel.BranchNamespace.FindRequired( monitor, branch );
     }

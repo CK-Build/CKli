@@ -251,7 +251,7 @@ public sealed partial class HotGraph
                 return false;
             }
             Throw.DebugAssert( closestBranch.GitDevBranch != null );
-            monitor.Info( ScreenType.CKliScreenTag, $"Considering solution in branch '{closestBranch.GitDevBranch.FriendlyName}' that can be read without errors." );
+            monitor.Info( ScreenType.ScreenTag, $"Considering solution in branch '{closestBranch.GitDevBranch.FriendlyName}' that can be read without errors." );
             isDevSolution = true;
         }
         var s = new Solution( this, branchInfo, closestBranch, shallow, isPivot, isDevSolution );

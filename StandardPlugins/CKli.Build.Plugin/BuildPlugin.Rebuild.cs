@@ -56,7 +56,7 @@ public sealed partial class BuildPlugin
                                               forceRebuild: true,
                                               PrimaryPluginContext.Cancellation ).ConfigureAwait( false ) != null )
                     {
-                        monitor.Info( ScreenType.CKliScreenTag, $"Version '{tag.Version.ParsedText}' of '{repo.DisplayPath}' is valid." );
+                        monitor.Info( ScreenType.ScreenTag, $"Version '{tag.Version.ParsedText}' of '{repo.DisplayPath}' is valid." );
                         break;
                     }
                     monitor.Warn( $"Version '{tag.Version.ParsedText}' of '{repo.DisplayPath}' cannot be rebuilt." );
@@ -128,7 +128,7 @@ public sealed partial class BuildPlugin
             monitor.Error( "Build failed. See 'ckli log'." );
             return false;
         }
-        monitor.Info( ScreenType.CKliScreenTag, $"Version '{tag.Version.ParsedText}' of '{repo.DisplayPath}' has been successfully rebuilt." );
+        monitor.Info( ScreenType.ScreenTag, $"Version '{tag.Version.ParsedText}' of '{repo.DisplayPath}' has been successfully rebuilt." );
         return true;
     }
 }

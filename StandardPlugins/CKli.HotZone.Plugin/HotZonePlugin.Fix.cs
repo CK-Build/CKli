@@ -506,7 +506,7 @@ public sealed partial class HotZonePlugin
         }
         if( workflow == null )
         {
-            monitor.Info( ScreenType.CKliScreenTag, "There is no current Fix Workflow." );
+            monitor.Info( ScreenType.ScreenTag, "There is no current Fix Workflow." );
         }
         else
         {
@@ -536,7 +536,7 @@ public sealed partial class HotZonePlugin
         }
         if( workflow == null )
         {
-            monitor.Error( ScreenType.CKliScreenTag, "No current workflow exist." );
+            monitor.Error( ScreenType.ScreenTag, "No current workflow exist." );
             return false;
         }
         // Only the branches are pushed. The "local/" version tags are deliberately left behind: the fix
@@ -576,7 +576,7 @@ public sealed partial class HotZonePlugin
         }
         if( workflow == null )
         {
-            monitor.Info( ScreenType.CKliScreenTag, "No current workflow exist." );
+            monitor.Info( ScreenType.ScreenTag, "No current workflow exist." );
             return true;
         }
         foreach( var target in workflow.Targets )

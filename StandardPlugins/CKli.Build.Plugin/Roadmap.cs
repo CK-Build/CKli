@@ -276,10 +276,10 @@ public sealed partial class Roadmap
                     return null;
                 }
                 var names = interrupted.Select( s => s.Repo.DisplayPath.Path ).Concatenate( "', '" );
-                monitor.Info( ScreenType.CKliScreenTag,
+                monitor.Info( ScreenType.ScreenTag,
                               $"Completed the interrupted build of '{names}': their 'building/' version tag is now a 'local/' one." );
             }
-            monitor.Info( ScreenType.CKliScreenTag, "No repositories need to be built." );
+            monitor.Info( ScreenType.ScreenTag, "No repositories need to be built." );
             _buildSuccess = true;
             ReportOutOfFocus( monitor );
             return [];
@@ -326,7 +326,7 @@ public sealed partial class Roadmap
         if( !_focus ) return;
         var outOfFocus = _orderedSolutions.Where( s => s.IsOutOfFocus ).Select( s => s.Repo.DisplayPath.Path ).ToArray();
         if( outOfFocus.Length == 0 ) return;
-        monitor.Info( ScreenType.CKliScreenTag,
+        monitor.Info( ScreenType.ScreenTag,
                       outOfFocus.Length == 1
                         ? $"'{outOfFocus[0]}' is out of focus and was not built. Run '*build' to complete the World."
                         : $"{outOfFocus.Length} repositories are out of focus and were not built: '{outOfFocus.Concatenate( "', '" )}'. Run '*build' to complete the World." );

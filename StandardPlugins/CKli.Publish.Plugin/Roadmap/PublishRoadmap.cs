@@ -226,7 +226,7 @@ sealed class PublishRoadmap
 
         void Collect( ref ActivityMonitorLogData data )
         {
-            if( data.MaskedLevel >= LogLevel.Warn || data.Tags.Overlaps( ScreenType.CKliScreenTag ) )
+            if( data.MaskedLevel >= LogLevel.Warn || data.Tags.Overlaps( ScreenType.ScreenTag ) )
             {
                 _entries.Add( (data.MaskedLevel, data.Tags, data.Text, data.Exception) );
             }

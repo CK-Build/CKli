@@ -253,7 +253,7 @@ public sealed partial class VersionTagPlugin
         {
             var n = existingCommit.Version.SetBuildMetaData( null ).ToString();
             var vN = 'v' + n;
-            monitor.Info( ScreenType.CKliScreenTag, $"Deprecation tag expired. Removing '{vN}' tag (from local and remote) in '{repo.DisplayPath}'." );
+            monitor.Info( ScreenType.ScreenTag, $"Deprecation tag expired. Removing '{vN}' tag (from local and remote) in '{repo.DisplayPath}'." );
 
             var localTags = repo.GitRepository.Repository.Tags;
             if( localTags[n] != null )
@@ -269,7 +269,7 @@ public sealed partial class VersionTagPlugin
         }
         else
         {
-            monitor.Info( ScreenType.CKliScreenTag, $"Version tag '{name}' has been updated in '{repo.DisplayPath}'." );
+            monitor.Info( ScreenType.ScreenTag, $"Version tag '{name}' has been updated in '{repo.DisplayPath}'." );
         }
         return existingTagInfo;
     }
@@ -286,7 +286,7 @@ public sealed partial class VersionTagPlugin
         AddTag( existing.Repo, existing, tagInfo, name );
         if( tagInfo.HasExpired )
         {
-            monitor.Info( ScreenType.CKliScreenTag, $"Deprecation tag expired. Removing '{existing.Version.ParsedText}' tag (from local and remote) in '{existing.Repo.DisplayPath}'." );
+            monitor.Info( ScreenType.ScreenTag, $"Deprecation tag expired. Removing '{existing.Version.ParsedText}' tag (from local and remote) in '{existing.Repo.DisplayPath}'." );
 
             var localTags = existing.Repo.GitRepository.Repository.Tags;
             if( localTags[existing.Version.ParsedText] != null )
@@ -297,7 +297,7 @@ public sealed partial class VersionTagPlugin
         }
         else
         {
-            monitor.Info( ScreenType.CKliScreenTag, $"Version tag '{name}' has been created in '{existing.Repo.DisplayPath}'." );
+            monitor.Info( ScreenType.ScreenTag, $"Version tag '{name}' has been created in '{existing.Repo.DisplayPath}'." );
         }
         return tagInfo;
     }

@@ -117,7 +117,7 @@ public sealed partial class BranchModelPlugin
         int stillOpened = infos.Count( i => i.Branches[b.Index].Exists );
         if( stillOpened > 0 )
         {
-            monitor.Info( ScreenType.CKliScreenTag,
+            monitor.Info( ScreenType.ScreenTag,
                           $"Branch '{b.Name}' closed in {Repositories( toClose.Count )}, still opened in {Repositories( stillOpened )}." );
             return true;
         }
@@ -167,7 +167,7 @@ public sealed partial class BranchModelPlugin
         }
         if( toProcess.Count == 0 )
         {
-            monitor.Info( ScreenType.CKliScreenTag, $"Branch '{b.Name}' doesn't exist in the {Repositories( scope.Count )} here." );
+            monitor.Info( ScreenType.ScreenTag, $"Branch '{b.Name}' doesn't exist in the {Repositories( scope.Count )} here." );
         }
         while( toProcess.TryDequeue( out var i ) )
         {
@@ -182,7 +182,7 @@ public sealed partial class BranchModelPlugin
                 {
                     closing[u] = true;
                     toProcess.Enqueue( u );
-                    monitor.Info( ScreenType.CKliScreenTag,
+                    monitor.Info( ScreenType.ScreenTag,
                                   $"Also closing '{b.Name}' in '{all[u].DisplayPath}': its '{b.Name}' versions are consumed by '{all[i].DisplayPath}'." );
                 }
             }

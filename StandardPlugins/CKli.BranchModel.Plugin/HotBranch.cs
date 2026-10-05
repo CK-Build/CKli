@@ -205,7 +205,7 @@ public sealed class HotBranch
             return false;
         }
         var b = git.Branches.Add( _name.Name, forkPoint );
-        monitor.Info( ScreenType.CKliScreenTag,
+        monitor.Info( ScreenType.ScreenTag,
                       $"Recreated the missing branch '{_name.Name}' of '{dev.FriendlyName}' in '{Repo.DisplayPath}' where it left '{parent.BranchName}'." );
         _link = BranchLink.Create( b, dev );
         return true;
