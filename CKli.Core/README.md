@@ -22,6 +22,11 @@ This assembly provides some general helpers that are use by all CKli ecosystem:
     repository names - has to be a flow: as a horizontal content its minimal width exceeds any screen past a
     dozen cells, and every cell is then wrapped inside `TextBlock.MinimalWidth` columns. A flow cell is atomic,
     so a group that must not be split (a name and its comma) is one cell.
+  - Logs reach the screen through the `ScreenLogger`: warnings and errors (of the command's monitor and of the
+    background ones) and the infos tagged `ScreenType.ScreenTag` (`[Screen]`) are persisted on the screen. A log
+    tagged `ScreenType.NoScreenTag` (`[NoScreen]`) never is: its command displays it in its own way, typically as
+    an auto-tag of a monitor whose warnings and errors are collected and displayed with the outcome of an
+    operation (`ScreenType.CreateLog( level, IRenderable )` gives them the same level head as a logged line).
 - The [`Helpers/`](Helpers) folder contains basic helpers. Plugins are invited to use them as much as possible in order to centralize behavior.
 
 

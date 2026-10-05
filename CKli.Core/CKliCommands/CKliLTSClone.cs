@@ -118,7 +118,7 @@ sealed class CKliLTSClone : Command
             {
                 return false;
             }
-            monitor.Info( ScreenType.CKliScreenTag,
+            monitor.Info( ScreenType.ScreenTag,
                           newClones == null || newClones.Count == 0
                             ? $"World '{worldName.FullName}' has no repository to clone."
                             : $"Cloned {newClones.Count} repositories of world '{worldName.FullName}'." );
@@ -128,7 +128,7 @@ sealed class CKliLTSClone : Command
             var pin = world.DefinitionFile.PinnedCKliVersion;
             if( pin != null && !worldName.IsDefaultWorld && LocalCKliTool.Ensure( monitor, worldName.WorldRoot, pin ) )
             {
-                monitor.Info( ScreenType.CKliScreenTag,
+                monitor.Info( ScreenType.ScreenTag,
                               $"CKli '{pin}' is installed in '{worldName.WorldRoot}': use '{LocalCKliTool.LocalCommand}' instead of 'ckli' there." );
             }
             // Opening the world creates its plugin solution in the Stack repository: a tracked

@@ -177,7 +177,7 @@ public sealed partial class World
             }
             else
             {
-                monitor.Info( ScreenType.CKliScreenTag, "Plugins are disabled because there is no configured World.PluginLoader." );
+                monitor.Info( ScreenType.ScreenTag, "Plugins are disabled because there is no configured World.PluginLoader." );
             }
         }
         var w = new World( stackRepository, screenType, worldName, definitionFile, layout, machinery );

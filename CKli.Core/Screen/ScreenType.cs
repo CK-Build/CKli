@@ -39,10 +39,22 @@ public sealed class ScreenType
     /// <summary>
     /// ActivityMonitor tag that can be used to display a persistent info, trace or debug on the <see cref="IScreen"/>.
     /// <para>
-    /// Fatal, Errors and Warnings are always persistent.
+    /// Fatal, Errors and Warnings are persistent unless they carry the <see cref="NoScreenTag"/>.
     /// </para>
     /// </summary>
-    public static readonly CKTrait CKliScreenTag = ActivityMonitor.Tags.Register( "Screen" );
+    public static readonly CKTrait ScreenTag = ActivityMonitor.Tags.Register( "Screen" );
+
+    /// <summary>
+    /// ActivityMonitor tag that prevents a log from being persisted on the <see cref="IScreen"/>, even a Fatal,
+    /// an Error or a Warning: the command that emits it displays it in its own way (a renderable that links the
+    /// repository it is about, for instance). The log is still written to the log files and still feeds the
+    /// transient progress display. It wins over the <see cref="ScreenTag"/>.
+    /// <para>
+    /// As an <see cref="IActivityMonitor.AutoTags"/>, it applies to every log of a monitor: a command can then
+    /// collect the warnings and errors of an operation and display them with the operation's outcome.
+    /// </para>
+    /// </summary>
+    public static readonly CKTrait NoScreenTag = ActivityMonitor.Tags.Register( "NoScreen" );
 
     /// <summary>
     /// Initializes a new screen type.
@@ -133,7 +145,17 @@ public sealed class ScreenType
     /// <param name="level">The log level.</param>
     /// <param name="message">The log message.</param>
     /// <returns>The renderable.</returns>
-    public IRenderable CreateLog( LogLevel level, string message )
+    public IRenderable CreateLog( LogLevel level, string message ) => CreateLog( level, Text( message, TextStyle.Default ) );
+
+    /// <summary>
+    /// Creates a renderable log whose message is a renderable: it has the same level head as a
+    /// <see cref="IScreen.ScreenLog(LogLevel, string)"/>, so that a command can display a log that
+    /// links what it is about.
+    /// </summary>
+    /// <param name="level">The log level.</param>
+    /// <param name="message">The log message.</param>
+    /// <returns>The renderable.</returns>
+    public IRenderable CreateLog( LogLevel level, IRenderable message )
     {
         var head = level switch
         {
@@ -141,7 +163,7 @@ public sealed class ScreenType
             LogLevel.Warn => WarningHead,
             _ => InfoHead
         };
-        return head.AddRight( Text( message, TextStyle.Default ) );
+        return head.AddRight( message );
     }
 
     sealed class RenderableUnit : IRenderable

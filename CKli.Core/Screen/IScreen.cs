@@ -33,7 +33,7 @@ public interface IScreen
 
     /// <summary>
     /// Called whenever a error (can be <see cref="LogLevel.Fatal"/>) or a warning or
-    /// <see cref="ScreenType.CKliScreenTag"/> log is emitted.
+    /// <see cref="ScreenType.ScreenTag"/> log is emitted, unless it carries the <see cref="ScreenType.NoScreenTag"/>.
     /// <para>
     /// Can be used directly to display non logged errors or warnings.
     /// </para>

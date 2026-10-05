@@ -1240,7 +1240,7 @@ public sealed partial class StackRepository : IDisposable
             var pin = definitionFile.PinnedCKliVersion;
             if( success && pin != null && !world.IsDefaultWorld && LocalCKliTool.Ensure( monitor, world.WorldRoot, pin ) )
             {
-                monitor.Info( ScreenType.CKliScreenTag,
+                monitor.Info( ScreenType.ScreenTag,
                               $"CKli '{pin}' is installed in '{world.WorldRoot}': use '{LocalCKliTool.LocalCommand}' instead of 'ckli' there." );
             }
             return success;

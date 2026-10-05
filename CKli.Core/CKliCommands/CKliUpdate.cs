@@ -110,7 +110,7 @@ sealed class CKliUpdate : Command
         }
         if( allowDowngrade ) updateCmd += " --allow-downgrade";
         updateCmd += $" --no-http-cache --source " + LocalCKliTool.FeedUrl;
-        monitor.Info( ScreenType.CKliScreenTag, $"""
+        monitor.Info( ScreenType.ScreenTag, $"""
             Currently installed '{info.Version}'. Will now execute after this CKli instance ends:
             {updateCmd}
             """ );
@@ -193,7 +193,7 @@ sealed class CKliUpdate : Command
             Throw.DebugAssert( root != null );
             var current = root.Attribute( XNames.CKliVersion )?.Value;
             var props = worldName.SharedDataFolder.Combine( $"{PluginMachinery.GetPluginSolutionName( worldName )}/{PluginMachinery.CKliVersionPropsFileName}" );
-            monitor.Info( ScreenType.CKliScreenTag, $"""
+            monitor.Info( ScreenType.ScreenTag, $"""
                 Updating the CKli version of the Long Term Support world '{worldName.FullName}' from '{current ?? "(none)"}' to '{version}':
                 1 - its local tool in '{worldName.WorldRoot}' (the one '{LocalCKliTool.LocalCommand}' runs),
                 2 - the CKliVersion attribute of '{definitionPath.LastPart}' (committed and pushed in the Stack repository),
@@ -220,7 +220,7 @@ sealed class CKliUpdate : Command
                     """ );
                 return false;
             }
-            monitor.Info( ScreenType.CKliScreenTag, $"""
+            monitor.Info( ScreenType.ScreenTag, $"""
                 CKli '{version}' is now the CKli of '{worldName.FullName}': use '{LocalCKliTool.LocalCommand}' there.
                 """ );
             return true;

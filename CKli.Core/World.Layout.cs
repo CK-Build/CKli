@@ -439,7 +439,7 @@ sealed partial class World
         var actions = CreateFixOrXifLayoutRoadMap( physicalLayout, _layout, fix );
         if( emitNoActionMessage && actions.Count == 0 )
         {
-            monitor.Info( ScreenType.CKliScreenTag, $"Layout '{_stackRepository.GitDisplayPath}/{_name.XmlDescriptionFilePath.LastPart}' is up-to-date with folders and repositories in '{_name.WorldRoot}'." );
+            monitor.Info( ScreenType.ScreenTag, $"Layout '{_stackRepository.GitDisplayPath}/{_name.XmlDescriptionFilePath.LastPart}' is up-to-date with folders and repositories in '{_name.WorldRoot}'." );
         }
         return actions;
     }

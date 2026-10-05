@@ -159,7 +159,7 @@ public sealed partial class World
     {
         if( issues.Count == 0 )
         {
-            monitor.Info( ScreenType.CKliScreenTag, "No issues found." );
+            monitor.Info( ScreenType.ScreenTag, "No issues found." );
         }
         else
         {

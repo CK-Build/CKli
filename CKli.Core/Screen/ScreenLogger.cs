@@ -54,7 +54,7 @@ public sealed class ScreenLogger : IActivityMonitorClient
     void OnLog( ref ActivityMonitorLogData data, bool isOpenGroup )
     {
         var l = data.MaskedLevel;
-        if( l >= LogLevel.Warn || data.Tags.Overlaps( ScreenType.CKliScreenTag ) )
+        if( (l >= LogLevel.Warn || data.Tags.Overlaps( ScreenType.ScreenTag )) && !data.Tags.Overlaps( ScreenType.NoScreenTag ) )
         {
             _screen.ScreenLog( l, data.Text );
         }
@@ -100,7 +100,7 @@ public sealed class ScreenLogger : IActivityMonitorClient
                     // The ProcessRunner's StdOut/StdErr are logged as Trace: they are below Warn and never
                     // reach the screen this way.
                     var level = logEvent.LogLevel & LogLevel.Mask;
-                    if( fromBackgroundMonitor && level >= LogLevel.Warn )
+                    if( fromBackgroundMonitor && level >= LogLevel.Warn && !logEvent.Tags.Overlaps( ScreenType.NoScreenTag ) )
                     {
                         _screen.ScreenLog( level, t );
                     }

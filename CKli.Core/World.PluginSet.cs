@@ -67,7 +67,7 @@ public sealed partial class World
             if( handled.HasValue )
             {
                 if( !handled.Value ) return false;
-                monitor.Info( ScreenType.CKliScreenTag,
+                monitor.Info( ScreenType.ScreenTag,
                               attributeValue != null
                                 ? $"""Plugin '{info.PluginName}': {attributeName} set to "{attributeValue}"."""
                                 : $"Plugin '{info.PluginName}': {attributeName} unset." );
