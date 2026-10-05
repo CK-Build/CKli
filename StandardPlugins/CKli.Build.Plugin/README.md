@@ -374,8 +374,8 @@ Four things this view does deliberately:
   repository lists form one straight column down the report. A `TextBlock` trims its content, so that padding
   is a right margin and never trailing spaces.
 - **No pivot marker, and the names are inline.** The grouping is about packages, not about where a repository
-  sits in the graph. Each name keeps its link to the working folder (`Repo.ToLinkedNameRenderable`, the inner
-  half of the shared [repository row](#the-repository-row-one-rendering-two-commands)), and the branch creation
+  sits in the graph. Each name keeps its link to the working folder (`Repo.ToLinkedNameRenderable`, the innermost
+  part of the shared [repository row](#the-repository-row-one-rendering-two-commands)), and the branch creation
   note - a property of a repository, not of a package - is said once at the end instead of under every package
   that repository appears in.
 - **The list of names is a `FlowContent`, not a row of cells.** A package that 60 repositories reference breaks
@@ -489,7 +489,7 @@ than with two implementations that agree today:
 | Piece | Where it lives | What it says |
 |---|---|---|
 | The pivot marker | `HotGraph.Solution.ToPivotPrefixRenderable` (`CKli.HotZone.Plugin`) | How the repository relates to the [pivots](#the-roadmap-computing-what-to-build). |
-| The name | `Repo.ToNameRenderable` (`CKli.Core`) | The `DisplayPath`, linked to the working folder, preceded by `✱` when the repository is dirty. |
+| The name | `Repo.ToNameRenderable` (`CKli.Core`) | The `DisplayPath`, linked to the working folder, preceded by `✱` when the repository is dirty. Its inner half, `Repo.ToInlineNameRenderable`, is the same without the alignment gutter, for inline lists of repositories. |
 
 The marker has nine cases, all exactly **3 columns wide** - so a column of them aligns with no table layout
 involved - and it is displayed only when `HotGraph.HasPivots` is true. When it is false every repository is

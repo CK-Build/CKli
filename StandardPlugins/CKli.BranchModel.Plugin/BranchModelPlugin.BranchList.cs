@@ -115,23 +115,23 @@ public sealed partial class BranchModelPlugin
     {
         int fastForwards = 0;
         int merges = 0;
-        var conflicts = new List<string>();
-        var unknowns = new List<string>();
+        var conflicts = new List<Repo>();
+        var unknowns = new List<Repo>();
         foreach( var info in infos )
         {
             switch( predict( info ) )
             {
                 case MergeOutcome.FastForward: ++fastForwards; break;
                 case MergeOutcome.Merge: ++merges; break;
-                case MergeOutcome.Conflict: conflicts.Add( info.Repo.DisplayPath.Path ); break;
-                case MergeOutcome.Failed: unknowns.Add( info.Repo.DisplayPath.Path ); break;
+                case MergeOutcome.Conflict: conflicts.Add( info.Repo ); break;
+                case MergeOutcome.Failed: unknowns.Add( info.Repo ); break;
             }
         }
         var parts = new List<IRenderable>();
         if( fastForwards > 0 ) parts.Add( s.Text( fastForwards == 1 ? "1 fast-forward" : $"{fastForwards} fast-forwards", ConsoleColor.DarkGray ) );
         if( merges > 0 ) parts.Add( s.Text( merges == 1 ? "1 merge" : $"{merges} merges", ConsoleColor.DarkGray ) );
-        if( conflicts.Count > 0 ) parts.Add( s.Text( $"{(conflicts.Count == 1 ? "1 conflict" : $"{conflicts.Count} conflicts")} ({conflicts.Concatenate( ", " )})", ConsoleColor.Red ) );
-        if( unknowns.Count > 0 ) parts.Add( s.Text( $"{unknowns.Count} unknown ({unknowns.Concatenate( ", " )})", ConsoleColor.Yellow ) );
+        if( conflicts.Count > 0 ) parts.Add( RepoList( s, conflicts.Count == 1 ? "1 conflict" : $"{conflicts.Count} conflicts", conflicts, ConsoleColor.Red ) );
+        if( unknowns.Count > 0 ) parts.Add( RepoList( s, $"{unknowns.Count} unknown", unknowns, ConsoleColor.Yellow ) );
         if( parts.Count == 0 )
         {
             return null;
@@ -143,6 +143,19 @@ public sealed partial class BranchModelPlugin
             line = line.AddRight( s.Text( ",", ConsoleColor.DarkGray ), parts[i].Box( marginLeft: 1 ) );
         }
         return line;
+
+        // "<label> (<repo>, <repo>)": the repositories are linked and show their dirty marker, since a dirty
+        // working folder may be the cause of the outcome.
+        static IRenderable RepoList( ScreenType s, string label, List<Repo> repos, ConsoleColor color )
+        {
+            var style = new TextStyle( color );
+            IRenderable list = s.Text( label + " (", color ).AddRight( repos[0].ToInlineNameRenderable( s, style ) );
+            for( int i = 1; i < repos.Count; ++i )
+            {
+                list = list.AddRight( s.Text( ",", color ), repos[i].ToInlineNameRenderable( s, style ).Box( marginLeft: 1 ) );
+            }
+            return list.AddRight( s.Text( ")", color ) );
+        }
     }
 
     /// <summary>

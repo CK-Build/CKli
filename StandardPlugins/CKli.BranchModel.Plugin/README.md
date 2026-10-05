@@ -345,11 +345,12 @@ repository is up to date (nothing to merge: nothing is shown), a **fast-forward*
 (`PackageVersionMerge`, with the resolver from the `HotGraph` of the branch that receives the merge, requested
 once per branch when a merge first conflicts): it is a merge. When the `HotGraph` cannot be obtained (a World
 with issues, a solution that cannot be read), the errors that explain it are displayed once, followed by a
-single warning for the branch, and its conflicts stay conflicts. Conflicts are the only outcome that needs
-someone, so they are the only one that names its repositories (in red); **unknown** ones (yellow) are where the
-merge cannot be computed, typically because the commit to integrate cannot be found: a Regular or CI link
-without an `ITagCommitProvider`, or a repository whose version tags have issues (the errors of the
-`ITagCommitProvider` say which, and `ckli issue` reports them).
+single warning for the branch, and its conflicts stay conflicts. Conflicts need someone, so they name their
+repositories (in red); so do the **unknown** ones (yellow), where the merge cannot be computed, typically
+because the commit to integrate cannot be found: a Regular or CI link without an `ITagCommitProvider`, or a
+repository whose version tags have issues (the errors of the `ITagCommitProvider` say which, and `ckli issue`
+reports them). These names are `Repo.ToInlineNameRenderable`: linked to the working folder and preceded by `✱`
+when the repository is dirty, since a dirty working folder may be why its merge conflicts.
 
 - **`--link` changes the `↘` lines only.** It predicts the synchronizations with that link type instead of each
   branch's configured one, exactly like `branch sync --link`, and it cannot be `Manual`. A close doesn't
