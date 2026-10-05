@@ -537,6 +537,26 @@ been computed and is not a dry-run:
   `CancellationTokenSource`, linked to the caller's. The requests queued at that moment still get a monitor, since
   their task has to complete, but they end at once without logging a start. See
   [`build --focus`](#build---focus-working-in-a-pivot-and-its-upstreams).
+- **Each build displays its outcome as one row** (`DisplayOutcome`), as soon as it completes: the repository
+  (`Repo.ToInlineNameRenderable`: linked, with its `✱` dirty marker), the target `⏚/vX` and either the number of
+  produced packages (`built: 3 packages.`, or `already built:` for a skipped build) or `build failed.`, followed by
+  the warnings and errors of that build:
+  ```
+   i  Core/Basic/CK-Monitoring ⏚/v27.1.0-mike.0.ci.3 built: 2 packages.
+   E  ✱ Misc/CK-Mailer ⏚/v14.0.0-juliet.0.ci.8 build failed.
+       E  Dotnet build fails for 'Misc/CK-Mailer'.
+  ```
+  The build's monitor (a pool monitor, or the command's one for a single build) carries the
+  `ScreenType.NoScreenTag` while it builds and its warnings and errors are collected (`CollectEntries`): the
+  screen logger doesn't echo them on their own, the row displays them. This holds for every failure, wherever it
+  comes from (branch, dependency update, `RepoBuilder`, a fake build). A build stopped by `--focus` or the
+  cancellation, which fails without an error, displays nothing, and so does a build that never starts because one
+  of its requirements failed.
+- **The rows come in the roadmap order** (the `BuildNumber`), not in the completion order: a completed build's row
+  waits until every previous build is done, so the output is deterministic and matches the roadmap above it. A
+  build that never starts tells the run loop so (`OnRequirementFailed` writes its `Roadmap.BuildInfo` to the
+  channel): the following rows don't wait for it. This cannot block, since the requirements of a build have lower
+  `BuildNumber`s; the price is that a slow build holds back the rows of the builds that complete after it.
 - Per-solution build (`DoBuildAsync`) does, for the target repo: ensure/checkout the right branch (`dev/` for CI builds,
   or integrate `dev/` into the regular branch first for non-CI builds), handle a possible version-tag clash on the same
   commit (creates an empty commit when needed so the new version has its own commit), rewrite package references via

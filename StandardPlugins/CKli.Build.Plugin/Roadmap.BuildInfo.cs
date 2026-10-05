@@ -181,7 +181,12 @@ public sealed partial class Roadmap
                 BuildResult?[] req = await Task.WhenAll( all ).ConfigureAwait( false );
                 foreach( var r in req )
                 {
-                    if( r == null ) return null;
+                    if( r == null )
+                    {
+                        // This build will never request a monitor: the executor must know it.
+                        builder.OnRequirementFailed( this );
+                        return null;
+                    }
                 }
             }
             // Building requirements succeed: running this build.

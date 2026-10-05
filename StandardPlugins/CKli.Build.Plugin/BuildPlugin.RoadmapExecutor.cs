@@ -4,6 +4,7 @@ using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using LibGit2Sharp;
+using LogLevel = CK.Core.LogLevel;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -76,7 +77,15 @@ public sealed partial class BuildPlugin
                 {
                     var s = _roadmap.OrderedSolutions.Single( s => s.MustBuild );
                     Throw.DebugAssert( !s.BuildInfo.DirectRequirements.Any( s => s.MustBuild ) );
-                    var r = await DoBuildAsync( monitor, s.BuildInfo );
+                    // The warnings and errors of the build are displayed with its outcome (see DisplayOutcome).
+                    BuildResult? r;
+                    IReadOnlyList<ActivityMonitorSimpleCollector.Entry> entries;
+                    using( monitor.TemporarilySetAutoTags( ScreenType.NoScreenTag, SetOperation.Union ) )
+                    using( monitor.CollectEntries( out entries, LogLevelFilter.Warn ) )
+                    {
+                        r = await DoBuildAsync( monitor, s.BuildInfo );
+                    }
+                    DisplayOutcome( s.BuildInfo, r, entries );
                     result = r != null
                                 ? s.BuildInfo.SetSingleBuildResult( r )
                                 : null;
@@ -90,7 +99,7 @@ public sealed partial class BuildPlugin
                     if( _stopped )
                     {
                         Throw.DebugAssert( result == null );
-                        monitor.Info( ScreenType.CKliScreenTag,
+                        monitor.Info( ScreenType.ScreenTag,
                                       $"Stopped after the first failure ('--focus'): {_roadmap.SolutionBuildCount - _startedCount} of {_roadmap.SolutionBuildCount} builds were not started." );
                     }
                 }
@@ -133,6 +142,25 @@ public sealed partial class BuildPlugin
                 // Counts the builds that have started: this is the "n°k" of the "Building roadmap n°k/N" log.
                 // The BuildNumber is the roadmap order, and the builds don't start in that order.
                 int dispatchCount = 0;
+                // The outcomes are displayed in the roadmap order (the BuildNumber), as soon as all the previous
+                // builds are done: a completed build (its released MonitorRequest) or a build that will never
+                // start (its Roadmap.BuildInfo, see OnRequirementFailed). This never waits for a build that
+                // cannot complete: the requirements of a build have lower BuildNumbers.
+                var done = new object?[_roadmap.SolutionBuildCount];
+                int nextOutcome = 0;
+                void SetDone( Roadmap.BuildInfo build, object doneMarker )
+                {
+                    Throw.DebugAssert( done[build.Solution.BuildNumber - 1] == null );
+                    done[build.Solution.BuildNumber - 1] = doneMarker;
+                    while( nextOutcome < done.Length && done[nextOutcome] != null )
+                    {
+                        if( done[nextOutcome] is MonitorRequest r )
+                        {
+                            DisplayOutcome( r.Build, r.BuildResult, r.Entries );
+                        }
+                        ++nextOutcome;
+                    }
+                }
                 _ = WaitForTerminationAsync();
                 for(; ; )
                 {
@@ -147,11 +175,17 @@ public sealed partial class BuildPlugin
                             // There SHOULD never be any pending requests here: all tasks have been completed,
                             // they have released their monitor.
                             Throw.DebugAssert( waiting.Count == 0 );
+                            Throw.DebugAssert( "Every build is done.", nextOutcome == done.Length );
                             while( monitorPool.TryDequeue( out var m ) )
                             {
                                 m.MonitorEnd();
                             }
                             return (results.All( r => r != null ) ? results : null)!;
+                        }
+                        if( msg is Roadmap.BuildInfo skipped )
+                        {
+                            SetDone( skipped, skipped );
+                            continue;
                         }
                         Throw.DebugAssert( msg is MonitorRequest );
                         var req = (MonitorRequest)msg;
@@ -161,10 +195,11 @@ public sealed partial class BuildPlugin
                         }
                         else
                         {
-                            // On a null BuildResult, the error message must have been emitted by the build itself (rather than a generic message here).
+                            // On a null BuildResult, the error message must have been emitted by the build itself (rather than a
+                            // generic message here): DisplayOutcome displays it.
                             if( req.BuildResult != null )
                             {
-                                monitor.Info( ScreenType.CKliScreenTag, $"Build '{req.Build.Solution.Repo.DisplayPath}' succeed." );
+                                monitor.Info( $"Build '{req.Build.Solution.Repo.DisplayPath}' succeed." );
                             }
                             else if( _roadmap.IsFocus && !_stop.IsCancellationRequested )
                             {
@@ -172,6 +207,7 @@ public sealed partial class BuildPlugin
                                 _stopped = true;
                                 _stop.Cancel();
                             }
+                            SetDone( req.Build, req );
                             if( _pendingPriorityBuilds > 0 && GetPriorityClass( req.Build ) == 0 )
                             {
                                 --_pendingPriorityBuilds;
@@ -191,6 +227,8 @@ public sealed partial class BuildPlugin
                         {
                             if( monitorCount == _maxDoP ) break;
                             available = new ActivityMonitor( $"Build Agent n°{++monitorCount}." );
+                            // The warnings and errors of a build are displayed with its outcome (see DisplayOutcome).
+                            available.AutoTags = ScreenType.NoScreenTag;
                         }
                         waiting.Dequeue();
                         // Once stopped, a request still needs its monitor to complete, but it will not build.
@@ -260,6 +298,8 @@ public sealed partial class BuildPlugin
 
             public BuildResult? BuildResult => _buildResult;
 
+            public IReadOnlyList<ActivityMonitorSimpleCollector.Entry> Entries { get; private set; } = [];
+
             public void SetMonitor( IActivityMonitor monitor, IActivityMonitor available, int dispatchNumber )
             {
                 if( dispatchNumber > 0 )
@@ -269,11 +309,22 @@ public sealed partial class BuildPlugin
                 _initialize.SetResult( available );
             }
 
-            public void Release( BuildResult? result )
+            public void Release( BuildResult? result, IReadOnlyList<ActivityMonitorSimpleCollector.Entry> entries )
             {
                 _buildResult = result;
+                Entries = entries;
                 _writer.TryWrite( this );
             }
+        }
+
+        /// <summary>
+        /// Called by a build that will never start because one of its requirements failed: its outcome is not
+        /// displayed, but the following ones must not wait for it.
+        /// </summary>
+        internal void OnRequirementFailed( Roadmap.BuildInfo buildInfo )
+        {
+            Throw.DebugAssert( !_singleBuild );
+            _channel.Writer.TryWrite( buildInfo );
         }
 
         internal async Task<BuildResult?> ParallelBuildAsync( Roadmap.BuildInfo buildInfo )
@@ -285,17 +336,62 @@ public sealed partial class BuildPlugin
 
             // Actual build.
             BuildResult? result = null;
-            try
+            IReadOnlyList<ActivityMonitorSimpleCollector.Entry> entries;
+            using( monitor.CollectEntries( out entries, LogLevelFilter.Warn ) )
             {
-                result = await DoBuildAsync( monitor, buildInfo );
-            }
-            catch( Exception ex )
-            {
-                monitor.Error( $"Error while building '{buildInfo.Solution}'.", ex );
+                try
+                {
+                    result = await DoBuildAsync( monitor, buildInfo );
+                }
+                catch( Exception ex )
+                {
+                    monitor.Error( $"Error while building '{buildInfo.Solution}'.", ex );
+                }
             }
             // Returning the monitor to the pool (and handling centralized success/failure of builds).
-            request.Release( result );
+            request.Release( result, entries );
             return result;
+        }
+
+        /// <summary>
+        /// Displays the outcome of a build: the repository (linked, with its dirty marker), the target version and
+        /// the produced package count or the failure, followed by the warnings and errors of the build. The build's
+        /// monitor carries the <see cref="ScreenType.NoScreenTag"/>: they are not displayed elsewhere.
+        /// <para>
+        /// A build that failed without an error has been stopped (by "--focus" or the cancellation): it has
+        /// nothing to say.
+        /// </para>
+        /// </summary>
+        void DisplayOutcome( Roadmap.BuildInfo build, BuildResult? result, IReadOnlyList<ActivityMonitorSimpleCollector.Entry> entries )
+        {
+            if( result == null
+                && _cancellation.IsCancellationRequested
+                && !entries.Any( e => e.MaskedLevel >= LogLevel.Error ) )
+            {
+                return;
+            }
+            var screen = _context.Screen;
+            var s = screen.ScreenType;
+            IRenderable outcome;
+            if( result == null )
+            {
+                outcome = s.Text( $"⏚/v{build.TargetVersion}", ConsoleColor.Red ).Box( marginLeft: 1 )
+                           .AddRight( s.Text( "build failed.", ConsoleColor.Red ).Box( marginLeft: 1 ) );
+            }
+            else
+            {
+                int count = result.Content.Produced.Length;
+                var packages = count switch { 0 => "no package", 1 => "1 package", _ => $"{count} packages" };
+                outcome = s.Text( $"⏚/v{build.TargetVersion}", ConsoleColor.Green ).Box( marginLeft: 1 )
+                           .AddRight( s.Text( $"{(result.SkippedBuild ? "already built" : "built")}: {packages}." ).Box( marginLeft: 1 ) );
+            }
+            IRenderable display = s.CreateLog( result == null ? LogLevel.Error : LogLevel.Info,
+                                               build.Solution.Repo.ToInlineNameRenderable( s, TextStyle.None ).AddRight( outcome ) );
+            if( entries.Count > 0 )
+            {
+                display = display.AddBelow( entries.Select( e => s.CreateLog( e.MaskedLevel, e.Text ).Box( marginLeft: 4 ) ) );
+            }
+            screen.Display( display );
         }
 
         // This doesn't catch exception. When called with a true _singleBuild, this is a unhandled
