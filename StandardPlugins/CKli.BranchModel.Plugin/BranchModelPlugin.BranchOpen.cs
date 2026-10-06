@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using CKli.ShallowSolution.Plugin;
 using System;
 using System.Linq;
 
@@ -8,31 +9,39 @@ namespace CKli.BranchModel.Plugin;
 public sealed partial class BranchModelPlugin
 {
     /// <summary>
-    /// Opens a Conformant SVersion branch.
+    /// Implements "ckli branch open" (the command is handled by the HotZone plugin, that provides the
+    /// <paramref name="versionResolver"/>): opens a Conformant SVersion branch, or updates the link type of an opened
+    /// one, in the repositories of the current directory (see <see cref="HotBranch.OpenOrPredict"/>).
+    /// <para>
+    /// Only the opened branch and its closest existing parent matter: a repository where one of them has an issue is
+    /// skipped and fails the command, the other ones are still opened. A failed command doesn't save the branch model:
+    /// running it again once the failures are fixed completes the open (the branches already created are kept).
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="context">The minimal context.</param>
     /// <param name="branchName">The branch name to open.</param>
+    /// <param name="link">
+    /// Optional link type (Manual, Regular, CI or Full) to the parent branch. Defaults to CI for a new branch: an already
+    /// opened branch keeps its current link type.
+    /// </param>
     /// <param name="parent">Parent branch to consider instead of the currently checked out branch (applies only to 'explo/' branch).</param>
+    /// <param name="versionResolver">
+    /// Optional provider of the resolver of the package versions that conflict (see <see cref="HotBranch.Synchronize"/>).
+    /// It receives the opened branch.
+    /// </param>
+    /// <param name="dryRun">
+    /// True to only display what the open would do: nothing is created nor merged and the branch model is not changed.
+    /// This returns what the open would return: false when a merge would be left in progress or when it would fail.
+    /// </param>
     /// <returns>True on success, false on error.</returns>
-    [Description( """
-        Opens a Conformant SVersion branch if it doesn't already exist.
-        - For prerelease branches ('alpha', 'bravo', 'charlie', ...'zulu'), the parent branch is based on the lexicographic order.
-        - For exploratory branches ('explo/name'), the parent is the currently checked out branch (unless --parent option specifies it). 
-        """ )]
-    [CommandPath( "branch open" )]
-    public bool BranchOpen( IActivityMonitor monitor,
+    public bool OpenBranch( IActivityMonitor monitor,
                             CKliEnv context,
-                            [Description( "Branch name to open." )]
                             string branchName,
-                            [Description( """
-                                Specifies the link (Manual, Regular, CI or Full) to the parent branch.
-                                Defaults to CI for a new branch: an already opened branch keeps its current link type.
-                                """ )]
-                            [OptionName( "--link,-l" )]
-                            string? link = null,
-                            [Description( "Parent branch to consider instead of the currently checked out branch (applies only to 'explo/' branch)." )]
-                            string? parent = null )
+                            string? link,
+                            string? parent,
+                            Func<IActivityMonitor, BranchName, IPackageVersionResolver?>? versionResolver,
+                            bool dryRun = false )
     {
         var repos = World.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
         if( repos == null ) return false;
@@ -46,8 +55,8 @@ public sealed partial class BranchModelPlugin
         // We can have a git branch and/or a BranchName: we must not rely here on any kind of synchronization
         // between these 2 aspects.
 
-        // First, handle the branch namespace because it is a immutable model. The namespace will be updated
-        // only if git branch manipulations/synchronizations below work.
+        // First, handle the branch namespace because it is a immutable model. The namespace is saved only if
+        // the git branches have been handled.
         if( !BranchName.TryParseBranchName( monitor, branchName, out CSVersionKind csPrerelease ) )
         {
             return false;
@@ -95,33 +104,43 @@ public sealed partial class BranchModelPlugin
         if( namespaceChanged )
         {
             var added = ns.Branches.Length > _namespace.Branches.Length;
+            var change = dryRun
+                            ? (added ? "Would add new" : "Would update")
+                            : (added ? "Added new" : "Updated");
             monitor.Info( ScreenType.ScreenTag, $"""
-                {(added ? "Added new" : "Updated")} branch model:
+                {change} branch model:
                 {newBranch.ToParentedString()}
                 """ );
         }
-        // To handle git branches, we create a brand new BranchModelInfo (with its HotBranches) that
-        // is driven by the new namespace.
-        foreach( var repo in repos )
+        Func<IActivityMonitor, IPackageVersionResolver?>? resolver = versionResolver != null
+                                                                        ? m => versionResolver( m, newBranch )
+                                                                        : null;
+        // To handle git branches, we create brand new BranchModelInfo (with their HotBranches) that
+        // are driven by the new namespace.
+        var infos = GetInfos( monitor, repos, ns );
+        if( infos == null ) return false;
+        var report = new BranchMergeReport( dryRun, prepareMerges: resolver != null );
+        bool success = OpenOrPredict( monitor, infos, newBranch, resolver, report, $"opening '{newBranch.Name}'" );
+        report.Display( context.Screen );
+        return success && (!namespaceChanged || dryRun || SaveBranchNamespace( monitor, ns ));
+    }
+
+    // Opens the branch in each repository ("ckli branch open" and "ckli branch switch --create"): a repository where the
+    // branch or its closest existing parent has an issue is skipped and fails, the other ones are still opened.
+    static bool OpenOrPredict( IActivityMonitor monitor,
+                               BranchModelInfo[] infos,
+                               BranchName branch,
+                               Func<IActivityMonitor, IPackageVersionResolver?>? resolver,
+                               BranchMergeReport report,
+                               string before )
+    {
+        bool success = true;
+        foreach( var info in infos )
         {
-            var info = CreateBranchModelInfo( monitor, repo, ns, _autoFixDevBranch );
-            if( info == null ) return false;
-            if( info.HasIssue )
-            {
-                monitor.Error( $"Please fix any issue in '{repo.DisplayPath}' before opening a new branch." );
-                return false;
-            }
-            var b = info.Branches[newBranch.Index];
-            // Since we explicitly open the branch here:
-            // - We want the "dev/" to exist (and be checked out).
-            // - We want the branch to be synchronized (according to its LinkType).
-            if( !b.EnsureExists( monitor ) ) return false;
-            b.EnsureDevBranch();
-            if( !b.Synchronize( monitor ) ) return false;
-            if( !repo.GitRepository.Checkout( monitor, b.GitDevBranch ) ) return false;
+            var b = info.Branches[branch.Index];
+            success &= b.CheckNoIssue( monitor, before ) && b.OpenOrPredict( monitor, resolver, report );
         }
-        // Everything went fine: save the updated namespace if needed.
-        return !namespaceChanged || SaveBranchNamespace( monitor, ns );
+        return success;
     }
 
     static bool ParseLink( IActivityMonitor monitor, string? link, bool allowManual, out BranchLinkType linkType )

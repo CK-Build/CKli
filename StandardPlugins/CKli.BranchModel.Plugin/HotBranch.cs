@@ -583,6 +583,103 @@ public sealed class HotBranch
         return true;
     }
 
+    /// <summary>
+    /// Opens this branch: creates it at its start commit if it doesn't exist (see <see cref="EnsureExists"/>), ensures its
+    /// "dev/" branch, synchronizes it (see <see cref="Synchronize"/>) and checks out the "dev/" branch.
+    /// <para>
+    /// A created branch starts at the commit that its link propagates: its synchronization has nothing to merge. Only an
+    /// already opened branch can have something to merge. The root branch, that must exist, is synchronized with its
+    /// remote only.
+    /// </para>
+    /// <para>
+    /// In a dry run, nothing is changed: a missing branch is a creation, an existing one is predicted
+    /// (see <see cref="PredictSynchronize"/>).
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="versionResolver">Optional provider of the resolver of the package versions that conflict.</param>
+    /// <param name="report">The report that collects the merges.</param>
+    /// <returns>True on success, false on error.</returns>
+    internal bool OpenOrPredict( IActivityMonitor monitor,
+                                 Func<IActivityMonitor, IPackageVersionResolver?>? versionResolver,
+                                 BranchMergeReport report )
+    {
+        if( report.DryRun )
+        {
+            if( Exists ) return SynchronizeOrPredict( monitor, BranchLinkType.None, versionResolver, report );
+            // The creation fails when its start commit cannot be obtained.
+            if( GetStartCommit( monitor ) == null ) return report.OnPrediction( MergeOutcome.Failed, null );
+            report.OnCreationPrediction();
+            return true;
+        }
+        if( !EnsureExists( monitor ) ) return false;
+        // The work goes on in the "dev/" branch.
+        EnsureDevBranch();
+        return SynchronizeOrPredict( monitor, BranchLinkType.None, versionResolver, report )
+               && Repo.GitRepository.Checkout( monitor, _gitDevBranch! );
+    }
+
+    /// <summary>
+    /// Synchronizes this existing branch (see <see cref="Synchronize"/>) or, in a dry run, predicts it
+    /// (see <see cref="PredictSynchronize"/>).
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="applyLink">Optional link type to consider. By default, this configured <see cref="BranchName.LinkType"/> is considered.</param>
+    /// <param name="versionResolver">Optional provider of the resolver of the package versions that conflict.</param>
+    /// <param name="report">The report that collects the merges.</param>
+    /// <returns>True on success, false on error.</returns>
+    internal bool SynchronizeOrPredict( IActivityMonitor monitor,
+                                        BranchLinkType applyLink,
+                                        Func<IActivityMonitor, IPackageVersionResolver?>? versionResolver,
+                                        BranchMergeReport report )
+    {
+        return report.DryRun
+                ? report.OnPrediction( PredictSynchronize( monitor, applyLink, versionResolver, out var conflict ), conflict )
+                : Synchronize( monitor, applyLink, versionResolver, report.OnPreparedMerge );
+    }
+
+    /// <summary>
+    /// Closes this existing branch (see <see cref="Close"/>) or, in a dry run, predicts it (see <see cref="PredictClose"/>).
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="versionResolver">Optional provider of the resolver of the package versions that conflict (the parent's one).</param>
+    /// <param name="report">The report that collects the merges.</param>
+    /// <returns>True on success, false on error.</returns>
+    internal bool CloseOrPredict( IActivityMonitor monitor,
+                                  Func<IActivityMonitor, IPackageVersionResolver?>? versionResolver,
+                                  BranchMergeReport report )
+    {
+        return report.DryRun
+                ? report.OnPrediction( PredictClose( monitor, versionResolver, out var conflict ), conflict )
+                : Close( monitor, versionResolver, report.OnPreparedMerge );
+    }
+
+    /// <summary>
+    /// Checks that neither this branch nor its closest existing parent (the one it is created from, synchronized with
+    /// and closed into; the root has none) has an issue: the issues of the other branches don't matter. Errors are logged.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="before">What cannot be done: "before {before}." ends the error.</param>
+    /// <returns>True when there is no issue, false otherwise.</returns>
+    internal bool CheckNoIssue( IActivityMonitor monitor, string before )
+    {
+        HotBranch? closest = null;
+        if( _name.Parent != null )
+        {
+            closest = _info.GetRequiredClosestExistingBranch( monitor, _name.Parent );
+            if( closest == null ) return false;
+        }
+        if( HasIssue() || (closest != null && closest.HasIssue()) )
+        {
+            var which = closest != null
+                            ? $"the '{_name.Name}' or '{closest.BranchName.Name}' branch issue"
+                            : $"the '{_name.Name}' branch issue";
+            monitor.Error( $"Please fix {which} in '{Repo.DisplayPath}' before {before}." );
+            return false;
+        }
+        return true;
+    }
+
     // Merges "other" into the "target" branch: nothing when the target already contains it, a fast-forward, or a merge
     // commit (no empty one: see GitRepository.MergeBranchContent). A merge commit is where the package versions may
     // conflict: with a resolver, they are aligned (see PackageVersionMerge) and, when other conflicts remain, the merge

@@ -2,7 +2,7 @@ using CK.Core;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using System;
-using System.Collections.Generic;
+using System.Linq;
 
 namespace CKli.BranchModel.Plugin;
 
@@ -12,8 +12,9 @@ public sealed partial class BranchModelPlugin
     /// Implements "ckli branch sync" (the command is handled by the HotZone plugin, that provides the
     /// <paramref name="versionResolver"/>): synchronizes the specified branch with its closest parent branch.
     /// <para>
-    /// A repository with issues is skipped and fails the command; the other ones are still synchronized. When the branch
-    /// (or its "dev/") was checked out, its "dev/" branch is checked out afterwards.
+    /// A missing root branch fails the command before anything is done. Only the branch and its closest existing parent
+    /// matter: a repository where one of them has an issue is skipped and fails the command; the other ones are still
+    /// synchronized. When the branch (or its "dev/") was checked out, its "dev/" branch is checked out afterwards.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
@@ -48,58 +49,47 @@ public sealed partial class BranchModelPlugin
             return false;
         }
         Throw.DebugAssert( (branchName.LinkType is BranchLinkType.None) == branchName.IsRoot );
+        if( branchName.IsRoot && linkType != BranchLinkType.None )
+        {
+            monitor.Error( $"The root branch '{branchName}' has no parent: the --link option cannot be used." );
+            return false;
+        }
+        // Read before the BranchModelInfo exist: obtaining one can auto fix a useless "dev/" branch, which
+        // deletes it and checks out its base branch.
+        var checkedOut = repos.Select( r => r.GitRepository.CurrentBranchName ).ToArray();
+        var infos = GetInfos( monitor, repos );
+        if( infos == null ) return false;
         Func<IActivityMonitor, IPackageVersionResolver?>? resolver = versionResolver != null
                                                                         ? m => versionResolver( m, branchName )
                                                                         : null;
         bool success = true;
-        var preparedMerges = new List<PreparedMerge>();
-        var outcomes = new List<MergeOutcome>();
-        foreach( var repo in repos )
+        var report = new BranchMergeReport( dryRun, prepareMerges: resolver != null );
+        for( int i = 0; i < infos.Length; i++ )
         {
-            // Read before the BranchModelInfo exists: obtaining it can auto fix a useless "dev/" branch, which
-            // deletes it and checks out its base branch.
-            var checkedOut = repo.GitRepository.CurrentBranchName;
-            var info = GetWithoutIssue( monitor, repo, before: null );
-            if( info == null )
-            {
-                // A skipped repository is a failure: the branch has not been synchronized there.
-                monitor.Error( $"Repository '{repo.DisplayPath}' has issues: branch '{branchName}' has not been synchronized. Please fix them first." );
-                success = false;
-                continue;
-            }
-            var b = info.Branches[branchName.Index];
-            if( !b.Exists )
+            var b = infos[i].Branches[branchName.Index];
+            // A branch that doesn't exist has nothing to synchronize, unless its orphan "dev/" branch carries work:
+            // this is an issue.
+            if( !b.Exists && !b.HasOrphanDevBranch )
             {
                 continue;
             }
-            if( dryRun )
-            {
-                var outcome = b.PredictSynchronize( monitor, linkType, resolver, out var conflict );
-                outcomes.Add( outcome );
-                if( conflict != null ) preparedMerges.Add( conflict );
-                success &= outcome is not (MergeOutcome.Conflict or MergeOutcome.Failed);
-                continue;
-            }
-            if( !b.Synchronize( monitor, linkType, resolver, resolver != null ? preparedMerges.Add : null ) )
+            // A skipped repository is a failure: the branch has not been synchronized there.
+            if( !b.CheckNoIssue( monitor, $"synchronizing '{branchName}'" )
+                || !b.SynchronizeOrPredict( monitor, linkType, resolver, report ) )
             {
                 success = false;
                 continue;
             }
+            if( dryRun ) continue;
+            Throw.DebugAssert( "An orphan \"dev/\" branch is an issue.", b.Exists );
             // When the branch was checked out, its work goes on in its "dev/" branch if it exists (a merge may
             // have just created it): the next commit must not land on the base branch.
-            if( checkedOut == b.GitBranch.FriendlyName || checkedOut == b.GitDevBranch?.FriendlyName )
+            if( checkedOut[i] == b.GitBranch.FriendlyName || checkedOut[i] == b.GitDevBranch?.FriendlyName )
             {
-                success &= repo.GitRepository.Checkout( monitor, b.GitDevBranch ?? b.GitBranch );
+                success &= b.Repo.GitRepository.Checkout( monitor, b.GitDevBranch ?? b.GitBranch );
             }
         }
-        if( dryRun )
-        {
-            PreparedMerge.DisplayDryRun( context.Screen, outcomes, preparedMerges );
-        }
-        else
-        {
-            PreparedMerge.Display( context.Screen, preparedMerges );
-        }
+        report.Display( context.Screen );
         return success;
     }
 }

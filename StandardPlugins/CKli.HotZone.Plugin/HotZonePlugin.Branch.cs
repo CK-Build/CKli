@@ -7,11 +7,82 @@ using System.Collections.Generic;
 
 namespace CKli.HotZone.Plugin;
 
-// "ckli branch sync", "ckli branch close" and "ckli branch list" are implemented by the BranchModel plugin: they are handled here because
-// the package versions that conflict when merging a branch's link are resolved like a build of the branch would
-// update them, and that needs the branch's HotGraph.
+// "ckli branch open", "ckli branch switch", "ckli branch sync", "ckli branch close" and "ckli branch list" are implemented
+// by the BranchModel plugin: they are handled here because the package versions that conflict when merging a branch's
+// link are resolved like a build of the branch would update them, and that needs the branch's HotGraph.
 public sealed partial class HotZonePlugin
 {
+    /// <summary>
+    /// Switches the working folder to the specified branch, optionally opening it in the repositories.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The minimal CKli context.</param>
+    /// <param name="branch">The branch name to switch to.</param>
+    /// <param name="create">True to open the branch in the repositories where it doesn't exist and synchronize it.</param>
+    /// <param name="all">Consider all the Repos of the current World.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    [Description( """
+        Switch the working folder to the specified branch of the branch model, optionally opening it in the Repo.
+        Without --create, the branch (its "dev/" branch when it exists) or its closest existing branch is checked out.
+        With --create, the branch is opened like "ckli branch open" opens an already opened branch: created if needed,
+        synchronized with its parent and its "dev/" branch is checked out. The package versions that conflict are
+        resolved the way a build of the branch updates them; when other conflicts remain, the merge is left in progress.
+        """ )]
+    [CommandPath( "branch switch" )]
+    public bool BranchSwitch( IActivityMonitor monitor,
+                              CKliEnv context,
+                              [Description( "Branch name to checkout." )]
+                              string branch,
+                              [Description( "Open (create and synchronize) the branch, instead of switching to the closest existing one when it doesn't exist." )]
+                              [OptionName( "--create,-c" )]
+                              bool create = false,
+                              [Description( "Consider all the Repos of the current World (even if current path is in a Repo)." )]
+                              bool all = false )
+    {
+        return _branchModel.SwitchBranch( monitor, context, branch, create, all, CreateVersionResolverProvider() );
+    }
+
+    /// <summary>
+    /// Opens a Conformant SVersion branch, or updates the link type of an opened one, in the current repositories.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="context">The minimal context.</param>
+    /// <param name="branchName">The branch name to open.</param>
+    /// <param name="link">Optional link type (Manual, Regular, CI or Full) to the parent branch.</param>
+    /// <param name="parent">Parent branch to consider instead of the currently checked out branch (applies only to 'explo/' branch).</param>
+    /// <param name="dryRun">True to only display what the open would do.</param>
+    /// <returns>True on success, false on error.</returns>
+    [Description( """
+        Opens a Conformant SVersion branch if it doesn't already exist, and synchronizes it with its parent.
+        - For prerelease branches ('alpha', 'bravo', 'charlie', ...'zulu'), the parent branch is based on the lexicographic order.
+        - For exploratory branches ('explo/name'), the parent is the currently checked out branch (unless --parent option specifies it).
+        A new branch starts at the commit that its link propagates: only an already opened branch can have something to merge.
+        The package versions that conflict are resolved the way a build of the branch updates them. When other conflicts
+        remain, the merge is left in progress in the working folder (the "dev/" branch is checked out): resolve them and
+        commit the merge.
+        With --dry-run, nothing is created nor merged: what the open would do is displayed and the command fails when it
+        would fail (a merge would be left in progress, for instance).
+        """ )]
+    [CommandPath( "branch open" )]
+    public bool BranchOpen( IActivityMonitor monitor,
+                            CKliEnv context,
+                            [Description( "Branch name to open." )]
+                            string branchName,
+                            [Description( """
+                                Specifies the link (Manual, Regular, CI or Full) to the parent branch.
+                                Defaults to CI for a new branch: an already opened branch keeps its current link type.
+                                """ )]
+                            [OptionName( "--link,-l" )]
+                            string? link = null,
+                            [Description( "Parent branch to consider instead of the currently checked out branch (applies only to 'explo/' branch)." )]
+                            string? parent = null,
+                            [Description( "Displays what the open would do without creating nor merging anything." )]
+                            [OptionName( "--dry-run,-d" )]
+                            bool dryRun = false )
+    {
+        return _branchModel.OpenBranch( monitor, context, branchName, link, parent, CreateVersionResolverProvider(), dryRun );
+    }
+
     /// <summary>
     /// Synchronizes the specified branch with its closest parent branch.
     /// </summary>

@@ -69,11 +69,12 @@ calls it from `BuildPlugin.Fix.cs` before building a Fix Workflow.
 
 ## How: `branch sync` and `branch list`
 
-These commands, and `branch close`, are implemented by `CKli.BranchModel.Plugin` (`BranchModelPlugin.SynchronizeBranch`,
-`DisplayBranchList` and `CloseBranch`, documented in [its README](../CKli.BranchModel.Plugin/README.md#commands)) but
-handled here (`HotZonePlugin.Branch.cs`): a command is not tied to the plugin that implements its feature, and these
-ones need a `HotGraph`. `branch close` merges a branch into its parent: its versions are resolved with the parent's
-`HotGraph`, the branch that receives the merge.
+These commands, `branch open`, `branch switch` and `branch close`, are implemented by `CKli.BranchModel.Plugin`
+(`BranchModelPlugin.SynchronizeBranch`, `DisplayBranchList`, `OpenBranch`, `SwitchBranch` and `CloseBranch`, documented
+in [its README](../CKli.BranchModel.Plugin/README.md#commands)) but handled here (`HotZonePlugin.Branch.cs`): a command
+is not tied to the plugin that implements its feature, and these ones need a `HotGraph`. `branch open` and
+`branch switch --create` synchronize an already opened branch like `branch sync` does. `branch close` merges a branch into its parent: its versions are
+resolved with the parent's `HotGraph`, the branch that receives the merge.
 
 Two branches that are built independently both rewrite the references to the World's packages, so merging
 a parent's build into its child typically conflicts on the very same `<PackageReference Version="..." />`
@@ -100,7 +101,8 @@ fails until the merge is committed: the next `branch sync` then finds it up to d
 merges nothing: it computes the merges in the object database (`HotBranch.PredictSynchronize`, from the local
 branches: the merges of the remote branches depend on a fetch and are not predicted), displays a summary of their
 outcomes and the merges that would be left in progress, and returns what the synchronization would return - so
-that a script can test it. `branch close --dry-run` does the same with `HotBranch.PredictClose`, and `branch list`
+that a script can test it. `branch open --dry-run` does the same (a missing branch is counted as a creation),
+`branch close --dry-run` with `HotBranch.PredictClose`, and `branch list`
 displays both predictions for every branch, each one resolved with the `HotGraph` of the branch that receives the merge. The reading of the
 branch model is not inert, though: the `AutoFixDevBranch` repairs still happen. `branch close` prepares its merge the same way, on the parent's `dev/` branch: the
 branch stays opened until the merge is committed and the close is run again.
@@ -114,8 +116,10 @@ number of conflicts, above the paths in conflict.
 A merge is left in progress: resolve its conflicts and commit it (or abort it).
 > X-Core  ⎇ dev/sierra ← branch 'dev/stable'  1 conflict
 │ Conflict.txt
-``` These two commands and `ckli pull`/`ckli push` (see below) prepare merges: `branch open`,
-`branch switch --create` and the roadmap fail on a conflict.
+```
+
+`branch open`, `branch switch --create`, `branch sync`, `branch close` and `ckli pull`/`ckli push` (see below)
+prepare merges: the roadmap fails on a conflict.
 
 The roadmap doesn't need this: its `Synchronize` call (`BuildPlugin.RoadmapExecutor`) runs right after
 `EnsureExists` created the branch at its start commit, which is the link commit itself.

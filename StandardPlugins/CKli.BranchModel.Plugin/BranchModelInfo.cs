@@ -77,31 +77,47 @@ public sealed partial class BranchModelInfo : RepoInfo
 
     /// <summary>
     /// Gets the closest <see cref="HotBranch"/> with a non null <see cref="HotBranch.GitBranch"/> in the <see cref="Namespace"/>
-    /// that is not <see cref="HotBranch.HasOrphanDevBranch"/> or emits an error.
+    /// or emits an error when the root branch is missing or when a skipped branch <see cref="HotBranch.HasOrphanDevBranch"/>:
+    /// its "dev/" branch carries work that the closest existing branch doesn't have.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="name">The branch name from which the closest existing branch must be found.</param>
     /// <returns>The branch (that may be the <paramref name="name"/> one) or null.</returns>
     public HotBranch? GetRequiredClosestExistingBranch( IActivityMonitor monitor, BranchName name )
     {
+        if( !CheckRoot( monitor ) ) return null;
         var b = GetClosestExistingBranch( name );
-        if( b == null )
+        Throw.DebugAssert( "The root exists.", b != null );
+        // Stops on this issue because it will introduce an ambiguity. Every skipped branch is considered: an orphan
+        // "dev/" branch of a grand parent is as ambiguous as the parent's one (by design, b cannot have an orphan
+        // "dev/" branch because its GitBranch exists).
+        for( var skipped = _branches[name.Index]; skipped != b; skipped = skipped.Parent! )
         {
-            monitor.Error( $"Missing root '{_namespace.Root.Name}' branch in '{Repo.DisplayPath}'. Please create it or use 'ckli issue' to fix this." );
-            return null;
-        }
-        // Stops on this issue because it will introduce an ambiguity.
-        // This applies only to a "real" closest branch (by design, if b is the requested name branch, it cannot has an orphan dev
-        // branch because its GitBranch exists).
-        if( b.BranchName != name && _branches[name.Index].HasOrphanDevBranch )
-        {
-            monitor.Error( $"""
-                    Branch '{name.DevName}' in '{Repo.DisplayPath}' exists but its base '{name.Name}' branch doesn't exist.
-                    Use 'ckli issue --fix' to recreate it.
-                    """ );
-            return null;
+            if( skipped.HasOrphanDevBranch )
+            {
+                var n = skipped.BranchName;
+                monitor.Error( $"""
+                        Branch '{n.DevName}' in '{Repo.DisplayPath}' exists but its base '{n.Name}' branch doesn't exist.
+                        Use 'ckli issue --fix' to recreate it.
+                        """ );
+                return null;
+            }
         }
         return b;
+    }
+
+    /// <summary>
+    /// Checks that the root branch exists or emits an error. A missing root branch is the ultimate branch issue: the
+    /// <see cref="Branches"/> only contain the <see cref="Root"/> and nothing can be done in this repository until
+    /// "ckli issue --fix" solves it.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>True if the root branch exists, false otherwise.</returns>
+    public bool CheckRoot( IActivityMonitor monitor )
+    {
+        if( Root.GitBranch != null ) return true;
+        monitor.Error( $"Missing root '{_namespace.Root.Name}' branch in '{Repo.DisplayPath}'. Use 'ckli issue --fix' to fix this." );
+        return false;
     }
 
     internal ShallowSolutionPlugin ShallowSolutionPlugin => _plugin._shallowSolution;

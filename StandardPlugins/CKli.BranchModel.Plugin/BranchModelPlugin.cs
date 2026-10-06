@@ -239,6 +239,33 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     }
 
     /// <summary>
+    /// Gets the <see cref="BranchModelInfo"/> of the repositories that a branch command reads, indexed like them. A missing
+    /// root branch blocks the command: every repository without it is reported (see <see cref="BranchModelInfo.CheckRoot"/>)
+    /// and nothing is returned.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="repos">The repositories.</param>
+    /// <param name="ns">
+    /// Optional namespace that drives brand new infos instead of the cached ones of the current namespace (see
+    /// <see cref="OpenBranch"/>).
+    /// </param>
+    /// <returns>The infos or null if a root branch is missing.</returns>
+    BranchModelInfo[]? GetInfos( IActivityMonitor monitor, IReadOnlyList<Repo> repos, BranchNamespace? ns = null )
+    {
+        var infos = new BranchModelInfo[repos.Count];
+        bool success = true;
+        for( int i = 0; i < infos.Length; i++ )
+        {
+            var info = ns == null
+                        ? Get( monitor, repos[i] )
+                        : CreateBranchModelInfo( monitor, repos[i], ns, _autoFixDevBranch );
+            success &= info.CheckRoot( monitor );
+            infos[i] = info;
+        }
+        return success ? infos : null;
+    }
+
+    /// <summary>
     /// Tries to parse "fix/v<paramref name="major"/>.<paramref name="minor"/>".
     /// </summary>
     /// <param name="s">The name to parse.</param>

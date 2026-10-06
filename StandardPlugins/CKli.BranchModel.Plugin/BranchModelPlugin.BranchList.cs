@@ -27,7 +27,7 @@ public sealed partial class BranchModelPlugin
     /// package versions only is a merge, as it is for "ckli branch sync" and "ckli branch close". It receives the
     /// branch that the merge goes into and is called at most once per branch.
     /// </param>
-    /// <returns>True on success, false if the link is invalid or a solution cannot be read.</returns>
+    /// <returns>True on success, false if the link is invalid, a root branch is missing or a solution cannot be read.</returns>
     public bool DisplayBranchList( IActivityMonitor monitor,
                                    CKliEnv context,
                                    string? link,
@@ -39,7 +39,8 @@ public sealed partial class BranchModelPlugin
         }
         var repos = World.GetAllDefinedRepo( monitor );
         if( repos == null ) return false;
-        var infos = repos.Select( r => Get( monitor, r ) ).ToArray();
+        var infos = GetInfos( monitor, repos );
+        if( infos == null ) return false;
         var reader = new SolutionReader( _shallowSolution );
         var resolvers = new ResolverCache( versionResolver );
 

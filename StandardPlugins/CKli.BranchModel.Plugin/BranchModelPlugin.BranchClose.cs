@@ -69,24 +69,18 @@ public sealed partial class BranchModelPlugin
         var all = World.GetAllDefinedRepo( monitor );
         if( scope == null || all == null ) return false;
 
-        var infos = all.Select( r => Get( monitor, r ) ).ToArray();
+        var infos = GetInfos( monitor, all );
+        if( infos == null ) return false;
         var toClose = CollectBranchesToClose( monitor, all, infos, scope, b, out bool success );
         if( !success ) return false;
         foreach( var hb in toClose )
         {
             // Only the closed branch and the branch that receives it matter: any other branch (and its issues)
             // is irrelevant here.
-            var closest = hb.BranchModelInfo.GetRequiredClosestExistingBranch( monitor, b.Parent! );
-            if( closest == null ) return false;
-            if( hb.HasIssue() || closest.HasIssue() )
-            {
-                monitor.Error( $"Please fix the '{hb.BranchName.Name}' or '{closest.BranchName.Name}' branch issue in '{hb.Repo.DisplayPath}' before closing '{b.Name}'." );
-                success = false;
-            }
+            success &= hb.CheckNoIssue( monitor, $"closing '{b.Name}'" );
         }
         if( !success ) return false;
-        var preparedMerges = new List<PreparedMerge>();
-        var outcomes = new List<MergeOutcome>();
+        var report = new BranchMergeReport( dryRun, prepareMerges: versionResolver != null );
         foreach( var hb in toClose )
         {
             // A merge left in progress (or any failure) in a repository doesn't stop the others: the branch is still
@@ -95,25 +89,10 @@ public sealed partial class BranchModelPlugin
             Func<IActivityMonitor, IPackageVersionResolver?>? resolver = versionResolver != null
                                                                             ? m => versionResolver( m, parent )
                                                                             : null;
-            if( dryRun )
-            {
-                var outcome = hb.PredictClose( monitor, resolver, out var conflict );
-                outcomes.Add( outcome );
-                if( conflict != null ) preparedMerges.Add( conflict );
-                success &= outcome is not (MergeOutcome.Conflict or MergeOutcome.Failed);
-            }
-            else
-            {
-                success &= hb.Close( monitor, resolver, resolver != null ? preparedMerges.Add : null );
-            }
+            success &= hb.CloseOrPredict( monitor, resolver, report );
         }
-        if( dryRun )
-        {
-            PreparedMerge.DisplayDryRun( context.Screen, outcomes, preparedMerges );
-            return success;
-        }
-        PreparedMerge.Display( context.Screen, preparedMerges, closedBranch: b.Name );
-        if( !success ) return false;
+        report.Display( context.Screen, closedBranch: b.Name );
+        if( dryRun || !success ) return success;
         int stillOpened = infos.Count( i => i.Branches[b.Index].Exists );
         if( stillOpened > 0 )
         {
