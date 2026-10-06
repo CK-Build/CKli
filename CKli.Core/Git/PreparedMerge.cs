@@ -64,20 +64,22 @@ public sealed record PreparedMerge( Repo Repo, string TargetBranch, string Merge
     }
 
     /// <summary>
-    /// Displays the result of a dry run: the count of each outcome, the merges that would be left in progress and the
+    /// Displays the result of a dry run: the count of each action and outcome, the merges that would be left in progress and the
     /// ones that would not be merged.
     /// </summary>
     /// <param name="screen">The screen.</param>
     /// <param name="outcomes">The predicted outcomes, one per merge.</param>
     /// <param name="conflicts">The merges that would be left in progress.</param>
     /// <param name="notMerged">The merges that would conflict and not be merged.</param>
+    /// <param name="actions">The counts of the actions that are not merges ("2 creations"), displayed before the outcomes.</param>
     public static void DisplayDryRun( IScreen screen,
                                       IReadOnlyList<MergeOutcome> outcomes,
                                       IReadOnlyList<PreparedMerge> conflicts,
-                                      IReadOnlyList<PreparedMerge>? notMerged = null )
+                                      IReadOnlyList<PreparedMerge>? notMerged = null,
+                                      IEnumerable<string>? actions = null )
     {
         var s = screen.ScreenType;
-        var counts = new List<string>();
+        var counts = actions != null ? new List<string>( actions ) : new List<string>();
         Add( counts, outcomes, MergeOutcome.Merge, "merge", "merges" );
         Add( counts, outcomes, MergeOutcome.FastForward, "fast-forward", "fast-forwards" );
         Add( counts, outcomes, MergeOutcome.UpToDate, "up to date", "up to date" );
