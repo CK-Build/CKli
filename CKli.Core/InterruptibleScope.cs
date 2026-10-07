@@ -18,6 +18,10 @@ public sealed class InterruptibleScope : IDisposable
     static readonly Lock _lock = new Lock();
     static readonly CancellationTokenSource _termination = new CancellationTokenSource();
     static InterruptibleScope? _top;
+    // The registrations MUST be kept alive: a collected PosixSignalRegistration is finalized, which
+    // unregisters its handler and restores the default behavior (the process is killed on Ctrl+C).
+    static PosixSignalRegistration? _sigTerm;
+    static PosixSignalRegistration? _sigInt;
 
     readonly CancellationTokenSource _cancel;
     readonly InterruptibleScope? _prev;
@@ -34,9 +38,9 @@ public sealed class InterruptibleScope : IDisposable
         // Register for SIGTERM (Commonly sent by Docker/Kubernetes/systemd).
         // This is handled to guaranty that all existing InterruptibleScope are signaled
         // and no more InterruptibleScope can be created.
-        _ = PosixSignalRegistration.Create( PosixSignal.SIGTERM, HandleTerminationSignal );
+        _sigTerm ??= PosixSignalRegistration.Create( PosixSignal.SIGTERM, HandleTerminationSignal );
         // Register for SIGINT (Ctrl+C on Windows/Linux) to signal and pop the topmost handler.
-        _ = PosixSignalRegistration.Create( PosixSignal.SIGINT, HandleInterruptSignal );
+        _sigInt ??= PosixSignalRegistration.Create( PosixSignal.SIGINT, HandleInterruptSignal );
     }
 
     static void HandleTerminationSignal( PosixSignalContext context )
