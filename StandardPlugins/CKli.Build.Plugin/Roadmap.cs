@@ -34,6 +34,7 @@ public sealed partial class Roadmap
     readonly bool _dryRun;
     readonly bool _isPullBuild;
     readonly bool _focus;
+    readonly bool _stopAfterFocus;
     readonly ImmutableArray<BuildSolution> _orderedSolutions;
     readonly ImmutableArray<BuildSolution> _pivots;
     readonly BuildSolutionList _buildSolutions;
@@ -43,6 +44,7 @@ public sealed partial class Roadmap
     int _directPublishCount;
     PublishableStatus _publishable;
     bool? _buildSuccess;
+    bool _isStoppedAfterFocus;
 
     Roadmap( HotGraph graph,
              HotGraph.PackageUpdater packageUpdater,
@@ -50,13 +52,16 @@ public sealed partial class Roadmap
              CIBuildMode ciBuildMode,
              bool mustPublish,
              bool dryRun,
-             bool focus )
+             bool focus,
+             bool stopAfterFocus )
     {
         Throw.DebugAssert( "'--focus' is ignored without pivots.", !focus || graph.HasPivots );
+        Throw.DebugAssert( !stopAfterFocus || focus );
         _graph = graph;
         _packageUpdater = packageUpdater;
         _isPullBuild = isPullBuild;
         _focus = focus;
+        _stopAfterFocus = stopAfterFocus;
         _ciBuildMode = ciBuildMode;
         _mustPublish = mustPublish;
         _dryRun = dryRun;
@@ -88,7 +93,8 @@ public sealed partial class Roadmap
                                      CIBuildMode ciBuildMode,
                                      bool mustPublish,
                                      bool dryRun,
-                                     bool focus )
+                                     bool focus,
+                                     bool stopAfterFocus )
     {
 
         // Refactor this?...
@@ -113,7 +119,7 @@ public sealed partial class Roadmap
             var packageUpdater = graph.GetPackageUpdater( monitor, versionTag );
             if( packageUpdater == null ) return null;
 
-            roadmap = new Roadmap( graph, packageUpdater, isPullBuild, ciBuildMode, mustPublish, dryRun, focus );
+            roadmap = new Roadmap( graph, packageUpdater, isPullBuild, ciBuildMode, mustPublish, dryRun, focus, stopAfterFocus );
             if( !roadmap.Initialize( monitor ) )
             {
                 return null;
@@ -186,6 +192,18 @@ public sealed partial class Roadmap
     /// not skippable. Always false when <see cref="HotGraph.HasPivots"/> is false.
     /// </summary>
     public bool IsFocus => _focus;
+
+    /// <summary>
+    /// Gets whether this <see cref="IsFocus"/> build stops once the pivots and their upstreams are built: the
+    /// other builds don't start (this is the default, "--continue" builds them).
+    /// </summary>
+    public bool StopAfterFocus => _stopAfterFocus;
+
+    /// <summary>
+    /// Gets whether the build has stopped after the successful builds of the pivots and their upstreams
+    /// (see <see cref="StopAfterFocus"/>). This roadmap is not complete: <see cref="BuildSuccess"/> is not true.
+    /// </summary>
+    public bool IsStoppedAfterFocus => _isStoppedAfterFocus;
 
     /// <summary>
     /// Gets the package mapping.
@@ -315,6 +333,10 @@ public sealed partial class Roadmap
             _buildSuccess = true;
             ReportOutOfFocus( monitor );
         }
+        else if( _isStoppedAfterFocus = builder.IsStoppedAfterFocus )
+        {
+            ReportOutOfFocus( monitor );
+        }
         return result;
     }
 
@@ -342,6 +364,7 @@ public sealed partial class Roadmap
                             PublishableStatus publishableStatus,
                             int directPublishCount,
                             int ciForceCandidateCount,
+                            int afterFocusCount,
                             IEnumerable<BuildSolution> buildingPending )
     {
         IRenderable? _uDepHead;
@@ -435,6 +458,11 @@ public sealed partial class Roadmap
                         r = r.AddBelow( _dDepHead.AddRight( screen.Text( $"{DDepUpdates} update{(DDepUpdates > 1 ? "s" : "")} to fix external dependencies discrepancies." ) ) );
                     }
                 }
+                if( afterFocusCount > 0 )
+                {
+                    var what = afterFocusCount > 1 ? $"the {afterFocusCount} other builds" : "the other build";
+                    r = r.AddBelow( screen.Text( $"('--focus' stops before {what}: use '--continue' to build {(afterFocusCount > 1 ? "them" : "it")}.)", TextEffect.Italic ) );
+                }
             }
 
             if( isPublish && publishableStatus is PublishableStatus.BuildingPending )
@@ -475,6 +503,11 @@ public sealed partial class Roadmap
                                 // used it, and in non-CI mode a CI version is not what is being asked for.
                                 _ciBuildMode == CIBuildMode.CI
                                     ? _orderedSolutions.Count( s => s.IsCIForceCandidate )
+                                    : 0,
+                                // The builds that a "--focus" stops before: the ones that are neither a pivot nor
+                                // one of their upstreams (see RoadmapExecutor.GetPriorityClass).
+                                _stopAfterFocus
+                                    ? _orderedSolutions.Count( s => s.MustBuild && !s.Solution.IsPivot && !s.Solution.IsPivotUpstream )
                                     : 0,
                                 _buildSolutions.Where( s => s.PublishableStatus == PublishableStatus.BuildingPending ) );
         var renderables = ImmutableArray.CreateBuilder<IRenderable>( _orderedSolutions.Length );

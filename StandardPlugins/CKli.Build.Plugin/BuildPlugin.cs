@@ -54,6 +54,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     const string _dDryRun = "Only display the build roadmap.";
     const string _oDryRun = "--dry-run,-d";
     const string _oFocus = "--focus";
+    const string _oContinue = "--continue";
 
     readonly VersionTagPlugin _versionTag;
     readonly BranchModelPlugin _branchModel;
@@ -252,6 +253,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="dryRun"></param>
     /// <param name="all"></param>
     /// <param name="focus"></param>
+    /// <param name="continueOnSuccess"></param>
     /// <returns></returns>
     [Description( "Build-Test-Package and propagates packages from the current repositories to their consumers, keeping them local.",
                   Summary = "Build-Test-Package, keeping the produced packages local." )]
@@ -281,12 +283,24 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                   [Description( """
                                                 Focus on the current repositories: their upstreams that need a build are built too
                                                 (they are skipped otherwise), they are built before any other repository and the
-                                                build stops at the first failure. CI only: incompatible with '--regular'.
+                                                build stops once they are built (or at the first failure): their consumers are
+                                                not built. CI only: incompatible with '--regular'.
                                                 """ )]
                                   [OptionName( _oFocus )]
-                                  bool focus = false )
+                                  bool focus = false,
+                                  [Description( """
+                                                With '--focus', once the current repositories and their upstreams are successfully
+                                                built, goes on with the other builds (still stopping at the first failure).
+                                                """ )]
+                                  [OptionName( _oContinue )]
+                                  bool continueOnSuccess = false )
     {
         if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
+        if( continueOnSuccess && !focus )
+        {
+            monitor.Error( $"'{_oContinue}' applies to '{_oFocus}' that must be specified." );
+            return Task.FromResult( false );
+        }
         // In a non-CI build only the pivots are read from their "dev/" branch: the work in progress of an upstream
         // would be invisible, and this is precisely what "--focus" is about.
         if( regular && focus )
@@ -296,7 +310,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         }
         return regular
             ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: false )
-            : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: false, focus );
+            : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: false, focus, continueOnSuccess );
     }
 
     /// <summary>
@@ -465,14 +479,15 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                           bool dryRun,
                           bool isPullBuild,
                           bool publish,
-                          bool focus = false )
+                          bool focus = false,
+                          bool continueOnSuccess = false )
     {
         if( !ParseInteger( monitor, "--max-dop", maxDop, out var vMaxDoP, 4 )
             || !HandleForceSkipTests( monitor, skipTests, forceTests, out bool? runTest ) )
         {
             return Task.FromResult( false );
         }
-        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all, dryRun, focus );
+        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all, dryRun, focus, continueOnSuccess );
         if( roadmap == null )
         {
             return Task.FromResult( false );
@@ -512,7 +527,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         var results = await roadmap.BuildAsync( monitor, context, this, runTest, vMaxDoP, PrimaryPluginContext.Cancellation ).ConfigureAwait( false );
         if( results == null )
         {
-            return false;
+            // A "--focus" build that stopped after the successful builds of the pivots and their upstreams
+            // succeeded: the roadmap is not complete, the RoadmapBuild event is not raised.
+            return roadmap.IsStoppedAfterFocus;
         }
         return await RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaxDoP ).ConfigureAwait( false );
     }
@@ -547,7 +564,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                        string? branch,
                                        bool all,
                                        bool dryRun,
-                                       bool focus = false )
+                                       bool focus = false,
+                                       bool continueOnSuccess = false )
     {
         // Consider the repositories selected by current path as the Pivots.
         var pivots = all
@@ -601,7 +619,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             monitor.Warn( $"'{_oFocus}' is ignored: all the repositories are selected, there is no pivot to focus on." );
             focus = false;
         }
-        var roadmap = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish, dryRun, focus );
+        var roadmap = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish, dryRun,
+                                      focus,
+                                      stopAfterFocus: focus && !continueOnSuccess );
         if( roadmap != null  )
         {
             context.Screen.Display( roadmap.ToRenderable );

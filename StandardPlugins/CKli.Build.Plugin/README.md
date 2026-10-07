@@ -114,7 +114,8 @@ All build-family commands share a common set of options (declared once as `const
 | `forceTests` | Run tests even if they already ran successfully on the commit. Mutually exclusive with `skipTests`. |
 | `--dry-run,-d` | Only compute and display the roadmap; no build/publish is performed (`OnRoadmapBuild` is still raised, with `Roadmap.DryRun == true`). |
 | `all` | Consider all Repos of the World as pivots, not only the ones reachable from the current directory. |
-| `--focus` | `build` only. The pivots' upstreams are built too, the pivots are built before anything else and the build stops at the first failure - see [below](#build---focus-working-in-a-pivot-and-its-upstreams). CI only: exclusive with `--regular`. |
+| `--focus` | `build` only. The pivots' upstreams are built too, the pivots are built before anything else, the build stops once they are built (or at the first failure) - see [below](#build---focus-working-in-a-pivot-and-its-upstreams). CI only: exclusive with `--regular`. |
+| `--continue` | `build --focus` only. Once the pivots and their upstreams are successfully built, goes on with the other builds (their consumers). |
 
 | `[CommandPath]` | Method | Description |
 |---|---|---|
@@ -148,7 +149,7 @@ the same time. Neither existing command fits it:
 - `*build` builds **everything that has a reason to build**, the repositories unrelated to the pivot included, and
   they compete with it for the `--max-dop` monitors.
 
-`--focus` is in between, and it is three things:
+`--focus` is in between, and it is four things:
 
 1. **Scope.** The pivots' upstreams are not skippable: `canSkip` gains `!(focus && IsPivotUpstream)`, nothing else
    changes. The downstream propagation is not gated by `canSkip`, so a *sibling* - a repository that consumes a rebuilt
@@ -162,10 +163,18 @@ the same time. Neither existing command fits it:
    its cancellation until .NET 11 brings a graceful termination, because a process-tree kill misses the detached
    children (the compiler server, shared with the concurrent builds) and can interrupt a write into the NuGet cache or
    the `$Local` feed.
+4. **Stop after the focus.** Once the pivots and their upstreams are all built, the run stops as if it had failed: the
+   builds held by the barrier (the consumers) never start, and the screen says *"Stopped after the focused builds
+   ('--focus'): k of N builds were not started. Use '--continue' to build them."* The command nevertheless succeeds
+   (`Roadmap.IsStoppedAfterFocus`), but the roadmap is not complete: the `RoadmapBuild` event is not raised and the
+   `"building/"` tags are not promoted - the next run completes them, exactly as after a failure. When nothing is to
+   be built in focus, nothing starts. The `--dry-run` roadmap says how many builds the focus stops before.
+   **`--continue`** lifts this stop: the consumers are built once the focused builds have succeeded (the first failure
+   still stops the run). It is refused without `--focus`.
 
-After a successful focused build, the screen names the repositories that a `*build` would have built: *"'X-Other' is
+After a successful `--focus --continue` build, the screen names the repositories that a `*build` would have built: *"'X-Other' is
 out of focus and was not built. Run '*build' to complete the World."* (`BuildSolution.IsOutOfFocus`). **Nothing else
-marks them**, and in particular the `"building/"` tags are promoted to `"local/"` as usual: the versions a focused
+marks them**, and in particular the `"building/"` tags are promoted to `"local/"` as usual: the versions such a focused
 build produces are complete - the pivots, their upstreams and all their consumers - and what is not "ready" is only
 what it left out, whose reasons to build are still there for the next `*build` to find. Keeping `"building/"` tags as a
 marker would have given that prefix a second meaning, been erased by the next idle run (which completes an
@@ -400,7 +409,8 @@ repository" rather than "where does this package move".
 
 ```csharp
 var hotGraph = _hotZone.GetHotGraph( monitor, branchName, ciBuildMode != CIBuildMode.None, pivots );
-var roadmap  = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish, dryRun, focus );
+var roadmap  = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish, dryRun,
+                               focus, stopAfterFocus: focus && !continueOnSuccess );
 ```
 
 For every `HotGraph.Solution` (ordered topologically, `OrderedSolutions`), a `Roadmap.BuildSolution` is created and its
@@ -534,7 +544,8 @@ been computed and is not a dry-run:
   one. The `Building roadmap n°k/N` log counts the builds as they start, so `k` is not the `BuildNumber`.
 - **Under `--focus`** the first class is a barrier (the other requests stay queued until its last build completed; it
   cannot deadlock, since that class is closed upward) and the first failure cancels the executor's own
-  `CancellationTokenSource`, linked to the caller's. The requests queued at that moment still get a monitor, since
+  `CancellationTokenSource`, linked to the caller's. Without `--continue`, the success of the last build of the first
+  class cancels it too when other builds remain (`IsStoppedAfterFocus`). The requests queued at that moment still get a monitor, since
   their task has to complete, but they end at once without logging a start. See
   [`build --focus`](#build---focus-working-in-a-pivot-and-its-upstreams).
 - **Each build displays its outcome as one row** (`DisplayOutcome`), as soon as it completes: the repository

@@ -32,8 +32,11 @@ public sealed partial class BuildPlugin
         int _pendingPriorityBuilds;
         // Linked to the caller's cancellation. "--focus" cancels it on the first failure: no new build starts,
         // and a running one stops at its next step. _stopped is true when this happened.
+        // Unless "--continue" is specified, "--focus" also cancels it once all the builds of the
+        // class 0 have succeeded: no other build starts and _stoppedAfterFocus is true.
         readonly CancellationTokenSource _stop;
         bool _stopped;
+        bool _stoppedAfterFocus;
         int _startedCount;
 
         public RoadmapExecutor( BuildPlugin buildPlugin,
@@ -61,6 +64,12 @@ public sealed partial class BuildPlugin
         }
 
         /// <summary>
+        /// Gets whether the builds of the pivots and their upstreams have succeeded and the other ones have not
+        /// been started (see <see cref="Roadmap.StopAfterFocus"/>).
+        /// </summary>
+        internal bool IsStoppedAfterFocus => _stoppedAfterFocus;
+
+        /// <summary>
         /// Entry point of the build: routes between single build by directly calling <see cref="DoBuildAsync"/>
         /// or parallel build with <see cref="RunLoopAsync"/>.
         /// </summary>
@@ -73,6 +82,14 @@ public sealed partial class BuildPlugin
             try
             {
                 if( _cancellation.IsCancellationRequested ) return null;
+                if( _roadmap.StopAfterFocus && _pendingPriorityBuilds == 0 )
+                {
+                    // The pivots and their upstreams are up to date: there is nothing to build in focus.
+                    _stoppedAfterFocus = true;
+                    monitor.Info( ScreenType.ScreenTag,
+                                  $"Nothing to build in focus ('--focus'): {_roadmap.SolutionBuildCount} builds were not started. Use '--continue' to build them." );
+                    return null;
+                }
                 if( _singleBuild )
                 {
                     var s = _roadmap.OrderedSolutions.Single( s => s.MustBuild );
@@ -99,8 +116,11 @@ public sealed partial class BuildPlugin
                     if( _stopped )
                     {
                         Throw.DebugAssert( result == null );
+                        var notStarted = $"{_roadmap.SolutionBuildCount - _startedCount} of {_roadmap.SolutionBuildCount} builds were not started.";
                         monitor.Info( ScreenType.ScreenTag,
-                                      $"Stopped after the first failure ('--focus'): {_roadmap.SolutionBuildCount - _startedCount} of {_roadmap.SolutionBuildCount} builds were not started." );
+                                      _stoppedAfterFocus
+                                        ? $"Stopped after the focused builds ('--focus'): {notStarted} Use '--continue' to build them."
+                                        : $"Stopped after the first failure ('--focus'): {notStarted}" );
                     }
                 }
             }
@@ -210,7 +230,16 @@ public sealed partial class BuildPlugin
                             SetDone( req.Build, req );
                             if( _pendingPriorityBuilds > 0 && GetPriorityClass( req.Build ) == 0 )
                             {
-                                --_pendingPriorityBuilds;
+                                // The last build in focus succeeded (a failure has already stopped the build): unless
+                                // "--continue", the builds held by the barrier will not build.
+                                if( --_pendingPriorityBuilds == 0
+                                    && _roadmap.StopAfterFocus
+                                    && !_stop.IsCancellationRequested
+                                    && _startedCount < _roadmap.SolutionBuildCount )
+                                {
+                                    _stopped = _stoppedAfterFocus = true;
+                                    _stop.Cancel();
+                                }
                             }
                             monitorPool.Enqueue( req.Acquired );
                             Throw.DebugAssert( monitorPool.Count <= _maxDoP );
