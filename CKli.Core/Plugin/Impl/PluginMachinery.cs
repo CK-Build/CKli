@@ -43,6 +43,10 @@ public sealed partial class PluginMachinery
     // The last created PluginCollectorContext. It is immutable: it is reused to reload the plugins
     // (see RecoverFromInstantiationError).
     PluginCollectorContext? _pluginContext;
+    // Set when "CKli.Version.props" has been (re)written, until the next successful compilation: the packages of
+    // a new CKli version may have just been published, and NuGet's HTTP cache can still list the previous ones
+    // (it keeps a feed listing for 30 minutes). That compilation's restore bypasses the HTTP cache.
+    bool _ckliVersionChanged;
 
     // Fundamental singleton!
     // This MAY be transformed in a dictionary per World (key would be the RunFolder) to allow more than a
@@ -403,6 +407,7 @@ public sealed partial class PluginMachinery
             monitor.Info( $"Setting CKliVersion to '{version}' in '{CKliVersionPropsFileName}'." );
             File.WriteAllText( CKliVersionProps, content );
             mustRecompile = true;
+            _ckliVersionChanged = true;
             // This file is generated: the Stack's .gitignore must cover it. Doing it here also repairs the
             // Stacks whose .gitignore predates it.
             return _definitionFile.World.Stack.EnsureGeneratedFilesIgnored( monitor )
@@ -661,6 +666,10 @@ public sealed partial class PluginMachinery
         // Global property: it wins over the generated "CKli.Version.props", so CKli's own build never depends on
         // that file being up to date. The IDE and "dotnet test" builds get the value from the file instead.
         args.Append( " -p:CKliVersion=" ).Append( EffectiveCKliVersion );
+        if( _ckliVersionChanged )
+        {
+            args.Append( " -p:RestoreNoHttpCache=true" );
+        }
         using var gLog = monitor.OpenTrace( $"""
             Compiling '{CKliPluginsCSProj.LastPart}'
             dotnet {args}.
@@ -674,6 +683,7 @@ public sealed partial class PluginMachinery
             monitor.CloseGroup( $"Failed to build '{Name}' solution. Exit code = '{exitCode}'." );
             return false;
         }
+        _ckliVersionChanged = false;
         return true;
     }
 

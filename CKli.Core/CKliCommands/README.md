@@ -609,7 +609,9 @@ two developers on two CKli versions don't produce a conflicting change in a trac
 tracked file would be rewritten on every World open, leaving the Stack dirty and making the next `pull` fail.
 
 `CKli.Version.props` is written on every World open, and rewriting it is what triggers a recompilation of the
-plugins. `ckli` passes the value to its own builds explicitly; an IDE or a plain `dotnet build`/`dotnet test`
+plugins. The restore of that recompilation bypasses NuGet's HTTP cache (`RestoreNoHttpCache`): the packages of a
+new CKli version may have just been published, and a cached feed listing would still end at the previous version.
+`ckli` passes the value to its own builds explicitly; an IDE or a plain `dotnet build`/`dotnet test`
 reads the file. A build that finds no `$(CKliVersion)` at all — a fresh clone where no `ckli` command has run
 yet — fails with a message saying so rather than with an obscure NuGet error.
 
