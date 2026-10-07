@@ -378,7 +378,9 @@ multi-pass algorithm (see `VersionTagPlugin.cs`):
 5. If `AutoFixRemovableTag` is set (and no blocking conflicts/issues exist), removable tags are deleted locally right
    away; otherwise everything is surfaced through `CollectIssues` for `ckli issue`.
 6. `HotZoneInfo.Create` flags a "hot zone issue" when `topHot` is inconsistent with `lastStable` (e.g.
-   `topHot >= (lastStable.Major+1).0.0` with no `+fake` covering the gap) — this must be fixed manually.
+   `topHot > (lastStable.Major+1).0.0` with no `+fake` covering the gap) — this must be fixed manually.
+   `topHot == (lastStable.Major+1).0.0` is accepted when it is a `building/` or `local/` release: that is what a
+   breaking change builds, and it is not a `lastStable` until published (a published one would be the `lastStable`).
 
 ### Computing the next version
 

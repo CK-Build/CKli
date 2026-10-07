@@ -764,8 +764,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         else
         {
             Throw.DebugAssert( topHot != null );
-            // The HotZoneInfo will create the required manual fix if topHot.Version >= (lastStable.Major + 1, 0, 0)
-            // or (when lastStable is a +fake or is a "local/" with an associated FakeVersion) if topHot is greater
+            // The HotZoneInfo will create the required manual fix if topHot.Version > (lastStable.Major + 1, 0, 0)
+            // (or equal to it without being an unpublished "building/" or "local/" release) or (when lastStable is a +fake or is a "local/" with an associated FakeVersion) if topHot is greater
             // to the fake version (a fake version is always stable).
             hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, info, lastStable, topHot );
         }

@@ -53,11 +53,15 @@ public sealed partial class VersionTagInfo
                 }
                 else
                 {
+                    // A breaking change builds the next Major: an unpublished "building/" or "local/" release of
+                    // exactly that version is legitimate (it is not a LastStable, only a published version is).
+                    // Every version is computed from the LastStable, so nothing legitimate can be greater.
                     var hotSupremum = SVersion.Create( lastStable.Version.Major + 1, 0, 0 );
-                    if( topHot.Version >= hotSupremum )
+                    if( topHot.Version > hotSupremum
+                        || (topHot.Version == hotSupremum && !topHot.IsBuildingOrLocal) )
                     {
                         message = $"""
-                              The greatest version tag '{topHot.Version.ParsedText}' cannot be greater or equal to 'v{hotSupremum.Major}.0.0' because the last published stable version is '{lastStable.Version.ParsedText}'.
+                              The greatest version tag '{topHot.Version.ParsedText}' cannot be greater than 'v{hotSupremum.Major}.0.0' (that can only be an unpublished release) because the last published stable version is '{lastStable.Version.ParsedText}'.
                               This should be fixed manually.
                               """;
                     }
@@ -78,7 +82,8 @@ public sealed partial class VersionTagInfo
         public VersionTagInfo VersionTagInfo => _info;
 
         /// <summary>
-        /// Gets a manual issue if <see cref="TopHot"/> is greater or equal to the next major of the last published stable version.
+        /// Gets a manual issue if <see cref="TopHot"/> is greater than the next major of the last published stable version,
+        /// or equal to it without being an unpublished "building/" or "local/" release.
         /// </summary>
         public World.Issue? HotZoneIssue => _hotZoneIssue;
 
