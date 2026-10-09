@@ -130,6 +130,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
                                                                HttpClient client,
                                                                NormalizedPath repoPath,
                                                                string branchName,
+                                                               LogLevel failureLevel,
                                                                CancellationToken cancellation )
     {
         var update = new GiteaUpdateDefaultBranchRequest { DefaultBranch = branchName };
@@ -137,7 +138,7 @@ public sealed partial class GiteaProvider : HttpGitHostingProvider
         if( !response.IsSuccessStatusCode )
         {
             // The branch must exist: Gitea answers a 422 when it doesn't.
-            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+            return await LogFailedAsync( monitor, response, failureLevel ).ConfigureAwait( false );
         }
         return true;
     }

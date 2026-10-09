@@ -147,6 +147,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     public sealed override async Task<bool> SetDefaultBranchAsync( IActivityMonitor monitor,
                                                                    NormalizedPath repoPath,
                                                                    string branchName,
+                                                                   LogLevel failureLevel = LogLevel.Error,
                                                                    CancellationToken cancellation = default )
     {
         Throw.CheckState( HasDefaultBranch );
@@ -161,7 +162,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
             // No read before the write here (as opposed to ArchiveRepositoryAsync): hosts accept a write that
             // sets the branch that is already the default one, and the repository representation they serve
             // right after a write can be stale, which would make a "no change needed" shortcut unreliable.
-            return await SetDefaultBranchAsync( monitor, client, repoPath, branchName, cancellation ).ConfigureAwait( false );
+            return await SetDefaultBranchAsync( monitor, client, repoPath, branchName, failureLevel, cancellation ).ConfigureAwait( false );
         }
         catch( Exception ex )
         {
@@ -179,6 +180,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
                                                          HttpClient client,
                                                          NormalizedPath repoPath,
                                                          string branchName,
+                                                         LogLevel failureLevel,
                                                          CancellationToken cancellation );
 
     /// <inheritdoc />
@@ -770,7 +772,7 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     }
 
     /// <summary>
-    /// Logs an unexpected <paramref name="response"/> as an error and returns false.
+    /// Logs an unexpected <paramref name="response"/> (as an error by default) and returns false.
     /// <para>
     /// Nothing else logs a failed response: every failing path must call this (or <see cref="LogResponseAsync"/>)
     /// or the reason for the failure is lost. A status that is a normal answer rather than a failure must
@@ -779,10 +781,11 @@ public abstract partial class HttpGitHostingProvider : GitHostingProvider
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="response">The unexpected response.</param>
+    /// <param name="level">The log level.</param>
     /// <returns>Always false.</returns>
-    protected async Task<bool> LogFailedAsync( IActivityMonitor monitor, HttpResponseMessage response )
+    protected async Task<bool> LogFailedAsync( IActivityMonitor monitor, HttpResponseMessage response, LogLevel level = LogLevel.Error )
     {
-        await LogResponseAsync( monitor, response, LogLevel.Error ).ConfigureAwait( false );
+        await LogResponseAsync( monitor, response, level ).ConfigureAwait( false );
         return false;
     }
 

@@ -158,12 +158,17 @@ public abstract partial class GitHostingProvider
     /// <param name="monitor">The activity monitor.</param>
     /// <param name="repoPath">The repository path in this provider.</param>
     /// <param name="branchName">The branch name that must become the default one.</param>
+    /// <param name="failureLevel">
+    /// The level of the log that reports the host's refusal. A caller for which this is not an error (hosts require
+    /// administration rights on the repository to change it) lowers it and reports the failure its own way.
+    /// </param>
     /// <param name="cancellation">Cancellation token.</param>
     /// <returns>True on success, false on error.</returns>
     /// <exception cref="InvalidOperationException">When <see cref="HasDefaultBranch"/> is false.</exception>
     public abstract Task<bool> SetDefaultBranchAsync( IActivityMonitor monitor,
                                                       NormalizedPath repoPath,
                                                       string branchName,
+                                                      LogLevel failureLevel = LogLevel.Error,
                                                       CancellationToken cancellation = default );
 
     /// <summary>

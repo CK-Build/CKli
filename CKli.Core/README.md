@@ -573,7 +573,9 @@ more from it:
   [`remote stack migrate`](CKliCommands/README.md#remote-stack-migrate-newurl). The first two also **delete** the repository
   they just created when the rest of the operation fails, so the key must allow that too;
 - **archiving a repository** and **changing its default branch** —
-  [`remote stack migrate`](CKliCommands/README.md#remote-stack-migrate-newurl) and the publication;
+  [`remote stack migrate`](CKliCommands/README.md#remote-stack-migrate-newurl) and the publication (which
+  doesn't fail when the key cannot change the default branch: it lists the repositories in a single warning at the
+  end);
 - **creating, uploading to and finalizing releases** — the `Publish` plugin.
 
 On GitHub, that maps to the `repo` scope of a classic token — plus `delete_repo` if you want the rollback

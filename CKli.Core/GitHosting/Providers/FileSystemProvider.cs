@@ -26,6 +26,7 @@ sealed class FileSystemProvider : GitHostingProvider
     public override Task<bool> SetDefaultBranchAsync( IActivityMonitor monitor,
                                                       NormalizedPath repoPath,
                                                       string branchName,
+                                                      LogLevel failureLevel = LogLevel.Error,
                                                       CancellationToken cancellation = default )
     {
         Throw.CheckState( HasDefaultBranch );

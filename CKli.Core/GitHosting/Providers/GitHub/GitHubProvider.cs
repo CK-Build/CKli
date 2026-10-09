@@ -161,6 +161,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
                                                                HttpClient client,
                                                                NormalizedPath repoPath,
                                                                string branchName,
+                                                               LogLevel failureLevel,
                                                                CancellationToken cancellation )
     {
         var update = new GitHubUpdateDefaultBranchRequest { Name = repoPath.LastPart, DefaultBranch = branchName };
@@ -169,7 +170,7 @@ public sealed partial class GitHubProvider : HttpGitHostingProvider
         {
             // The branch must exist: GitHub answers a 422 "Validation Failed" with an
             // "invalid" code on "default_branch" when it doesn't.
-            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+            return await LogFailedAsync( monitor, response, failureLevel ).ConfigureAwait( false );
         }
         return true;
     }

@@ -206,6 +206,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
                                                                HttpClient client,
                                                                NormalizedPath repoPath,
                                                                string branchName,
+                                                               LogLevel failureLevel,
                                                                CancellationToken cancellation )
     {
         var projectPath = HttpUtility.UrlEncode( repoPath );
@@ -214,7 +215,7 @@ public sealed partial class GitLabProvider : HttpGitHostingProvider
         if( !response.IsSuccessStatusCode )
         {
             // The branch must exist: GitLab answers a 400 "default_branch is invalid" when it doesn't.
-            return await LogFailedAsync( monitor, response ).ConfigureAwait( false );
+            return await LogFailedAsync( monitor, response, failureLevel ).ConfigureAwait( false );
         }
         return true;
     }

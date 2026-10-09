@@ -1346,7 +1346,7 @@ public sealed partial class StackRepository : IDisposable
             // SetDefaultBranchAsync is idempotent and the branch is required to exist: hence after the push.
             if( newStack != null && hostingProvider.HasDefaultBranch )
             {
-                if( !await hostingProvider.SetDefaultBranchAsync( monitor, remoteRepoPath, BranchName, cancellation )
+                if( !await hostingProvider.SetDefaultBranchAsync( monitor, remoteRepoPath, BranchName, cancellation: cancellation )
                                           .ConfigureAwait( false ) )
                 {
                     newStack.Dispose();
