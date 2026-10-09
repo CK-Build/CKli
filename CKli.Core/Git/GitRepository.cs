@@ -111,6 +111,11 @@ public sealed partial class GitRepository : IDisposable
     /// This enables purely local scenario without overhead and guaranties that the "ckli-repo" tag is properly initialized on
     /// any "ckli aware repository".
     /// </para>
+    /// <para>
+    /// This set lives in memory only: it is lost when the process ends without a push. This is deliberate: a failing process
+    /// must not impact the remotes. Use <see cref="PersistentDeferredPushRefSpecs"/> for references that must be pushed
+    /// even by a subsequent process.
+    /// </para>
     /// </summary>
     public HashSet<string> DeferredPushRefSpecs => _deferredPushRefSpecs;
 
@@ -1189,7 +1194,8 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
-    /// Low level push method that must be used whenever possible as this handles the <see cref="DeferredPushRefSpecs"/>.
+    /// Low level push method that must be used whenever possible as this handles the <see cref="DeferredPushRefSpecs"/>
+    /// and the <see cref="PersistentDeferredPushRefSpecs"/>.
     /// <para>
     /// Ref specs for which <see cref="IsRefusedPushRefSpec(ReadOnlySpan{char})"/> is true are skipped (with a warning):
     /// this is the single place that guaranties that no "local/" or "building/" reference can ever reach a remote.
@@ -1210,18 +1216,20 @@ public sealed partial class GitRepository : IDisposable
         // They are skipped instead of failing the push and are removed from the DeferredPushRefSpecs: a deferred
         // spec that must not be pushed must neither break nor be retried by every subsequent push. Commands that
         // explicitly name the reference to push (ckli tag push, ckli branch push) reject it before reaching this.
-        _deferredPushRefSpecs.RemoveWhere( spec =>
+        _deferredPushRefSpecs.RemoveWhere( SkipRefused );
+        // The persistent ones are checked when added: this is defensive (the file may have been edited).
+        var persistent = GetPersistentDeferredPushRefSpecs();
+        if( persistent.RemoveWhere( SkipRefused ) > 0 && !SavePersistentDeferredPushRefSpecs( monitor ) )
         {
-            if( !IsRefusedPushRefSpec( spec ) ) return false;
-            monitor.Warn( $"Skipping push of '{spec}' in '{DisplayPath}': 'local/' and 'building/' references must never be pushed (nor wildcards that may match them)." );
-            return true;
-        } );
-        if( _deferredPushRefSpecs.Count == 0 )
+            return false;
+        }
+        var refSpecs = persistent.Count == 0 ? _deferredPushRefSpecs : _deferredPushRefSpecs.Union( persistent ).ToHashSet();
+        if( refSpecs.Count == 0 )
         {
             monitor.Trace( $"Nothing to push in '{DisplayPath}'." );
             return true;
         }
-        var commonLogMsg = $"'{DisplayPath}' references '{_deferredPushRefSpecs.Concatenate( "', '" )}'";
+        var commonLogMsg = $"'{DisplayPath}' references '{refSpecs.Concatenate( "', '" )}'";
         using( monitor.OpenTrace( $"Pushing {commonLogMsg}." ) )
         {
             try
@@ -1240,7 +1248,7 @@ public sealed partial class GitRepository : IDisposable
                             """ );
                     }
                 };
-                _git.Network.Push( remote, _deferredPushRefSpecs, options );
+                _git.Network.Push( remote, refSpecs, options );
                 if( !errors.IsEmpty )
                 {
                     monitor.Error( $"""
@@ -1251,6 +1259,11 @@ public sealed partial class GitRepository : IDisposable
                     return false;
                 }
                 _deferredPushRefSpecs.Clear();
+                if( persistent.Count > 0 )
+                {
+                    persistent.Clear();
+                    return SavePersistentDeferredPushRefSpecs( monitor );
+                }
                 return true;
             }
             catch( Exception ex )
@@ -1258,6 +1271,13 @@ public sealed partial class GitRepository : IDisposable
                 monitor.Error( $"While pushing {commonLogMsg}.", ex );
                 return false;
             }
+        }
+
+        bool SkipRefused( string spec )
+        {
+            if( !IsRefusedPushRefSpec( spec ) ) return false;
+            monitor.Warn( $"Skipping push of '{spec}' in '{DisplayPath}': 'local/' and 'building/' references must never be pushed (nor wildcards that may match them)." );
+            return true;
         }
     }
 

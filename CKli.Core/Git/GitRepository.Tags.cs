@@ -332,7 +332,8 @@ public sealed partial class GitRepository
     }
 
     /// <summary>
-    /// Pushes any number of tags (empty <paramref name="tagNames"/> is a no-op).
+    /// Pushes any number of tags along with the <see cref="DeferredPushRefSpecs"/> and <see cref="PersistentDeferredPushRefSpecs"/>.
+    /// An empty <paramref name="tagNames"/> pushes only these pending ref specs (and is a no-op when there are none).
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="tagNames">The tag names. They can be canonic (start with "refs/tags/") or regular.</param>
@@ -341,7 +342,7 @@ public sealed partial class GitRepository
     public bool PushTags( IActivityMonitor monitor, IEnumerable<string> tagNames, string remoteName = "origin" )
     {
         var names = tagNames.Concatenate();
-        if( names.Length == 0 ) return true;
+        if( names.Length == 0 && _deferredPushRefSpecs.Count == 0 && PersistentDeferredPushRefSpecs.Count == 0 ) return true;
         monitor.Trace( $"Pushing tags '{names}' to '{remoteName}'." );
 
         if( !GetRemote( monitor, remoteName, forWrite: true, out var remote, out var creds ) )

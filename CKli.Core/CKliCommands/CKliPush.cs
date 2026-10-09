@@ -154,7 +154,7 @@ sealed class CKliPush : Command
             }
             refSpecs.Add( $"{b.CanonicalName}:{b.CanonicalName}" );
         }
-        if( refSpecs.Count == 0 && git.DeferredPushRefSpecs.Count == 0 )
+        if( refSpecs.Count == 0 && git.DeferredPushRefSpecs.Count == 0 && git.PersistentDeferredPushRefSpecs.Count == 0 )
         {
             monitor.Trace( $"No branch tracking 'origin' to push in '{repo.DisplayPath}'." );
             return true;

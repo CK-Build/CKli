@@ -375,6 +375,11 @@ included. This is guaranteed, not merely respected by convention:
   or friendly name) or contains a wildcard (a wildcard cannot be proved to exclude such a reference).
 - Skipping rather than failing is deliberate: a refused ref spec sitting in `DeferredPushRefSpecs` must break no
   subsequent push, and it is removed from the set so that it is not retried forever.
+- `DeferredPushRefSpecs` lives in memory only, on purpose: when the process ends without a push (typically because it
+  failed), they are lost and the remote is untouched. `PersistentDeferredPushRefSpecs` is for the local changes that
+  are complete by themselves and must be shared (rebuilt version tags): `AddPersistentDeferredPushRefSpecs` saves them
+  in the `.git/CKLI_DEFERRED_PUSH` file, and they are pushed — and the file is removed — by the next successful `Push`,
+  be it a `ckli push` run days later. Adding a refused ref spec there is an error rather than a skip.
 - Deletions (`:refs/tags/local/v1.0.0`) are never refused: a reference that reached a remote before must stay removable.
   `DeleteRemoteTags` is the only push that doesn't go through `Push` — it builds nothing but deletion ref specs.
 - The commands where the user names the reference reject it up front with an error rather than a silent skip:
