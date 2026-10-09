@@ -125,8 +125,8 @@ All build-family commands share a common set of options (declared once as `const
 | `*publish` | `StarPublishAsync` | Same as `*build`, and publishes on success. |
 | `fix build` | `FixBuildAsync` | Builds the current `FixWorkflow` into the local feed (see below). A fix has no CI line, so it is always a release build and takes no mode flag at all - the one place where the build family's CI default does not apply. |
 | `fix publish` | `FixPublishAsync` | Builds and publishes the current `FixWorkflow`; on success the workflow is finished. |
-| `maintenance rebuild old` | `RebuildOldAsync` | Walks each Repo's stable tags from the newest down, force-rebuilding until one succeeds; tags failing commits `+invalid` (unless `warnOnly`). |
-| `maintenance rebuild version` | `RebuildVersionAsync` | Force-rebuilds one specific version tag of the current repository (used to refresh a tag's recorded build content, e.g. to fix lightweight/unreadable tags). |
+| `maintenance rebuild old` | `RebuildOldAsync` | Walks each Repo's stable tags from the oldest up, force-rebuilding until one succeeds; tags failing commits `+invalid` (unless `warnOnly`). The rebuilt and `+invalid` tags are pushed by the next push (see [Issues](#issues-version-tag-housekeeping)). |
+| `maintenance rebuild version` | `RebuildVersionAsync` | Force-rebuilds one specific version tag of the current repository (used to refresh a tag's recorded build content, e.g. to fix lightweight/unreadable tags). The rebuilt tag is pushed by the next push (see [Issues](#issues-version-tag-housekeeping)). |
 | `deps update` | `DepsUpdateAsync` | Aligns the World's **external** package dependencies on the versions its World References publish - and, only with `--with-nuget`, on what its feeds offer for the identifiers no reference anchors (see below). |
 
 `build`/`publish` and `*build`/`*publish` differ only in the `isPullBuild` flag passed down to roadmap computation
@@ -684,6 +684,9 @@ roadmap executor, targets are built **sequentially**, in `workflow.Targets` orde
 - **`TagsRebuildIssue`** - lightweight tags among the regular version tags (should be annotated) or annotated tags whose
   message can't be parsed. `ExecuteAsync` (i.e. `ckli issue --fix`) rebuilds each one via `CoreBuildAsync` with
   `forceRebuild: true` to recompute and re-store its build content info, replacing the tag if its canonical name changed.
+  Whenever `CoreBuildAsync` force-rebuilds a published version (here and in the `maintenance rebuild` commands), the
+  rebuilt tag is added to the repository's `PersistentDeferredPushRefSpecs` (and so is the removal of a replaced tag
+  here): the next push publishes them, even from another process, so that other clones don't rebuild them again.
 - **`NoVersionTagIssue`** - a repository with no version tag at all but a resolvable branch-model root: `ExecuteAsync`
   creates an initial `v0.0.0+fake` tag (or based on `VersionTagInfo.InfVersion`) on the root branch's tip so the
   repository enters the normal versioning flow.

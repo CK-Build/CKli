@@ -191,7 +191,9 @@ public sealed partial class VersionTagPlugin
                             }
                             if( pushInvalidTags )
                             {
-                                success &= repo.GitRepository.PushTags( monitor, names );
+                                // Persistent: if this push fails, the next one publishes them.
+                                success &= repo.GitRepository.AddPersistentDeferredPushRefSpecs( monitor, names.Select( n => $"+{n}" ) )
+                                           && repo.GitRepository.PushTags( monitor, [] );
                             }
                             success &= repo.GitRepository.DeleteLocalTags( monitor, tagToInvalid.Select( i => i.CanonicalName ) );
                         }

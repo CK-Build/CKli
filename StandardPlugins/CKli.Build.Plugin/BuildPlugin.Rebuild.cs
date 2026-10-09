@@ -65,6 +65,11 @@ public sealed partial class BuildPlugin
                         string invalidTag = $"v{tag.Version.SetBuildMetaData( null )}+invalid";
                         monitor.Info( $"Adding '{invalidTag}' on '{tag.Commit.Sha}'." );
                         repo.GitRepository.Repository.Tags.Add( invalidTag, tag.Commit );
+                        // Other clones must not try to rebuild it again: the next push publishes it.
+                        if( !repo.GitRepository.AddPersistentDeferredPushRefSpecs( monitor, [$"+refs/tags/{invalidTag}"] ) )
+                        {
+                            return false;
+                        }
                     }
                 }
             }

@@ -712,7 +712,21 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return null;
         }
-        return await _builderFunction( monitor, context, versionInfo, buildCommit, runTest.Value, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
+        var result = await _builderFunction( monitor, context, versionInfo, buildCommit, runTest.Value, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
+        // A forced rebuild of a published version updates its version tag content: this is locally complete
+        // and must be shared, other clones would otherwise keep the previous tag and have to rebuild it again.
+        // ("building/" versions are the roadmap and fix workflows: they are published, if ever, by the publish step.)
+        if( result != null
+            && forceRebuild
+            && !result.Version.IsBuildingOrLocal() )
+        {
+            if( !versionInfo.Repo.GitRepository.AddPersistentDeferredPushRefSpecs( monitor, [$"+{result.VersionTag.CanonicalName}"] ) )
+            {
+                return null;
+            }
+            monitor.Info( $"Rebuilt tag '{result.VersionTag.FriendlyName}' in '{versionInfo.Repo.DisplayPath}' will be pushed by the next push." );
+        }
+        return result;
     }
 
     static async Task<BuildResult?> RealBuildAsync( IActivityMonitor monitor,

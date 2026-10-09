@@ -131,15 +131,22 @@ public sealed partial class BuildPlugin
                     return false;
                 }
                 // If the tag that triggered the build differs from the final target one, removes it.
+                // The rebuilt tag is pushed by the next push (see CoreBuildAsync): its removal is pushed with it
+                // so that other clones don't keep the old one.
                 Throw.DebugAssert( "Tags to rebuild are regular ones.", v.BuildMetaData.Length == 0 );
                 if( t.CanonicalName != buildResult.VersionTag.CanonicalName )
                 {
                     Repo.GitRepository.DeleteLocalTags( monitor, [t.CanonicalName] );
+                    if( !v.IsBuildingOrLocal()
+                        && !Repo.GitRepository.AddPersistentDeferredPushRefSpecs( monitor, [$":{t.CanonicalName}"] ) )
+                    {
+                        return false;
+                    }
                 }
                 if( !v.IsBuildingOrLocal() )
                 {
                     monitor.Warn( $"""
-                        Tag '{v.ParsedText}' in '{Repo.DisplayPath}' has been rebuilt.
+                        Tag '{v.ParsedText}' in '{Repo.DisplayPath}' has been rebuilt: it will be pushed by the next 'ckli push'.
                         Its artefacts, if any, must be manually published.
                         """ );
                 }

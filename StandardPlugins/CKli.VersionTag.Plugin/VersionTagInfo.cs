@@ -556,7 +556,9 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// <param name="version">The target version. This is necessarily a "local/" prefixed version.</param>
     /// <param name="allowRebuildVersion">
     /// True to allow the target <paramref name="version"/> to already exist on another commit.
-    /// This is the "force rebuild" of the Build plugin.
+    /// This is the "force rebuild" of the Build plugin. When the published version is already tagged on
+    /// the <paramref name="buildCommit"/>, the version topology rules (no gaps, base version in the parents)
+    /// are not checked: the version already exists.
     /// </param>
     /// <returns>The commit build info on success, null on error.</returns>
     public CommitBuildInfo? TryGetCommitBuildInfo( IActivityMonitor monitor, Commit buildCommit, SVersion version, bool allowRebuildVersion )
@@ -577,7 +579,11 @@ public sealed partial class VersionTagInfo : RepoInfo
         //
         // When there is no stable release at all in the ]InfVersion?,SupVersion?[ range: we allow the target
         // version to be anywhere in the range.
-        if( _hotZone != null )
+        //
+        // These invariants govern the creation of a version. Rebuilding a published version on the commit that
+        // already bears its tag creates nothing (it only recomputes the tag content): the history is what it is.
+        // Checking them there would fail on the first version (it has no base) or after a gap in the old history.
+        if( _hotZone != null && !(allowRebuildVersion && IsPublishedVersionTaggedOn( buildCommit, version )) )
         {
             TagCommit? baseCommit = FindBaseCommitByVersion( monitor, buildCommit, version );
             if( baseCommit == null )
@@ -596,6 +602,24 @@ public sealed partial class VersionTagInfo : RepoInfo
             }
         }
         return new CommitBuildInfo( this, version, buildCommit );
+    }
+
+    // The tag can be a valid version tag or a lightweight/unreadable one that is being rebuilt: these are
+    // not TagCommit, any tag on the commit is considered. Tags with a build metadata (+fake, +deprecated,
+    // +invalid) don't count.
+    bool IsPublishedVersionTaggedOn( Commit buildCommit, SVersion version )
+    {
+        if( version.IsBuildingOrLocal() ) return false;
+        foreach( var t in Repo.GitRepository.Repository.Tags )
+        {
+            if( t.PeeledTarget.Sha != buildCommit.Sha ) continue;
+            var v = SVersion.ParseNoThrow( t.FriendlyName );
+            if( v.IsValid && v.BuildMetaData.Length == 0 && !v.IsBuildingOrLocal() && v == version )
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     bool CanBuildAnyCommit( IActivityMonitor monitor, Commit buildCommit, SVersion version, bool allowRebuildVersion )

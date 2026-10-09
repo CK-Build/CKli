@@ -135,8 +135,9 @@ public sealed partial class VersionTagPlugin
         }
         // Ensures that:
         //  - The +deprecated tag exists in this repo (creates or updates it).
-        //  - And that it appears in the DeferredPushRefSpec ("+refs/tags/...").
-        //  - And if HasExpired, the deprecated tag version appears in the DeferredPushRefSpec (in order to remove it ":refs/tags/...").
+        //  - And that it appears in the PersistentDeferredPushRefSpecs ("+refs/tags/...").
+        //  - And if HasExpired, the deprecated tag version appears in the PersistentDeferredPushRefSpecs (in order to remove it ":refs/tags/...").
+        // These are persistent: the deprecation is locally complete, if the push below fails, the next push publishes it.
         DeprecatedTagInfo? tagInfo = EnsureRootDeprecatedTag( monitor, tagCommit, reason, daysDelay, allowUpdate );
         if( tagInfo == null )
         {
@@ -148,9 +149,8 @@ public sealed partial class VersionTagPlugin
         // is added to it but is NOT deprecated (the propagation stops there with a warning). Only the
         // releases that actually carry a "+deprecated" tag can be mirrored, hence this second collection.
         var deprecated = new List<RepoReleaseInfo>() { releaseInfo };
-        EnsureImpliedDeprecatedTag( monitor, releaseInfo, visited, deprecated, path: [releaseInfo], tagInfo.DaysDelay, tagInfo.Expiration );
+        bool success = EnsureImpliedDeprecatedTag( monitor, releaseInfo, visited, deprecated, path: [releaseInfo], tagInfo.DaysDelay, tagInfo.Expiration );
 
-        bool success = true;
         using( monitor.OpenInfo( $"Pushing tags creation (and suppression if any) to remote origin repositories." ) )
         {
             foreach( var r in visited )
@@ -224,22 +224,22 @@ public sealed partial class VersionTagPlugin
 
     // This is used by UpdateExistingDeprecationTag and CreateDeprecationTag: this pushes the
     // tag creation/update to the origin remote.
-    static void AddTag( Repo repo, TagCommit existing, DeprecatedTagInfo tagInfo, string name )
+    static bool AddTag( IActivityMonitor monitor, Repo repo, TagCommit existing, DeprecatedTagInfo tagInfo, string name )
     {
         repo.GitRepository.Repository.Tags.Add( name,
                                                 existing.Commit,
                                                 repo.GitRepository.Committer,
                                                 tagInfo.ToString(),
                                                 allowOverwrite: true );
-        repo.GitRepository.DeferredPushRefSpecs.Add( $"+refs/tags/{name}" );
+        return repo.GitRepository.AddPersistentDeferredPushRefSpecs( monitor, [$"+refs/tags/{name}"] );
     }
 
-    static DeprecatedTagInfo UpdateExistingDeprecationTag( IActivityMonitor monitor,
-                                                           TagCommit existingCommit,
-                                                           DeprecatedTagInfo existingTagInfo,
-                                                           string? reason,
-                                                           int daysDelay,
-                                                           DateOnly expiration )
+    static DeprecatedTagInfo? UpdateExistingDeprecationTag( IActivityMonitor monitor,
+                                                            TagCommit existingCommit,
+                                                            DeprecatedTagInfo existingTagInfo,
+                                                            string? reason,
+                                                            int daysDelay,
+                                                            DateOnly expiration )
     {
         existingTagInfo = new DeprecatedTagInfo( existingTagInfo.ContentInfo,
                                                  expiration,
@@ -248,7 +248,10 @@ public sealed partial class VersionTagPlugin
 
         var name = existingCommit.Tag.FriendlyName;
         var repo = existingCommit.Repo;
-        AddTag( repo, existingCommit, existingTagInfo, name );
+        if( !AddTag( monitor, repo, existingCommit, existingTagInfo, name ) )
+        {
+            return null;
+        }
         if( existingTagInfo.HasExpired )
         {
             var n = existingCommit.Version.SetBuildMetaData( null ).ToString();
@@ -264,8 +267,10 @@ public sealed partial class VersionTagPlugin
             {
                 localTags.Remove( vN );
             }
-            repo.GitRepository.DeferredPushRefSpecs.Add( $":refs/tags/{n}" );
-            repo.GitRepository.DeferredPushRefSpecs.Add( $":refs/tags/{vN}" );
+            if( !repo.GitRepository.AddPersistentDeferredPushRefSpecs( monitor, [$":refs/tags/{n}", $":refs/tags/{vN}"] ) )
+            {
+                return null;
+            }
         }
         else
         {
@@ -274,7 +279,7 @@ public sealed partial class VersionTagPlugin
         return existingTagInfo;
     }
 
-    static DeprecatedTagInfo CreateDeprecationTag( IActivityMonitor monitor, TagCommit existing, string? reason, int daysDelay )
+    static DeprecatedTagInfo? CreateDeprecationTag( IActivityMonitor monitor, TagCommit existing, string? reason, int daysDelay )
     {
         Throw.DebugAssert( "We used GetWithoutIssue and existing is not a +fake.", existing.BuildContentInfo != null );
         var tagInfo = new DeprecatedTagInfo( existing.BuildContentInfo,
@@ -283,7 +288,10 @@ public sealed partial class VersionTagPlugin
                                              reason ?? DeprecatedTagInfo.UnspecifiedReason );
 
         var name = $"v{existing.Version}+deprecated";
-        AddTag( existing.Repo, existing, tagInfo, name );
+        if( !AddTag( monitor, existing.Repo, existing, tagInfo, name ) )
+        {
+            return null;
+        }
         if( tagInfo.HasExpired )
         {
             monitor.Info( ScreenType.ScreenTag, $"Deprecation tag expired. Removing '{existing.Version.ParsedText}' tag (from local and remote) in '{existing.Repo.DisplayPath}'." );
@@ -293,7 +301,10 @@ public sealed partial class VersionTagPlugin
             {
                 localTags.Remove( existing.Version.ParsedText );
             }
-            existing.Repo.GitRepository.DeferredPushRefSpecs.Add( $":refs/tags/{existing.Version.ParsedText}" );
+            if( !existing.Repo.GitRepository.AddPersistentDeferredPushRefSpecs( monitor, [$":refs/tags/{existing.Version.ParsedText}"] ) )
+            {
+                return null;
+            }
         }
         else
         {
@@ -302,7 +313,7 @@ public sealed partial class VersionTagPlugin
         return tagInfo;
     }
 
-    void EnsureImpliedDeprecatedTag( IActivityMonitor monitor,
+    bool EnsureImpliedDeprecatedTag( IActivityMonitor monitor,
                                      RepoReleaseInfo origin,
                                      HashSet<RepoReleaseInfo> visited,
                                      List<RepoReleaseInfo> deprecated,
@@ -350,14 +361,15 @@ public sealed partial class VersionTagPlugin
                     {
                         // If the existing deprecation is planned but later than the
                         // current one: the earlier obviously wins.
-                        if( tagInfo.Expiration > expiration )
+                        if( tagInfo.Expiration > expiration
+                            && UpdateExistingDeprecationTag( monitor,
+                                                             tagCommit,
+                                                             tagInfo,
+                                                             reason: null,
+                                                             tagInfo.DaysDelay,
+                                                             expiration ) == null )
                         {
-                            tagInfo = UpdateExistingDeprecationTag( monitor,
-                                                                    tagCommit,
-                                                                    tagInfo,
-                                                                    reason: null,
-                                                                    tagInfo.DaysDelay,
-                                                                    expiration );
+                            return false;
                         }
                         // Even if this one is already deprecated, continue the propagation.
                     }
@@ -370,15 +382,22 @@ public sealed partial class VersionTagPlugin
                             sb.Append( c.Repo.DisplayPath ).Append( '/' ).Append( c.Version );
                             if( i > 0 ) sb.Append( " <- " );
                         }
-                        tagInfo = CreateDeprecationTag( monitor, tagCommit, reason: sb.ToString(), daysDelay );
+                        if( CreateDeprecationTag( monitor, tagCommit, reason: sb.ToString(), daysDelay ) == null )
+                        {
+                            return false;
+                        }
                     }
                     deprecated.Add( impact );
                     path.Add( impact );
-                    EnsureImpliedDeprecatedTag( monitor, impact, visited, deprecated, path, daysDelay, expiration );
+                    if( !EnsureImpliedDeprecatedTag( monitor, impact, visited, deprecated, path, daysDelay, expiration ) )
+                    {
+                        return false;
+                    }
                     path.RemoveAt( path.Count - 1 );
                 }
             }
         }
+        return true;
 
         static string StoppingDeprecationMessage( IActivityMonitor monitor, RepoReleaseInfo i )
         {

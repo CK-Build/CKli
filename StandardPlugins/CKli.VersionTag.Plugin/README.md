@@ -398,7 +398,10 @@ roadmap's propagation to the downstream repositories sees the capped change too.
 `VersionTagInfo.TryGetCommitBuildInfo` is the gate a Build plugin calls before producing that version: it checks
 `InfVersion`/`SupVersion` bounds, that the target commit/version pair doesn't collide with an existing one (unless
 `RebuildMode` explicitly allows it), that no tag conflicts exist, and (via `FindBaseCommitByVersion`) that there is
-no gap in the Major/Minor/Patch sequence relative to `LastStables` — unless bridged by a `+fake`.
+no gap in the Major/Minor/Patch sequence relative to `LastStables` — unless bridged by a `+fake`. These sequence
+rules govern the creation of a version: a forced rebuild (`allowRebuildVersion`) of a published version on the commit
+that already bears its tag (a valid one or the lightweight/unreadable one being rebuilt) skips them, otherwise the
+first version of a repository (it has no base) or a version after a gap in the old history could never be rebuilt.
 
 ### Release graph and deprecation
 
@@ -406,7 +409,8 @@ no gap in the Major/Minor/Patch sequence relative to `LastStables` — unless br
 producing `RepoKey`, then lazily builds `RepoReleaseInfo` nodes with direct/transitive producer and consumer sets by
 walking `Consumed` package lists. `version deprecate` uses this graph (`GetDirectConsumers`) to walk outward from the
 deprecated version and create/refresh a `+deprecated` tag (with the earliest expiration) on every downstream
-consumer, pushing tag creations (and removals, once expired) to each repo's remote via `DeferredPushRefSpecs`.
+consumer, pushing tag creations (and removals, once expired) to each repo's remote via
+`PersistentDeferredPushRefSpecs`: when this final push fails, the next push of the repository publishes them.
 
 The propagation obeys the same alive-version rule as its root: a consumer whose **alive** version still consumes the
 deprecated one is left alone, with a warning, and the walk stops there and on that repository's own consumers — the
