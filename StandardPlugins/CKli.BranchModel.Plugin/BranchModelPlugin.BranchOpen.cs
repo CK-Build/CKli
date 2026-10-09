@@ -22,7 +22,7 @@ public sealed partial class BranchModelPlugin
     /// <param name="context">The minimal context.</param>
     /// <param name="branchName">The branch name to open.</param>
     /// <param name="link">
-    /// Optional link type (Manual, Regular, CI or Full) to the parent branch. Defaults to CI for a new branch: an already
+    /// Optional link type (Manual, Regular, CI or Full) to the parent branch. Defaults to Full for a new branch: an already
     /// opened branch keeps its current link type.
     /// </param>
     /// <param name="parent">Parent branch to consider instead of the currently checked out branch (applies only to 'explo/' branch).</param>

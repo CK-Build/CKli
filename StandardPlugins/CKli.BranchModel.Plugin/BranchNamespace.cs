@@ -150,8 +150,8 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                         Duplicate Prerelease Name="{csKind.ToBranchName()}" in BranchModel configuration.
                         """ );
                 }
-                // Link is optional (defaults to CI), like <Explo>. WriteConfiguration always writes it.
-                BranchLinkType linkType = BranchLinkType.CI;
+                // Link is optional (defaults to Full), like <Explo>. WriteConfiguration always writes it.
+                BranchLinkType linkType = BranchLinkType.Full;
                 var sLink = (string?)e.Attribute( XNames.Link );
                 if( !string.IsNullOrWhiteSpace( sLink ) )
                 {
@@ -212,8 +212,8 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
                             Expected Name="..." attribute in BranchModel configuration.
                             """ );
             }
-            // LinkType is optional (defaults to CI).
-            BranchLinkType linkType = BranchLinkType.CI;
+            // LinkType is optional (defaults to Full).
+            BranchLinkType linkType = BranchLinkType.Full;
             var sLink = (string?)e.Attribute( XNames.Link );
             if( !string.IsNullOrWhiteSpace( sLink ) )
             {
@@ -528,8 +528,8 @@ public sealed partial class BranchNamespace : IEquatable<BranchNamespace>
         return exploNodes.Where( e => e.Attribute( XNames.Parent ) != null );
     }
 
-    // The Link attribute is ALWAYS written, even for the CI default: a World definition file states what is
-    // true instead of relying on a default the reader has to know. Reading it stays tolerant (absent = CI).
+    // The Link attribute is ALWAYS written, even for the Full default: a World definition file states what is
+    // true instead of relying on a default the reader has to know. Reading it stays tolerant (absent = Full).
     static XElement ToXml( string name, BranchLinkType type, string? parentName, XName elementName )
     {
         Throw.DebugAssert( type is not BranchLinkType.None );

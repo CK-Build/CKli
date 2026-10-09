@@ -100,8 +100,8 @@ public sealed partial class BranchModelPlugin
         {
             BranchLinkType.Manual => ": nothing is synchronized from the parent.",
             BranchLinkType.Regular => ": the parent's last regular version is merged.",
-            BranchLinkType.CI => " (the default): the parent's last version, regular or CI, is merged.",
-            _ => """: the parent's "dev/" branch is merged."""
+            BranchLinkType.CI => ": the parent's last version, regular or CI, is merged.",
+            _ => """ (the default): the parent's "dev/" branch is merged."""
         };
     }
 

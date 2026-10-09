@@ -29,7 +29,7 @@ public enum BranchLinkType
     Regular,
 
     /// <summary>
-    /// This is the default link ("->"): the "dev/" child branch is synchronized with the "dev/" parent branch but only on built commits
+    /// CI link ("->"): the "dev/" child branch is synchronized with the "dev/" parent branch but only on built commits
     /// (a build - CI or "--regular" - must be have been done on the parent branch to impact the child).
     /// <para>
     /// All versioned commits are merged into the "dev/" child branch. 
@@ -39,6 +39,9 @@ public enum BranchLinkType
 
     /// <summary>
     /// Full link ("=>"): the "dev/" child branch is synchronized with the "dev/" parent branch.
+    /// <para>
+    /// This is the default link.
+    /// </para>
     /// </summary>
     Full
 }

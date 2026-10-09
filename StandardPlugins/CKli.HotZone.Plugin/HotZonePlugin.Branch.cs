@@ -70,7 +70,7 @@ public sealed partial class HotZonePlugin
                             string branchName,
                             [Description( """
                                 Specifies the link (Manual, Regular, CI or Full) to the parent branch.
-                                Defaults to CI for a new branch: an already opened branch keeps its current link type.
+                                Defaults to Full for a new branch: an already opened branch keeps its current link type.
                                 """ )]
                             [OptionName( "--link,-l" )]
                             string? link = null,

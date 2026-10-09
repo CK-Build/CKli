@@ -13,7 +13,7 @@ public sealed partial class BranchNamespace
     /// Creates a new namespace with a new or updated branch name.
     /// </summary>
     /// <param name="linkType">
-    /// The optional link type. Defaults to <see cref="BranchLinkType.CI"/> for a new branch.
+    /// The optional link type. Defaults to <see cref="BranchLinkType.Full"/> for a new branch.
     /// When updating an existing branch, the current link type is unchanged when this is not specified.
     /// </param>
     /// <param name="prerelease">
@@ -30,10 +30,10 @@ public sealed partial class BranchNamespace
 
         // BranchLinkType.None is "not specified": only the Root branch can have it, since a <Prerelease>
         // element always writes a Link. Like AddOrUpdateExplo, an already opened branch keeps its link type
-        // and a new one defaults to CI.
+        // and a new one defaults to Full.
         if( linkType is BranchLinkType.None )
         {
-            linkType = _byName.TryGetValue( branchName, out var exists ) ? exists.LinkType : BranchLinkType.CI;
+            linkType = _byName.TryGetValue( branchName, out var exists ) ? exists.LinkType : BranchLinkType.Full;
         }
 
         return Rebuild( _ltsName,
@@ -51,7 +51,7 @@ public sealed partial class BranchNamespace
     /// Creates a new namespace with a new or updated "explo/" branch name.
     /// </summary>
     /// <param name="branchName">The "explo/name" branch name to add.</param>
-    /// <param name="linkType">The optional link type. Defaults to <see cref="BranchLinkType.CI"/> for a new branch.</param>
+    /// <param name="linkType">The optional link type. Defaults to <see cref="BranchLinkType.Full"/> for a new branch.</param>
     /// <param name="parent">
     /// The optional parent branch.
     /// <list type="bullet">
@@ -101,7 +101,7 @@ public sealed partial class BranchNamespace
                                  .Select( b => (b.LinkType, b.VersionKind, b.Name) ),
                         _branches.Skip( _mainLineCount )
                                  .Select( b => (b.LinkType, b.Name, b.Parent!.Name) )
-                                 .Append( (linkType is BranchLinkType.None ? BranchLinkType.CI : linkType, branchName, (parent ?? _branches[_mainLineCount - 1]).Name) ),
+                                 .Append( (linkType is BranchLinkType.None ? BranchLinkType.Full : linkType, branchName, (parent ?? _branches[_mainLineCount - 1]).Name) ),
                         branchName );
     }
 
