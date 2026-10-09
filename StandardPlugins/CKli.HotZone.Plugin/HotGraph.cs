@@ -163,6 +163,51 @@ public sealed partial class HotGraph
     }
 
     /// <summary>
+    /// Creates the resolver of the package versions that conflict when merging into this graph's branch
+    /// (see <see cref="PackageUpdater.CreateVersionResolver(bool)"/>).
+    /// <para>
+    /// Unlike <see cref="GetPackageUpdater"/>, a solution whose commit doesn't contain the last stable version of its
+    /// repository is not an error: this is what a branch looks like when its parent has published since the last
+    /// synchronization, and the merge is precisely what brings the last stable version into it. Such a solution has
+    /// no build to offer (its builds are older than the last stable one): its packages resolve to the greatest of the
+    /// two versions.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The required monitor.</param>
+    /// <param name="versionTag">The version tag plugin.</param>
+    /// <param name="ciBuild">True for the CI point of view.</param>
+    /// <returns>The resolver or null on error.</returns>
+    public IPackageVersionResolver? CreateMergeVersionResolver( IActivityMonitor monitor, VersionTagPlugin versionTag, bool ciBuild )
+    {
+        if( _packageUpdater != null ) return _packageUpdater.CreateVersionResolver( ciBuild );
+        using( monitor.OpenInfo( "Computing graph's merge version resolver." ) )
+        {
+            var ordered = OrderedSolutions;
+            bool complete = true;
+            var versions = new SolutionVersionInfo?[_solutions.Length];
+            for( int i = 0; i < _solutions.Length; i++ )
+            {
+                Solution s = _solutions[i];
+                var vInfo = versionTag.GetWithoutIssue( monitor, s.Repo );
+                if( vInfo == null ) return null;
+                var sV = s.ComputeVersionInfo( monitor, vInfo, lastStableRequired: false );
+                if( sV == null )
+                {
+                    monitor.Info( $"'{s.Repo.DisplayPath}' doesn't contain its last stable version '{vInfo.HotZone!.LastStable.Version.ParsedText}': its packages resolve to the greatest version." );
+                    complete = false;
+                }
+                versions[i] = sV;
+            }
+            if( complete )
+            {
+                _packageUpdater = new PackageUpdater( this, ImmutableCollectionsMarshal.AsImmutableArray<SolutionVersionInfo>( versions! ) );
+                return _packageUpdater.CreateVersionResolver( ciBuild );
+            }
+            return PackageUpdater.CreateVersionResolver( this, versions, ciBuild );
+        }
+    }
+
+    /// <summary>
     /// Mutate this graph by adding the <paramref name="solutions"/> to the <see cref="DevSolutions"/>.
     /// <para>
     /// This is idempotent. When <paramref name="hasChanged"/> is true, the graph has been reordered according

@@ -196,7 +196,7 @@ public sealed partial class HotZonePlugin
                 using( monitor.OpenInfo( $"Computing the Hot Graph of branch '{branch}' to resolve the package versions that conflict." ) )
                 {
                     var graph = GetHotGraph( monitor, branch, isCIBuild: true, [] );
-                    resolver = graph?.GetPackageUpdater( monitor, _versionTag )?.CreateVersionResolver( ciBuild: true );
+                    resolver = graph?.CreateMergeVersionResolver( monitor, _versionTag, ciBuild: true );
                 }
                 cache.Add( branch, resolver );
             }

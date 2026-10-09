@@ -168,7 +168,8 @@ public sealed partial class HotGraph
         /// </summary>
         public IReadOnlyList<PackageInstance> ExternalDependencies => _externalDependencies;
 
-        internal SolutionVersionInfo? ComputeVersionInfo( IActivityMonitor monitor, VersionTagInfo? vInfo )
+        // When lastStableRequired is false, a commit that doesn't contain the LastStable returns null without error.
+        internal SolutionVersionInfo? ComputeVersionInfo( IActivityMonitor monitor, VersionTagInfo? vInfo, bool lastStableRequired = true )
         {
             Throw.DebugAssert( _solution != null );
             // When VersionTagInfo has issue it is null.
@@ -183,11 +184,13 @@ public sealed partial class HotGraph
                 // tip, or the commit the graph branch would be created at when it is missing here).
                 // We store this commit's sha in the SolutionVersionInfo: IsDirty uses it.
                 var currentTip = _solution.Commit;
-                var tagCommitTree = vInfo.HotZone.GetRequiredTagCommitTree( monitor, currentTip );
-                if( tagCommitTree != null )
-                {
-                    _versionInfo = new SolutionVersionInfo( this, vInfo, currentTip.Sha, tagCommitTree );
-                }
+                var tagCommitTree = lastStableRequired
+                                        ? vInfo.HotZone.GetRequiredTagCommitTree( monitor, currentTip )
+                                        : vInfo.HotZone.GetTagCommitTree( currentTip );
+                // A dirty version info must not survive a failure.
+                _versionInfo = tagCommitTree != null
+                                ? new SolutionVersionInfo( this, vInfo, currentTip.Sha, tagCommitTree )
+                                : null;
             }
             return _versionInfo;
         }

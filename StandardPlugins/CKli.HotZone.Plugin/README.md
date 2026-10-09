@@ -85,6 +85,12 @@ closest branch toward the root), then `WorldConfiguredMapping` (the World's boun
 greatest of the two versions (the `DiscrepanciesMapping` rule applied to the two sides). The merges go to the
 `dev/` branches, so the graph is the CI one.
 
+The resolver is obtained with `HotGraph.CreateMergeVersionResolver`, not `GetPackageUpdater`: a branch whose parent
+has published since its last synchronization doesn't contain the parent's new last stable version, so its
+`TagCommitTree` cannot be computed - and bringing that version into the branch is precisely what the merge does.
+Such a solution is not an error here: it has no build to offer (its builds are older than the last stable one) and
+its packages resolve to the greatest of the two versions.
+
 `CreateVersionResolverProvider` computes the `HotGraph` of a branch the first time a merge of that branch
 conflicts on project files and caches it, failure included: a sync or a list without such a conflict never
 computes it, and a World with issues (that has no `HotGraph`) still synchronizes everything that merges

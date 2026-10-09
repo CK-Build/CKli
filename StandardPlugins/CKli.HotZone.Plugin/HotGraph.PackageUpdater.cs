@@ -133,6 +133,12 @@ public sealed partial class HotGraph
         /// <returns>The resolver.</returns>
         public IPackageVersionResolver CreateVersionResolver( bool ciBuild ) => new VersionResolver( GetAlreadyBuiltMapping( ciBuild ), WorldConfiguredMapping );
 
+        // The resolver of HotGraph.CreateMergeVersionResolver when a solution has no version info: its packages are not mapped.
+        internal static IPackageVersionResolver CreateVersionResolver( HotGraph graph, SolutionVersionInfo?[] versions, bool ciBuild )
+        {
+            return new VersionResolver( new LastBuildVersionMapping( graph._p2s, versions, ciBuild ), graph._externalPackages );
+        }
+
         sealed class VersionResolver( IPackageMapping alreadyBuilt, IPackageMapping configured ) : IPackageVersionResolver
         {
             public SVersion Resolve( string packageId, SVersion ours, SVersion theirs )
@@ -147,10 +153,11 @@ public sealed partial class HotGraph
         sealed class LastBuildVersionMapping : IPackageMapping
         {
             readonly Dictionary<string, Solution> _p2s;
-            readonly ImmutableArray<SolutionVersionInfo> _versions;
+            // A null version info has no build to offer: its packages are known but not mapped.
+            readonly IReadOnlyList<SolutionVersionInfo?> _versions;
             readonly bool _ciBuild;
 
-            public LastBuildVersionMapping( Dictionary<string, Solution> p2s, ImmutableArray<SolutionVersionInfo> versions, bool ciBuild )
+            public LastBuildVersionMapping( Dictionary<string, Solution> p2s, IReadOnlyList<SolutionVersionInfo?> versions, bool ciBuild )
             {
                 _p2s = p2s;
                 _versions = versions;
@@ -164,6 +171,10 @@ public sealed partial class HotGraph
                 if( _p2s.TryGetValue( packageId, out var s ) )
                 {
                     var sv = _versions[s.Repo.Index];
+                    if( sv == null )
+                    {
+                        return null;
+                    }
                     var v = sv.GetLastBuild( _ciBuild );
                     if( v.VersionMustBuild )
                     {
@@ -174,12 +185,13 @@ public sealed partial class HotGraph
                 return null;
             }
 
-            // A solution whose last build must itself be rebuilt (a "+fake" or a deprecated version) has no
+            // A solution without version info or whose last build must itself be rebuilt (a "+fake" or a deprecated version) has no
             // version to offer: the identifier is known but nothing maps, and that is not an anomaly.
             public PackageMappingType GetMappingType( string packageId )
             {
                 if( !_p2s.TryGetValue( packageId, out var s ) ) return PackageMappingType.None;
-                return _versions[s.Repo.Index].GetLastBuild( _ciBuild ).VersionMustBuild
+                var sv = _versions[s.Repo.Index];
+                return sv == null || sv.GetLastBuild( _ciBuild ).VersionMustBuild
                         ? PackageMappingType.KnownName
                         : PackageMappingType.Mapped;
             }
