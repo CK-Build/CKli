@@ -467,7 +467,21 @@ public partial class GitRepositoryTests
             var before = content;
             bob.MergeBranchContent( TestHelper.Monitor, ref content, bobMaster.TrackedBranch ).ShouldBeTrue();
             content.ShouldBeSameAs( before, "Nothing done: the branch has not been rewritten." );
+            bob.PredictMerge( TestHelper.Monitor, content.Tip, bobMaster.TrackedBranch.Tip, null, out _ ).ShouldBe( MergeOutcome.UpToDate );
             bob.Repository.Branches.Remove( content );
+        }
+
+        // ...unless the merged side brings a tagged commit (a release of the parent whose content the branch already
+        // has): the empty merge commit is then created, otherwise the version tag would not be in the branch's history.
+        {
+            var tag = bob.Repository.Tags.Add( "v1.0.0", timLast );
+            var content = bob.Repository.Branches.Add( "content-check", bobMaster.Tip );
+            bob.PredictMerge( TestHelper.Monitor, content.Tip, bobMaster.TrackedBranch.Tip, null, out _ ).ShouldBe( MergeOutcome.Merge );
+            bob.MergeBranchContent( TestHelper.Monitor, ref content, bobMaster.TrackedBranch ).ShouldBeTrue();
+            content.Tip.Parents.Select( p => p.Sha ).ShouldBe( [bobLast.Sha, timLast.Sha] );
+            content.Tip.Tree.Sha.ShouldBe( bobLast.Tree.Sha );
+            bob.Repository.Branches.Remove( content );
+            bob.Repository.Tags.Remove( tag );
         }
 
         // The pull creates an (empty) merge commit...

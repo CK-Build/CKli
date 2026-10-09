@@ -59,7 +59,8 @@ public sealed partial class GitRepository
         var d = _git.ObjectDatabase.CalculateHistoryDivergence( other, target );
         if( d.AheadBy is 0 ) return MergeOutcome.UpToDate;
         if( d.BehindBy is 0 ) return MergeOutcome.FastForward;
-        if( target.Tree.Sha == other.Tree.Sha ) return MergeOutcome.UpToDate;
+        // Same content: no merge is needed (see MergeBranchContent), unless other brings a tagged commit.
+        if( target.Tree.Sha == other.Tree.Sha ) return BringsTaggedCommit( target, other ) ? MergeOutcome.Merge : MergeOutcome.UpToDate;
         var merge = MergeTrees( monitor, target, other, aligner, mustResolveAll: false );
         if( merge.Failed ) return MergeOutcome.Failed;
         conflicts = merge.Conflicts;

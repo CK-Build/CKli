@@ -901,7 +901,8 @@ public sealed partial class GitRepository : IDisposable
     /// <para>
     /// Unlike <see cref="MergeBranch(IActivityMonitor, ref Branch, Branch)"/>, when the two tips have diverged and have
     /// the same content, no empty merge commit is created: the <paramref name="branch"/> is left as-is and
-    /// <paramref name="other"/> doesn't become part of its history.
+    /// <paramref name="other"/> doesn't become part of its history - unless <paramref name="other"/> brings a tagged
+    /// commit: the empty merge commit is then created so that the tag is in the branch's history.
     /// A fast-forward creates no commit and is always done, whatever the content.
     /// </para>
     /// </summary>
@@ -919,7 +920,8 @@ public sealed partial class GitRepository : IDisposable
     /// <para>
     /// Unlike <see cref="MergeBranch(IActivityMonitor, ref Branch, Commit)"/>, when the branch's tip and the commit have
     /// diverged and have the same content, no empty merge commit is created: the <paramref name="branch"/> is left as-is
-    /// and <paramref name="commit"/> doesn't become part of its history.
+    /// and <paramref name="commit"/> doesn't become part of its history - unless <paramref name="commit"/> brings a tagged
+    /// commit: the empty merge commit is then created so that the tag is in the branch's history.
     /// A fast-forward creates no commit and is always done, whatever the content.
     /// </para>
     /// </summary>
@@ -930,6 +932,20 @@ public sealed partial class GitRepository : IDisposable
     public bool MergeBranchContent( IActivityMonitor monitor, ref Branch branch, Commit commit )
     {
         return DoMergeBranch( monitor, ref branch, commit, skipSameContent: true );
+    }
+
+    // True when a commit reachable from "other" but not from "target" carries a tag: merging "other" is then
+    // required even when the content is the same, otherwise the tag is not in the target's history.
+    internal bool BringsTaggedCommit( Commit target, Commit other )
+    {
+        var tagged = new HashSet<string>();
+        foreach( var t in _git.Tags )
+        {
+            if( t.PeeledTarget is Commit c ) tagged.Add( c.Sha );
+        }
+        if( tagged.Count == 0 ) return false;
+        var brought = _git.Commits.QueryBy( new CommitFilter { IncludeReachableFrom = other, ExcludeReachableFrom = target } );
+        return brought.Any( c => tagged.Contains( c.Sha ) );
     }
 
     bool DoMergeBranch( IActivityMonitor monitor, ref Branch branch, Branch other, bool skipSameContent )
@@ -1019,8 +1035,10 @@ public sealed partial class GitRepository : IDisposable
                 // Fast-forward "branch" to "otherTip".
                 return otherTip;
             }
-            // The two have diverged. When skipSameContent is true, we don't create an empty merge commit.
-            if( skipSameContent && branch.Tip.Tree.Sha == otherTip.Tree.Sha )
+            // The two have diverged. When skipSameContent is true, we don't create an empty merge commit,
+            // unless otherTip brings a tagged commit: like a fast-forward, skipping it would leave the version
+            // tag out of the branch's history.
+            if( skipSameContent && branch.Tip.Tree.Sha == otherTip.Tree.Sha && !git.BringsTaggedCommit( branch.Tip, otherTip ) )
             {
                 // No-op: there is no content to merge.
                 return branch.Tip;
