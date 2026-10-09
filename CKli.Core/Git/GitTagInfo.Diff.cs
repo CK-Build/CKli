@@ -252,7 +252,7 @@ public sealed partial class GitTagInfo
                         {
                             difference.Append( "is locally an annotated tag but remotely a lightweight one." );
                         }
-                        else if( lr.Diff == TagDiff.LocalAnnotatedDiffer )
+                        else if( lr.Diff == TagDiff.RemoteAnnotatedDiffer )
                         {
                             difference.Append( "is locally a lightweight tag but remotely an annotated one." );
                         }

@@ -15,6 +15,13 @@ namespace CKli.Core.Tests;
 [TestFixture]
 public partial class TagTests
 {
+    // At least one test here pushes, so the write PAT for the "FILESYSTEM" is required.
+    [OneTimeSetUp]
+    public void OneTimeSetup() => TestEnv.SetFileSystemWritePAT();
+
+    [OneTimeTearDown]
+    public void OneTimeTearDown() => TestEnv.RemoveFileSystemWritePAT();
+
     [Test]
     public async Task TagFetchMode_All_must_not_be_the_default_Async()
     {
@@ -415,6 +422,18 @@ public partial class TagTests
                 │ <remote signature>⮐
                 │  Bob (bob@mail.com)⮐
                 │  on 2025-12-11 00:00:00Z⮐
+
+                """ );
+        }
+        // Tim's v4 becomes a lightweight tag: Bob's annotated one is now the only annotated.
+        {
+            var t4 = tim.Repository.Tags["v4"];
+            tim.Repository.Tags.Add( "v4", t4.PeeledTarget, allowOverwrite: true );
+            tim.GetDiffTags( TestHelper.Monitor, out diff ).ShouldBeTrue();
+            DebugRenderer.Render( diff.ToRenderable( ScreenType.Default, orderByTagName: true ) ).ShouldBe( """
+                t1-annotated, t1-lightweight⮐
+                [MAGENTA]1 differences:[GRAY]⮐
+                - 'v4' is locally a lightweight tag but remotely an annotated one.⮐
 
                 """ );
         }
