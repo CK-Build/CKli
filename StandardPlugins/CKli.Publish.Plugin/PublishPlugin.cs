@@ -324,16 +324,23 @@ public sealed class PublishPlugin : PrimaryPluginBase
             var packageSender = PackageSender.Create( monitor, artifactHandler, branchModel, world.StackRepository.SecretsStore );
             if( packageSender == null ) return false;
 
-            var publisher = new FixPublisher( packageSender, artifactHandler, branchModel.BranchNamespace.Root.Name, keepLocalReleaseAfterPublish );
-
-            for( int i = 0; i < results.Length; i++ )
+            var defaultBranchFailures = new DefaultBranchFailures();
+            var publisher = new FixPublisher( packageSender, artifactHandler, branchModel.BranchNamespace.Root.Name, keepLocalReleaseAfterPublish, defaultBranchFailures );
+            try
             {
-                var result = results[i];
-                var branchName = fixWorkflow.Targets[i].BranchName;
-                if( !await publisher.PublishAsync( monitor, result.Repo, branchName, result.Version, result.VersionTag, result.Content, cancel ).ConfigureAwait( false ) )
+                for( int i = 0; i < results.Length; i++ )
                 {
-                    return false;
+                    var result = results[i];
+                    var branchName = fixWorkflow.Targets[i].BranchName;
+                    if( !await publisher.PublishAsync( monitor, result.Repo, branchName, result.Version, result.VersionTag, result.Content, cancel ).ConfigureAwait( false ) )
+                    {
+                        return false;
+                    }
                 }
+            }
+            finally
+            {
+                defaultBranchFailures.Warn( monitor );
             }
             bool stackPushed = PushStack( monitor, world );
 
@@ -466,8 +473,9 @@ public sealed class PublishPlugin : PrimaryPluginBase
                             e.SetFailed();
                             return;
                         }
-                        var roadmapPublisher = new RoadmapPublisher( packageSender, _artifactHandler, _branchModel, _keepLocalReleaseAfterPublish );
-                        var indirectPublisher = new IndirectPublisher( packageSender, _artifactHandler, _branchModel, _keepLocalReleaseAfterPublish );
+                        var defaultBranchFailures = new DefaultBranchFailures();
+                        var roadmapPublisher = new RoadmapPublisher( packageSender, _artifactHandler, _branchModel, _keepLocalReleaseAfterPublish, defaultBranchFailures );
+                        var indirectPublisher = new IndirectPublisher( packageSender, _artifactHandler, _branchModel, _keepLocalReleaseAfterPublish, defaultBranchFailures );
                         // The profile is identified by a time based version that is free in the PublishedFolder: the
                         // branch that is published (and whether this is a CI build) places its file.
                         var publishedFolder = PublishedFolder;
@@ -484,6 +492,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                                                          e.MaxDop,
                                                          cancellation ).ConfigureAwait( false ) )
                         {
+                            defaultBranchFailures.Warn( monitor );
                             e.SetFailed();
                         }
                         else
@@ -507,6 +516,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                             {
                                 monitor.Error( $"While saving the published profile '{profileVersion}'.", ex );
                             }
+                            defaultBranchFailures.Warn( monitor );
                             if( !PushStack( monitor, World ) ) e.SetFailed();
                         }
                     }

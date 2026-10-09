@@ -26,16 +26,19 @@ abstract class BasePublisher
     readonly ArtifactHandlerPlugin _artifactHandler;
     readonly string _rootBranchName;
     readonly bool _keepLocalReleaseAfterPublish;
+    readonly DefaultBranchFailures _defaultBranchFailures;
 
     protected BasePublisher( PackageSender packageSender,
                              ArtifactHandlerPlugin artifactHandler,
                              string rootBranchName,
-                             bool keepLocalReleaseAfterPublish )
+                             bool keepLocalReleaseAfterPublish,
+                             DefaultBranchFailures defaultBranchFailures )
     {
         _packageSender = packageSender;
         _artifactHandler = artifactHandler;
         _rootBranchName = rootBranchName;
         _keepLocalReleaseAfterPublish = keepLocalReleaseAfterPublish;
+        _defaultBranchFailures = defaultBranchFailures;
     }
 
     /// <summary>
@@ -166,10 +169,11 @@ abstract class BasePublisher
                 // A failure doesn't fail the publication: the packages are already sent, the release is fine and
                 // only the remote repository's presentation is not the one we want. Hosts also require more than
                 // push rights to change it (GitHub requires administration rights on the repository): a token that
-                // can publish but not administer must not turn every publication into a failure.
-                if( !await hostingProvider.SetDefaultBranchAsync( monitor, hostedRepoPath, branchName, cancel ).ConfigureAwait( false ) )
+                // can publish but not administer must not turn every publication into a failure: the host's answer
+                // is only traced and the repository is collected, a single warning reports them all at the end.
+                if( !await hostingProvider.SetDefaultBranchAsync( monitor, hostedRepoPath, branchName, LogLevel.Trace, cancel ).ConfigureAwait( false ) )
                 {
-                    monitor.Warn( $"Unable to make '{branchName}' the default branch of '{hostedRepoPath}'. Publication continues." );
+                    _defaultBranchFailures.Add( repo.DisplayPath, branchName );
                 }
                 else
                 {

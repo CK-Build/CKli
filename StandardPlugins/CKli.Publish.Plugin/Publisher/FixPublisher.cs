@@ -18,8 +18,9 @@ sealed class FixPublisher : BasePublisher
     public FixPublisher( PackageSender packageSender,
                          ArtifactHandlerPlugin artifactHandler,
                          string rootBranchName,
-                         bool keepLocalReleaseAfterPublish )
-        : base( packageSender, artifactHandler, rootBranchName, keepLocalReleaseAfterPublish )
+                         bool keepLocalReleaseAfterPublish,
+                         DefaultBranchFailures defaultBranchFailures )
+        : base( packageSender, artifactHandler, rootBranchName, keepLocalReleaseAfterPublish, defaultBranchFailures )
     {
     }
 

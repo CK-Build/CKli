@@ -22,8 +22,9 @@ sealed class RoadmapPublisher : BasePublisher
     public RoadmapPublisher( PackageSender packageSender,
                              ArtifactHandlerPlugin artifactHandler,
                              BranchModelPlugin branchModel,
-                             bool keepLocalReleaseAfterPublish )
-        : base( packageSender, artifactHandler, branchModel.BranchNamespace.Root.Name, keepLocalReleaseAfterPublish )
+                             bool keepLocalReleaseAfterPublish,
+                             DefaultBranchFailures defaultBranchFailures )
+        : base( packageSender, artifactHandler, branchModel.BranchNamespace.Root.Name, keepLocalReleaseAfterPublish, defaultBranchFailures )
     {
         _branches = branchModel.BranchNamespace;
     }
