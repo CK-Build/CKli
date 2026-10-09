@@ -8,11 +8,15 @@ namespace CKli.Build.Plugin;
 
 /// <summary>
 /// Very basic string cache stored in "<see cref="StackRepository.StackWorkingFolder"/>/$Local" folder.
+/// <para>
+/// This is thread safe: parallel builds share the same cache.
+/// </para>
 /// </summary>
 public sealed class LocalStringCache
 {
     readonly LocalWorldName _world;
     readonly string _name;
+    readonly object _lock;
     string? _filePath;
     HashSet<string>? _cache;
 
@@ -25,6 +29,7 @@ public sealed class LocalStringCache
     {
         _world = world;
         _name = name;
+        _lock = new object();
     }
 
     /// <summary>
@@ -33,7 +38,13 @@ public sealed class LocalStringCache
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="key">The key to lookup.</param>
     /// <returns>True if this cache contains the key.</returns>
-    public bool Contains( IActivityMonitor monitor, string key ) => GetCache( monitor ).Contains( key );
+    public bool Contains( IActivityMonitor monitor, string key )
+    {
+        lock( _lock )
+        {
+            return GetCache( monitor ).Contains( key );
+        }
+    }
 
     /// <summary>
     /// Adds a key.
@@ -42,16 +53,21 @@ public sealed class LocalStringCache
     /// <param name="key">The key to add.</param>
     public void Add( IActivityMonitor monitor, string key )
     {
-        var c = GetCache( monitor );
-        c.Add( key );
-        try
+        // Concurrent writes of the file fail with a sharing violation ("being used by another process"):
+        // the whole update, file included, is done under the lock.
+        lock( _lock )
         {
-            Throw.DebugAssert( _filePath != null );
-            File.WriteAllLines( _filePath, c );
-        }
-        catch( Exception ex )
-        {
-            monitor.Warn( $"While writing '{_filePath}'.", ex );
+            var c = GetCache( monitor );
+            if( !c.Add( key ) ) return;
+            try
+            {
+                Throw.DebugAssert( _filePath != null );
+                File.WriteAllLines( _filePath, c );
+            }
+            catch( Exception ex )
+            {
+                monitor.Warn( $"While writing '{_filePath}'.", ex );
+            }
         }
     }
 

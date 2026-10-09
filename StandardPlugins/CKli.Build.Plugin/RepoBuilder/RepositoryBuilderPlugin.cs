@@ -26,7 +26,7 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     // successfully passed tests. All RepoBuilder use it.
     // This is in the $Local (not in the git repository) to allow tests to run on each machine.
     // There is currently no housekeeping.
-    internal LocalStringCache? _shaTestRunCache;
+    internal readonly LocalStringCache _shaTestRunCache;
 
     /// <summary>
     /// The name of the <see cref="LocalStringCache"/> of the commit contents whose tests have successfully run.
@@ -43,6 +43,8 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     {
         _artifactHandler = artifactHandler;
         _onCoreBuild = new PerfectEventSender<CoreBuildEventArgs>();
+        // Created here (it reads nothing until used): the parallel builds would race on a lazy creation.
+        _shaTestRunCache = new LocalStringCache( World.Name, ShaTestRunCacheName );
         World.Events.PluginInfo += PluginInfoRequested;
         World.Events.CreateLTS.Sync += LTSCreated;
         // <Build DeleteBeforeBuild="$StObjGen;*.g.cs" />: entries that a previous build produced and that
@@ -213,7 +215,6 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
     /// <inheritdoc />
     protected override RepoBuilder Create( IActivityMonitor monitor, Repo repo )
     {
-        _shaTestRunCache ??= new LocalStringCache( repo.World.Name, ShaTestRunCacheName );
         return new RepoBuilder( repo, this, _artifactHandler, _artifactHandler.Get( monitor, repo ) );
     }
 

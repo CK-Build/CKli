@@ -80,7 +80,6 @@ public class RepoBuilder : RepoInfo
     public bool HasTestRun( IActivityMonitor monitor, Commit commit )
     {
         string testKey = commit.Tree.Sha;
-        Throw.DebugAssert( _repositoryBuilder._shaTestRunCache != null );
         return _repositoryBuilder._shaTestRunCache.Contains( monitor, testKey );
     }
 
@@ -92,7 +91,6 @@ public class RepoBuilder : RepoInfo
     /// <param name="commit">The commit on which the tests have run.</param>
     public void SetTestRun( IActivityMonitor monitor, Commit commit )
     {
-        Throw.DebugAssert( _repositoryBuilder._shaTestRunCache != null );
         _repositoryBuilder._shaTestRunCache.Add( monitor, commit.Tree.Sha );
     }
 
