@@ -197,13 +197,26 @@ public sealed partial class GitRepository : IDisposable
     }
 
     /// <summary>
-    /// Checks that the current head is a clean commit (working directory is clean and no staging files exists).
+    /// Checks that the current head is a clean commit (working directory is clean and no staging files exists)
+    /// and that no operation (a merge, a rebase, etc.) is in progress: the error tells which one and how many
+    /// conflicts remain.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <returns>True if the current head is clean, false otherwise.</returns>
     public bool CheckCleanCommit( IActivityMonitor monitor )
     {
-        if( _git.RetrieveStatus( _checkDirtyOptions ).IsDirty )
+        var status = _git.RetrieveStatus( _checkDirtyOptions );
+        var operation = _git.Info.CurrentOperation;
+        if( operation != CurrentOperation.None )
+        {
+            int conflicts = status.Count( e => (e.State & FileStatus.Conflicted) != 0 );
+            var todo = conflicts == 0
+                        ? "its conflicts are resolved: commit it (or abort it)"
+                        : $"{conflicts} conflict(s) remain: resolve them and commit it (or abort it)";
+            monitor.Error( $"Repository '{DisplayPath}' has a {operation.ToString().ToLowerInvariant()} in progress ({CurrentBranchName}): {todo}." );
+            return false;
+        }
+        if( status.IsDirty )
         {
             monitor.Error( $"Repository '{DisplayPath}' has uncommitted changes ({CurrentBranchName})." );
             return false;

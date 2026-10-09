@@ -76,12 +76,23 @@ public partial class GitRepositoryTests
         status.Operation.ShouldBe( CurrentOperation.Merge );
         status.ConflictCount.ShouldBe( 1 );
         status.IsDirty.ShouldBeTrue();
+        // The head is not clean: the merge in progress is named, not reported as mere uncommitted changes.
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            r.CheckCleanCommit( TestHelper.Monitor ).ShouldBeFalse();
+            logs.ShouldContain( t => t.Contains( "has a merge in progress (main): 1 conflict(s) remain: resolve them and commit it (or abort it)." ) );
+        }
 
         File.WriteAllText( file, "Resolved." );
         Commands.Stage( r.Repository, "SomeFile.txt" );
         status = r.GetSimpleStatusInfo();
         status.Operation.ShouldBe( CurrentOperation.Merge );
         status.ConflictCount.ShouldBe( 0 );
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            r.CheckCleanCommit( TestHelper.Monitor ).ShouldBeFalse();
+            logs.ShouldContain( t => t.Contains( "has a merge in progress (main): its conflicts are resolved: commit it (or abort it)." ) );
+        }
     }
 
 
