@@ -52,6 +52,60 @@ public class LayoutTests
     }
 
     [Test]
+    public async Task wip_folder_is_ignored_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var remotes = TestEnv.OpenRemotes( "CKt" );
+
+        // ckli clone file:///.../CKt-Stack
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
+        // cd CKt
+        context = context.ChangeDirectory( "CKt" );
+
+        // The .wip folder is a git repository without origin that contains a repository with an origin
+        // (not defined in the world) and a repository without origin.
+        var wip = context.CurrentDirectory.AppendPart( ".wip" );
+        Repository.Init( wip );
+        Repository.Clone( remotes.GetUriFor( "CKt-ActivityMonitor" ).ToString(), wip.Combine( "Sub/CKt-ActivityMonitor" ) );
+        Repository.Init( wip.AppendPart( "NoOrigin" ) );
+
+        // ckli layout fix --delete-aliens
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "layout", "fix", "--delete-aliens" )).ShouldBeTrue();
+        File.Exists( wip.Combine( "Sub/CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Not an alien: ignored." );
+        Directory.Exists( wip.Combine( "NoOrigin/.git" ) ).ShouldBeTrue();
+        Directory.Exists( wip.AppendPart( ".git" ) ).ShouldBeTrue();
+
+        // ckli layout xif
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "layout", "xif" )).ShouldBeTrue();
+        File.ReadAllText( context.CurrentStackPath.AppendPart( "CKt.xml" ) ).ShouldNotContain( "CKt-ActivityMonitor" );
+        File.Exists( wip.Combine( "Sub/CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task issue_fix_never_deletes_aliens_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var remotes = TestEnv.OpenRemotes( "CKt" );
+
+        // ckli clone file:///.../CKt-Stack
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
+        // cd CKt
+        context = context.ChangeDirectory( "CKt" );
+
+        // CKt-ActivityMonitor is not defined in the world.
+        var alien = context.CurrentDirectory.AppendPart( "Alien" );
+        Repository.Clone( remotes.GetUriFor( "CKt-ActivityMonitor" ).ToString(), alien );
+
+        // ckli issue --all --fix (the layout issue is only detected with --all).
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "issue", "--all", "--fix" )).ShouldBeTrue();
+        File.Exists( alien.AppendPart( "CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Only 'layout fix --delete-aliens' deletes aliens." );
+
+        // ckli layout fix --delete-aliens
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "layout", "fix", "--delete-aliens" )).ShouldBeTrue();
+        Directory.Exists( alien ).ShouldBeFalse();
+    }
+
+    [Test]
     public async Task layout_xif_Async()
     {
         var context = TestEnv.EnsureCleanFolder();

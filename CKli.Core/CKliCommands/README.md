@@ -283,7 +283,13 @@ Compares the local layout of folders and repositories with the World's definitio
 and updates the local file system accordingly.
 - Folders are moved and/or renamed to match the definition file (also fixes the difference in name casing).
 - Missing Repo are cloned (where they must be).
-- If `--delete-aliens` is specified, repositories not defined in the World are deleted.
+- If `--delete-aliens` is specified, repositories not defined in the World are deleted. This is the only
+  command that deletes them: the layout issue fixed by `issue --fix` lists them but never deletes them.
+
+The `.wip/` folder at the root of the World is not part of its layout: CKli fully ignores it. It is a place
+for work in progress that doesn't belong to the World. It can be a plain folder or a git repository (with
+or without an origin) and can contain any number of repositories: `layout fix` never moves or deletes them
+and `layout xif` never adds them to the definition file.
 
 ### `layout xif`
 Opposite of `fix`: consider the current folders and repositories to be the "right" definition of the World.
@@ -295,6 +301,9 @@ To publish this update, a `push` (typically with `--stack-only`) must be execute
 
 Detects issues and display them or fix the issues that can be automatically fixed when `--fix` is specified.
 When `--all` is specified, this applies to all the Repos of the current World (even if current path is in a Repo).
+
+The layout issue is fixed like `layout fix` without `--delete-aliens`: repositories not defined in the World
+are reported, never deleted.
 
 ### `exec ... --ckli-continue-on-error --ckli-all`
 

@@ -14,6 +14,13 @@ namespace CKli.Core;
 sealed partial class World
 {
     /// <summary>
+    /// Name of the work-in-progress folder at the root of a world that CKli fully ignores.
+    /// It can be a plain folder or a git repository (with or without an origin) and can contain
+    /// any number of repositories: none of them is part of the world's physical layout.
+    /// </summary>
+    public const string WipFolderName = ".wip";
+
+    /// <summary>
     /// Captures the <c>&lt;Repository Url="..." /&gt;</c> element.
     /// </summary>
     /// <param name="Url">The repository url.</param>
@@ -516,6 +523,11 @@ sealed partial class World
                     // The Stack repository must not appear in the physical layout.
                     continue;
                 }
+                if( subFolder.Equals( WipFolderName, StringComparison.OrdinalIgnoreCase ) )
+                {
+                    // The world root's work-in-progress folder is fully ignored, whatever it contains.
+                    continue;
+                }
                 if( otherWorldRoots.Contains( p ) )
                 {
                     // Another world of the stack: its repositories belong to it, not to this world.
@@ -664,7 +676,8 @@ sealed partial class World
 
         protected internal override ValueTask<bool> ExecuteAsync( IActivityMonitor monitor, CKliEnv context, World world, CancellationToken cancellation )
         {
-            return ValueTask.FromResult( world.FixLayout( monitor, true, out _ ) );
+            // Never deletes the repositories that don't belong to the world: only "ckli layout fix --delete-aliens" does.
+            return ValueTask.FromResult( world.FixLayout( monitor, deleteAliens: false, out _ ) );
         }
     }
 
