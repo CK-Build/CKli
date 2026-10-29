@@ -286,8 +286,9 @@ and updates the local file system accordingly.
 - If `--delete-aliens` is specified, repositories not defined in the World are deleted. This is the only
   command that deletes them: the layout issue fixed by `issue --fix` lists them but never deletes them.
 
-The `.wip/` folder at the root of the World is not part of its layout: CKli fully ignores it. It is a place
-for work in progress that doesn't belong to the World. It can be a plain folder or a git repository (with
+The `.wip/` folder at the root of every World (the Stack root for the default World, its `@ltsName/` folder
+for a LTS World) is not part of its layout: CKli fully ignores it. It is a place for work in progress that
+doesn't belong to the World. It can be a plain folder or a git repository (with
 or without an origin) and can contain any number of repositories: `layout fix` never moves or deletes them
 and `layout xif` never adds them to the definition file.
 

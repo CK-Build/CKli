@@ -319,6 +319,49 @@ public class LTSWorldTests
     }
 
     /// <summary>
+    /// The ".wip" folder at the root of every world (the Stack root for the default world, "@ltsName/" for a
+    /// LTS world) is fully ignored. Each ".wip" here is a git repository without origin that contains a clone
+    /// of the world's own repository: if it was scanned, it would be a duplicate or a misplaced repository.
+    /// </summary>
+    [Test]
+    public async Task wip_folder_is_ignored_in_every_world_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var one = TestEnv.OpenRemotes( "One" );
+        ArrangeLTSWorld( context, one.StackUri, "One", "@net8" );
+
+        StackRepository.ClearRegistry( TestHelper.Monitor ).ShouldBeTrue();
+        var target = context.ChangeDirectory( "Target" );
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, target, "clone", one.StackUri, "--lts-name", "@net8" ))
+            .ShouldBeTrue();
+        var stackRoot = target.CurrentDirectory.AppendPart( "One" );
+        var ltsRoot = stackRoot.AppendPart( "@net8" );
+
+        var wips = new[] { stackRoot.AppendPart( ".wip" ), ltsRoot.AppendPart( ".wip" ) };
+        foreach( var wip in wips )
+        {
+            LibGit2Sharp.Repository.Init( wip );
+            LibGit2Sharp.Repository.Clone( one.GetUriFor( "OneRepo" ).ToString(), wip.Combine( "Sub/OneRepo" ) );
+            LibGit2Sharp.Repository.Init( wip.AppendPart( "NoOrigin" ) );
+        }
+
+        // ckli layout fix --delete-aliens, in the LTS world and in the default world.
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, target.ChangeDirectory( ltsRoot ), "layout", "fix", "--delete-aliens" ))
+            .ShouldBeTrue();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, target.ChangeDirectory( stackRoot ), "layout", "fix", "--delete-aliens" ))
+            .ShouldBeTrue();
+
+        foreach( var wip in wips )
+        {
+            Directory.Exists( wip.AppendPart( ".git" ) ).ShouldBeTrue();
+            Directory.Exists( wip.Combine( "Sub/OneRepo/.git" ) ).ShouldBeTrue( $"'{wip}' content is ignored." );
+            Directory.Exists( wip.Combine( "NoOrigin/.git" ) ).ShouldBeTrue();
+        }
+        Directory.Exists( ltsRoot.AppendPart( "OneRepo" ) ).ShouldBeTrue( "The LTS world's repository is where it must be." );
+        Directory.Exists( stackRoot.AppendPart( "OneRepo" ) ).ShouldBeTrue( "The default world cloned its own copy." );
+    }
+
+    /// <summary>
     /// Pushes a "@{ltsName}/{name}@{ltsName}.xml" world definition file to the Stack remote. Its layout is the same
     /// single repository as the fixture's default world.
     /// </summary>
