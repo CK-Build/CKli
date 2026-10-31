@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,6 +17,7 @@ sealed class CKliPush : Command
                 Pushes the Stack repository and all Repo's local branches that track a remote branch.
                 A pull is done before: it must be successful for the actual push to be done.
                 A merge of this pull that conflicts is left in progress on the branch named by --branch (see 'ckli pull').
+                A local branch that a plugin requires (like a Branch Model one) is pushed even if it tracks no remote branch yet.
                 """,
                 [],
                 [
@@ -93,8 +95,13 @@ sealed class CKliPush : Command
                     // Instead of working branch per branch, we pull (fetch-merge) all branches
                     // first and then push them (CKliPull.DoPullAsync fetches all remote branches and then
                     // merges them).
+                    // The pull associates the untracked branches to their existing "origin" branch: the ones that
+                    // remain untracked have no remote branch yet. The Pushing event names the ones that must be
+                    // pushed anyway.
+                    (bool Success, IReadOnlySet<string>? Names) trackedBranchNames = default;
                     if( await CKliPull.DoPullAsync( monitor, world, context.Screen, repos, withTags: false, maxDop, continueOnError, branch, dryRun: false, scopeAlive )
-                                      .ConfigureAwait( false ) )
+                                      .ConfigureAwait( false )
+                        && (trackedBranchNames = await RaisePushingAsync( monitor, context, world, repos ).ConfigureAwait( false )).Success )
                     {
                         // Repositories are independent: they are pushed in parallel, exactly like they have
                         // just been pulled. Each of them is pushed by a single network operation (see PushOne).
@@ -103,7 +110,7 @@ sealed class CKliPush : Command
                             var pool = new ActivityMonitorAsyncPool( maxDop <= 0 ? int.MaxValue : maxDop );
                             // SoftStop: on error, the started repositories end but no new one is pushed.
                             success &= await pool.ParallelAsync( repos,
-                                                                 static ( monitor, repo, cancellation ) => PushOne( monitor, repo ),
+                                                                 ( monitor, repo, cancellation ) => PushOne( monitor, repo, trackedBranchNames.Names ),
                                                                  continueOnError ? ParallelErrorBehavior.Ignore : ParallelErrorBehavior.SoftStop,
                                                                  scopeAlive )
                                                  .ConfigureAwait( false );
@@ -124,6 +131,18 @@ sealed class CKliPush : Command
         }
     }
 
+    static async Task<(bool Success, IReadOnlySet<string>? Names)> RaisePushingAsync( IActivityMonitor monitor,
+                                                                                      CKliEnv context,
+                                                                                      World world,
+                                                                                      IReadOnlyList<Repo> repos )
+    {
+        if( !world.Events._pushingEventSender.HasHandlers ) return (true, null);
+        var e = new PushingEventArgs( monitor, context, world, repos );
+        bool success = await world.Events._pushingEventSender.SafeRaiseAsync( monitor, e ).ConfigureAwait( false )
+                       && e.Success;
+        return (success, e.TrackedBranchNames);
+    }
+
     /// <summary>
     /// Pushes all the branches of one repository that track an "origin" branch with a single call to
     /// <see cref="GitRepository.Push"/>: a push is a full connection to the remote and the low level push
@@ -132,14 +151,30 @@ sealed class CKliPush : Command
     /// This must never be called concurrently for the same <paramref name="repo"/>: a <see cref="GitRepository"/>
     /// is not thread safe. Parallelism here is across repositories only.
     /// </para>
+    /// <para>
+    /// A local branch named by <paramref name="trackedBranchNames"/> (see <see cref="PushingEventArgs.EnsureTracking"/>)
+    /// that tracks no branch is first configured to track its "origin" branch.
+    /// </para>
     /// </summary>
-    static bool PushOne( IActivityMonitor monitor, Repo repo )
+    static bool PushOne( IActivityMonitor monitor, Repo repo, IReadOnlySet<string>? trackedBranchNames )
     {
         var git = repo.GitRepository;
         var refSpecs = new List<string>();
-        foreach( var b in git.Repository.Branches )
+        // Branches.Update changes the collection: works on a snapshot.
+        foreach( var branch in git.Repository.Branches.ToList() )
         {
+            var b = branch;
+            if( b.IsRemote ) continue;
             var tracked = b.TrackedBranch;
+            if( tracked == null
+                && trackedBranchNames != null
+                && trackedBranchNames.Contains( b.FriendlyName )
+                && !GitRepository.IsLocalOnlyRefName( b.FriendlyName ) )
+            {
+                monitor.Info( $"Branch '{b.FriendlyName}' of '{repo.DisplayPath}' has no tracked branch: it now tracks 'origin/{b.FriendlyName}'." );
+                b = git.Repository.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
+                tracked = b.TrackedBranch;
+            }
             if( tracked == null
                 || !tracked.CanonicalName.StartsWith( "refs/remotes/origin/", StringComparison.Ordinal ) )
             {

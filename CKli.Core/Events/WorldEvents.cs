@@ -12,12 +12,14 @@ public sealed class WorldEvents
     internal readonly PerfectEventSender<RepoAddedEventArgs> _repoAddedEventSender;
     internal readonly PerfectEventSender<CreateLTSEventArgs> _createLTSEventSender;
     internal readonly PerfectEventSender<StackMergedEventArgs> _stackMergedEventSender;
+    internal readonly PerfectEventSender<PushingEventArgs> _pushingEventSender;
 
     internal WorldEvents()
     {
         _repoAddedEventSender = new PerfectEventSender<RepoAddedEventArgs>();
         _createLTSEventSender = new PerfectEventSender<CreateLTSEventArgs>();
         _stackMergedEventSender = new PerfectEventSender<StackMergedEventArgs>();
+        _pushingEventSender = new PerfectEventSender<PushingEventArgs>();
     }
 
     internal void ReleaseEvents()
@@ -28,6 +30,7 @@ public sealed class WorldEvents
         _repoAddedEventSender.RemoveAll();
         _createLTSEventSender.RemoveAll();
         _stackMergedEventSender.RemoveAll();
+        _pushingEventSender.RemoveAll();
     }
 
     static bool Raise<T>( IActivityMonitor monitor, Action<T>? handler, T e ) where T : WorldEventArgs
@@ -84,5 +87,11 @@ public sealed class WorldEvents
     /// rebuilds it.
     /// </summary>
     public PerfectEvent<StackMergedEventArgs> StackMerged => _stackMergedEventSender.PerfectEvent;
+
+    /// <summary>
+    /// Raised by "ckli push" once the repositories have been pulled, before they are pushed: a plugin names the
+    /// branches that must be pushed even when they don't track a remote branch yet.
+    /// </summary>
+    public PerfectEvent<PushingEventArgs> Pushing => _pushingEventSender.PerfectEvent;
 
 }

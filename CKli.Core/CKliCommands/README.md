@@ -208,6 +208,11 @@ Pushes the Stack repository and all Repo's local branches that track a remote br
 A pull is done before: it must be successful for the actual push to be done. A merge of this pull that conflicts
 is handled as `ckli pull` does: left in progress on the branch named by `--branch <name>`, not merged elsewhere.
 
+The pull associates a local branch that tracks nothing to its existing `origin` branch. A local branch that has
+no remote branch yet (created by a raw `git checkout -b`) is pushed only when a plugin requires it through the
+`WorldEvents.Pushing` event: it is configured to track its `origin` branch and the remote branch is created. The
+BranchModel plugin requires every branch of the branch model and its `dev/` branch; the other branches stay as-is.
+
 The Repos are independent: they are pulled and then pushed in parallel and each of them is pushed by a
 single network operation (all its branches at once). `--max-dop <n>` limits the parallelism of both phases.
 The Stack repository itself is always pushed first and alone.

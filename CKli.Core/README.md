@@ -694,6 +694,11 @@ such a file is derived from others and its owner rebuilds it here. The pull done
 happens before any plugin exists: its merge is `StackRepository.MergedPaths`, read in `Initialize`.
 `PullStackAsync` refuses incoming commits that change the running World's definition file or its plugins.
 
+`WorldEvents.Pushing` is raised by `ckli push` once the Repos have been pulled, before they are pushed. Only the
+local branches that track an `origin` branch are pushed: a handler calls `PushingEventArgs.EnsureTracking( name )`
+for the branches that must be pushed even when they track no remote branch yet. Such a branch is configured to
+track its `origin` branch and the remote branch is created. `SetFailed()` cancels the push.
+
 ## Plugin configuration
 
 Each plugin has an XML element in the World definition file under `<Plugins>`:
