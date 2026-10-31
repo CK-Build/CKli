@@ -36,6 +36,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         World.Events.PluginInfo += PluginInfoRequested;
         World.Events.Issue += IssueRequested;
         World.Events.RepoAdded.Sync += OnRepoAdded;
+        World.Events.Pushing.Sync += OnPushing;
         _shallowSolution = shallowSolution;
         var configElement = primaryContext.Configuration.XElement;
         _namespace = new BranchNamespace( World.Name.LTSName, configElement );
@@ -99,6 +100,17 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
         {
             var devRoot = BranchLink.CreateAheadBranch( git, root.Tip, _namespace.Root.DevName, withEmptyInitializationCommit: false );
             git.Checkout( monitor, devRoot );
+        }
+    }
+
+    // A branch of the model (or its "dev/" branch) created without "ckli branch" tracks no remote branch:
+    // "ckli push" must push it anyway.
+    void OnPushing( IActivityMonitor monitor, PushingEventArgs e )
+    {
+        foreach( var b in _namespace.Branches )
+        {
+            e.EnsureTracking( b.Name );
+            e.EnsureTracking( b.DevName );
         }
     }
 
