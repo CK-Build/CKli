@@ -4,6 +4,7 @@ using CKli.ShallowSolution.Plugin;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 namespace CKli.BranchModel.Plugin;
@@ -128,34 +129,48 @@ public sealed partial class BranchModelPlugin
                 case MergeOutcome.Failed: unknowns.Add( info.Repo ); break;
             }
         }
-        var parts = new List<IRenderable>();
-        if( fastForwards > 0 ) parts.Add( s.Text( fastForwards == 1 ? "1 fast-forward" : $"{fastForwards} fast-forwards", ConsoleColor.DarkGray ) );
-        if( merges > 0 ) parts.Add( s.Text( merges == 1 ? "1 merge" : $"{merges} merges", ConsoleColor.DarkGray ) );
-        if( conflicts.Count > 0 ) parts.Add( RepoList( s, conflicts.Count == 1 ? "1 conflict" : $"{conflicts.Count} conflicts", conflicts, ConsoleColor.Red ) );
-        if( unknowns.Count > 0 ) parts.Add( RepoList( s, $"{unknowns.Count} unknown", unknowns, ConsoleColor.Yellow ) );
-        if( parts.Count == 0 )
+        if( fastForwards == 0 && merges == 0 && conflicts.Count == 0 && unknowns.Count == 0 )
         {
             return null;
         }
-        // A TextBlock trims its content: the separators' spaces are margins.
-        IRenderable line = s.Text( arrow, ConsoleColor.DarkGray ).AddRight( parts[0].Box( marginLeft: 1 ) );
-        for( int i = 1; i < parts.Count; ++i )
+        // The line is a FlowContent and NOT a HorizontalContent: the repositories of a list are cells, and a row
+        // of N cells is a row of N columns that share the screen width. Past a dozen repositories nothing fits
+        // and every name is wrapped inside the 10 columns of TextBlock.MinimalWidth. A flow breaks into lines
+        // instead, the continuation ones aligned after the arrow.
+        // A separator belongs to the cell it follows, so that a line break never lands before a comma. A TextBlock
+        // trims its content: the separators' spaces are margins.
+        var cells = ImmutableArray.CreateBuilder<IRenderable>();
+        var head = s.Text( arrow, ConsoleColor.DarkGray )!.Box( marginRight: 1 );
+        cells.Add( head );
+        IRenderable? pending = null;
+        ConsoleColor pendingSeparatorColor = ConsoleColor.DarkGray;
+        if( fastForwards > 0 ) Push( s.Text( fastForwards == 1 ? "1 fast-forward" : $"{fastForwards} fast-forwards", ConsoleColor.DarkGray )!, ConsoleColor.DarkGray );
+        if( merges > 0 ) Push( s.Text( merges == 1 ? "1 merge" : $"{merges} merges", ConsoleColor.DarkGray )!, ConsoleColor.DarkGray );
+        if( conflicts.Count > 0 ) PushRepoList( conflicts.Count == 1 ? "1 conflict" : $"{conflicts.Count} conflicts", conflicts, ConsoleColor.Red );
+        if( unknowns.Count > 0 ) PushRepoList( $"{unknowns.Count} unknown", unknowns, ConsoleColor.Yellow );
+        cells.Add( pending! );
+        return s.Flow( head.Width, cells.DrainToImmutable() );
+
+        void Push( IRenderable cell, ConsoleColor separatorColor )
         {
-            line = line.AddRight( s.Text( ",", ConsoleColor.DarkGray ), parts[i].Box( marginLeft: 1 ) );
+            if( pending != null ) cells.Add( pending.AddRight( s.Text( ",", pendingSeparatorColor )!.Box( marginRight: 1 ) ) );
+            pending = cell;
+            pendingSeparatorColor = separatorColor;
         }
-        return line;
 
         // "<label> (<repo>, <repo>)": the repositories are linked and show their dirty marker, since a dirty
-        // working folder may be the cause of the outcome.
-        static IRenderable RepoList( ScreenType s, string label, List<Repo> repos, ConsoleColor color )
+        // working folder may be the cause of the outcome. The label and the first repository are one cell.
+        void PushRepoList( string label, List<Repo> repos, ConsoleColor color )
         {
             var style = new TextStyle( color );
-            IRenderable list = s.Text( label + " (", color ).AddRight( repos[0].ToInlineNameRenderable( s, style ) );
+            Push( s.Text( label + " (", color )!.AddRight( repos[0].ToInlineNameRenderable( s, style ) ), color );
             for( int i = 1; i < repos.Count; ++i )
             {
-                list = list.AddRight( s.Text( ",", color ), repos[i].ToInlineNameRenderable( s, style ).Box( marginLeft: 1 ) );
+                Push( repos[i].ToInlineNameRenderable( s, style ), color );
             }
-            return list.AddRight( s.Text( ")", color ) );
+            pending = pending!.AddRight( s.Text( ")", color )! );
+            // The separator that follows the list separates two parts of the line.
+            pendingSeparatorColor = ConsoleColor.DarkGray;
         }
     }
 
