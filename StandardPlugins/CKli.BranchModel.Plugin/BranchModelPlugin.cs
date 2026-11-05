@@ -35,6 +35,7 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
     {
         World.Events.PluginInfo += PluginInfoRequested;
         World.Events.Issue += IssueRequested;
+        World.Events.RepoAdding.Sync += OnRepoAdding;
         World.Events.RepoAdded.Sync += OnRepoAdded;
         World.Events.Pushing.Sync += OnPushing;
         _shallowSolution = shallowSolution;
@@ -74,6 +75,13 @@ public sealed partial class BranchModelPlugin : PrimaryRepoPlugin<BranchModelInf
             result = PrimaryPluginContext.Configuration.SetBooleanAttribute( monitor, XNames.AutoFixDevBranch, attributeValue );
         }
         return Task.FromResult( result );
+    }
+
+    // The root branch is the default branch of a new repository: the remote one ("ckli repo create") and the
+    // branch of the initial commit of an empty repository.
+    void OnRepoAdding( IActivityMonitor monitor, RepoAddingEventArgs e )
+    {
+        e.DefaultBranchName = _namespace.Root.Name;
     }
 
     void OnRepoAdded( IActivityMonitor monitor, RepoAddedEventArgs e )

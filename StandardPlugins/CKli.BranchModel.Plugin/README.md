@@ -50,7 +50,11 @@ branch" without `BranchModelPlugin` depending on the versioning plugin.
 [CKli.Core's README](../../CKli.Core/README.md) for the plugin base classes) — it is always
 instantiated, and caches one `BranchModelInfo` per `Repo`. Its constructor reads the
 `<BranchModel>` element from `PrimaryPluginContext.Configuration`, builds the `BranchNamespace`,
-and subscribes to `World.Events.Issue`, `World.Events.RepoAdded` and `World.Events.Pushing`.
+and subscribes to `World.Events.Issue`, `World.Events.RepoAdding`, `World.Events.RepoAdded` and `World.Events.Pushing`.
+
+On `RepoAdding` (`ckli repo add`, `ckli repo create`), the root branch (`stable`) is the default branch of the new
+repository: no `main` nor `master` branch is created. On `RepoAdded`, the root branch is created when missing (from
+a previous root branch like `main` or `master`) and the `dev/` root branch is checked out.
 
 On `Pushing` (`ckli push`), it requires every branch of the namespace and its `dev/` branch to track its `origin`
 branch: such a branch created without `ckli branch` (a raw `git checkout -b`) is pushed and its remote branch is
