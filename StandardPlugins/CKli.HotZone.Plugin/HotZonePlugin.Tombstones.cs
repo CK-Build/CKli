@@ -83,7 +83,11 @@ public sealed partial class HotZonePlugin
     // is removed from the solution.
     void OnContentIssue( ContentIssueEventArgs e )
     {
-        if( !e.Branch.BranchName.IsRoot
+        if( !e.Branch.BranchName.IsRoot ) return;
+        // A missing solution is not our business: TryGetSolution would report it as a manual issue.
+        var slnxPath = new NormalizedPath( $"{e.Repo.DisplayPath.LastPart}.slnx" );
+        var slnx = e.Content.GetFileInfo( slnxPath );
+        if( slnx == null
             || !e.TryGetSolution( e.Monitor, out var solution )
             || solution == null )
         {
@@ -91,9 +95,6 @@ public sealed partial class HotZonePlugin
         }
         var tombstones = FindPublishedTombstones( e.Monitor, e.Repo, solution.Projects, e.Content );
         if( tombstones.Count == 0 ) return;
-        var slnxPath = new NormalizedPath( $"{e.Repo.DisplayPath.LastPart}.slnx" );
-        var slnx = e.Content.GetFileInfo( slnxPath );
-        if( slnx == null ) return;
         foreach( var t in tombstones )
         {
             e.Monitor.Info( ScreenType.ScreenTag,
