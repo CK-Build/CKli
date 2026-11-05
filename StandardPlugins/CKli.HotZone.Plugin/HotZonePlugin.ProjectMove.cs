@@ -29,6 +29,10 @@ public sealed partial class HotZonePlugin
         public NormalizedPath OldFolder => OldPath.RemoveLastPart();
         public NormalizedPath NewFolder => NewPath.RemoveLastPart();
         public string Name => Project.Name;
+        // The files of the folder that git tracks (relative to the source's working folder): only them are moved.
+        public IReadOnlyList<NormalizedPath> TrackedFiles { get; set; } = [];
+        // The other files of the folder (ignored by git: the repository is clean): they stay where they are.
+        public int IgnoredFileCount { get; set; }
     }
 
     /// <summary>
@@ -163,6 +167,18 @@ public sealed partial class HotZonePlugin
             m.NewPath = destinationFolder.Combine( m.OldPath.RemoveFirstPart( common.Parts.Count ) );
         }
         if( !CheckDestinations( monitor, targetRepo, moved ) ) return false;
+        foreach( var m in moved )
+        {
+            var prefix = m.OldFolder.Path + '/';
+            m.TrackedFiles = m.Source.GitRepository.Repository.Index
+                                .Select( e => new NormalizedPath( e.Path ) )
+                                .Where( p => p.Path.StartsWith( prefix, StringComparison.OrdinalIgnoreCase ) )
+                                .ToList();
+            var folder = m.Source.WorkingFolder.Combine( m.OldFolder );
+            m.IgnoredFileCount = Directory.Exists( folder )
+                                    ? Directory.EnumerateFiles( folder, "*", SearchOption.AllDirectories ).Count() - m.TrackedFiles.Count
+                                    : 0;
+        }
 
         var movedByProject = moved.ToDictionary( m => m.Project );
         Repo FinalRepo( Repo r, MutableProject p ) => movedByProject.ContainsKey( p ) ? targetRepo : r;
@@ -281,6 +297,10 @@ public sealed partial class HotZonePlugin
             var solutionFolder = MutableSolution.GetSolutionFolderPath( m.NewPath );
             plan.Add( (2, $"{m.Source.DisplayPath}/{m.OldFolder} -> {targetRepo.DisplayPath}/{m.NewFolder} "
                           + (solutionFolder.IsEmptyPath ? "(root of the solution)." : $"(solution folder '/{solutionFolder}/').")) );
+            if( m.IgnoredFileCount > 0 )
+            {
+                plan.Add( (4, $"{m.TrackedFiles.Count} tracked files move; {m.IgnoredFileCount} ignored files stay in '{m.Source.DisplayPath}/{m.OldFolder}'.") );
+            }
         }
         if( startVersion != null )
         {
@@ -323,18 +343,34 @@ public sealed partial class HotZonePlugin
                     return false;
                 }
             }
-            // Moves the folders.
+            // Moves the tracked files of the folders: the ignored files (build outputs, the state of a package manager,
+            // a local setting...) are generated for their place, or are not ours to move. They stay where they are.
             foreach( var m in moved )
             {
                 var from = m.Source.WorkingFolder.Combine( m.OldFolder );
                 var to = targetRepo.WorkingFolder.Combine( m.NewFolder );
                 try
                 {
-                    Directory.CreateDirectory( to.RemoveLastPart() );
-                    Directory.Move( from, to );
-                    // The folders left empty are removed.
-                    for( var parent = from.RemoveLastPart();
-                         parent.Parts.Count > m.Source.WorkingFolder.Parts.Count && !Directory.EnumerateFileSystemEntries( parent ).Any();
+                    foreach( var f in m.TrackedFiles )
+                    {
+                        var fileTarget = to.Combine( f.RemoveFirstPart( m.OldFolder.Parts.Count ) );
+                        Directory.CreateDirectory( fileTarget.RemoveLastPart() );
+                        File.Move( m.Source.WorkingFolder.Combine( f ), fileTarget );
+                    }
+                    // The folders left empty are removed: below the moved folder, the folder itself and its parents.
+                    if( Directory.Exists( from ) )
+                    {
+                        foreach( var d in Directory.EnumerateDirectories( from, "*", SearchOption.AllDirectories )
+                                                   .OrderByDescending( d => d.Length )
+                                                   .ToList() )
+                        {
+                            if( !Directory.EnumerateFileSystemEntries( d ).Any() ) Directory.Delete( d );
+                        }
+                    }
+                    for( var parent = from;
+                         parent.Parts.Count > m.Source.WorkingFolder.Parts.Count
+                         && Directory.Exists( parent )
+                         && !Directory.EnumerateFileSystemEntries( parent ).Any();
                          parent = parent.RemoveLastPart() )
                     {
                         Directory.Delete( parent );

@@ -197,6 +197,9 @@ of the World, or both. It is implemented by `HotZonePlugin.ProjectMove`.
 - **The solution folder of a moved project is derived from its path** (`MutableSolution.AddProject`): `My.Lib/` is at
   the root of the `.slnx`, `Tests/My.Lib.Tests/` in `/Tests/`. A solution folder left empty is removed, and so are the
   folders left empty on disk.
+- **Only the files that git tracks move.** The ignored files of a moved folder (build outputs, the state of a package
+  manager, a local setting) are generated for their place, or are not the move's to decide: they stay where they are,
+  and the plan says how many stay.
 - **The references follow:**
   - inside a repository, the `<ProjectReference>` paths, from and to the moved projects;
   - across repositories, a `<ProjectReference>` that crosses the repository boundary becomes a `<PackageReference>`,
