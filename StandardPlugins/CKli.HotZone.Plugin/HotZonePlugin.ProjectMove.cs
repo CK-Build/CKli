@@ -1,4 +1,5 @@
 using CK.Core;
+using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
 using System;
@@ -92,20 +93,39 @@ public sealed partial class HotZonePlugin
         var addedTests = new List<(Repo Repo, NormalizedPath Path)>();
         if( withTests && !AddTestProjects( monitor, found, addedTests ) ) return false;
 
-        // The repositories involved: they must be clean and on the same branch.
+        // The repositories involved: they must be clean and on the same branch of the branch model.
+        // Their BranchModelInfo is obtained first, while they are clean: obtaining it deletes a useless "dev/" branch
+        // (no commit of its own, typically just after "ckli branch switch --create") and checks out its base. The
+        // branches are compared without their "dev/" prefix, and the move lands on the "dev/" branches (see below).
         var involved = found.Select( f => f.Repo ).Append( targetRepo ).Distinct().OrderBy( r => r.Index ).ToList();
-        var branchName = targetRepo.GitRepository.CurrentBranchName;
+        var branchNamespace = _branchModel.BranchNamespace;
+        var hotBranches = new Dictionary<Repo, HotBranch>();
+        BranchName? branch = null;
         bool success = true;
         foreach( var r in involved )
         {
             if( !r.GitRepository.CheckCleanCommit( monitor ) )
             {
                 success = false;
+                continue;
             }
-            else if( r.GitRepository.CurrentBranchName != branchName )
+            var info = _branchModel.Get( monitor, r );
+            var current = branchNamespace.RemoveDevPrefix( r.GitRepository.CurrentBranchName, out _ );
+            var b = branchNamespace.Find( current );
+            if( b == null )
             {
-                monitor.Error( $"Repository '{r.DisplayPath}' is on branch '{r.GitRepository.CurrentBranchName}': all the repositories must be on '{branchName}' (the branch of '{targetRepo.DisplayPath}')." );
+                monitor.Error( $"Repository '{r.DisplayPath}' is on branch '{r.GitRepository.CurrentBranchName}' that is not a branch of the branch model." );
                 success = false;
+            }
+            else if( branch != null && b != branch )
+            {
+                monitor.Error( $"Repository '{r.DisplayPath}' is on branch '{b.Name}': all the repositories must be on the same branch ('{branch.Name}')." );
+                success = false;
+            }
+            else
+            {
+                branch = b;
+                hotBranches.Add( r, info.Branches[b.Index] );
             }
         }
         if( !success ) return false;
@@ -292,6 +312,16 @@ public sealed partial class HotZonePlugin
                 && !_versionTag.BumpVersion( monitor, targetRepo, context.Committer, startVersion ) )
             {
                 return false;
+            }
+            // The move lands on the "dev/" branches: the working folders are still clean, the "dev/" branch is
+            // created where it is missing (it may have been deleted as useless above) and checked out.
+            foreach( var (r, hb) in hotBranches )
+            {
+                var dev = hb.EnsureDevBranch();
+                if( !dev.IsCurrentRepositoryHead && !r.GitRepository.Checkout( monitor, dev ) )
+                {
+                    return false;
+                }
             }
             // Moves the folders.
             foreach( var m in moved )

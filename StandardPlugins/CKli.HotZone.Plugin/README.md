@@ -210,7 +210,9 @@ of the World, or both. It is implemented by `HotZonePlugin.ProjectMove`.
   version a source already produced it in.
 
 It refuses, before changing anything, when:
-- a repository involved is not clean, or is not on the same branch as the target;
+- a repository involved is not clean, or is not on the same branch of the branch model as the target (with or
+  without its `dev/` prefix). The move lands on the `dev/` branches: a missing one (a `dev/` branch without commits
+  of its own is deleted as useless when the branch model is read) is created and checked out before anything moves;
 - a destination folder already exists, or a project would move inside its own folder;
 - a test project (named `*.Tests`) would not be in a `Tests` folder (to move test projects alone, run the move from
   the target's `Tests/` folder);
