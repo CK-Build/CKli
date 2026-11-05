@@ -9,6 +9,7 @@ namespace CKli.Core;
 /// </summary>
 public sealed class WorldEvents
 {
+    internal readonly PerfectEventSender<RepoAddingEventArgs> _repoAddingEventSender;
     internal readonly PerfectEventSender<RepoAddedEventArgs> _repoAddedEventSender;
     internal readonly PerfectEventSender<CreateLTSEventArgs> _createLTSEventSender;
     internal readonly PerfectEventSender<StackMergedEventArgs> _stackMergedEventSender;
@@ -16,6 +17,7 @@ public sealed class WorldEvents
 
     internal WorldEvents()
     {
+        _repoAddingEventSender = new PerfectEventSender<RepoAddingEventArgs>();
         _repoAddedEventSender = new PerfectEventSender<RepoAddedEventArgs>();
         _createLTSEventSender = new PerfectEventSender<CreateLTSEventArgs>();
         _stackMergedEventSender = new PerfectEventSender<StackMergedEventArgs>();
@@ -27,6 +29,7 @@ public sealed class WorldEvents
         PluginInfo = null;
         FixedLayout = null;
         Issue = null;
+        _repoAddingEventSender.RemoveAll();
         _repoAddedEventSender.RemoveAll();
         _createLTSEventSender.RemoveAll();
         _stackMergedEventSender.RemoveAll();
@@ -70,6 +73,12 @@ public sealed class WorldEvents
     public event Action<IssueEventArgs>? Issue;
 
     internal bool SafeRaiseEvent( IActivityMonitor monitor, IssueEventArgs e ) => Raise( monitor, Issue, e );
+
+    /// <summary>
+    /// Raised by "ckli repo add" and "ckli repo create" commands before anything is done: a plugin
+    /// can set the <see cref="RepoAddingEventArgs.DefaultBranchName"/>.
+    /// </summary>
+    public PerfectEvent<RepoAddingEventArgs> RepoAdding => _repoAddingEventSender.PerfectEvent;
 
     /// <summary>
     /// Raised by "ckli repo add" and "ckli repo create" commands.

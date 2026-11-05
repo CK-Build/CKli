@@ -27,15 +27,20 @@ public sealed partial class GitRepository
     /// (This is often the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
     /// </param>
     /// <param name="cancellation">Optional cancellation token.</param>
+    /// <param name="initialBranchName">
+    /// The branch of the initial commit when the remote repository is empty. Defaults to the "init.defaultBranch" of the
+    /// git configuration.
+    /// </param>
     /// <returns>The GitRepository object or null on error.</returns>
     public static GitRepository? Clone( IActivityMonitor monitor,
                                         GitRepositoryKey git,
                                         Signature committer,
                                         NormalizedPath workingFolder,
                                         NormalizedPath displayPath,
-                                        CancellationToken cancellation = default )
+                                        CancellationToken cancellation = default,
+                                        string? initialBranchName = null )
     {
-        var r = CloneWorkingFolder( monitor, git, workingFolder, cancellation );
+        var r = CloneWorkingFolder( monitor, git, workingFolder, cancellation, initialBranchName );
         return r == null ? null : new GitRepository( git, committer, r, workingFolder, displayPath );
     }
 
@@ -208,11 +213,16 @@ public sealed partial class GitRepository
     /// <param name="git">The Git key.</param>
     /// <param name="workingFolder">The local working folder.</param>
     /// <param name="cancellation">Optional cancellation token.</param>
+    /// <param name="initialBranchName">
+    /// The branch of the initial commit when the remote repository is empty. Defaults to the "init.defaultBranch" of the
+    /// git configuration.
+    /// </param>
     /// <returns>The LibGit2Sharp Repository object or null on error.</returns>
     public static Repository? CloneWorkingFolder( IActivityMonitor monitor,
                                                   GitRepositoryKey git,
                                                   NormalizedPath workingFolder,
-                                                  CancellationToken cancellation )
+                                                  CancellationToken cancellation,
+                                                  string? initialBranchName = null )
     {
         using( monitor.OpenInfo( $"Cloning '{workingFolder}' from '{git.OriginUrl}'." ) )
         {
@@ -236,7 +246,7 @@ public sealed partial class GitRepository
                     return null;
                 }
                 r = new Repository( workingFolder );
-                EnsureFirstCommit( monitor, r );
+                EnsureFirstCommit( monitor, r, initialBranchName );
                 return r;
             }
             catch( Exception ex )
@@ -364,7 +374,7 @@ public sealed partial class GitRepository
                     }
                 }
             }
-            EnsureFirstCommit( monitor, r );
+            EnsureFirstCommit( monitor, r, initialBranchName: null );
             return (r, originUrl);
         }
         catch( Exception ex )
@@ -374,11 +384,17 @@ public sealed partial class GitRepository
         }
     }
 
-    static void EnsureFirstCommit( IActivityMonitor m, Repository r )
+    static void EnsureFirstCommit( IActivityMonitor m, Repository r, string? initialBranchName )
     {
         if( !r.Commits.Any() )
         {
-            m.Info( $"Uninitialized repository: automatically creating an initial commit." );
+            if( initialBranchName != null )
+            {
+                // The head is "unborn" on the "init.defaultBranch" of the git configuration (often "master"):
+                // this simply rewrites the HEAD file.
+                r.Refs.Add( "HEAD", $"refs/heads/{initialBranchName}", allowOverwrite: true );
+            }
+            m.Info( $"Uninitialized repository: automatically creating an initial commit on '{r.Head.FriendlyName}'." );
             var date = DateTimeOffset.Now;
             Signature author = r.Config.BuildSignature( date );
             var committer = new Signature( "CKli", "none", date );

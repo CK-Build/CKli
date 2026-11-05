@@ -55,8 +55,12 @@ sealed partial class World
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="context">The CKli minimal context. The CurrentDirectory is the folder of the new repo.</param>
     /// <param name="gitKey">The repository key.</param>
+    /// <param name="initialBranchName">
+    /// The branch of the initial commit when the remote repository is empty (see <see cref="RepoAddingEventArgs.DefaultBranchName"/>).
+    /// Defaults to the "init.defaultBranch" of the git configuration.
+    /// </param>
     /// <returns>True on success, false on error.</returns>
-    public async Task<bool> AddRepositoryAsync( IActivityMonitor monitor, CKliEnv context, GitRepositoryKey gitKey )
+    public async Task<bool> AddRepositoryAsync( IActivityMonitor monitor, CKliEnv context, GitRepositoryKey gitKey, string? initialBranchName = null )
     {
         Throw.CheckState( CanChangeLayout );
         Throw.CheckArgument( !gitKey.IsStackRepository );
@@ -132,7 +136,7 @@ sealed partial class World
 
         XElement xRepo = _definitionFile.CreateDefaultRepositoryElement( monitor, gitKey.OriginUrl );
         // ...and we must ensure that it can be cloned.
-        using( var gitRepository = GitRepository.Clone( monitor, gitKey, _stackRepository.Context.Committer, folderPath, folderPath, _scopeAlive ) )
+        using( var gitRepository = GitRepository.Clone( monitor, gitKey, _stackRepository.Context.Committer, folderPath, folderPath, _scopeAlive, initialBranchName ) )
         {
             if( gitRepository == null ) return false;
             // The working folder is successfully cloned.

@@ -267,6 +267,11 @@ to a Git hosting provider that CKli can handle, and a write PAT is required), th
 directory and added to the World's definition file. If anything fails after the creation, the remote
 repository is deleted again.
 
+The default branch of the new repository is the one the plugins choose (`WorldEvents.RepoAdding`: the root branch
+of the branch model, `stable`; `main` without plugin): the remote repository is created with it, the initial commit
+of an empty repository lands on it, and once the repository is added this branch is pushed and set as the remote's
+default branch (a host that creates an empty repository otherwise takes the first pushed branch, whatever it is).
+
 The new repository is created private or public according to the Stack: see
 [Private & Public stack and repositories](../../README.md#private--public-stack-and-repositories).
 
