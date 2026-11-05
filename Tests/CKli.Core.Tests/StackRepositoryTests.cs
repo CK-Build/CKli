@@ -142,6 +142,12 @@ public class StackRepositoryTests
         cktCoreRepo = world.GetDefinedRepo( TestHelper.Monitor, inCKtProjectCoreTests.CurrentDirectory )
                            .ShouldNotBeNull();
         cktCoreRepo.CKliRepoId.ShouldBe( cktCoreRepoId );
+        // Once loaded, a Repo is found again from a sub path: it is not loaded twice (this threw an
+        // "An item with the same key has already been added" on its CKli repository identifier).
+        world.GetDefinedRepo( TestHelper.Monitor, inCKtProjectCoreTests.CurrentDirectory ).ShouldBeSameAs( cktCoreRepo );
+        world.GetAllDefinedRepo( TestHelper.Monitor ).ShouldNotBeNull().ShouldContain( cktCoreRepo );
+        world.GetAllDefinedRepo( TestHelper.Monitor, inCKtProjectCoreTests.CurrentDirectory ).ShouldNotBeNull()
+             .ShouldHaveSingleItem().ShouldBeSameAs( cktCoreRepo );
         stack.Dispose();
     }
 

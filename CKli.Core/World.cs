@@ -365,7 +365,11 @@ public sealed partial class World
             return true;
         }
         workingFolder = FindPathOrUriInLayout( uriOrPath, out index );
-        return !workingFolder.IsEmptyPath;
+        if( workingFolder.IsEmptyPath ) return false;
+        // A path below the working folder (or another spelling of the url) is not a key of the cache: the Repo
+        // may already be loaded, it must not be loaded twice.
+        _cachedRepositories.TryGetValue( workingFolder, out repo );
+        return true;
     }
 
     /// <summary>
