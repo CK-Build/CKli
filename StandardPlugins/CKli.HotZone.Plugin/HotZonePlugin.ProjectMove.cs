@@ -14,9 +14,9 @@ namespace CKli.HotZone.Plugin;
     """
     The projects of the repositories: "project move" moves projects to a folder of a repository, from the same
     repository (the references follow) or from other repositories of the World (the references that cross a
-    repository boundary become package references).
+    repository boundary become package references). "project retire" turns packages into tombstones.
     """,
-    Summary = "Moves projects inside a repository or across repositories.",
+    Summary = "Moves projects inside a repository or across repositories, retires packages.",
     HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.HotZone.Plugin/README.md#how-project-move" )]
 public sealed partial class HotZonePlugin
 {

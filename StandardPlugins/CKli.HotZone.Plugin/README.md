@@ -230,6 +230,42 @@ A moved project whose depth changes may have other relative paths (an `Import`, 
 rewritten, and the plan warns about them. Nothing is committed (except the empty commit that may carry the `+fake` tag):
 review, build from the World root (the source and the target must both build), and commit.
 
+## How: `project retire`
+
+`ckli project retire <projects> [--replacement, -r <packageId | url>] [--reason <text>] [--dry-run, -d] [--with-tests]`
+turns packable projects into **tombstones**: the last version of a removed (or renamed) package, without code and
+without dependencies, whose only content is a transitive MSBuild `.targets` that fails the build of any project that
+depends on it with an error (`CKDEPRECATED`) that names the replacement. It applies the CK stack's guideline
+["Removing or renaming a package"](https://github.com/signature-opensource/CK-Stack/blob/main/Docs/Guidelines/removing-or-renaming-a-package.md).
+It is implemented by `HotZonePlugin.ProjectRetire`.
+
+- **`<projects>`** are found in the whole World, as for `project move`.
+- **`--replacement`** is the package that replaces the retired ones: its name when the World produces it (the URL of
+  its documentation is derived: the `README.md` of its folder on the root branch of its repository, for an http(s)
+  origin), or the URL of its README when the World doesn't produce it. The package is then named after the folder that
+  holds the README (`.../New.Package/README.md`: a project folder is named after its package).
+- **`--reason`** says why, and what to do instead: required without `--replacement`, added to the message with it.
+- **`--with-tests`** deletes, for each retired project `X`, the project `X.Tests` of the same repository (and removes
+  it from the solution): it has nothing left to test.
+
+It refuses, before changing anything, when a retired project is not packable (it produces no package: delete it), is
+already a tombstone, or **is still used by a project of the World** (a `<PackageReference>` anywhere, a
+`<ProjectReference>` in its repository): the error lists the consumers. Every project must stop depending on a package
+before it is retired; a consumer that is itself retired in the same command, or a test project deleted by
+`--with-tests`, doesn't count. Its repository must be clean and on a branch of the branch model: the tombstones land on
+its `dev/` branch.
+
+The tombstone keeps the project's name and place: its tracked files are deleted except its `.csproj`, which becomes
+the guideline's template (with the project's target framework, the first one of a multi-targeted project, or none when
+it is inherited) and a `<Description>`. `MSBuild/<PackageId>.targets` holds the error (its target is named after the
+package id, so that several tombstones can be imported by the same project); `README.md` and `docs/Package.md` say only
+that the package is deprecated and what replaces it. CKli builds and publishes it as the next version of the package.
+The plan warns when every package of a repository is retired.
+
+**`--dry-run`** runs the checks and displays the plan (the tombstones and their message). Nothing is committed: list the
+retired projects as deprecated in the repository's `README.md` (one line: it is free-form, the command doesn't edit
+it), build from the World root and commit.
+
 ## Plugin wiring
 
 `HotZonePlugin` derives from `PrimaryPluginBase` (see [CKli.Core's README](../../CKli.Core/README.md#plugin-system))
