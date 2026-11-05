@@ -29,8 +29,9 @@ public sealed partial class FakeBuildTestEnv
     ///     left as-is, unless a test changes it with <see cref="FakeBuildRepo.OnBuild"/>.
     ///     </item>
     ///     <item>
-    ///     "dotnet build" does nothing and "dotnet test" always succeeds (but the tested content is recorded
-    ///     by <see cref="RepoBuilder.SetTestRun(IActivityMonitor, Commit)"/> just like the real build does).
+    ///     "dotnet build" does nothing and "dotnet test" always succeeds: the build plugin records the tested
+    ///     content (<see cref="RepoBuilder.SetTestRun(IActivityMonitor, Commit)"/>) as it does for a real build. A test
+    ///     can simulate tests that change the working folder with <see cref="FakeBuildRepo.OnTest"/>.
     ///     </item>
     ///     <item>
     ///     "dotnet pack" writes a minimal ".nupkg" (see <see cref="WriteFakePackage"/>) for each packable project of
@@ -105,11 +106,11 @@ public sealed partial class FakeBuildTestEnv
                                           .Select( p => p.Name )
                                           .Distinct( StringComparer.OrdinalIgnoreCase );
 
-        // Instead of "dotnet test": tests always pass. Recording the content sha is what makes the
-        // "tests already ran on this content" optimization observable by tests.
+        // Instead of "dotnet test": tests always pass (the build plugin records the tested content once the
+        // build succeeded). A test can simulate tests that change the working folder.
         if( runTest )
         {
-            repoBuilder.SetTestRun( monitor, buildCommit );
+            declaring?.OnTest?.Invoke( repo.WorkingFolder );
         }
 
         // Same temporary output folder pattern as the real RepoBuilder.BuildAsync: on success, it belongs to

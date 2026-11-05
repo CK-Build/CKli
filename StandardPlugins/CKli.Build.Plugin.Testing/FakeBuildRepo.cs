@@ -117,6 +117,14 @@ public sealed partial class FakeBuildRepo
     public Action<NormalizedPath>? OnBuild { get; set; }
 
     /// <summary>
+    /// Gets or sets an action that the fake build calls with the working folder of this repository when it runs the
+    /// tests (they always pass): it simulates tests that create, modify or delete files (a test application that
+    /// a generator rewrites). Unlike <see cref="OnBuild"/>, it is not called when the tests are skipped (they already
+    /// ran on the content of the built commit). Defaults to null.
+    /// </summary>
+    public Action<NormalizedPath>? OnTest { get; set; }
+
+    /// <summary>
     /// Gets the <see cref="InitialVersion"/> or throws if this repository has been created without one:
     /// a repository can only be referenced if it produces a version.
     /// </summary>

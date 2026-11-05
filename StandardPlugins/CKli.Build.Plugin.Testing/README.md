@@ -27,6 +27,7 @@ What can be declared:
 | `TransitivePackages` | The transitive packages recorded in `BuildContentInfo`. The fake restores nothing, so declaring them is the only way a transitive set can exist here; `default` (the default) means *unknown*, which is not the empty array. Setting it also rewrites the initial version tag's annotation, in place on its own commit. |
 | `FailBuild` | Makes this repository's fake build fail. It bails out before anything is written — in particular before `ApplyReleaseBuildTag` — like a build that does not compile. Settable back to `false`, so a test can fail a build, observe what it left behind, then build again. |
 | `OnBuild` | An action called with the working folder once the fake build has "built" the checked out commit: it simulates a build that creates, modifies or deletes files (the impacts of the build, see `--build-impacts`). An action that always does the same thing has no impact on the second build that `--build-impacts commit` triggers. |
+| `OnTest` | The same, called only when the tests run (they are skipped when they already ran on the content): it simulates tests that change the working folder, like a test application that a generator rewrites. |
 
 `FailBuild` is how a **partially failed roadmap** is arranged: failing one solution stops
 `RoadmapExecutor` from promoting the `building/` tags of the ones that did succeed, which is the state

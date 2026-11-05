@@ -813,6 +813,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         }
         bool resetDone = false;
         BuildOutput? output = null;
+        // The tests that passed are recorded once the build succeeded: a build that fails (on its impacts for
+        // instance) must run them again, they may be what changes the working folder.
+        bool testsPassed = false;
         try
         {
             for(; ; )
@@ -833,6 +836,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                     monitor.Error( $"Build failed for '{repo.DisplayPath}' on commit '{buildCommit.Sha}'.", ex );
                 }
                 if( output == null || cancellation.IsCancellationRequested ) return null;
+                testsPassed |= runTest;
 
                 var impacts = GetBuildImpacts( git );
                 if( impacts.Count == 0 ) break;
@@ -858,12 +862,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                 buildImpacts = BuildImpacts.Error;
                 var amended = CommitBuildImpacts( monitor, git, buildCommit, mustCheckOut, impacts, buildInfo );
                 if( amended == null ) return null;
-                // The tests ran on the content of the amended commit: the working folder with the impacts.
-                if( runTest )
-                {
-                    repoBuilder.SetTestRun( monitor, amended );
-                    runTest = false;
-                }
+                // The tests ran on the content of the amended commit (the working folder with the impacts):
+                // they are not run again and are recorded on the amended commit once it is built.
+                runTest = false;
                 // Builds the amended commit: the assemblies must reference it, not the commit that has been replaced.
                 FileHelper.DeleteFolder( monitor, output.PackagesFolder );
                 output = null;
@@ -900,6 +901,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                 return null;
             }
             Throw.DebugAssert( version != null );
+            if( testsPassed )
+            {
+                repoBuilder.SetTestRun( monitor, buildCommit );
+            }
             return new BuildResult( repo, tag, version, content, output.AssetsFolder, skippedBuild: false );
         }
         finally

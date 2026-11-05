@@ -636,7 +636,10 @@ been computed and is not a dry-run:
    or an amended commit that goes back to step 6.
 8. Hard-resets the working folder (untracked files and empty folders included), publishes the produced packages to
    the local NuGet feed (`RepoArtifactInfo.PublishToNuGetLocalFeed`) and applies the release build tag
-   (`CommitBuildInfo.ApplyReleaseBuildTag`) to produce the final `BuildResult`.
+   (`CommitBuildInfo.ApplyReleaseBuildTag`) to produce the final `BuildResult`. When the tests ran, the built commit (the
+   amended one after a `--build-impacts commit`) is recorded in the test-run cache (`RepoBuilder.SetTestRun`): only
+   now, so that a build that failed, on its impacts for instance, runs its tests again (they may be what changes the
+   working folder). A `BuilderFunction` never records it.
 9. Whatever happened, deletes the packages folder, resets the working folder and restores the original head.
 
 #### `DeleteBeforeBuild`: not reusing what a previous build generated

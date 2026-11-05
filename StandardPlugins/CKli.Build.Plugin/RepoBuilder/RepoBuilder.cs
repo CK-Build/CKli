@@ -86,6 +86,9 @@ public class RepoBuilder : RepoInfo
     /// <summary>
     /// Records that tests have successfully run on the commit's content: <see cref="HasTestRun(IActivityMonitor, Commit)"/>
     /// will return true for any commit with the same content.
+    /// <para>
+    /// The build plugin calls this once a build that ran the tests succeeded: a <see cref="BuilderFunction"/> doesn't.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="commit">The commit on which the tests have run.</param>
@@ -367,12 +370,8 @@ public class RepoBuilder : RepoInfo
     /// <returns>True on tests success, false otherwise.</returns>
     protected bool DotNetTest( IActivityMonitor monitor, bool release, CancellationToken cancellation )
     {
-        if( !Repo.RunDotnet( monitor, $"test -tl:off -c {(release ? "Release" : "Debug")} --nologo --no-build --blame-hang-timeout {TestHangTimeout}", cancellation: cancellation ) )
-        {
-            return false;
-        }
-        SetTestRun( monitor, Repo.GitRepository.Repository.Head.Tip );
-        return true;
+        // The test run is recorded by the build plugin once the build succeeded (see SetTestRun).
+        return Repo.RunDotnet( monitor, $"test -tl:off -c {(release ? "Release" : "Debug")} --nologo --no-build --blame-hang-timeout {TestHangTimeout}", cancellation: cancellation );
     }
 
     /// <summary>
