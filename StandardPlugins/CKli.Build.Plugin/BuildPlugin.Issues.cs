@@ -125,6 +125,7 @@ public sealed partial class BuildPlugin
                                                                      v,
                                                                      runTest: false,
                                                                      forceRebuild: true,
+                                                                     BuildImpacts.Discard,
                                                                      cancellation );
                 if( buildResult == null)
                 {

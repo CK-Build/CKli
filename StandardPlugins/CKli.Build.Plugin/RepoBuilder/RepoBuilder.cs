@@ -96,8 +96,13 @@ public class RepoBuilder : RepoInfo
 
     /// <summary>
     /// Build, test, package and generate the optional Deployment assets of the repository.
-    /// On success, the <see cref="BuildResult"/> contains the consumed and produced NuGet packages
-    /// and the files to deploy.
+    /// On success, the <see cref="BuildOutput"/> contains the consumed NuGet packages, the folder of the
+    /// produced ones and the published deployment assets.
+    /// <para>
+    /// The "nuget.config" file is restored but the working folder is left as the build left it: the caller
+    /// handles the impacts of the build, resets the working folder, publishes the packages, tags the version and
+    /// deletes the <see cref="BuildOutput.PackagesFolder"/>.
+    /// </para>
     /// <para>
     /// This can throw: it is up to the caller to catch (or not) exceptions.
     /// </para>
@@ -107,8 +112,8 @@ public class RepoBuilder : RepoInfo
     /// <param name="buildInfo">The build info.</param>
     /// <param name="runTest">Whether tests should be run or not.</param>
     /// <param name="cancellation">Cancellation token.</param>
-    /// <returns>True on success, false otherwise.</returns>
-    public async Task<BuildResult?> BuildAsync( IActivityMonitor monitor,
+    /// <returns>The build output on success, null otherwise.</returns>
+    public async Task<BuildOutput?> BuildAsync( IActivityMonitor monitor,
                                                 CKliEnv context,
                                                 CommitBuildInfo buildInfo,
                                                 bool runTest,
@@ -128,6 +133,8 @@ public class RepoBuilder : RepoInfo
         //
         monitor.Trace( "Add the local feed to the 'nuget.config' file." );
         var nugetConfigPath = Repo.WorkingFolder.AppendPart( "nuget.config" );
+        // The modified file is restored after the build: it must not appear among the impacts of the build.
+        var originalNuGetConfig = File.Exists( nugetConfigPath ) ? File.ReadAllBytes( nugetConfigPath ) : null;
 
         var configRoot = NuGetHelper.GetConfigurationRoot( monitor, nugetConfigPath );
         if( configRoot == null ) return null;
@@ -153,78 +160,61 @@ public class RepoBuilder : RepoInfo
 
         if( cancellation.IsCancellationRequested ) return null;
 
-        // We ResetHard the repository after the build.
-        bool resetHardDone = false;
-
-        // Temporary output folder for artifacts.
+        // Temporary output folder for artifacts: on success, it belongs to the caller.
         var outputPath = FileUtil.CreateUniqueTimedFolder( Path.GetTempPath() + "CKliBuild", null, DateTime.UtcNow );
-
+        BuildOutput? output = null;
         try
         {
-            XmlHelper.SafeSave( configRoot, nugetConfigPath, SaveOptions.DisableFormatting );
-            var (success, result) = await _repositoryBuilder.RaiseOnCoreBuildAsync( monitor, context, buildInfo, outputPath, runTest, cancellation ).ConfigureAwait( false );
-            if( !success || result != null )
+            try
             {
-                return result;
-            }
-            if( DotNetBuildTestPack( monitor, buildInfo, runTest, outputPath, cancellation )
-                && !cancellation.IsCancellationRequested
-                && BuildResult.GetConsumedPackages( monitor,
-                                                    Repo,
-                                                    buildInfo.ToString(),
-                                                    out var consumedPackages,
-                                                    out var transitivePackages ) )
-            {
-                // Everything went fine, it's time to cleanup the working folder and we are rather aggressive here:
-                // we use a git reset hard, delete any untracked files and eventually removes any empty folder.
-                //
-                // If we cannot reset the working folder, we don't want to ignore this at all: the build fails.
-                if( !Repo.GitRepository.ResetHard( monitor, out _ ) )
+                XmlHelper.SafeSave( configRoot, nugetConfigPath, SaveOptions.DisableFormatting );
+                var (success, hooked) = await _repositoryBuilder.RaiseOnCoreBuildAsync( monitor, context, buildInfo, outputPath, runTest, cancellation ).ConfigureAwait( false );
+                if( !success || hooked != null )
                 {
-                    monitor.Error( $"Unable to reset the working folder after build. This should not happen: failing the build." );
+                    return output = hooked;
+                }
+                if( !DotNetBuildTestPack( monitor, buildInfo, runTest, outputPath, cancellation )
+                    || cancellation.IsCancellationRequested
+                    || !BuildResult.GetConsumedPackages( monitor,
+                                                         Repo,
+                                                         buildInfo.ToString(),
+                                                         out var consumedPackages,
+                                                         out var transitivePackages ) )
+                {
                     return null;
                 }
-                // This may fail (we just warn).
-                FileHelper.DeleteEmptyFoldersBelow( monitor, buildInfo.Repo.WorkingFolder, CK.Core.LogLevel.Warn );
-                resetHardDone = true;
-
+                RestoreNuGetConfig( nugetConfigPath, originalNuGetConfig );
                 var deploymentFolder = Repo.WorkingFolder.AppendPart( ArtifactHandlerPlugin.DeployFolderName );
-                if( HandleDeployAssets( monitor, deploymentFolder, buildInfo.Version, out var assetsFolder, out var assetFileNames )
-                    && _repoArtifact.PublishToNuGetLocalFeed( monitor, buildInfo.Version, outputPath, out var publishedPackages ) ) 
+                if( !HandleDeployAssets( monitor, deploymentFolder, buildInfo.Version, out var assetsFolder, out var assetFileNames ) )
                 {
-                    var content = new BuildContentInfo( consumedPackages,
-                                                        publishedPackages,
-                                                        assetFileNames,
-                                                        transitivePackages );
-                    var (tag,version) = buildInfo.ApplyReleaseBuildTag( monitor, context, content );
-                    if( tag == null )
-                    {
-                        return null;
-                    }
-                    Throw.DebugAssert( version != null );
-                    var r = new BuildResult( Repo,
-                                             tag,
-                                             version,
-                                             content,
-                                             assetsFolder,
-                                             skippedBuild: false );
-
-                    return r;
+                    return null;
                 }
+                return output = new BuildOutput( outputPath, consumedPackages, transitivePackages, assetsFolder, assetFileNames );
+            }
+            finally
+            {
+                RestoreNuGetConfig( nugetConfigPath, originalNuGetConfig );
             }
         }
         finally
         {
-            if( outputPath != null ) FileHelper.DeleteFolder( monitor, outputPath );
-            // If reset has not been done (build failed or hooked BuildResult on which we ave no control),
-            // do it.
-            if( !resetHardDone )
+            if( output == null || output.PackagesFolder != outputPath )
             {
-                Repo.GitRepository.ResetHard( monitor, out var _ );
-                FileHelper.DeleteEmptyFoldersBelow( monitor, buildInfo.Repo.WorkingFolder, CK.Core.LogLevel.Warn );
+                FileHelper.DeleteFolder( monitor, outputPath );
             }
         }
-        return null;
+
+        static void RestoreNuGetConfig( NormalizedPath nugetConfigPath, byte[]? originalNuGetConfig )
+        {
+            if( originalNuGetConfig == null )
+            {
+                if( File.Exists( nugetConfigPath ) ) File.Delete( nugetConfigPath );
+            }
+            else
+            {
+                File.WriteAllBytes( nugetConfigPath, originalNuGetConfig );
+            }
+        }
     }
 
     bool HandleDeployAssets( IActivityMonitor monitor,

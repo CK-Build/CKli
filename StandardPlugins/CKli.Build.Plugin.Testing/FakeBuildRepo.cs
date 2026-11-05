@@ -106,6 +106,17 @@ public sealed partial class FakeBuildRepo
     public bool FailBuild { get; set; }
 
     /// <summary>
+    /// Gets or sets an action that the fake build calls with the working folder of this repository, after it
+    /// has "built" the checked out commit: it simulates a build that creates, modifies or deletes files (the
+    /// impacts of the build, see "--build-impacts"). Defaults to null.
+    /// <para>
+    /// With "--build-impacts commit", the amended commit is built again: an action that always does the same
+    /// thing has no impact on this second build (the changes are already committed).
+    /// </para>
+    /// </summary>
+    public Action<NormalizedPath>? OnBuild { get; set; }
+
+    /// <summary>
     /// Gets the <see cref="InitialVersion"/> or throws if this repository has been created without one:
     /// a repository can only be referenced if it produces a version.
     /// </summary>

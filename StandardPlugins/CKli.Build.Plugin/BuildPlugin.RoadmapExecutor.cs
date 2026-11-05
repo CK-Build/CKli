@@ -26,6 +26,7 @@ public sealed partial class BuildPlugin
         readonly int _maxDoP;
         readonly CancellationToken _cancellation;
         readonly bool? _runTest;
+        readonly BuildImpacts _buildImpacts;
         readonly bool _singleBuild;
         // "--focus": the builds of the class 0 (see GetPriorityClass) that have not completed yet. While it is
         // not 0, no build of another class starts. Always 0 when the roadmap is not a focused one.
@@ -43,6 +44,7 @@ public sealed partial class BuildPlugin
                                 CKliEnv context,
                                 Roadmap roadmap,
                                 bool? runTest,
+                                BuildImpacts buildImpacts,
                                 int maxDoP,
                                 CancellationToken cancellation )
         {
@@ -51,6 +53,7 @@ public sealed partial class BuildPlugin
             _roadmap = roadmap;
             _singleBuild = roadmap.SolutionBuildCount == 1;
             _runTest = runTest;
+            _buildImpacts = buildImpacts;
             _maxDoP = maxDoP;
             _stop = CancellationTokenSource.CreateLinkedTokenSource( cancellation );
             _cancellation = _stop.Token;
@@ -509,7 +512,13 @@ public sealed partial class BuildPlugin
                                                             build.TargetVersion,
                                                             _runTest,
                                                             forceRebuild: !build.TargetVersion.IsCI,
+                                                            _buildImpacts,
                                                             _cancellation ).ConfigureAwait( false );
+            // "--build-impacts commit" may have amended the head of the build branch.
+            if( result != null && !buildBranch.Refresh( monitor ) )
+            {
+                return null;
+            }
             Throw.DebugAssert( "If build succeeded, the produced packages in the last built version must all be mapped to the new target version.",
                                result == null
                                || result.Content.Produced.All( p => _roadmap.PackageMapping.GetMappedVersion( p, build.Solution.LastBuild.Version ) == result.Version ) );

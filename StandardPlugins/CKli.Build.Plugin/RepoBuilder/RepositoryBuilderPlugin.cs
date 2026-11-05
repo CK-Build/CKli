@@ -218,7 +218,7 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
         return new RepoBuilder( repo, this, _artifactHandler, _artifactHandler.Get( monitor, repo ) );
     }
 
-    internal async Task<(bool,BuildResult?)> RaiseOnCoreBuildAsync( IActivityMonitor monitor,
+    internal async Task<(bool,BuildOutput?)> RaiseOnCoreBuildAsync( IActivityMonitor monitor,
                                                                     CKliEnv context,
                                                                     CommitBuildInfo buildInfo,
                                                                     string outputPath,
@@ -247,6 +247,6 @@ public sealed class RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>
         {
             monitor.Info( $"No listener to the CoreBuild event." );
         }
-        return (true, e?.ResultHook);
+        return (true, e?.OutputHook);
     }
 }

@@ -264,6 +264,7 @@ public sealed partial class Roadmap
                                                     CKliEnv context,
                                                     BuildPlugin buildPlugin,
                                                     bool? runTest,
+                                                    BuildImpacts buildImpacts,
                                                     int maxDop,
                                                     CancellationToken cancellation )
     {
@@ -320,7 +321,7 @@ public sealed partial class Roadmap
                 return null;
             }
         }
-        var builder = new BuildPlugin.RoadmapExecutor( buildPlugin, context, this, runTest, maxDop, cancellation );
+        var builder = new BuildPlugin.RoadmapExecutor( buildPlugin, context, this, runTest, buildImpacts, maxDop, cancellation );
         // The builds are the one step of a publication that offers no checkpoint - they take as long as they take
         // - so the publication lease is renewed WHILE they run rather than being sized on them. They work in the
         // Repos and never touch the Stack repository, which is what makes that concurrent renewal legal.

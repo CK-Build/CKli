@@ -116,6 +116,7 @@ All build-family commands share a common set of options (declared once as `const
 | `all` | Consider all Repos of the World as pivots, not only the ones reachable from the current directory. |
 | `--focus` | `build` only. The pivots' upstreams are built too, the pivots are built before anything else, the build stops once they are built (or at the first failure) - see [below](#build---focus-working-in-a-pivot-and-its-upstreams). CI only: exclusive with `--regular`. |
 | `--continue` | `build --focus` only. Once the pivots and their upstreams are successfully built, goes on with the other builds (their consumers). |
+| `--build-impacts <commit\|discard>` | `build` and `*build` only. What to do with the files that a build creates, modifies or deletes: they fail the build by default - see [below](#build-impacts-what-a-build-leaves-in-the-working-folder). |
 
 | `[CommandPath]` | Method | Description |
 |---|---|---|
@@ -138,6 +139,25 @@ funnel into the same `DoCIAsync`/`DoNonCIAsync` → `ComputeAndDisplayRoadmap` �
 branch, deletes the remote `dev/` and, for `publish`, creates the actual release), so it is the one that has to be
 asked for by name. `--regular` and `--ci.0` are mutually exclusive and refused together
 (`BuildPlugin.CheckReleaseAndCIForce`).
+
+### Build impacts: what a build leaves in the working folder
+
+The **impacts** of a build are the files it creates, modifies or deletes in the working folder, the ignored files aside
+(a test application whose generator rewrites its `package.json`, a missing `Deployment/.gitignore`...). After a build,
+the working folder is reset: without a decision, these changes would silently vanish at each build, and the next build
+would make them again. So **impacts fail the build**, with an error that lists them (`created:`, `modified:`,
+`deleted:`) and says what to do:
+
+| `--build-impacts` | The impacts |
+|---|---|
+| *(none)* | An error. Commit them, ignore them with a `.gitignore` pattern, or use one of the values below. |
+| `commit` | Amended to the built commit (`"Changes made by the build."`), which is then **built again**: the assemblies name the commit they are built from in their informational version, and the replaced commit would no longer exist. The version is tagged on the amended commit, and its build must have no impact (an error otherwise: the build is not reproducible). Amending keeps the commit depth, hence the version. The built commit must be the tip of the checked out branch and must not have been pushed: an error says so otherwise. |
+| `discard` | Erased by the reset that follows the build (with a warning that lists them): a one-off, while the `.gitignore` pattern is written. |
+
+`publish`, `*publish` and `fix build`/`fix publish` have no option: what is published must be what is committed and
+tagged, and a fix must not change the content of its `fix/` branch. `maintenance rebuild` and the version-tag issue
+fixers discard the impacts: they reproduce versions that are already tagged. What to ignore is a human decision (a
+pattern like `**/.yarn/unplugged`): nothing writes a `.gitignore` automatically.
 
 ### `build --focus`: working in a pivot and its upstreams
 
@@ -246,14 +266,16 @@ repository — a renewal commits to it and pushes it. See
 |---|---|---|---|
 | `BuildPlugin.OnRoadmapBuild` | After a `Roadmap` build succeeds, or immediately for `--dry-run` | `RoadmapBuildEventArgs` (`Roadmap`, `ShouldPublish`, `BuildDate`) | Lets a listener (typically `CKli.Publish.Plugin`) act on the outcome; `Roadmap.SolutionBuildCount` can be 0 (nothing needed building). Handlers call `e.SetFailed()` to fail the command. |
 | `BuildPlugin.OnFixBuild` | After all targets of a `FixWorkflow` build succeed | `FixBuildEventArgs` (`FixWorkflow`, `Results`, `KeepBranchOnSuccessfulPublish`, `ShouldPublish`) | Same purpose for the `fix build`/`fix publish` pipeline. |
-| `RepositoryBuilderPlugin.OnCoreBuild` | Right before `RepoBuilder` runs `dotnet build/test/pack` for one repository | `CoreBuildEventArgs` (`CommitBuildInfo`, `OutputPath`, `RunTest`, `Cancellation`, settable `ResultHook`) | Lets a handler short-circuit the actual build by setting `ResultHook` to a `BuildResult` - the mechanism used to fake builds in tests. |
+| `RepositoryBuilderPlugin.OnCoreBuild` | Right before `RepoBuilder` runs `dotnet build/test/pack` for one repository | `CoreBuildEventArgs` (`CommitBuildInfo`, `OutputPath`, `RunTest`, `Cancellation`, settable `OutputHook`) | Lets a handler short-circuit the actual build by setting `OutputHook` to a `BuildOutput` (whose packages folder should be the `OutputPath`). |
 
 Both `RoadmapBuildEventArgs` and `FixBuildEventArgs` derive from `BuildBaseEventArgs`, which centralizes `ShouldPublish`,
 a single `BuildDate` for the whole operation, and the `Success`/`SetFailed()` pair.
 
 There is also a static test seam independent of events: `BuildPlugin.SetBuilderFunction(BuilderFunction?)` replaces the
 delegate (`BuilderFunction`, default `RealBuildAsync`) that `CoreBuildAsync` calls to perform the actual build - mainly
-used to inject a fake builder in tests, and it returns the previous function so callers can chain to the real one.
+used to inject a fake builder in tests, and it returns the previous function so callers can chain to the real one. The
+function only builds, tests and packs the checked out commit and returns a `BuildOutput`: everything else is done by
+`CoreBuildAsync`, so that it also runs under a fake builder.
 
 ### `deps update`: aligning the external dependencies
 
@@ -605,8 +627,17 @@ been computed and is not a dry-run:
    available (`ArtifactHandlerPlugin.HasAllArtifacts`) - if so and tests don't need to (re)run, the build is skipped and
    a `BuildResult` with `SkippedBuild: true` is returned immediately ("Useless build ... skipped").
 4. Obtains a `CommitBuildInfo` (`VersionTagInfo.TryGetCommitBuildInfo`).
-5. Calls `RepositoryBuilderPlugin.DeleteBeforeBuild` (see below), then the injected `BuilderFunction`
-   (`RealBuildAsync` by default).
+5. Checks out the build commit (detached HEAD) if the working tree isn't already on it (a clean working folder is
+   required otherwise).
+6. Calls `RepositoryBuilderPlugin.DeleteBeforeBuild` (see below), then the injected `BuilderFunction`
+   (`RealBuildAsync` by default) that returns a `BuildOutput`: the consumed and transitive packages, the temporary
+   folder of the produced packages, the published deployment assets.
+7. Handles the [impacts](#build-impacts-what-a-build-leaves-in-the-working-folder) of the build: an error, a discard,
+   or an amended commit that goes back to step 6.
+8. Hard-resets the working folder (untracked files and empty folders included), publishes the produced packages to
+   the local NuGet feed (`RepoArtifactInfo.PublishToNuGetLocalFeed`) and applies the release build tag
+   (`CommitBuildInfo.ApplyReleaseBuildTag`) to produce the final `BuildResult`.
+9. Whatever happened, deletes the packages folder, resets the working folder and restores the original head.
 
 #### `DeleteBeforeBuild`: not reusing what a previous build generated
 
@@ -629,24 +660,21 @@ This runs in `CoreBuildAsync` rather than in `RepoBuilder.BuildAsync` because it
 of the `BuilderFunction` that happens to be installed: `CKli.Build.Plugin.Testing` replaces that function wholesale, so
 a hook inside `RepoBuilder` would never run under the fake harness (nor under a specialized `RepoBuilder`).
 
-`RealBuildAsync` checks out the build commit (detached HEAD) if the working tree isn't already on it, calls
-`RepoBuilder.BuildAsync`, and restores the original branch afterward - regardless of success.
+`RealBuildAsync` calls `RepoBuilder.BuildAsync`.
 
 `RepoBuilder` (`RepoBuilder/RepoBuilder.cs`, a `RepoInfo` created and cached per-Repo by `RepositoryBuilderPlugin : PrimaryRepoPlugin<RepoBuilder>`) does the concrete work:
 
 1. Adds the World's local NuGet feed (and any artifact-handler-configured feeds) to `nuget.config`, working around a
    `PackageSourceMapping`/local-feed NuGet issue.
-2. Raises `RepositoryBuilderPlugin.OnCoreBuild` - if a handler sets `CoreBuildEventArgs.ResultHook`, the real
-   build/test/pack steps are skipped entirely and that result is used (the test-injection point).
+2. Raises `RepositoryBuilderPlugin.OnCoreBuild` - if a handler sets `CoreBuildEventArgs.OutputHook`, the real
+   build/test/pack steps are skipped entirely and that output is used.
 3. Otherwise calls `DotNetBuildTestPack` (`protected virtual`, overridable by a specialized `RepoBuilder`): `dotnet
    build` (with `/p:Version`, `/p:InformationalVersion`, `/p:FileVersion`, `ContinuousIntegrationBuild=true`), optionally
-   `dotnet test`, then `dotnet pack` to a temporary output folder.
-4. On success: hard-resets the working folder, runs the `Deployment/GenerateAssets.cs` convention if present (via
-   `dotnet run` and `ArtifactHandlerPlugin`'s asset publishing), publishes the packed packages to the local NuGet feed
-   (`RepoArtifactInfo.PublishToNuGetLocalFeed`), and applies the release build tag
-   (`CommitBuildInfo.ApplyReleaseBuildTag`) to produce the final `BuildResult`.
-5. The working folder is always reset (hard reset + empty-folder cleanup) in a `finally`, whether or not the build
-   succeeded.
+   `dotnet test`, then `dotnet pack` to a temporary output folder, and reads the consumed packages.
+4. On success: restores the original `nuget.config` (its modification is not an impact of the build), runs the
+   `Deployment/GenerateAssets.cs` convention if present (via `dotnet run` and `ArtifactHandlerPlugin`'s asset
+   publishing) and returns the `BuildOutput`. The working folder is left as the build left it: `CoreBuildAsync` reads
+   its impacts, then resets it.
 
 `RepoBuilder.HasTestRun`/the successful-test cache is backed by `LocalStringCache` (`RepoBuilder/LocalStringCache.cs`): a
 trivial newline-delimited set of keys persisted under the World's `$Local` folder (`TestRun.Sha.txt`), shared by every
@@ -698,6 +726,8 @@ roadmap executor, targets are built **sequentially**, in `workflow.Targets` orde
 | `CIBuildMode` (internal enum: `Regular`, `CI`, `CIForce`) | Distinguishes `--regular` builds from the default CI ones and from `--ci.0`; threaded through `Roadmap`/`BuildSolution` decisions. `CI` is the default, so `Regular` is the exceptional member. |
 | `PublishableStatus` | See above - ordered enum combined by taking the maximum across solutions. |
 | `BuilderFunction` (delegate) | The pluggable "actually build this repo" seam used by `CoreBuildAsync`/`SetBuilderFunction`. |
+| `BuildOutput` | What a `BuilderFunction` produced: consumed and transitive packages, the temporary packages folder, the deployment assets. Not published, not tagged yet. |
+| `BuildImpacts` (enum: `Error`, `Commit`, `Discard`) | What `CoreBuildAsync` does with the [impacts](#build-impacts-what-a-build-leaves-in-the-working-folder) of a build. |
 | `FixPackageMapper` | Patch-tolerant `IPackageMapping` used only by the fix workflow. |
 | `LocalStringCache` | Generic `$Local`-backed string-set cache; currently used only for the test-run SHA cache. |
 

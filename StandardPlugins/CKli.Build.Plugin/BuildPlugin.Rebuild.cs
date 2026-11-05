@@ -54,6 +54,7 @@ public sealed partial class BuildPlugin
                                               tag.Version,
                                               runTest,
                                               forceRebuild: true,
+                                              BuildImpacts.Discard,
                                               PrimaryPluginContext.Cancellation ).ConfigureAwait( false ) != null )
                     {
                         monitor.Info( ScreenType.ScreenTag, $"Version '{tag.Version.ParsedText}' of '{repo.DisplayPath}' is valid." );
@@ -128,6 +129,7 @@ public sealed partial class BuildPlugin
                                   tag.Version,
                                   runTest,
                                   forceRebuild: true,
+                                  BuildImpacts.Discard,
                                   PrimaryPluginContext.Cancellation ).ConfigureAwait( false ) == null )
         {
             monitor.Error( "Build failed. See 'ckli log'." );

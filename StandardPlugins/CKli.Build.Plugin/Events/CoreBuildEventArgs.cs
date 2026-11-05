@@ -11,7 +11,7 @@ namespace CKli.Build.Plugin;
 /// It wraps the CommitBuildInfo that describes the build that is about to be ran in
 /// the checked out <see cref="CommitBuildInfo.Repo"/>.
 /// <para>
-/// This can hook the build thanks to the <see cref="ResultHook"/>.
+/// This can hook the build thanks to the <see cref="OutputHook"/>.
 /// </para>
 /// </summary>
 public sealed class CoreBuildEventArgs : WorldEventArgs
@@ -36,10 +36,11 @@ public sealed class CoreBuildEventArgs : WorldEventArgs
     }
 
     /// <summary>
-    /// Gets or sets the build result to consider.
-    /// When setting this to a non null result, the build/test/package steps are skipped.
+    /// Gets or sets the build output to consider.
+    /// When setting this to a non null output, the build/test/package steps are skipped: its
+    /// <see cref="BuildOutput.PackagesFolder"/> should be the <see cref="OutputPath"/>.
     /// </summary>
-    public BuildResult? ResultHook { get; set; }
+    public BuildOutput? OutputHook { get; set; }
 
     /// <summary>
     /// Gets the <see cref="CommitBuildInfo"/>.

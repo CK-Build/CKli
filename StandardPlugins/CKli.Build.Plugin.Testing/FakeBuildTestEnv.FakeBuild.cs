@@ -24,8 +24,9 @@ public sealed partial class FakeBuildTestEnv
     /// Fake <see cref="BuilderFunction"/>: not a single "dotnet" process is started here.
     /// <list type="bullet">
     ///     <item>
-    ///     The working folder is left as-is: the <paramref name="buildCommit"/> is not checked out, its content
-    ///     is read from the Git tree by the <see cref="ShallowSolutionPlugin"/>.
+    ///     The <paramref name="buildCommit"/> is checked out (by the build plugin, as for any build) but its
+    ///     content is read from the Git tree by the <see cref="ShallowSolutionPlugin"/>. The working folder is
+    ///     left as-is, unless a test changes it with <see cref="FakeBuildRepo.OnBuild"/>.
     ///     </item>
     ///     <item>
     ///     "dotnet build" does nothing and "dotnet test" always succeeds (but the tested content is recorded
@@ -45,9 +46,10 @@ public sealed partial class FakeBuildTestEnv
     ///     The "Deployment" assets are not faked: <see cref="BuildContentInfo.AssetFileNames"/> is always empty.
     ///     </item>
     /// </list>
-    /// Everything else (publishing to the local NuGet feed and tagging the built commit) is the real thing.
+    /// Everything else (handling the impacts of the build, publishing to the local NuGet feed and tagging the
+    /// built commit) is done by the build plugin: this is the real thing.
     /// </summary>
-    internal Task<BuildResult?> FakeBuildAsync( IActivityMonitor monitor,
+    internal Task<BuildOutput?> FakeBuildAsync( IActivityMonitor monitor,
                                               CKliEnv context,
                                               VersionTagInfo versionInfo,
                                               Commit buildCommit,
@@ -59,7 +61,7 @@ public sealed partial class FakeBuildTestEnv
         return Task.FromResult( FakeBuild( monitor, context, buildCommit, runTest, repoBuilder, buildInfo, cancellation ) );
     }
 
-    BuildResult? FakeBuild( IActivityMonitor monitor,
+    BuildOutput? FakeBuild( IActivityMonitor monitor,
                             CKliEnv context,
                             Commit buildCommit,
                             bool runTest,
@@ -73,8 +75,8 @@ public sealed partial class FakeBuildTestEnv
         if( cancellation.IsCancellationRequested ) return null;
 
         // A test can make a repository's build fail through FakeBuildRepo.FailBuild. This bails out before
-        // anything is written - in particular before ApplyReleaseBuildTag - which is what a build that fails
-        // to compile does. Failing any solution of the roadmap is enough to stop the RoadmapExecutor from
+        // anything is written - in particular before the build plugin tags the version - which is what a build
+        // that fails to compile does. Failing any solution of the roadmap is enough to stop the RoadmapExecutor from
         // promoting the "building/" tags of the ones that DID succeed.
         var declaring = FindFakeBuildRepo( repo );
         if( declaring != null && declaring.FailBuild )
@@ -84,8 +86,7 @@ public sealed partial class FakeBuildTestEnv
         }
 
         var shallow = repo.World.GetRequiredPlugin<ShallowSolutionPlugin>( monitor );
-        var artifactHandler = repo.World.GetRequiredPlugin<ArtifactHandlerPlugin>( monitor );
-        if( shallow == null || artifactHandler == null ) return null;
+        if( shallow == null ) return null;
 
         // The whole point of this fake: we read the commit's tree instead of checking it out and building it.
         // The solution is required here, just like the real build requires it to compile anything.
@@ -111,8 +112,10 @@ public sealed partial class FakeBuildTestEnv
             repoBuilder.SetTestRun( monitor, buildCommit );
         }
 
-        // Same temporary output folder pattern as the real RepoBuilder.BuildAsync.
+        // Same temporary output folder pattern as the real RepoBuilder.BuildAsync: on success, it belongs to
+        // the build plugin that publishes the packages in the local feed.
         var outputPath = FileUtil.CreateUniqueTimedFolder( System.IO.Path.GetTempPath() + "CKliFakeBuild", null, DateTime.UtcNow );
+        BuildOutput? output = null;
         try
         {
             foreach( var packageId in packageIds )
@@ -120,22 +123,9 @@ public sealed partial class FakeBuildTestEnv
                 WriteFakePackage( outputPath, packageId, buildInfo.Version );
             }
             if( cancellation.IsCancellationRequested ) return null;
-
-            // From here, this is the real build: the packages are published in the local feed and the
-            // version tag with its BuildContentInfo annotation is set on the built commit.
-            var repoArtifact = artifactHandler.Get( monitor, repo );
-            if( !repoArtifact.PublishToNuGetLocalFeed( monitor, buildInfo.Version, outputPath, out var produced ) )
-            {
-                return null;
-            }
-            var content = new BuildContentInfo( consumed, produced, assetFileNames: [], GetTransitivePackages( repo ) );
-            var (tag, version) = buildInfo.ApplyReleaseBuildTag( monitor, context, content );
-            if( tag == null )
-            {
-                return null;
-            }
-            Throw.DebugAssert( version != null );
-            return new BuildResult( repo, tag, version, content, assetsFolder: default, skippedBuild: false );
+            // A test can simulate a build that creates, modifies or deletes files in the working folder.
+            declaring?.OnBuild?.Invoke( repo.WorkingFolder );
+            return output = new BuildOutput( outputPath, consumed, GetTransitivePackages( repo ), assetsFolder: default, assetFileNames: [] );
         }
         catch( Exception ex )
         {
@@ -144,7 +134,7 @@ public sealed partial class FakeBuildTestEnv
         }
         finally
         {
-            FileHelper.DeleteFolder( monitor, outputPath );
+            if( output == null ) FileHelper.DeleteFolder( monitor, outputPath );
         }
     }
 

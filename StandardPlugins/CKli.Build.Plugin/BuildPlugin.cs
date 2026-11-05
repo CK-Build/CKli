@@ -8,6 +8,7 @@ using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -53,6 +54,11 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     const string _dForceTests = "Run tests even if they have already run successfully on the commit.";
     const string _dDryRun = "Only display the build roadmap.";
     const string _oDryRun = "--dry-run,-d";
+    const string _dBuildImpacts = """
+                                  What to do with the files that a build creates, modifies or deletes (they fail the build by default):
+                                  'commit' amends them to the built commit and builds it again, 'discard' erases them.
+                                  """;
+    const string _oBuildImpacts = "--build-impacts";
     const string _oFocus = "--focus";
     const string _oContinue = "--continue";
 
@@ -265,6 +271,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                   string? branch = null,
                                   [Description( _dMaxDoP )]
                                   string? maxDop = null,
+                                  [Description( _dBuildImpacts )]
+                                  [OptionName( _oBuildImpacts )]
+                                  string? buildImpacts = null,
                                   [Description( _dRegular )]
                                   [OptionName( _oRegular )]
                                   bool regular = false,
@@ -295,7 +304,11 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                   [OptionName( _oContinue )]
                                   bool continueOnSuccess = false )
     {
-        if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
+        if( !CheckRegularAndCIForce( monitor, regular, ciForce )
+            || !ParseBuildImpacts( monitor, buildImpacts, out var vBuildImpacts ) )
+        {
+            return Task.FromResult( false );
+        }
         if( continueOnSuccess && !focus )
         {
             monitor.Error( $"'{_oContinue}' applies to '{_oFocus}' that must be specified." );
@@ -309,8 +322,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             return Task.FromResult( false );
         }
         return regular
-            ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: false )
-            : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: false, focus, continueOnSuccess );
+            ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: false, vBuildImpacts )
+            : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: false, vBuildImpacts, focus, continueOnSuccess );
     }
 
     /// <summary>
@@ -355,8 +368,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     {
         if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
         return UnderPublishLockAsync( monitor, dryRun, () => regular
-          ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: true )
-          : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: true ) );
+          ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: true, BuildImpacts.Error )
+          : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: true, BuildImpacts.Error ) );
     }
 
     /// <summary>
@@ -386,6 +399,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                       string? branch = null,
                                       [Description( _dMaxDoP )]
                                       string? maxDop = null,
+                                      [Description( _dBuildImpacts )]
+                                      [OptionName( _oBuildImpacts )]
+                                      string? buildImpacts = null,
                                       [Description( _dRegular )]
                                       [OptionName( _oRegular )]
                                       bool regular = false,
@@ -402,10 +418,14 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                       [Description( "Build all the Repos, not only the ones that consume or produce the current repositories." )]
                                       bool all = false )
     {
-        if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
+        if( !CheckRegularAndCIForce( monitor, regular, ciForce )
+            || !ParseBuildImpacts( monitor, buildImpacts, out var vBuildImpacts ) )
+        {
+            return Task.FromResult( false );
+        }
         return regular
-         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: false )
-         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: false );
+         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: false, vBuildImpacts )
+         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: false, vBuildImpacts );
     }
 
     /// <summary>
@@ -453,8 +473,27 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     {
         if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
         return UnderPublishLockAsync( monitor, dryRun, () => regular
-         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: true )
-         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: true ) );
+         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: true, BuildImpacts.Error )
+         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: true, BuildImpacts.Error ) );
+    }
+
+    // "--build-impacts <commit|discard>": no value is BuildImpacts.Error.
+    static bool ParseBuildImpacts( IActivityMonitor monitor, string? value, out BuildImpacts buildImpacts )
+    {
+        buildImpacts = BuildImpacts.Error;
+        if( value == null ) return true;
+        if( value.Equals( "commit", StringComparison.OrdinalIgnoreCase ) )
+        {
+            buildImpacts = BuildImpacts.Commit;
+            return true;
+        }
+        if( value.Equals( "discard", StringComparison.OrdinalIgnoreCase ) )
+        {
+            buildImpacts = BuildImpacts.Discard;
+            return true;
+        }
+        monitor.Error( $"Invalid '{_oBuildImpacts}' value '{value}': it must be 'commit' or 'discard'." );
+        return false;
     }
 
     // "--ci.0" asks for a CI version: it cannot be combined with "--regular", which asks for the opposite.
@@ -479,6 +518,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                           bool dryRun,
                           bool isPullBuild,
                           bool publish,
+                          BuildImpacts buildImpacts,
                           bool focus = false,
                           bool continueOnSuccess = false )
     {
@@ -494,7 +534,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         }
         return dryRun
                 ? RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaxDoP )
-                : DoRunAsync( monitor, context, vMaxDoP, runTest, roadmap );
+                : DoRunAsync( monitor, context, vMaxDoP, runTest, buildImpacts, roadmap );
     }
 
     Task<bool> DoNonCIAsync( IActivityMonitor monitor,
@@ -506,7 +546,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                              bool forceTests,
                              bool dryRun,
                              bool isPullBuild,
-                             bool publish )
+                             bool publish,
+                             BuildImpacts buildImpacts )
     {
         if( skipTests )
         {
@@ -519,12 +560,12 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         }
         return dryRun
                 ? RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaDxDop )
-                : DoRunAsync( monitor, context, vMaDxDop, runTest: forceTests ? true : null, roadmap );
+                : DoRunAsync( monitor, context, vMaDxDop, runTest: forceTests ? true : null, buildImpacts, roadmap );
     }
 
-    async Task<bool> DoRunAsync( IActivityMonitor monitor, CKliEnv context, int vMaxDoP, bool? runTest, Roadmap roadmap )
+    async Task<bool> DoRunAsync( IActivityMonitor monitor, CKliEnv context, int vMaxDoP, bool? runTest, BuildImpacts buildImpacts, Roadmap roadmap )
     {
-        var results = await roadmap.BuildAsync( monitor, context, this, runTest, vMaxDoP, PrimaryPluginContext.Cancellation ).ConfigureAwait( false );
+        var results = await roadmap.BuildAsync( monitor, context, this, runTest, buildImpacts, vMaxDoP, PrimaryPluginContext.Cancellation ).ConfigureAwait( false );
         if( results == null )
         {
             // A "--focus" build that stopped after the successful builds of the pivots and their upstreams
@@ -658,6 +699,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                              SVersion targetVersion,
                                              bool? runTest,
                                              bool forceRebuild,
+                                             BuildImpacts buildImpacts,
                                              CancellationToken cancellation )
     {
         // We reproduce the "building/", "local/" or nothing (published): we don't set
@@ -705,14 +747,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return null;
         }
-        // The working folder must not carry what a previous build generated: this is a property of the build
-        // itself, not of the BuilderFunction that happens to be installed, so it is done here rather than in
-        // RepoBuilder.BuildAsync (which a test harness replaces wholesale).
-        if( !_repoBuilder.DeleteBeforeBuild( monitor, versionInfo.Repo ) )
-        {
-            return null;
-        }
-        var result = await _builderFunction( monitor, context, versionInfo, buildCommit, runTest.Value, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
+        var result = await CheckedOutBuildAsync( monitor, context, versionInfo, buildCommit, targetVersion, runTest.Value, forceRebuild, buildImpacts, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
         // A forced rebuild of a published version updates its version tag content: this is locally complete
         // and must be shared, other clones would otherwise keep the previous tag and have to rebuild it again.
         // ("building/" versions are the roadmap and fix workflows: they are published, if ever, by the publish step.)
@@ -729,26 +764,34 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         return result;
     }
 
-    static async Task<BuildResult?> RealBuildAsync( IActivityMonitor monitor,
-                                                    CKliEnv context,
-                                                    VersionTagInfo versionInfo,
-                                                    Commit buildCommit,
-                                                    bool runTest,
-                                                    RepoBuilder repoBuilder,
-                                                    CommitBuildInfo buildInfo,
-                                                    CancellationToken cancellation )
+    // Checks out the build commit, calls the BuilderFunction, handles the impacts of the build, resets the
+    // working folder, publishes the packages in the local feed, tags the version and restores the head.
+    // Everything here is what every build must do: the BuilderFunction (that a test harness replaces) only
+    // builds, tests and packs.
+    async Task<BuildResult?> CheckedOutBuildAsync( IActivityMonitor monitor,
+                                                   CKliEnv context,
+                                                   VersionTagInfo versionInfo,
+                                                   Commit buildCommit,
+                                                   SVersion targetVersion,
+                                                   bool runTest,
+                                                   bool forceRebuild,
+                                                   BuildImpacts buildImpacts,
+                                                   RepoBuilder repoBuilder,
+                                                   CommitBuildInfo buildInfo,
+                                                   CancellationToken cancellation )
     {
         using var gLog = monitor.OpenTrace( $"Core build for '{buildInfo}'." );
 
         if( cancellation.IsCancellationRequested ) return null;
 
+        var repo = versionInfo.Repo;
         //
         // We ensure that the working folder is checked out on the buildCommit content tree.
         // We restore the current branch once we are done.
         // Note that the Branch Head may be a DetachedHead (internal LibGit2Sharp specialization of a Branch) but
         // we don't care: we restore the current state.
         //
-        var git = versionInfo.Repo.GitRepository;
+        var git = repo.GitRepository;
         Branch currentHead = git.Repository.Head;
         bool mustCheckOut = currentHead.Tip.Tree.Sha != buildCommit.Tree.Sha;
         if( mustCheckOut )
@@ -766,25 +809,194 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                 return null;
             }
         }
-        BuildResult? result = null;
+        bool resetDone = false;
+        BuildOutput? output = null;
         try
         {
-            result = await repoBuilder.BuildAsync( monitor,
-                                                   context,
-                                                   buildInfo,
-                                                   runTest,
-                                                   cancellation ).ConfigureAwait( false );
+            for(; ; )
+            {
+                // The working folder must not carry what a previous build generated: this is a property of the build
+                // itself, not of the BuilderFunction that happens to be installed, so it is done here rather than in
+                // RepoBuilder.BuildAsync (which a test harness replaces wholesale).
+                if( !_repoBuilder.DeleteBeforeBuild( monitor, repo ) )
+                {
+                    return null;
+                }
+                try
+                {
+                    output = await _builderFunction( monitor, context, versionInfo, buildCommit, runTest, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
+                }
+                catch( Exception ex )
+                {
+                    monitor.Error( $"Build failed for '{repo.DisplayPath}' on commit '{buildCommit.Sha}'.", ex );
+                }
+                if( output == null || cancellation.IsCancellationRequested ) return null;
+
+                var impacts = GetBuildImpacts( git );
+                if( impacts.Count == 0 ) break;
+                if( buildImpacts == BuildImpacts.Discard )
+                {
+                    monitor.Warn( ScreenType.ScreenTag, $"""
+                        The build of '{buildInfo}' changed {impacts.Count} files, they are discarded (--build-impacts discard):
+                        {impacts.Concatenate( Environment.NewLine )}
+                        """ );
+                    break;
+                }
+                if( buildImpacts == BuildImpacts.Error )
+                {
+                    monitor.Error( $"""
+                        The build of '{buildInfo}' changed {impacts.Count} files:
+                        {impacts.Concatenate( Environment.NewLine )}
+                        The files that a build creates, modifies or deletes must be committed or ignored: use "ckli build --build-impacts commit" (or "--build-impacts discard"), or ignore them with a '.gitignore' pattern.
+                        """ );
+                    return null;
+                }
+                Throw.DebugAssert( buildImpacts == BuildImpacts.Commit );
+                // The second build (of the amended commit) must have no impacts.
+                buildImpacts = BuildImpacts.Error;
+                var amended = CommitBuildImpacts( monitor, git, buildCommit, mustCheckOut, impacts, buildInfo );
+                if( amended == null ) return null;
+                // The tests ran on the content of the amended commit: the working folder with the impacts.
+                if( runTest )
+                {
+                    repoBuilder.SetTestRun( monitor, amended );
+                    runTest = false;
+                }
+                // Builds the amended commit: the assemblies must reference it, not the commit that has been replaced.
+                FileHelper.DeleteFolder( monitor, output.PackagesFolder );
+                output = null;
+                buildCommit = amended;
+                var amendedInfo = versionInfo.TryGetCommitBuildInfo( monitor, buildCommit, targetVersion, allowRebuildVersion: forceRebuild );
+                if( amendedInfo == null ) return null;
+                buildInfo = amendedInfo;
+                monitor.Info( ScreenType.ScreenTag, $"Building '{buildInfo}' again from the amended commit." );
+            }
+            // The working folder is cleaned up, and we are rather aggressive here: we use a git reset hard,
+            // delete any untracked files and eventually removes any empty folder.
+            //
+            // If we cannot reset the working folder, we don't want to ignore this at all: the build fails.
+            if( !git.ResetHard( monitor, out _ ) )
+            {
+                monitor.Error( $"Unable to reset the working folder after build. This should not happen: failing the build." );
+                return null;
+            }
+            // This may fail (we just warn).
+            FileHelper.DeleteEmptyFoldersBelow( monitor, repo.WorkingFolder, CK.Core.LogLevel.Warn );
+            resetDone = true;
+
+            if( !_artifactHandler.Get( monitor, repo ).PublishToNuGetLocalFeed( monitor, buildInfo.Version, output.PackagesFolder, out var publishedPackages ) )
+            {
+                return null;
+            }
+            var content = new BuildContentInfo( output.Consumed,
+                                                publishedPackages,
+                                                output.AssetFileNames,
+                                                output.Transitive );
+            var (tag, version) = buildInfo.ApplyReleaseBuildTag( monitor, context, content );
+            if( tag == null )
+            {
+                return null;
+            }
+            Throw.DebugAssert( version != null );
+            return new BuildResult( repo, tag, version, content, output.AssetsFolder, skippedBuild: false );
         }
-        catch( Exception ex )
+        finally
         {
-            monitor.Error( $"Build failed for '{versionInfo.Repo.DisplayPath}' on commit '{buildCommit.Sha}'.", ex );
+            if( output != null ) FileHelper.DeleteFolder( monitor, output.PackagesFolder );
+            if( !resetDone )
+            {
+                git.ResetHard( monitor, out var _ );
+                FileHelper.DeleteEmptyFoldersBelow( monitor, repo.WorkingFolder, CK.Core.LogLevel.Warn );
+            }
+            if( mustCheckOut )
+            {
+                monitor.Trace( "Restoring working folder to its previous head." );
+                git.Checkout( monitor, currentHead, deleteIgnored: true );
+            }
         }
-        if( mustCheckOut )
+    }
+
+    // The files that the build created, modified or deleted (ignored files are not impacts).
+    static List<string> GetBuildImpacts( GitRepository git )
+    {
+        var status = git.Repository.RetrieveStatus( new StatusOptions
         {
-            monitor.Trace( "Restoring working folder to its previous head." );
-            git.Checkout( monitor, currentHead, deleteIgnored: true );
+            IncludeUntracked = true,
+            RecurseUntrackedDirs = true,
+            IncludeIgnored = false,
+            DetectRenamesInIndex = false,
+            DetectRenamesInWorkDir = false
+        } );
+        var impacts = new List<string>();
+        foreach( var e in status )
+        {
+            var s = e.State;
+            if( s == FileStatus.Unaltered || (s & FileStatus.Ignored) != 0 ) continue;
+            var kind = (s & (FileStatus.NewInWorkdir | FileStatus.NewInIndex)) != 0
+                        ? "created"
+                        : (s & (FileStatus.DeletedFromWorkdir | FileStatus.DeletedFromIndex)) != 0
+                            ? "deleted"
+                            : "modified";
+            impacts.Add( $"  {kind}: {e.FilePath}" );
         }
-        return result;
+        impacts.Sort( StringComparer.Ordinal );
+        return impacts;
+    }
+
+    // Amends the build commit with the impacts of its build. Returns the amended commit or null on error.
+    static Commit? CommitBuildImpacts( IActivityMonitor monitor,
+                                       GitRepository git,
+                                       Commit buildCommit,
+                                       bool mustCheckOut,
+                                       List<string> impacts,
+                                       CommitBuildInfo buildInfo )
+    {
+        // Amending keeps the commit depth, hence the version: the version tag lands on the commit that contains
+        // the impacts. This requires the build commit to be the tip of the checked out branch and not pushed.
+        string? reason = mustCheckOut || git.Repository.Info.IsHeadDetached || git.Repository.Head.Tip.Sha != buildCommit.Sha
+                            ? "the built commit is not the tip of the checked out branch"
+                            : !git.CanAmendCommit
+                                ? $"the built commit has been pushed (branch '{git.CurrentBranchName}')"
+                                : null;
+        if( reason != null )
+        {
+            monitor.Error( $"""
+                The build of '{buildInfo}' changed {impacts.Count} files:
+                {impacts.Concatenate( Environment.NewLine )}
+                They cannot be committed (--build-impacts commit): {reason}.
+                Commit or ignore them, then build again.
+                """ );
+            return null;
+        }
+        if( git.Commit( monitor,
+                        "Changes made by the build.",
+                        CommitBehavior.AmendIfPossibleAndPrependPreviousMessage ) != CommitResult.Amended )
+        {
+            monitor.Error( $"Unable to amend the commit '{buildCommit.Sha}' with the changes made by the build of '{buildInfo}'." );
+            return null;
+        }
+        var amended = git.Repository.Head.Tip;
+        monitor.Info( ScreenType.ScreenTag, $"""
+            The build of '{buildInfo}' changed {impacts.Count} files, they are amended to its commit (--build-impacts commit):
+            {impacts.Concatenate( Environment.NewLine )}
+            """ );
+        return amended;
+    }
+
+    static async Task<BuildOutput?> RealBuildAsync( IActivityMonitor monitor,
+                                                    CKliEnv context,
+                                                    VersionTagInfo versionInfo,
+                                                    Commit buildCommit,
+                                                    bool runTest,
+                                                    RepoBuilder repoBuilder,
+                                                    CommitBuildInfo buildInfo,
+                                                    CancellationToken cancellation )
+    {
+        return await repoBuilder.BuildAsync( monitor,
+                                             context,
+                                             buildInfo,
+                                             runTest,
+                                             cancellation ).ConfigureAwait( false );
     }
 
 }
