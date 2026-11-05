@@ -53,7 +53,10 @@ public sealed partial class HotZonePlugin
                              string projects,
                              [Description( "The destination folder, relative to the current directory. Defaults to the current directory." )]
                              [OptionName( "--target,-t" )]
-                             string? target = null )
+                             string? target = null,
+                             [Description( "Displays what the move would do (the moved folders, the reference changes, the starting version) and changes nothing." )]
+                             [OptionName( "--dry-run,-d" )]
+                             bool dryRun = false )
     {
         // The destination.
         var destination = target == null ? context.CurrentDirectory : context.CurrentDirectory.Combine( target ).ResolveDots();
@@ -161,7 +164,7 @@ public sealed partial class HotZonePlugin
         }
 
         // Plans the reference changes (nothing is changed on error).
-        var changes = new List<Action>();
+        var changes = new List<(string Description, Action Apply)>();
         var dependencies = new HashSet<(Repo From, Repo To)>();
         foreach( var (r, list) in repoProjects )
         {
@@ -174,11 +177,17 @@ public sealed partial class HotZonePlugin
                     var q = list.FirstOrDefault( o => o.Path.Path.Equals( refPath.Path, StringComparison.OrdinalIgnoreCase ) );
                     if( q == null ) continue;
                     var finalRepoQ = FinalRepo( r, q );
+                    var oldInclude = (string?)e.Attribute( CKli.Core.XNames.Include );
                     if( finalRepoP == finalRepoQ )
                     {
                         // A reference inside a repository: its path follows the moved projects.
                         var qPath = FinalPath( q );
-                        changes.Add( () => p.SetProjectReference( e, qPath ) );
+                        var newInclude = MutableProject.GetRelativePath( FinalPath( p ).RemoveLastPart(), qPath );
+                        if( newInclude != oldInclude )
+                        {
+                            changes.Add( ($"{p.Name}: project reference '{oldInclude}' -> '{newInclude}'.",
+                                          () => p.SetProjectReference( e, qPath )) );
+                        }
                     }
                     else if( !IsPackable( q ) )
                     {
@@ -194,7 +203,8 @@ public sealed partial class HotZonePlugin
                         dependencies.Add( (finalRepoP, finalRepoQ) );
                         var version = GetReferenceVersion( monitor, repoProjects, finalRepoP, q.Name, finalRepoQ, targetRepo, startVersion );
                         var qName = q.Name;
-                        changes.Add( () => p.SetPackageReference( e, qName, version ) );
+                        changes.Add( ($"{p.Name}: project reference '{oldInclude}' -> package reference '{qName}' {version}.",
+                                      () => p.SetPackageReference( e, qName, version )) );
                     }
                 }
                 foreach( var (e, packageId) in p.PackageReferences )
@@ -206,7 +216,9 @@ public sealed partial class HotZonePlugin
                         if( producer.Project != p )
                         {
                             var producerPath = FinalPath( producer.Project );
-                            changes.Add( () => p.SetProjectReference( e, producerPath ) );
+                            var newInclude = MutableProject.GetRelativePath( FinalPath( p ).RemoveLastPart(), producerPath );
+                            changes.Add( ($"{p.Name}: package reference '{packageId}' -> project reference '{newInclude}'.",
+                                          () => p.SetProjectReference( e, producerPath )) );
                         }
                     }
                     else
@@ -229,6 +241,38 @@ public sealed partial class HotZonePlugin
             }
         }
         if( !success ) return false;
+
+        // The plan: displayed by a dry run, and after the move.
+        var plan = new List<(int Indent, string Line)>();
+        plan.Add( (0, $"{moved.Count} projects to '{targetRepo.DisplayPath}/{destinationFolder}':") );
+        foreach( var m in moved )
+        {
+            var solutionFolder = MutableSolution.GetSolutionFolderPath( m.NewPath );
+            plan.Add( (2, $"{m.Source.DisplayPath}/{m.OldFolder} -> {targetRepo.DisplayPath}/{m.NewFolder} "
+                          + (solutionFolder.IsEmptyPath ? "(root of the solution)." : $"(solution folder '/{solutionFolder}/').")) );
+        }
+        if( startVersion != null )
+        {
+            plan.Add( (0, $"Starting version of '{targetRepo.DisplayPath}': 'v{startVersion}+fake'.") );
+        }
+        if( changes.Count > 0 )
+        {
+            plan.Add( (0, $"{changes.Count} reference changes:") );
+            plan.AddRange( changes.Select( c => (2, c.Description) ) );
+        }
+        foreach( var m in moved.Where( m => m.OldFolder.Parts.Count != m.NewFolder.Parts.Count ) )
+        {
+            foreach( var v in m.Project.OtherParentRelativePaths )
+            {
+                plan.Add( (0, $"Warning: '{m.Name}' changes of depth, its relative path '{v}' is not updated.") );
+            }
+        }
+        if( dryRun )
+        {
+            context.Screen.Display( s => s.Text( "Dry run: nothing is changed. The move would be:" )! );
+            DisplayPlan( context, plan );
+            return true;
+        }
 
         using( monitor.OpenInfo( $"Moving {moved.Count} projects to '{targetRepo.DisplayPath}/{destinationFolder}'." ) )
         {
@@ -260,17 +304,10 @@ public sealed partial class HotZonePlugin
                     monitor.Error( $"While moving '{m.Source.DisplayPath}/{m.OldFolder}' to '{targetRepo.DisplayPath}/{m.NewFolder}'.", ex );
                     return false;
                 }
-                if( m.OldFolder.Parts.Count != m.NewFolder.Parts.Count )
-                {
-                    foreach( var v in m.Project.OtherParentRelativePaths )
-                    {
-                        monitor.Warn( $"Project '{m.Name}' changed of depth: its relative path '{v}' has not been updated." );
-                    }
-                }
                 m.Project.SetLocation( targetRepo.WorkingFolder, m.NewPath );
             }
             // Rewrites the references.
-            foreach( var c in changes ) c();
+            foreach( var c in changes ) c.Apply();
             foreach( var p in repoProjects.Values.SelectMany( l => l ) )
             {
                 if( !p.Save( monitor ) ) return false;
@@ -286,12 +323,19 @@ public sealed partial class HotZonePlugin
                 if( !s.Save( monitor ) ) return false;
             }
         }
-        monitor.Info( ScreenType.ScreenTag,
-                      $"""
-                      {moved.Count} projects moved to '{targetRepo.DisplayPath}/{destinationFolder}'.
-                      Review, build from the World root and commit.
-                      """ );
+        context.Screen.Display( s => s.Text( "Moved:" )! );
+        DisplayPlan( context, plan );
+        context.Screen.Display( s => s.Text( "Nothing is committed: review, build from the World root and commit." )! );
         return true;
+    }
+
+    // One display per line: a multi-line text block trims its lines (the indentation would be lost).
+    static void DisplayPlan( CKliEnv context, List<(int Indent, string Line)> plan )
+    {
+        foreach( var (indent, line) in plan )
+        {
+            context.Screen.Display( s => s.Text( line )!.Box( marginLeft: 2 + indent ) );
+        }
     }
 
     static bool IsPackable( MutableProject p ) => p.IsPackable != false && !p.Name.EndsWith( ".Tests", StringComparison.OrdinalIgnoreCase );

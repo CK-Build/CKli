@@ -178,7 +178,7 @@ change a produced package identifier or bump a dependency outside the fix's own 
 
 ## How: `project move`
 
-`ckli project move <projects> [--target, -t <folder>]` moves projects to a folder of a repository: the current
+`ckli project move <projects> [--target, -t <folder>] [--dry-run, -d]` moves projects to a folder of a repository: the current
 directory, or the `--target` folder (resolved against the current directory). The projects come from the same
 repository (the move inside a repository is more than a `git mv`: the references must follow), from other repositories
 of the World, or both. It is implemented by `HotZonePlugin.ProjectMove`.
@@ -215,8 +215,11 @@ It refuses, before changing anything, when:
   or a test project): they must move together;
 - the target and a source would depend on each other (a cycle). Moving the downstream projects first avoids it.
 
+**`--dry-run`** runs the checks and displays the plan, and changes nothing: the moved folders and their solution
+folders, the target's starting version, the reference changes. The same plan is displayed after a move.
+
 A moved project whose depth changes may have other relative paths (an `Import`, an item with `..\`): they are not
-rewritten, and a warning names them. Nothing is committed (except the empty commit that may carry the `+fake` tag):
+rewritten, and the plan warns about them. Nothing is committed (except the empty commit that may carry the `+fake` tag):
 review, build from the World root (the source and the target must both build), and commit.
 
 ## Plugin wiring
