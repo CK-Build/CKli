@@ -15,6 +15,8 @@ This assembly provides some general helpers that are use by all CKli ecosystem:
 - The `IRenderable` components and the `IScreen` and `ScreenType` is composable a terminal UI abstraction. Renderables are immutable objects and can be composed to
   describe screen parts.
   - `StringScreen` (captures output as a string) and `NoScreen` (discards all output) are available for testing.
+    `StringScreen.Width` (the maximal width by default) narrows what is displayed, as a console does: a test sets it
+    (to 80 for instance) to check a display on a narrow screen.
   - A `HorizontalContent`'s cells are **columns**: they share the width they are given, so its `MinWidth` is the
     **sum** of theirs. A `FlowContent`'s cells are a **paragraph**: each keeps its own width and the flow breaks
     into as many lines as needed, so its `MinWidth` is the **widest** of theirs (plus its `HangingIndent`, the

@@ -12,6 +12,7 @@ public sealed class StringScreen : IScreen
 {
     readonly StringBuilder _b;
     readonly IRenderTarget _renderer;
+    int _width = IScreen.MaxScreenWidth;
 
     /// <summary>
     /// Initializes a new string screen.
@@ -30,11 +31,34 @@ public sealed class StringScreen : IScreen
     /// <inheritdoc />
     public ScreenType ScreenType => ScreenType.Default;
 
-    /// <inheritdoc />
-    public void Display( IRenderable renderable, bool newLine = true ) => renderable.Render( _renderer, newLine );
+    /// <summary>
+    /// Renders the <paramref name="renderable"/>. A renderable wider than <see cref="Width"/> is narrowed first, as
+    /// the console screen does.
+    /// </summary>
+    /// <param name="renderable">The renderable to display.</param>
+    /// <param name="newLine">False to not end the last line.</param>
+    public void Display( IRenderable renderable, bool newLine = true )
+    {
+        if( renderable.Width > Width )
+        {
+            renderable = renderable.SetWidth( Width, false );
+        }
+        renderable.Render( _renderer, newLine );
+    }
 
-    /// <inheritdoc />
-    public int Width => IScreen.MaxScreenWidth;
+    /// <summary>
+    /// Gets or sets the width of this screen. Defaults to <see cref="IScreen.MaxScreenWidth"/>: nothing is narrowed.
+    /// A test sets a console width (80 for instance) to see what a display becomes on a narrow screen.
+    /// </summary>
+    public int Width
+    {
+        get => _width;
+        set
+        {
+            Throw.CheckOutOfRangeArgument( value > 0 && value <= IScreen.MaxScreenWidth );
+            _width = value;
+        }
+    }
 
     /// <inheritdoc />
     public void ScreenLog( LogLevel level, string message ) => ScreenType.Default.CreateLog( level, message ).Render( _renderer );
