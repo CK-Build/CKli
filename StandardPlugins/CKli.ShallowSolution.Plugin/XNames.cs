@@ -11,6 +11,9 @@ public static class XNames
     public static readonly XName VersionOverride = XNamespace.None + "VersionOverride";
     public static readonly XName Path = XNamespace.None + "Path";
     public static readonly XName Project = XNamespace.None + "Project";
+    public static readonly XName Folder = XNamespace.None + "Folder";
+    public static readonly XName Name = XNamespace.None + "Name";
+    public static readonly XName ProjectReference = XNamespace.None + "ProjectReference";
     public static readonly XName PropertyGroup = XNamespace.None + "PropertyGroup";
     public static readonly XName IsPackable = XNamespace.None + "IsPackable";
     public static XName Version => CKli.Core.XNames.Version;

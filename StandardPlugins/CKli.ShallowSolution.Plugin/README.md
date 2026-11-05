@@ -166,7 +166,13 @@ messier reality than the strict read path:
 4. Any other situation — no candidate, or more than one `.sln`/`.slnx` candidate, or both an exactly-named `.sln` and
    an unrelated `.slnx` present at once — is reported as an error and the whole operation aborts.
 
-Once loaded, `UpdatePackages(monitor, mapping, updated)` is the only mutation supported: it re-walks every project
+Once loaded, it supports two kinds of mutation. The projects of the solution are edited by `RemoveProject` (the
+solution folders left empty are removed) and `AddProject` (in the solution folder derived from the project's path:
+`Tests/My.Lib.Tests/My.Lib.Tests.csproj` goes in `/Tests/`, see `GetSolutionFolderPath`), then `Save` writes the
+`.slnx`. `ReadProjectPaths(monitor, repo)` lists the projects of a repository's `.slnx` without the side effects of
+`Create`.
+
+`UpdatePackages(monitor, mapping, updated)` updates the package versions: it re-walks every project
 and `Directory.(Build|Packages).props` file via `CommonSolution.LoadAllProjectFiles` (this time with
 `LoadOptions.PreserveWhitespace`, to keep diffs minimal), rewrites each `<PackageReference>`'s `VersionOverride`
 and/or `Version` attribute (and each `<PackageVersion>`'s `Version` attribute) using
@@ -177,6 +183,14 @@ mapping doesn't recognize produces a warning — not an error — and a `KnownNa
 doc comment explains the motivation: `dotnet package update`
 only operates on one project at a time and silently no-ops when a package isn't found — unusable for a batched,
 multi-repository update.
+
+### Editing the references of a project: `MutableProject`
+
+`MutableProject.Load(monitor, workingFolder, path)` loads a `.csproj` with its whitespaces. It exposes its
+`ProjectReferences` (with the repository-relative path of the referenced project) and its `PackageReferences`, and
+edits them: `SetProjectReference` sets the path of a `<ProjectReference>` or converts a `<PackageReference>` into one,
+`SetPackageReference` converts a `<ProjectReference>` into a `<PackageReference>`. `SetLocation` follows a project
+moved by the caller, and `Save` writes it back. This is what `ckli project move` (HotZone) uses.
 
 ### `PackageVersionMerge`
 
@@ -270,7 +284,8 @@ Three implementations are provided here (`CKli.Build.Plugin`'s `FixPackageMapper
 | `ShallowSolutionPlugin` | `PrimaryPluginBase` entry point; reads solutions from commits/branches (cached per `Tree.Sha`), dispatches to `MutableSolution` for updates. |
 | `GitSolutionContent` / `GitSolutionContent.Project` | Read-only projects + consumed packages, independent of any `Repo`/`Branch`. |
 | `GitSolution` | `GitSolutionContent` bound to the `Repo`/`Branch` it was read from. |
-| `MutableSolution` | Working-folder-only solution used to rewrite package versions in place; handles `.sln` → `.slnx` migration and renaming. |
+| `MutableSolution` | Working-folder-only solution used to rewrite package versions in place and to add or remove its projects; handles `.sln` → `.slnx` migration and renaming. |
+| `MutableProject` | Working-folder-only `.csproj` whose project and package references can be rewritten or converted into one another. |
 | `PackageVersionMerge` / `IPackageVersionResolver` | Creates a merge commit (objects only) whose package version conflicts are aligned on both sides with the resolver's answer; any other conflict fails. |
 | `CommonSolution` | Internal shared walker: resolves `.slnx` `<Project>` entries and `Directory.*.props` files. |
 | `INormalizedFileProvider` / `TreeFolder` / `CheckedOutFileProvider` / `GitFileInfo` / `FileInfoExtensions` | Uniform read-only file access over either a Git `Tree` or the physical working folder. |

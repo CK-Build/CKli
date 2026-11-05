@@ -16,19 +16,221 @@ namespace CKli.ShallowSolution.Plugin;
 /// one .sln or .slnx exists at the root).
 /// </para>
 /// <para>
-/// The only currently supported operation is <see cref="UpdatePackages"/>.
+/// The supported operations are <see cref="UpdatePackages"/> (that saves the project files it changes) and the
+/// edition of the solution's projects (<see cref="RemoveProject"/>, <see cref="AddProject"/>) that <see cref="Save"/>
+/// saves.
 /// </para>
 /// </summary>
 public sealed class MutableSolution
 {
     readonly Repo _repo;
     readonly XDocument _solution;
+    readonly NormalizedPath _solutionPath;
+    bool _isDirty;
 
-    MutableSolution( Repo repo, XDocument solution )
+    MutableSolution( Repo repo, XDocument solution, NormalizedPath solutionPath )
     {
         _repo = repo;
         _solution = solution;
+        _solutionPath = solutionPath;
     }
+
+    /// <summary>
+    /// Gets the repository.
+    /// </summary>
+    public Repo Repo => _repo;
+
+    /// <summary>
+    /// Gets the paths of the ".csproj" files of the solution, relative to the repository's working folder.
+    /// </summary>
+    public IEnumerable<NormalizedPath> ProjectPaths => _solution.Root!.Descendants( XNames.Project )
+                                                                       .Select( p => new NormalizedPath( (string?)p.Attribute( XNames.Path ) ) )
+                                                                       .Where( p => !p.IsEmptyPath );
+
+    /// <summary>
+    /// Gets whether <see cref="RemoveProject"/> or <see cref="AddProject"/> changed the solution: <see cref="Save"/>
+    /// must be called.
+    /// </summary>
+    public bool IsDirty => _isDirty;
+
+    /// <summary>
+    /// Removes a project from the solution. The solution folder that contained it is removed when it becomes empty,
+    /// and so are its parent solution folders that contain nothing else.
+    /// </summary>
+    /// <param name="projectPath">The path of the ".csproj" file, relative to the repository's working folder.</param>
+    /// <returns>True if the project has been removed, false if it was not in the solution.</returns>
+    public bool RemoveProject( NormalizedPath projectPath )
+    {
+        var e = FindProject( projectPath );
+        if( e == null ) return false;
+        var folder = e.Parent;
+        e.Remove();
+        _isDirty = true;
+        if( folder != null && folder.Name == XNames.Folder )
+        {
+            var name = (string?)folder.Attribute( XNames.Name );
+            // A solution folder is "/A/B/": its parents are "/A/" (and the root).
+            while( name != null && name.Length > 1 )
+            {
+                var f = FindFolder( name );
+                if( f == null || f.HasElements ) break;
+                // A folder that is the parent of another one is not empty.
+                if( _solution.Root!.Elements( XNames.Folder )
+                                   .Select( o => (string?)o.Attribute( XNames.Name ) )
+                                   .Any( n => n != null
+                                              && n.Length > name.Length
+                                              && n.StartsWith( name, StringComparison.OrdinalIgnoreCase ) ) )
+                {
+                    break;
+                }
+                f.Remove();
+                name = name[..(name.LastIndexOf( '/', name.Length - 2 ) + 1)];
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Adds a project to the solution, in the solution folder derived from its path: a project at the root of the
+    /// repository (<c>Project/Project.csproj</c>) is at the root of the solution, <c>Tests/Project.Tests/Project.Tests.csproj</c>
+    /// is in the "/Tests/" solution folder. The missing solution folders are created.
+    /// </summary>
+    /// <param name="projectPath">The path of the ".csproj" file, relative to the repository's working folder.</param>
+    /// <returns>True if the project has been added, false if it was already in the solution.</returns>
+    public bool AddProject( NormalizedPath projectPath )
+    {
+        if( FindProject( projectPath ) != null ) return false;
+        var newProject = new XElement( XNames.Project, new XAttribute( XNames.Path, projectPath.Path ) );
+        var folderPath = GetSolutionFolderPath( projectPath );
+        XElement container;
+        if( folderPath.IsEmptyPath )
+        {
+            container = _solution.Root!;
+        }
+        else
+        {
+            container = EnsureFolder( folderPath );
+            // Its parent folders exist too.
+            for( var p = folderPath.RemoveLastPart(); !p.IsEmptyPath; p = p.RemoveLastPart() )
+            {
+                EnsureFolder( p );
+            }
+        }
+        // The projects are sorted by path in their container, after its other elements (the root's folders, a
+        // folder's files).
+        var after = container.Elements( XNames.Project )
+                             .LastOrDefault( p => StringComparer.OrdinalIgnoreCase.Compare( (string?)p.Attribute( XNames.Path ), projectPath.Path ) < 0 );
+        if( after != null )
+        {
+            after.AddAfterSelf( newProject );
+        }
+        else
+        {
+            var first = container.Elements( XNames.Project ).FirstOrDefault();
+            if( first != null ) first.AddBeforeSelf( newProject );
+            else container.Add( newProject );
+        }
+        _isDirty = true;
+        return true;
+
+        XElement EnsureFolder( NormalizedPath folderPath )
+        {
+            var name = '/' + folderPath.Path + '/';
+            var f = FindFolder( name );
+            if( f == null )
+            {
+                f = new XElement( XNames.Folder, new XAttribute( XNames.Name, name ) );
+                // The folders are sorted by name, before the root's projects.
+                var root = _solution.Root!;
+                var after = root.Elements( XNames.Folder )
+                                .LastOrDefault( o => StringComparer.OrdinalIgnoreCase.Compare( (string?)o.Attribute( XNames.Name ), name ) < 0 );
+                if( after != null )
+                {
+                    after.AddAfterSelf( f );
+                }
+                else
+                {
+                    var first = root.Elements().FirstOrDefault();
+                    if( first != null ) first.AddBeforeSelf( f );
+                    else root.Add( f );
+                }
+            }
+            return f;
+        }
+    }
+
+    /// <summary>
+    /// Reads the paths of the ".csproj" files of a repository's solution from its working folder, without any
+    /// side effect (unlike <see cref="Create"/> that migrates a legacy solution file).
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <param name="repo">The repository.</param>
+    /// <returns>
+    /// The paths relative to the repository's working folder (empty when the repository has no conventional
+    /// ".slnx" file), or null on error.
+    /// </returns>
+    public static IReadOnlyList<NormalizedPath>? ReadProjectPaths( IActivityMonitor monitor, Repo repo )
+    {
+        var path = repo.WorkingFolder.AppendPart( repo.DisplayPath.LastPart + ".slnx" );
+        if( !File.Exists( path ) ) return [];
+        try
+        {
+            var doc = XDocument.Load( path );
+            return doc.Root!.Descendants( XNames.Project )
+                            .Select( p => new NormalizedPath( (string?)p.Attribute( XNames.Path ) ) )
+                            .Where( p => !p.IsEmptyPath )
+                            .ToList();
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While reading '{repo.DisplayPath}' solution.", ex );
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the solution folder of a project derived from its path: the folders that contain the project's folder.
+    /// The empty path is the root of the solution.
+    /// </summary>
+    /// <param name="projectPath">The path of the ".csproj" file, relative to the repository's working folder.</param>
+    /// <returns>The solution folder path ("Tests" for <c>Tests/Project.Tests/Project.Tests.csproj</c>).</returns>
+    public static NormalizedPath GetSolutionFolderPath( NormalizedPath projectPath ) => projectPath.RemoveLastPart( Math.Min( 2, projectPath.Parts.Count ) );
+
+    /// <summary>
+    /// Saves the solution file if <see cref="IsDirty"/> is true.
+    /// </summary>
+    /// <param name="monitor">The monitor.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool Save( IActivityMonitor monitor )
+    {
+        if( _isDirty )
+        {
+            try
+            {
+                // The solution has been loaded with its whitespaces: they are dropped so that the saved file is
+                // regularly indented, the edited elements included.
+                foreach( var t in _solution.DescendantNodes().OfType<XText>().Where( t => string.IsNullOrWhiteSpace( t.Value ) ).ToList() )
+                {
+                    t.Remove();
+                }
+                XmlHelper.SafeSave( _solution, _solutionPath );
+                _isDirty = false;
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"While saving '{_repo.DisplayPath}' solution.", ex );
+                return false;
+            }
+        }
+        return true;
+    }
+
+    XElement? FindProject( NormalizedPath projectPath ) => _solution.Root!.Descendants( XNames.Project )
+                                                                       .FirstOrDefault( p => new NormalizedPath( (string?)p.Attribute( XNames.Path ) )
+                                                                                               .Path.Equals( projectPath.Path, StringComparison.OrdinalIgnoreCase ) );
+
+    XElement? FindFolder( string name ) => _solution.Root!.Elements( XNames.Folder )
+                                                         .FirstOrDefault( f => string.Equals( (string?)f.Attribute( XNames.Name ), name, StringComparison.OrdinalIgnoreCase ) );
 
     /// <summary>
     /// Updating packages references is not that easy. "dotnet package update" is rather useless (it works only on a
@@ -200,7 +402,7 @@ public sealed class MutableSolution
         {
             var doc = XDocument.Load( slnOrSlnxPath, LoadOptions.PreserveWhitespace );
             Throw.CheckData( "A .slnx file must contain a <Solution> root element.", doc.Root?.Name.LocalName == "Solution" );
-            return new MutableSolution( repo, doc );
+            return new MutableSolution( repo, doc, slnOrSlnxPath );
         }
         catch( Exception ex )
         {

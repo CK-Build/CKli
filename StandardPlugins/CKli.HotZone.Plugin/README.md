@@ -176,6 +176,49 @@ and cancelled with three commands exposed by `HotZonePlugin`:
 `fix publish` — implemented elsewhere) to verify at each step that a fix build doesn't accidentally
 change a produced package identifier or bump a dependency outside the fix's own scope.
 
+## How: `project move`
+
+`ckli project move <projects> [--target, -t <folder>]` moves projects to a folder of a repository: the current
+directory, or the `--target` folder (resolved against the current directory). The projects come from the same
+repository (the move inside a repository is more than a `git mv`: the references must follow), from other repositories
+of the World, or both. It is implemented by `HotZonePlugin.ProjectMove`.
+
+- **`<projects>`** is a comma-separated list of project names (the `.csproj` names, which are the package names of the
+  packable projects). An entry can be prefixed by folders to disambiguate: it is matched against the end of
+  `<repository display path>/<project folder's parent>/<project name>`, segment by segment
+  (`Tests/My.Project.Tests`, `My-Repo/Tests/My.Project.Tests`). An entry that matches no project, or several, is an
+  error that lists the candidates.
+- **The moved projects keep their layout relative to each other:** the common folder of their paths is replaced by
+  the destination folder. Run from the root of a new repository, projects from another one keep their paths
+  (`My.Lib/` and `Tests/My.Lib.Tests/`); run from `Libs/`, `My.Lib/` alone lands in `Libs/My.Lib/`.
+- **The solution folder of a moved project is derived from its path** (`MutableSolution.AddProject`): `My.Lib/` is at
+  the root of the `.slnx`, `Tests/My.Lib.Tests/` in `/Tests/`. A solution folder left empty is removed, and so are the
+  folders left empty on disk.
+- **The references follow:**
+  - inside a repository, the `<ProjectReference>` paths, from and to the moved projects;
+  - across repositories, a `<ProjectReference>` that crosses the repository boundary becomes a `<PackageReference>`,
+    and a `<PackageReference>` to a package that is now produced by the same repository becomes a
+    `<ProjectReference>`. The version written is the one the repository already uses for this package, otherwise the
+    target's starting version for a package it receives, or the producer's highest version: a build must follow the
+    move, and it rewrites these versions anyway.
+- **The target's starting version:** when it receives packable projects from other repositories, a `+fake` version
+  tag is set on the target (`VersionTagPlugin.BumpVersion`, the `version bump` command for any repository) at the next
+  patch above the highest version of the target and of these sources. A moved package is never produced again in a
+  version a source already produced it in.
+
+It refuses, before changing anything, when:
+- a repository involved is not clean, or is not on the same branch as the target;
+- a destination folder already exists, or a project would move inside its own folder;
+- a test project (named `*.Tests`) would not be in a `Tests` folder (to move test projects alone, run the move from
+  the target's `Tests/` folder);
+- a reference that crosses a repository boundary targets a project that is not packable (`<IsPackable>false</IsPackable>`
+  or a test project): they must move together;
+- the target and a source would depend on each other (a cycle). Moving the downstream projects first avoids it.
+
+A moved project whose depth changes may have other relative paths (an `Import`, an item with `..\`): they are not
+rewritten, and a warning names them. Nothing is committed (except the empty commit that may carry the `+fake` tag):
+review, build from the World root (the source and the target must both build), and commit.
+
 ## Plugin wiring
 
 `HotZonePlugin` derives from `PrimaryPluginBase` (see [CKli.Core's README](../../CKli.Core/README.md#plugin-system))

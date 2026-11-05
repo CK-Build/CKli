@@ -33,6 +33,27 @@ public sealed partial class VersionTagPlugin
             monitor.Error( futureFake.ErrorMessage );
             return false;
         }
+        return BumpVersion( monitor, repo, context.Committer, futureFake );
+    }
+
+    /// <summary>
+    /// Bumps a repository version number by setting a "+fake" version tag on the "&lt;root&gt;" or "dev/&lt;root&gt;" branch:
+    /// this is the "version bump" command for any <paramref name="repo"/>.
+    /// <para>
+    /// The working folder is not touched: when the branch tip already carries another version, the tag is set on a new
+    /// empty commit (same tree) that only moves the branch reference.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="repo">The repository.</param>
+    /// <param name="committer">The committer of the empty commit that may be created.</param>
+    /// <param name="futureFake">
+    /// The new starting version. Must be a stable Major.Minor.Patch (no -prelease nor +metadata suffix) greater than the
+    /// greatest published version.
+    /// </param>
+    /// <returns>True on success, false on error.</returns>
+    public bool BumpVersion( IActivityMonitor monitor, Repo repo, Signature committer, SVersion futureFake )
+    {
         if( futureFake.IsPrerelease || futureFake.BuildMetaData.Length > 0 )
         {
             monitor.Error( """The version must be a stable Major.Minor.Patch (no -prelease nor +metadata suffix).""" );
@@ -104,7 +125,7 @@ public sealed partial class VersionTagPlugin
         {
             var newTarget = CreateEmptyCommit( monitor,
                                                repo,
-                                               context.Committer,
+                                               committer,
                                                branch,
                                                $"Empty commit carrying the 'v{futureFake}+fake' version tag." );
             if( newTarget == null ) return false;

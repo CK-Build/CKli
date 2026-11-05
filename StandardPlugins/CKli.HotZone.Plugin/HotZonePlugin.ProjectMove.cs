@@ -1,0 +1,434 @@
+using CK.Core;
+using CKli.Core;
+using CKli.ShallowSolution.Plugin;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Xml.Linq;
+
+namespace CKli.HotZone.Plugin;
+
+[CommandNamespace( "project",
+    """
+    The projects of the repositories: "project move" moves projects to a folder of a repository, from the same
+    repository (the references follow) or from other repositories of the World (the references that cross a
+    repository boundary become package references).
+    """,
+    Summary = "Moves projects inside a repository or across repositories.",
+    HelpUrl = "https://github.com/CK-Build/CKli/blob/stable/StandardPlugins/CKli.HotZone.Plugin/README.md#how-project-move" )]
+public sealed partial class HotZonePlugin
+{
+    sealed class MovedProject
+    {
+        public required Repo Source { get; init; }
+        public required MutableProject Project { get; init; }
+        public required NormalizedPath OldPath { get; init; }
+        public NormalizedPath NewPath { get; set; }
+        public NormalizedPath OldFolder => OldPath.RemoveLastPart();
+        public NormalizedPath NewFolder => NewPath.RemoveLastPart();
+        public string Name => Project.Name;
+    }
+
+    /// <summary>
+    /// Moves projects to the current directory (or to <paramref name="target"/>): inside its repository, or from other
+    /// repositories of the World. See the HotZone README.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The CKli context.</param>
+    /// <param name="projects">The comma-separated project names, optionally prefixed by folders.</param>
+    /// <param name="target">The destination folder. Defaults to the current directory.</param>
+    /// <returns>True on success, false on error.</returns>
+    [Description( """
+                  Moves projects to the current directory (or to --target): inside its repository, or from other
+                  repositories of the World. The moved projects keep their layout relative to each other.
+                  """ )]
+    [CommandPath( "project move" )]
+    public bool ProjectMove( IActivityMonitor monitor,
+                             CKliEnv context,
+                             [Description( """
+                                           Comma-separated project names (the .csproj names), optionally prefixed by folders to
+                                           disambiguate ("Tests/My.Project.Tests" or "My-Repo/Tests/My.Project.Tests").
+                                           """ )]
+                             string projects,
+                             [Description( "The destination folder, relative to the current directory. Defaults to the current directory." )]
+                             [OptionName( "--target,-t" )]
+                             string? target = null )
+    {
+        // The destination.
+        var destination = target == null ? context.CurrentDirectory : context.CurrentDirectory.Combine( target ).ResolveDots();
+        var targetRepo = destination.StartsWith( World.Name.WorldRoot, strict: false )
+                            ? World.TryGetRepo( monitor, destination )
+                            : null;
+        if( targetRepo == null )
+        {
+            monitor.Error( $"The destination '{destination}' is not in a repository of the World." );
+            return false;
+        }
+        var destinationFolder = destination.RemovePrefix( targetRepo.WorkingFolder );
+
+        var entries = projects.Split( ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries )
+                              .Select( e => new NormalizedPath( e ) )
+                              .ToList();
+        if( entries.Count == 0 )
+        {
+            monitor.Error( "No project to move." );
+            return false;
+        }
+        var allRepos = World.GetAllDefinedRepo( monitor );
+        if( allRepos == null ) return false;
+
+        // Finds the projects in the whole World.
+        var found = FindProjects( monitor, allRepos, entries );
+        if( found == null ) return false;
+
+        // The repositories involved: they must be clean and on the same branch.
+        var involved = found.Select( f => f.Repo ).Append( targetRepo ).Distinct().OrderBy( r => r.Index ).ToList();
+        var branchName = targetRepo.GitRepository.CurrentBranchName;
+        bool success = true;
+        foreach( var r in involved )
+        {
+            if( !r.GitRepository.CheckCleanCommit( monitor ) )
+            {
+                success = false;
+            }
+            else if( r.GitRepository.CurrentBranchName != branchName )
+            {
+                monitor.Error( $"Repository '{r.DisplayPath}' is on branch '{r.GitRepository.CurrentBranchName}': all the repositories must be on '{branchName}' (the branch of '{targetRepo.DisplayPath}')." );
+                success = false;
+            }
+        }
+        if( !success ) return false;
+
+        // Loads the solutions and the projects of the involved repositories.
+        var solutions = new Dictionary<Repo, MutableSolution>();
+        var repoProjects = new Dictionary<Repo, List<MutableProject>>();
+        foreach( var r in involved )
+        {
+            var s = MutableSolution.Create( monitor, r );
+            if( s == null ) return false;
+            solutions.Add( r, s );
+            var list = new List<MutableProject>();
+            foreach( var p in s.ProjectPaths )
+            {
+                if( !File.Exists( r.WorkingFolder.Combine( p ) ) ) continue;
+                var mp = MutableProject.Load( monitor, r.WorkingFolder, p );
+                if( mp == null ) return false;
+                list.Add( mp );
+            }
+            repoProjects.Add( r, list );
+        }
+
+        // The moved projects and their new paths: their common folder is replaced by the destination folder.
+        var moved = found.Select( f => new MovedProject
+                                       {
+                                           Source = f.Repo,
+                                           OldPath = f.Path,
+                                           Project = repoProjects[f.Repo].First( p => p.Path.Path.Equals( f.Path.Path, StringComparison.OrdinalIgnoreCase ) )
+                                       } ).ToList();
+        var common = moved.Select( m => m.OldFolder.RemoveLastPart() )
+                          .Aggregate( ( a, b ) => CommonPrefix( a, b ) );
+        foreach( var m in moved )
+        {
+            m.NewPath = destinationFolder.Combine( m.OldPath.RemoveFirstPart( common.Parts.Count ) );
+        }
+        if( !CheckDestinations( monitor, targetRepo, moved ) ) return false;
+
+        var movedByProject = moved.ToDictionary( m => m.Project );
+        Repo FinalRepo( Repo r, MutableProject p ) => movedByProject.ContainsKey( p ) ? targetRepo : r;
+        NormalizedPath FinalPath( MutableProject p ) => movedByProject.TryGetValue( p, out var m ) ? m.NewPath : p.Path;
+
+        // The packages produced by the involved repositories once the move is done.
+        var finalProducers = new Dictionary<string, (Repo Repo, MutableProject Project)>( StringComparer.OrdinalIgnoreCase );
+        foreach( var (r, list) in repoProjects )
+        {
+            foreach( var p in list )
+            {
+                if( IsPackable( p ) ) finalProducers[p.Name] = (FinalRepo( r, p ), p);
+            }
+        }
+
+        // The starting version of the target when it receives packable projects from other repositories.
+        SVersion? startVersion = null;
+        var packableSources = moved.Where( m => m.Source != targetRepo && IsPackable( m.Project ) )
+                                   .Select( m => m.Source )
+                                   .Distinct()
+                                   .ToList();
+        if( packableSources.Count > 0 )
+        {
+            var max = packableSources.Append( targetRepo ).Select( r => GetHighestVersion( monitor, r ) ).Max()!;
+            startVersion = SVersion.Create( max.Major, max.Minor, max.Patch + 1 );
+        }
+
+        // Plans the reference changes (nothing is changed on error).
+        var changes = new List<Action>();
+        var dependencies = new HashSet<(Repo From, Repo To)>();
+        foreach( var (r, list) in repoProjects )
+        {
+            foreach( var p in list )
+            {
+                var finalRepoP = FinalRepo( r, p );
+                foreach( var (e, refPath) in p.ProjectReferences )
+                {
+                    if( refPath.IsEmptyPath ) continue;
+                    var q = list.FirstOrDefault( o => o.Path.Path.Equals( refPath.Path, StringComparison.OrdinalIgnoreCase ) );
+                    if( q == null ) continue;
+                    var finalRepoQ = FinalRepo( r, q );
+                    if( finalRepoP == finalRepoQ )
+                    {
+                        // A reference inside a repository: its path follows the moved projects.
+                        var qPath = FinalPath( q );
+                        changes.Add( () => p.SetProjectReference( e, qPath ) );
+                    }
+                    else if( !IsPackable( q ) )
+                    {
+                        monitor.Error( $"""
+                                        '{r.DisplayPath}/{p.Path}' references '{q.Name}' that is not packable: after the move, they are in
+                                        different repositories and a reference to a non packable project can't become a package reference.
+                                        Move them together, or neither of them.
+                                        """ );
+                        success = false;
+                    }
+                    else
+                    {
+                        dependencies.Add( (finalRepoP, finalRepoQ) );
+                        var version = GetReferenceVersion( monitor, repoProjects, finalRepoP, q.Name, finalRepoQ, targetRepo, startVersion );
+                        var qName = q.Name;
+                        changes.Add( () => p.SetPackageReference( e, qName, version ) );
+                    }
+                }
+                foreach( var (e, packageId) in p.PackageReferences )
+                {
+                    if( !finalProducers.TryGetValue( packageId, out var producer ) ) continue;
+                    if( producer.Repo == finalRepoP )
+                    {
+                        // The package is now produced by the same repository: it becomes a project reference.
+                        if( producer.Project != p )
+                        {
+                            var producerPath = FinalPath( producer.Project );
+                            changes.Add( () => p.SetProjectReference( e, producerPath ) );
+                        }
+                    }
+                    else
+                    {
+                        dependencies.Add( (finalRepoP, producer.Repo) );
+                    }
+                }
+            }
+        }
+        // No cycle between the target and a source.
+        foreach( var (from, to) in dependencies )
+        {
+            if( from == targetRepo && dependencies.Contains( (to, targetRepo) ) )
+            {
+                monitor.Error( $"""
+                                After the move, '{targetRepo.DisplayPath}' and '{to.DisplayPath}' would depend on each other: this is a cycle.
+                                Moving the projects in another order (the downstream ones first) or moving more projects may avoid it.
+                                """ );
+                success = false;
+            }
+        }
+        if( !success ) return false;
+
+        using( monitor.OpenInfo( $"Moving {moved.Count} projects to '{targetRepo.DisplayPath}/{destinationFolder}'." ) )
+        {
+            // The target's version first, while the working folders are clean (this may create an empty commit).
+            if( startVersion != null
+                && !_versionTag.BumpVersion( monitor, targetRepo, context.Committer, startVersion ) )
+            {
+                return false;
+            }
+            // Moves the folders.
+            foreach( var m in moved )
+            {
+                var from = m.Source.WorkingFolder.Combine( m.OldFolder );
+                var to = targetRepo.WorkingFolder.Combine( m.NewFolder );
+                try
+                {
+                    Directory.CreateDirectory( to.RemoveLastPart() );
+                    Directory.Move( from, to );
+                    // The folders left empty are removed.
+                    for( var parent = from.RemoveLastPart();
+                         parent.Parts.Count > m.Source.WorkingFolder.Parts.Count && !Directory.EnumerateFileSystemEntries( parent ).Any();
+                         parent = parent.RemoveLastPart() )
+                    {
+                        Directory.Delete( parent );
+                    }
+                }
+                catch( Exception ex )
+                {
+                    monitor.Error( $"While moving '{m.Source.DisplayPath}/{m.OldFolder}' to '{targetRepo.DisplayPath}/{m.NewFolder}'.", ex );
+                    return false;
+                }
+                if( m.OldFolder.Parts.Count != m.NewFolder.Parts.Count )
+                {
+                    foreach( var v in m.Project.OtherParentRelativePaths )
+                    {
+                        monitor.Warn( $"Project '{m.Name}' changed of depth: its relative path '{v}' has not been updated." );
+                    }
+                }
+                m.Project.SetLocation( targetRepo.WorkingFolder, m.NewPath );
+            }
+            // Rewrites the references.
+            foreach( var c in changes ) c();
+            foreach( var p in repoProjects.Values.SelectMany( l => l ) )
+            {
+                if( !p.Save( monitor ) ) return false;
+            }
+            // Updates the solutions.
+            foreach( var m in moved )
+            {
+                solutions[m.Source].RemoveProject( m.OldPath );
+                solutions[targetRepo].AddProject( m.NewPath );
+            }
+            foreach( var s in solutions.Values )
+            {
+                if( !s.Save( monitor ) ) return false;
+            }
+        }
+        monitor.Info( ScreenType.ScreenTag,
+                      $"""
+                      {moved.Count} projects moved to '{targetRepo.DisplayPath}/{destinationFolder}'.
+                      Review, build from the World root and commit.
+                      """ );
+        return true;
+    }
+
+    static bool IsPackable( MutableProject p ) => p.IsPackable != false && !p.Name.EndsWith( ".Tests", StringComparison.OrdinalIgnoreCase );
+
+    static NormalizedPath CommonPrefix( NormalizedPath a, NormalizedPath b )
+    {
+        int i = 0;
+        int max = Math.Min( a.Parts.Count, b.Parts.Count );
+        while( i < max && string.Equals( a.Parts[i], b.Parts[i], StringComparison.OrdinalIgnoreCase ) ) ++i;
+        return a.RemoveLastPart( a.Parts.Count - i );
+    }
+
+    // Finds the project of each entry in the solutions of the World: an entry is matched against the end of
+    // "<repository display path>/<project folder's parent>/<project name>", segment by segment.
+    List<(Repo Repo, NormalizedPath Path)>? FindProjects( IActivityMonitor monitor, IReadOnlyList<Repo> allRepos, List<NormalizedPath> entries )
+    {
+        var candidates = new List<(Repo Repo, NormalizedPath Path, NormalizedPath WorldPath)>();
+        foreach( var r in allRepos )
+        {
+            var paths = MutableSolution.ReadProjectPaths( monitor, r );
+            if( paths == null ) return null;
+            foreach( var p in paths )
+            {
+                if( !p.LastPart.EndsWith( ".csproj", StringComparison.OrdinalIgnoreCase ) ) continue;
+                var folder = p.RemoveLastPart();
+                var worldPath = r.DisplayPath.Combine( folder.IsEmptyPath ? folder : folder.RemoveLastPart() )
+                                             .AppendPart( p.LastPart[..^".csproj".Length] );
+                candidates.Add( (r, p, worldPath) );
+            }
+        }
+        bool success = true;
+        var result = new List<(Repo Repo, NormalizedPath Path)>();
+        foreach( var entry in entries )
+        {
+            var matches = candidates.Where( c => EndsWith( c.WorldPath, entry ) ).ToList();
+            if( matches.Count == 0 )
+            {
+                monitor.Error( $"No project matches '{entry}'." );
+                success = false;
+            }
+            else if( matches.Count > 1 )
+            {
+                monitor.Error( $"""
+                                '{entry}' matches {matches.Count} projects: add folders before the name to choose one.
+                                {matches.Select( m => m.WorldPath.Path ).Concatenate( Environment.NewLine )}
+                                """ );
+                success = false;
+            }
+            else if( !result.Contains( (matches[0].Repo, matches[0].Path) ) )
+            {
+                result.Add( (matches[0].Repo, matches[0].Path) );
+            }
+        }
+        return success ? result : null;
+
+        static bool EndsWith( NormalizedPath path, NormalizedPath suffix )
+        {
+            int offset = path.Parts.Count - suffix.Parts.Count;
+            if( offset < 0 ) return false;
+            for( int i = 0; i < suffix.Parts.Count; ++i )
+            {
+                if( !string.Equals( path.Parts[offset + i], suffix.Parts[i], StringComparison.OrdinalIgnoreCase ) ) return false;
+            }
+            return true;
+        }
+    }
+
+    static bool CheckDestinations( IActivityMonitor monitor, Repo targetRepo, List<MovedProject> moved )
+    {
+        bool success = true;
+        foreach( var m in moved )
+        {
+            if( m.Source == targetRepo && m.NewPath.Path.Equals( m.OldPath.Path, StringComparison.OrdinalIgnoreCase ) )
+            {
+                monitor.Error( $"Project '{m.Name}' is already in '{targetRepo.DisplayPath}/{m.NewFolder}'." );
+                success = false;
+            }
+            else if( m.Source == targetRepo && m.NewFolder.StartsWith( m.OldFolder, strict: true ) )
+            {
+                monitor.Error( $"Project '{m.Name}' can't be moved inside its own folder '{m.OldFolder}'." );
+                success = false;
+            }
+            else if( Directory.Exists( targetRepo.WorkingFolder.Combine( m.NewFolder ) ) )
+            {
+                monitor.Error( $"Folder '{targetRepo.DisplayPath}/{m.NewFolder}' already exists." );
+                success = false;
+            }
+            if( m.Name.EndsWith( ".Tests", StringComparison.OrdinalIgnoreCase )
+                && !m.NewFolder.Parts.Any( p => p.Equals( "Tests", StringComparison.OrdinalIgnoreCase ) ) )
+            {
+                var hint = moved.All( o => o.Name.EndsWith( ".Tests", StringComparison.OrdinalIgnoreCase ) )
+                            ? " To move test projects alone, run the move from the 'Tests/' folder of the target."
+                            : "";
+                monitor.Error( $"Test project '{m.Name}' would land in '{m.NewFolder}': a test project must be in a 'Tests' folder.{hint}" );
+                success = false;
+            }
+        }
+        return success;
+    }
+
+    // The highest Major.Minor.Patch of a repository's versions (fake, CI and local ones included): what a moved
+    // package must never be produced again in.
+    SVersion GetHighestVersion( IActivityMonitor monitor, Repo repo )
+    {
+        var max = _versionTag.Get( monitor, repo ).AllVersions.Select( v => v.Version ).Max();
+        return max == null ? SVersion.ZeroVersion : SVersion.Create( max.Major, max.Minor, max.Patch );
+    }
+
+    // The version written in a new package reference: the one the consumer repository already uses for this package if any
+    // (one version per package in a repository), otherwise the target's starting version for a package it receives, or the
+    // producer's highest version. A build must follow the move: it rewrites these versions.
+    SVersion GetReferenceVersion( IActivityMonitor monitor,
+                                  Dictionary<Repo, List<MutableProject>> repoProjects,
+                                  Repo consumer,
+                                  string packageId,
+                                  Repo producer,
+                                  Repo targetRepo,
+                                  SVersion? startVersion )
+    {
+        if( repoProjects.TryGetValue( consumer, out var list ) )
+        {
+            foreach( var p in list )
+            {
+                foreach( var (e, id) in p.PackageReferences )
+                {
+                    var text = (string?)e.Attribute( CKli.Core.XNames.Version );
+                    if( id.Equals( packageId, StringComparison.OrdinalIgnoreCase )
+                        && text != null
+                        && SVersion.TryParse( text, out var v ) )
+                    {
+                        return v;
+                    }
+                }
+            }
+        }
+        return startVersion != null && producer == targetRepo
+                ? startVersion
+                : GetHighestVersion( monitor, producer );
+    }
+}
