@@ -259,10 +259,13 @@ The tombstone keeps the project's name and place: its tracked files are deleted 
 the guideline's template (with the project's target framework, the first one of a multi-targeted project, or none when
 it is inherited) and a `<Description>`. `MSBuild/<PackageId>.targets` holds the error (its target is named after the
 package id, so that several tombstones can be imported by the same project); `README.md` and `docs/Package.md` say only
-that the package is deprecated and what replaces it. CKli builds and publishes it as the next version of the package.
+that the package is deprecated and what replaces it. CKli builds and publishes it as the next version of the package,
+**a new Major**: a tombstone breaks its consumers. The command sets a `+fake` version tag at the next Major above the
+versions the repository produced (`VersionTagPlugin.BumpVersion`), unless a pending `+fake` version already is a new
+Major (a previous retirement): the first build produces exactly this version.
 The plan warns when every package of a repository is retired.
 
-**`--dry-run`** runs the checks and displays the plan (the tombstones and their message). Nothing is committed: list the
+**`--dry-run`** runs the checks and displays the plan (the tombstones, their message and the starting versions). Nothing is committed: list the
 retired projects as deprecated in the repository's `README.md` (one line: it is free-form, the command doesn't edit
 it), build from the World root and commit.
 

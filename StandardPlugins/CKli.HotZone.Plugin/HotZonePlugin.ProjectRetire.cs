@@ -227,6 +227,14 @@ public sealed partial class HotZonePlugin
         }
         if( !success ) return false;
 
+        // A tombstone breaks its consumers: it is a new Major of its repository.
+        var bumps = new List<(Repo Repo, SVersion Version)>();
+        foreach( var r in involved.Where( r => retired.Any( x => x.Repo == r ) ) )
+        {
+            var v = GetTombstoneVersion( monitor, r );
+            if( v != null ) bumps.Add( (r, v) );
+        }
+
         // The plan.
         var plan = new List<(int Indent, string Line)>();
         plan.Add( (0, $"{retired.Count} tombstones:") );
@@ -234,6 +242,10 @@ public sealed partial class HotZonePlugin
         {
             plan.Add( (2, $"{r.DisplayPath}/{p.Path}") );
             plan.Add( (4, GetMessage( p.Name, replacement, replacementUrl, reason )) );
+        }
+        foreach( var (r, v) in bumps )
+        {
+            plan.Add( (0, $"Starting version of '{r.DisplayPath}': 'v{v}+fake' (a tombstone breaks its consumers: a new Major).") );
         }
         if( deleted.Count > 0 )
         {
@@ -255,6 +267,11 @@ public sealed partial class HotZonePlugin
 
         using( monitor.OpenInfo( $"Retiring {retired.Count} projects." ) )
         {
+            // The new Major first, while the working folders are clean (this may create an empty commit).
+            foreach( var (r, v) in bumps )
+            {
+                if( !_versionTag.BumpVersion( monitor, r, context.Committer, v ) ) return false;
+            }
             // Lands on the "dev/" branches (the working folders are clean).
             foreach( var (r, hb) in hotBranches )
             {
@@ -309,6 +326,17 @@ public sealed partial class HotZonePlugin
             build from the World root and commit.
             """ )! );
         return true;
+    }
+
+    // The next Major above the versions the repository produced, or null when a pending "+fake" version is already
+    // a new Major (a previous retirement, or a "version bump").
+    SVersion? GetTombstoneVersion( IActivityMonitor monitor, Repo repo )
+    {
+        var versions = _versionTag.Get( monitor, repo ).AllVersions.Select( v => v.Version ).ToList();
+        var produced = versions.Where( v => !v.HasFakeMetadata ).Max();
+        var next = SVersion.Create( (produced?.Major ?? 0) + 1, 0, 0 );
+        var pending = versions.Where( v => v.HasFakeMetadata ).Max();
+        return pending != null && pending.Major >= next.Major ? null : next;
     }
 
     // A tombstone doesn't include its build output (see GetTombstoneProject).
