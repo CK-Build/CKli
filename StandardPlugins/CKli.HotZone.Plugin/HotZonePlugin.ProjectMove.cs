@@ -56,7 +56,12 @@ public sealed partial class HotZonePlugin
                              string? target = null,
                              [Description( "Displays what the move would do (the moved folders, the reference changes, the starting version) and changes nothing." )]
                              [OptionName( "--dry-run,-d" )]
-                             bool dryRun = false )
+                             bool dryRun = false,
+                             [Description( """
+                                           Also moves, for each moved project 'X', the project 'X.Tests' of the same repository when
+                                           it exists.
+                                           """ )]
+                             bool withTests = false )
     {
         // The destination.
         var destination = target == null ? context.CurrentDirectory : context.CurrentDirectory.Combine( target ).ResolveDots();
@@ -84,6 +89,8 @@ public sealed partial class HotZonePlugin
         // Finds the projects in the whole World.
         var found = FindProjects( monitor, allRepos, entries );
         if( found == null ) return false;
+        var addedTests = new List<(Repo Repo, NormalizedPath Path)>();
+        if( withTests && !AddTestProjects( monitor, found, addedTests ) ) return false;
 
         // The repositories involved: they must be clean and on the same branch.
         var involved = found.Select( f => f.Repo ).Append( targetRepo ).Distinct().OrderBy( r => r.Index ).ToList();
@@ -244,6 +251,10 @@ public sealed partial class HotZonePlugin
 
         // The plan: displayed by a dry run, and after the move.
         var plan = new List<(int Indent, string Line)>();
+        if( addedTests.Count > 0 )
+        {
+            plan.Add( (0, $"Test projects added by --with-tests: {addedTests.Select( t => t.Path.LastPart[..^".csproj".Length] ).Concatenate()}.") );
+        }
         plan.Add( (0, $"{moved.Count} projects to '{targetRepo.DisplayPath}/{destinationFolder}':") );
         foreach( var m in moved )
         {
@@ -401,6 +412,38 @@ public sealed partial class HotZonePlugin
             }
             return true;
         }
+    }
+
+    // For each found project "X" that is not itself a test project, adds the project "X.Tests" of the same repository
+    // (found by its name, wherever it is) when it exists and is not already found.
+    static bool AddTestProjects( IActivityMonitor monitor,
+                                 List<(Repo Repo, NormalizedPath Path)> found,
+                                 List<(Repo Repo, NormalizedPath Path)> added )
+    {
+        bool success = true;
+        foreach( var (repo, path) in found.ToList() )
+        {
+            var name = path.LastPart[..^".csproj".Length];
+            if( name.EndsWith( ".Tests", StringComparison.OrdinalIgnoreCase ) ) continue;
+            var paths = MutableSolution.ReadProjectPaths( monitor, repo );
+            if( paths == null ) return false;
+            var testFile = name + ".Tests.csproj";
+            var tests = paths.Where( p => p.LastPart.Equals( testFile, StringComparison.OrdinalIgnoreCase ) ).ToList();
+            if( tests.Count > 1 )
+            {
+                monitor.Error( $"""
+                                '{repo.DisplayPath}' has {tests.Count} projects named '{name}.Tests': name the one to move instead of using --with-tests.
+                                {tests.Select( t => t.Path ).Concatenate( Environment.NewLine )}
+                                """ );
+                success = false;
+            }
+            else if( tests.Count == 1 && !found.Contains( (repo, tests[0]) ) )
+            {
+                found.Add( (repo, tests[0]) );
+                added.Add( (repo, tests[0]) );
+            }
+        }
+        return success;
     }
 
     static bool CheckDestinations( IActivityMonitor monitor, Repo targetRepo, List<MovedProject> moved )

@@ -178,7 +178,7 @@ change a produced package identifier or bump a dependency outside the fix's own 
 
 ## How: `project move`
 
-`ckli project move <projects> [--target, -t <folder>] [--dry-run, -d]` moves projects to a folder of a repository: the current
+`ckli project move <projects> [--target, -t <folder>] [--dry-run, -d] [--with-tests]` moves projects to a folder of a repository: the current
 directory, or the `--target` folder (resolved against the current directory). The projects come from the same
 repository (the move inside a repository is more than a `git mv`: the references must follow), from other repositories
 of the World, or both. It is implemented by `HotZonePlugin.ProjectMove`.
@@ -188,6 +188,9 @@ of the World, or both. It is implemented by `HotZonePlugin.ProjectMove`.
   `<repository display path>/<project folder's parent>/<project name>`, segment by segment
   (`Tests/My.Project.Tests`, `My-Repo/Tests/My.Project.Tests`). An entry that matches no project, or several, is an
   error that lists the candidates.
+- **`--with-tests`** also moves, for each moved project `X`, the project named `X.Tests` of the same repository when
+  it exists (found by its name, wherever it is). It is moved as if it were named: the other test projects are named
+  explicitly.
 - **The moved projects keep their layout relative to each other:** the common folder of their paths is replaced by
   the destination folder. Run from the root of a new repository, projects from another one keep their paths
   (`My.Lib/` and `Tests/My.Lib.Tests/`); run from `Libs/`, `My.Lib/` alone lands in `Libs/My.Lib/`.
