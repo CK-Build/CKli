@@ -236,7 +236,7 @@ review, build from the World root (the source and the target must both build), a
 turns packable projects into **tombstones**: the last version of a removed (or renamed) package, without code and
 without dependencies, whose only content is a transitive MSBuild `.targets` that fails the build of any project that
 depends on it with an error (`CKDEPRECATED`) that names the replacement. It applies the CK stack's guideline
-["Removing or renaming a package"](https://github.com/signature-opensource/CK-Stack/blob/main/Docs/Guidelines/removing-or-renaming-a-package.md).
+["Managing projects and packages across repositories"](https://github.com/signature-opensource/CK-Stack/blob/main/Docs/Guidelines/managing-projects-across-repositories.md).
 It is implemented by `HotZonePlugin.ProjectRetire`.
 
 - **`<projects>`** are found in the whole World, as for `project move`.
