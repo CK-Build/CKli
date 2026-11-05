@@ -321,6 +321,32 @@ public sealed partial class Roadmap
                 return null;
             }
         }
+        // On the root branch, a tombstone whose stable version is published must be removed first: its package is
+        // published once (see "ckli project retire").
+        bool hasTombstone = false;
+        foreach( var s in _orderedSolutions )
+        {
+            var branch = s.BuildInfo.BuildBranch;
+            if( !s.MustBuild || branch == null || !branch.BranchName.IsRoot ) continue;
+            var tip = (branch.GitDevBranch ?? branch.GitBranch)?.Tip;
+            if( tip == null ) continue;
+            var tombstones = buildPlugin.HotZone.GetPublishedTombstones( monitor, s.Repo, tip );
+            if( tombstones == null )
+            {
+                _buildSuccess = false;
+                return null;
+            }
+            foreach( var t in tombstones )
+            {
+                monitor.Error( $"Tombstone '{t.PackageId}' of '{s.Repo.DisplayPath}' is published (v{t.Version}): it must be removed from '{branch.BranchName.Name}' before building it. Run 'ckli issue --fix'." );
+                hasTombstone = true;
+            }
+        }
+        if( hasTombstone )
+        {
+            _buildSuccess = false;
+            return null;
+        }
         var builder = new BuildPlugin.RoadmapExecutor( buildPlugin, context, this, runTest, buildImpacts, maxDop, cancellation );
         // The builds are the one step of a publication that offers no checkpoint - they take as long as they take
         // - so the publication lease is renewed WHILE they run rather than being sized on them. They work in the

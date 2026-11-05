@@ -339,13 +339,14 @@ public sealed partial class HotZonePlugin
         return pending != null && pending.Major >= next.Major ? null : next;
     }
 
+    static bool IsTombstone( Repo r, MutableProject p ) => IsTombstone( XDocument.Load( r.WorkingFolder.Combine( p.Path ) ) );
+
     // A tombstone doesn't include its build output (see GetTombstoneProject).
-    static bool IsTombstone( Repo r, MutableProject p )
+    static bool IsTombstone( XDocument project )
     {
-        var d = XDocument.Load( r.WorkingFolder.Combine( p.Path ) );
-        return d.Root!.Elements( "PropertyGroup" )
-                      .Elements( "IncludeBuildOutput" )
-                      .Any( e => e.Value.Trim().Equals( "false", StringComparison.OrdinalIgnoreCase ) );
+        return project.Root!.Elements( "PropertyGroup" )
+                            .Elements( "IncludeBuildOutput" )
+                            .Any( e => e.Value.Trim().Equals( "false", StringComparison.OrdinalIgnoreCase ) );
     }
 
     // The target framework of the project file (the first one of its TargetFrameworks), or null when the project

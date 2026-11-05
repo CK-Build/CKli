@@ -53,6 +53,7 @@ public sealed partial class HotZonePlugin : PrimaryPluginBase
         _versionTag = versionTag;
         _shallowSolution = shallowSolution;
         _artifactHandler = artifactHandler;
+        _branchModel.ContentIssue += OnContentIssue;
     }
 
     /// <summary>

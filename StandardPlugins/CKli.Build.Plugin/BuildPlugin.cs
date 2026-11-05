@@ -65,6 +65,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     readonly VersionTagPlugin _versionTag;
     readonly BranchModelPlugin _branchModel;
     readonly HotZonePlugin _hotZone;
+
+    internal HotZonePlugin HotZone => _hotZone;
     readonly RepositoryBuilderPlugin _repoBuilder;
     readonly ArtifactHandlerPlugin _artifactHandler;
     readonly ShallowSolutionPlugin _solutionPlugin;

@@ -265,6 +265,15 @@ versions the repository produced (`VersionTagPlugin.BumpVersion`), unless a pend
 Major (a previous retirement): the first build produces exactly this version.
 The plan warns when every package of a repository is retired.
 
+**A tombstone is published once.** Once its stable version is published (a version tag of the repository, neither
+`local/` nor `building/`, whose produced packages contain it), the project is removed from the root branch: a content
+issue of the root branch deletes its folder and removes it from the solution (`ckli issue --fix` commits this on
+`dev/stable`), and a build of the root branch (CI or regular) is blocked until it is fixed
+(`HotZonePlugin.GetPublishedTombstones`, checked by the roadmap before any build). The other branches keep it: they
+publish it again as prereleases until they are merged, which is harmless (the same tombstone, for the consumers of
+their prereleases only). Removing it there would remove it from the root branch at the merge, before its stable
+version is published.
+
 **`--dry-run`** runs the checks and displays the plan (the tombstones, their message and the starting versions). Nothing is committed: list the
 retired projects as deprecated in the repository's `README.md` (one line: it is free-form, the command doesn't edit
 it), build from the World root and commit.
