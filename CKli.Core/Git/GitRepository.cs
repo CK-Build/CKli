@@ -47,6 +47,26 @@ public sealed partial class GitRepository : IDisposable
         Throw.CheckArgument( repositoryKey.IsBareRepository
                              || _workingFolder.Path.Equals( new NormalizedPath( libRepository.Info.WorkingDirectory ), StringComparison.OrdinalIgnoreCase ) );
         Throw.CheckArgument( _workingFolder.Path.EndsWith( _displayPath, StringComparison.OrdinalIgnoreCase ) );
+        if( OperatingSystem.IsWindows() && !repositoryKey.IsBareRepository ) EnsureLongPaths( libRepository );
+    }
+
+    // On Windows, libgit2 fails on a path longer than 260 characters unless "core.longpaths" is true: the status
+    // walk then fails on any untracked file deep enough (a Yarn install left by a branch switch). This sets it in
+    // the repository's configuration when it doesn't define it, so that a fresh machine doesn't need the global
+    // setting. An explicit value of the repository (even false) is kept.
+    static void EnsureLongPaths( Repository r )
+    {
+        try
+        {
+            if( r.Config.Get<bool>( "core.longpaths", ConfigurationLevel.Local ) == null )
+            {
+                r.Config.Set( "core.longpaths", true, ConfigurationLevel.Local );
+            }
+        }
+        catch( LibGit2SharpException )
+        {
+            // A configuration that cannot be written (read-only folder) is not an error: the status reports it.
+        }
     }
 
     /// <summary>
@@ -174,26 +194,52 @@ public sealed partial class GitRepository : IDisposable
         /// Gets the number of files that are still conflicted (an <see cref="Operation"/> is in progress).
         /// </summary>
         public int ConflictCount { get; init; }
+
+        /// <summary>
+        /// Gets the error that prevented the status of the working folder from being read (typically a path too
+        /// long in an untracked folder). When not null, <see cref="IsDirty"/> is true: a repository whose state is
+        /// unknown is never considered clean.
+        /// </summary>
+        public string? StatusError { get; init; }
     }
 
     /// <summary>
     /// Gets a <see cref="SimpleStatusInfo"/> for this repository.
+    /// This never throws because of the working folder: a status that cannot be read is
+    /// the <see cref="SimpleStatusInfo.StatusError"/>.
     /// </summary>
     /// <returns>The simplified status info</returns>
     public SimpleStatusInfo GetSimpleStatusInfo()
     {
         var branchDetails = _git.Head.TrackingDetails;
-        var status = _git.RetrieveStatus( _checkDirtyOptions );
         var operation = _git.Info.CurrentOperation;
+        var status = TryRetrieveStatus( out var error );
         return new SimpleStatusInfo()
         {
             CurrentBranchName = _git.Head.FriendlyName,
             CommitAhead = branchDetails.AheadBy,
             CommitBehind = branchDetails.BehindBy,
-            IsDirty = status.IsDirty,
+            IsDirty = status?.IsDirty ?? true,
             Operation = operation,
-            ConflictCount = operation == CurrentOperation.None ? 0 : status.Count( e => (e.State & FileStatus.Conflicted) != 0 )
+            ConflictCount = operation == CurrentOperation.None || status == null ? 0 : status.Count( e => (e.State & FileStatus.Conflicted) != 0 ),
+            StatusError = error
         };
+    }
+
+    // The status walk of libgit2 fails on the working folder's content (a path too long, an unreadable file):
+    // this is an error of this repository, not of the command that reads it.
+    RepositoryStatus? TryRetrieveStatus( out string? error )
+    {
+        try
+        {
+            error = null;
+            return _git.RetrieveStatus( _checkDirtyOptions );
+        }
+        catch( LibGit2SharpException ex )
+        {
+            error = ex.Message;
+            return null;
+        }
     }
 
     /// <summary>
@@ -205,7 +251,12 @@ public sealed partial class GitRepository : IDisposable
     /// <returns>True if the current head is clean, false otherwise.</returns>
     public bool CheckCleanCommit( IActivityMonitor monitor )
     {
-        var status = _git.RetrieveStatus( _checkDirtyOptions );
+        var status = TryRetrieveStatus( out var error );
+        if( status == null )
+        {
+            monitor.Error( $"The status of repository '{DisplayPath}' cannot be read ({CurrentBranchName}): {error}" );
+            return false;
+        }
         var operation = _git.Info.CurrentOperation;
         if( operation != CurrentOperation.None )
         {
@@ -683,9 +734,16 @@ public sealed partial class GitRepository : IDisposable
         try
         {
             checkout( _git, new CheckoutOptions { CheckoutModifiers = force ? CheckoutModifiers.Force : CheckoutModifiers.None } );
-            if( deleteUntracked || deleteIgnored )
+            // The checkout is done: a failed clean up doesn't fail it, but it must be visible. The files that the
+            // previous branch ignored are untracked on this one (a Yarn install, bin/, obj/, nested test repositories):
+            // when they are not deleted, the repository is dirty and the commands that need a clean one refuse.
+            if( (deleteUntracked || deleteIgnored)
+                && (!ResetHard( monitor, out var failedDelete, deleteUntracked, deleteIgnored ) || failedDelete != null) )
             {
-                ResetHard( monitor, out _, deleteUntracked, deleteIgnored );
+                monitor.Warn( $"""
+                    Checked out '{DisplayPath}/{name}' but the files left by the previous branch could not all be deleted: the repository is dirty.
+                    Delete them with 'git clean -fd' ('git clean -ffd' when there are nested git repositories) in '{_workingFolder}'.
+                    """ );
             }
             return true;
         }

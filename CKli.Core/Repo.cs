@@ -226,6 +226,9 @@ public sealed class Repo
     /// <param name="withRemoteDiffCount">True to add a box with the commit remotes ↑0↓0 differences indicator.</param>
     /// <param name="withOriginUrl">True to add a box with the <see cref="OriginUrl"/>.</param>
     /// <returns>The renderable.</returns>
+    /// <remarks>
+    /// A <see cref="GitRepository.SimpleStatusInfo.StatusError"/> is always added last, in red.
+    /// </remarks>
     public IRenderable ToRenderable( ScreenType screenType, bool withBranchName = false, bool withRemoteDiffCount = false, bool withOriginUrl = false )
     {
         return ToRenderable( screenType, withBranchName ? GitStatus.CurrentBranchName : null, withRemoteDiffCount, withOriginUrl );
@@ -279,6 +282,11 @@ public sealed class Repo
         if( withOriginUrl )
         {
             folder = folder.AddRight( screenType.Text( OriginUrl.ToString(), foreColor: ConsoleColor.DarkBlue ).HyperLink( OriginUrl ).Box( marginRight: 1 ) );
+        }
+        // A status that cannot be read is an error of this repository: it is shown on its row, whatever the columns.
+        if( status.StatusError != null )
+        {
+            folder = folder.AddRight( screenType.Text( $"Status error: {status.StatusError}", ConsoleColor.Red ).Box( marginRight: 1 ) );
         }
         return folder;
 
