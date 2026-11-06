@@ -66,7 +66,7 @@ public sealed partial class HotZonePlugin
             try
             {
                 using var s = f.CreateReadStream();
-                if( IsTombstone( XDocument.Load( s ) ) )
+                if( IsTombstone( XDocument.Load( s ), p.Name ) )
                 {
                     result.Add( new PublishedTombstone( p.Path, p.Name, version ) );
                 }

@@ -339,14 +339,41 @@ public sealed partial class HotZonePlugin
         return pending != null && pending.Major >= next.Major ? null : next;
     }
 
-    static bool IsTombstone( Repo r, MutableProject p ) => IsTombstone( XDocument.Load( r.WorkingFolder.Combine( p.Path ) ) );
+    static bool IsTombstone( Repo r, MutableProject p ) => IsTombstone( XDocument.Load( r.WorkingFolder.Combine( p.Path ) ), p.Name );
 
-    // A tombstone doesn't include its build output (see GetTombstoneProject).
-    static bool IsTombstone( XDocument project )
+    // A tombstone doesn't include its build output and packs a "buildTransitive/<packageId>.targets" that fails the
+    // build of its consumers (see GetTombstoneProject). No assembly alone is not enough: a "dotnet new" template
+    // package doesn't include its build output either.
+    static bool IsTombstone( XDocument project, string packageId )
     {
-        return project.Root!.Elements( "PropertyGroup" )
-                            .Elements( "IncludeBuildOutput" )
-                            .Any( e => e.Value.Trim().Equals( "false", StringComparison.OrdinalIgnoreCase ) );
+        var root = project.Root!;
+        return root.Elements( "PropertyGroup" )
+                   .Elements( "IncludeBuildOutput" )
+                   .Any( e => e.Value.Trim().Equals( "false", StringComparison.OrdinalIgnoreCase ) )
+               && root.Elements( "ItemGroup" )
+                      .Elements()
+                      .Any( item => IsTombstoneTargets( item, packageId ) );
+
+        // The package path is either the file ("buildTransitive\X.targets") or its folder ("buildTransitive/"): the
+        // file name then comes from the Include.
+        static bool IsTombstoneTargets( XElement item, string packageId )
+        {
+            var packagePath = GetMetadata( item, "PackagePath" );
+            if( packagePath == null ) return false;
+            var parts = packagePath.Replace( '\\', '/' ).Split( '/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries );
+            if( parts.Length == 0 || !parts[0].Equals( "buildTransitive", StringComparison.OrdinalIgnoreCase ) ) return false;
+            var fileName = parts[^1].EndsWith( ".targets", StringComparison.OrdinalIgnoreCase )
+                            ? parts[^1]
+                            : GetMetadata( item, "Include" )?.Replace( '\\', '/' ).Split( '/' )[^1];
+            return fileName != null && fileName.Equals( packageId + ".targets", StringComparison.OrdinalIgnoreCase );
+        }
+
+        // An item metadata is an attribute or a child element.
+        static string? GetMetadata( XElement item, string name )
+        {
+            var v = (string?)item.Attribute( name ) ?? (string?)item.Element( name );
+            return string.IsNullOrWhiteSpace( v ) ? null : v.Trim();
+        }
     }
 
     // The target framework of the project file (the first one of its TargetFrameworks), or null when the project
