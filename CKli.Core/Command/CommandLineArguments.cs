@@ -306,33 +306,38 @@ public sealed class CommandLineArguments
     }
 
     /// <summary>
-    /// Extracts a multiple optional values.
+    /// Extracts a multiple optional values: the values that follow each occurrence of the option, up to the next
+    /// known option or flag name (or the end). The option can appear without values: "--opt" alone, or followed
+    /// by another option or flag, gives an empty array.
     /// </summary>
     /// <param name="names">The option names.</param>
-    /// <returns>The option values or null if not found.</returns>
+    /// <returns>The option values (possibly empty) or null if not found.</returns>
     public string[]? EatMultipleOption( params IEnumerable<string> names )
     {
         CheckOpened();
-        var s1 = DoEatSingleOption( names, out int idx );
-        if( s1 == null ) return null;
-        var result = new List<string>() { s1 };
-        for(; ; )
+        List<string>? result = null;
+        int idx;
+        while( (idx = FindName( names )) >= 0 )
         {
-            while( idx >= 0 && idx < _args.Count )
+            result ??= new List<string>();
+            _args.RemoveAt( idx );
+            while( idx < _args.Count && !IsKnownOptionOrFlagName( _args[idx] ) )
             {
-                var candidate = _args[idx];
-                if( IsKnownOptionOrFlagName( candidate ) )
-                {
-                    break;
-                }
-                result.Add( candidate );
+                result.Add( _args[idx] );
                 _args.RemoveAt( idx );
             }
-            s1 = DoEatSingleOption( names, out idx );
-            if( s1 == null ) break;
-            result.Add( s1 );
         }
-        return result.ToArray();
+        return result?.ToArray();
+
+        int FindName( IEnumerable<string> names )
+        {
+            foreach( var n in names )
+            {
+                int i = _args.IndexOf( n );
+                if( i >= 0 ) return i;
+            }
+            return -1;
+        }
     }
 
     bool IsKnownOptionOrFlagName( string candidate )
@@ -349,7 +354,7 @@ public sealed class CommandLineArguments
         // We don't know the command. Use the hyphen as a discriminator.
         // This doesn't really matter: when the command is not found, arguments analysis is not done:
         // this is mainly for coherency (and to ease test: no command needed).
-        return candidate[0] == '-';
+        return candidate.Length > 0 && candidate[0] == '-';
     }
 
     /// <summary>

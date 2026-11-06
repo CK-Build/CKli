@@ -898,6 +898,33 @@ public class ScreenTextTests
         }
     }
 
+    /// <summary>
+    /// A multiple option can have no value: alone at the end, or followed by another option or flag (that is not
+    /// taken as its value). Absent, it is null.
+    /// </summary>
+    [Test]
+    public void CommandLineArguments_multiple_option_without_values()
+    {
+        var atTheEnd = new CommandLineArguments( ["-f1", "-om"] );
+        atTheEnd.EatMultipleOption( "-om" ).ShouldBe( [] );
+        atTheEnd.EatFlag( "-f1" ).ShouldBeTrue();
+        atTheEnd.Close( TestHelper.Monitor ).ShouldBeTrue();
+
+        var beforeAFlag = new CommandLineArguments( ["-om", "-f1"] );
+        beforeAFlag.EatMultipleOption( "-om" ).ShouldBe( [] );
+        beforeAFlag.EatFlag( "-f1" ).ShouldBeTrue( "The flag is not the value of the option." );
+        beforeAFlag.Close( TestHelper.Monitor ).ShouldBeTrue();
+
+        var twice = new CommandLineArguments( ["-om", "-om", "OM1", "--multi", "OM2", "-os", "OS"] );
+        twice.EatMultipleOption( "-om", "--multi" ).ShouldBe( ["OM1", "OM2"] );
+        twice.EatSingleOption( "-os" ).ShouldBe( "OS" );
+        twice.Close( TestHelper.Monitor ).ShouldBeTrue();
+
+        var absent = new CommandLineArguments( ["-f1"] );
+        absent.EatMultipleOption( "-om" ).ShouldBeNull();
+        absent.EatFlag( "-f1" ).ShouldBeTrue();
+        absent.Close( TestHelper.Monitor ).ShouldBeTrue();
+    }
 
     [Test]
     public void CommandLineArguments_remaining_args()
