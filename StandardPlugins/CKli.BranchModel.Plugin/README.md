@@ -438,3 +438,10 @@ the actual Git/file work, and only runs when the user asks `ckli issue` to fix i
   creating a fresh local one, and can add an empty "Initializing '...'" commit when there is no
   remote to base the new `dev/` branch on (needed because a `dev/` branch identical to its base is
   otherwise indistinguishable from "nothing to build").
+- **An `origin/dev/xxx` that the local base already contains is never reused.** A non CI build
+  integrates `dev/xxx` into `xxx` and deletes it, while `origin/dev/xxx` stays where it was until the
+  publication pushes: after a publication that failed before its push, the local base holds work that
+  `origin/dev/xxx` doesn't. `BranchLink.GetAheadBranch` (used to load a `HotBranch`, to refresh a link,
+  by the HotZone merge assistant and by the publisher) then sees no `dev/xxx` instead of recreating it
+  from the remote, and `CreateAheadBranch` starts it from the base, tracking the remote branch (its push
+  is a fast-forward). A remote `dev/xxx` with commits of its own (someone else's work) is still reused.

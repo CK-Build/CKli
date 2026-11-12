@@ -71,7 +71,11 @@ sealed class RoadmapPublisher : BasePublisher
         var repo = solution.Repo.GitRepository;
         // A CI version is built from the "dev/" branch when it exists, from the regular one otherwise (a "--ci.0"
         // is typically built on the regular branch tip). The branch to push is the one the version comes from.
-        bool fromDevBranch = isCI && repo.GetBranch( monitor, branch.DevName, missingLocalAndRemote: LogLevel.None ) != null;
+        bool fromDevBranch = isCI
+                             && BranchLink.GetAheadBranch( monitor,
+                                                           repo,
+                                                           repo.GetBranch( monitor, branch.Name, missingLocalAndRemote: LogLevel.None ),
+                                                           branch.DevName ) != null;
         string gitBranchName = fromDevBranch ? branch.DevName : branch.Name;
 
         Tag? fakeTagVersionToPush = null;

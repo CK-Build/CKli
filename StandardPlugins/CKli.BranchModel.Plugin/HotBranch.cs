@@ -39,7 +39,7 @@ public sealed class HotBranch
     static void DoCreate( IActivityMonitor monitor, GitRepository repo, BranchName name, out BranchLink? link, out Branch? gitDevBranch )
     {
         var gitBranch = repo.GetBranch( monitor, name.Name, missingLocalAndRemote: CK.Core.LogLevel.None );
-        gitDevBranch = repo.GetBranch( monitor, name.DevName, missingLocalAndRemote: CK.Core.LogLevel.None );
+        gitDevBranch = BranchLink.GetAheadBranch( monitor, repo, gitBranch, name.DevName );
         if( gitBranch != null )
         {
             link = gitDevBranch == null

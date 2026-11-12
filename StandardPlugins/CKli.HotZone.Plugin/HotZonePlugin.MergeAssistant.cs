@@ -46,8 +46,8 @@ public sealed partial class HotZonePlugin : IMergeAssistant
                 // Not a branch of the branch model: the name is taken literally.
                 return git.GetBranch( monitor, branchName, CK.Core.LogLevel.None );
             }
-            return git.GetBranch( monitor, name.DevName, CK.Core.LogLevel.None )
-                   ?? git.GetBranch( monitor, name.Name, CK.Core.LogLevel.None );
+            var gitBranch = git.GetBranch( monitor, name.Name, CK.Core.LogLevel.None );
+            return BranchLink.GetAheadBranch( monitor, git, gitBranch, name.DevName ) ?? gitBranch;
         }
 
         public MergeSidesAligner? GetAligner( IActivityMonitor monitor, Repo repo, Branch target )

@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core;
 using LibGit2Sharp;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.BranchModel.Plugin;
@@ -154,10 +155,50 @@ public sealed partial class BranchLink
         Throw.CheckArgument( repo.Repository == RepositoryOf( Branch ) );
         var newBranch = repo.GetBranch( monitor, _branch.FriendlyName, LogLevel.None );
         if( newBranch == null ) return null;
-        var newAhead = repo.GetBranch( monitor, _aheadName, LogLevel.None );
+        var newAhead = GetAheadBranch( monitor, repo, newBranch, _aheadName );
         return newAhead != null
                     ? Create( newBranch, newAhead )
                     : new BranchLink( newBranch, null, _aheadName, 0, 0 );
+    }
+
+    /// <summary>
+    /// Gets the ahead branch of <paramref name="baseBranch"/> or null if it doesn't exist.
+    /// <para>
+    /// Like <see cref="GitRepository.GetBranch(IActivityMonitor, string, LogLevel)"/>, a missing local ahead branch is
+    /// created from its "origin" remote branch, except when the base branch already contains the remote tip: the
+    /// remote ahead branch has been integrated locally (a non CI build integrates the "dev/" branch and deletes it, the
+    /// remote one stays where it was until it is pushed again). Recreating it would bring back an ahead branch behind
+    /// its base, that a build would then use: the ahead branch is considered missing.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="repo">The repository.</param>
+    /// <param name="baseBranch">The base branch if it exists.</param>
+    /// <param name="aheadName">The ahead branch name.</param>
+    /// <returns>The ahead branch or null.</returns>
+    public static Branch? GetAheadBranch( IActivityMonitor monitor, GitRepository repo, Branch? baseBranch, string aheadName )
+    {
+        if( baseBranch != null
+            && repo.Repository.Branches[aheadName] == null
+            && IsIntegratedRemote( repo.Repository, baseBranch.Tip, aheadName, out var remote ) )
+        {
+            monitor.Trace( $"Remote '{remote.FriendlyName}' is already integrated in local '{baseBranch.FriendlyName}' in repository '{repo.DisplayPath}': local '{aheadName}' is not recreated from it." );
+            return null;
+        }
+        return repo.GetBranch( monitor, aheadName, LogLevel.None );
+    }
+
+    /// <summary>
+    /// Gets whether the "origin" remote branch of <paramref name="aheadName"/> exists and its tip is reachable from
+    /// <paramref name="baseCommit"/>.
+    /// </summary>
+    static bool IsIntegratedRemote( Repository repository, Commit baseCommit, string aheadName, [NotNullWhen( true )] out Branch? remote )
+    {
+        remote = repository.Branches["origin/" + aheadName];
+        if( remote == null ) return false;
+        var remoteTip = remote.Tip;
+        return remoteTip.Sha == baseCommit.Sha
+               || repository.ObjectDatabase.FindMergeBase( remoteTip, baseCommit )?.Sha == remoteTip.Sha;
     }
 
 
@@ -178,7 +219,7 @@ public sealed partial class BranchLink
         {
             return null;
         }
-        var newAhead = repo.GetBranch( monitor, _aheadName, LogLevel.None );
+        var newAhead = GetAheadBranch( monitor, repo, newBranch, _aheadName );
         if( newAhead != null && newAhead.TrackedBranch != null && (mergeTrackedError = !repo.MergeTrackedBranch( monitor, ref newAhead )) )
         {
             return null;
@@ -266,15 +307,16 @@ public sealed partial class BranchLink
         Throw.DebugAssert( repository == RepositoryOf( baseCommit ) );
         // Lookup for an existing "origin" remote.
         // (Reproduces GitRepository.GetBranch method - AROBAS).
-        string remoteName = "origin/" + aheadBranchName;
-        var remote = repository.Branches[remoteName];
-        if( remote != null )
+        // When the remote branch is already integrated in the base (see GetAheadBranch), its tip is behind the base:
+        // the ahead branch starts from the base like a new one, and tracks the remote one (pushing it is a fast-forward).
+        bool integratedRemote = IsIntegratedRemote( repository, baseCommit, aheadBranchName, out var remote );
+        if( remote != null && !integratedRemote )
         {
             var b = repository.Branches.Add( aheadBranchName, remote.Tip );
             b = repository.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
             return b;
         }
-        // No corresponding remote branch: "empty ahead commit" if withEmptyInitializationCommit.
+        // No corresponding remote branch (or an integrated one): "empty ahead commit" if withEmptyInitializationCommit.
         var c = withEmptyInitializationCommit
                     ? repository.ObjectDatabase.CreateCommit( baseCommit.Author,
                                                               git.Committer, $"""
@@ -285,7 +327,12 @@ public sealed partial class BranchLink
                                                               [baseCommit],
                                                               prettifyMessage: false )
                     : baseCommit;
-        return repository.Branches.Add( aheadBranchName, c );
+        var ahead = repository.Branches.Add( aheadBranchName, c );
+        if( remote != null )
+        {
+            ahead = repository.Branches.Update( ahead, u => u.TrackedBranch = remote.CanonicalName );
+        }
+        return ahead;
     }
 
     /// <summary>
