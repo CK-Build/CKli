@@ -260,7 +260,21 @@ public sealed partial class TagCommitTree
             }
             if( mustAddCommit ) ++ciNumber;
             // The patch increment (or not) has already been handled at the start of this method.
-            v = v.SetCINumber( ciNumber, impactStablePatchNumber: false );
+            var ciVersion = v.SetCINumber( ciNumber, impactStablePatchNumber: false );
+            // The depth is not unique: another history from the same base can have the same depth (a CI build of a
+            // "dev/" branch that has been replaced, typically after an interrupted publication). When this CI version
+            // is already tagged ("building/", "local/" or published) on another commit, the next free number is used:
+            // rebuilding a version under the same number would be an error, and a trap for the consumers' caches.
+            // The tip's own version (built already, nothing to add) is not "another commit".
+            var vInfo = _hotZone.VersionTagInfo;
+            TagCommit? exists;
+            while( (exists = vInfo.GetTagCommit( ciVersion )) != null
+                   && (mustAddCommit || exists.Commit.Sha != _tip.Sha) )
+            {
+                monitor.Info( $"CI version '{ciVersion}' (commit depth) is already used by commit '{exists.Sha}' in '{vInfo.Repo.DisplayPath}': using the next CI number." );
+                ciVersion = v.SetCINumber( ++ciNumber, impactStablePatchNumber: false );
+            }
+            v = ciVersion;
         }
         return v;
     }

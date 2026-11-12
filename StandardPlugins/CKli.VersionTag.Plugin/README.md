@@ -390,6 +390,13 @@ Conventional Commit headers / `BREAKING CHANGE` in the commit range up to the ho
 a prerelease suffix with an auto-incremented prerelease number, and finally sets the CI depth
 (`GitRepository.ComputeCommitDepth`) when a CI build is requested.
 
+**The CI number is the commit depth: the longest path from `LastStable` to the tip** (plus one when the build adds a
+commit). A depth is not unique: another history from the same base can have the same one (a `dev/` branch replaced
+after its CI build, typically after an interrupted publication). When the CI version is already tagged (`building/`,
+`local/` or published) on another commit, the next free CI number is used (logged at Info): the build would
+otherwise fail on "This version has already been produced", and a version rebuilt under the same number is a trap for
+the consumers' NuGet caches.
+
 **In a Long Term Support World (the only one with a `SupVersion`), a Major change is a Minor one**, whatever asked
 for it (a `!` conventional commit, a `BREAKING CHANGE`, an upstream): a LTS World never changes its Major, and since
 its cut is the next Major, this keeps every version below its `SupVersion`. The `vChange` is capped in place, so the
