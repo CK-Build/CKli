@@ -1592,10 +1592,13 @@ public sealed partial class GitRepository : IDisposable
                 d = -1;
                 if( target.Committer.When.UtcDateTime >= baseCommitWhen )
                 {
+                    // The depth is the longest path to the base: a parent that doesn't reach it (-1) is ignored.
+                    // (Comparing dP to d, the depth already incremented, ignored a parent one commit deeper than the
+                    // first one: a merge commit got the depth of its child.)
                     foreach( var p in target.Parents )
                     {
                         int dP = ComputeCommitDepth( baseCommitSha, baseCommitWhen, p, cache );
-                        if( dP > d )
+                        if( dP >= 0 && dP + 1 > d )
                         {
                             d = dP + 1;
                         }
