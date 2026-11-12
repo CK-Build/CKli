@@ -150,8 +150,8 @@ would make them again. So **impacts fail the build**, with an error that lists t
 
 | `--build-impacts` | The impacts |
 |---|---|
-| *(none)* | An error. Commit them, ignore them with a `.gitignore` pattern, or use one of the values below. |
-| `commit` | Amended to the built commit (`"Changes made by the build."`), which is then **built again**: the assemblies name the commit they are built from in their informational version, and the replaced commit would no longer exist. The version is tagged on the amended commit, and its build must have no impact (an error otherwise: the build is not reproducible). Amending keeps the commit depth, hence the version. The built commit must be the tip of the checked out branch and must not have been pushed: an error says so otherwise. |
+| *(none)* | An error. The impacts are **left in the working folder**: commit them, ignore them with a `.gitignore` pattern, or use one of the values below. When the built commit is not the checked out one (it had to be checked out for the build), they are discarded, since the previous head is restored: the error says so. |
+| `commit` | Amended to the built commit (`"Changes made by the build."`), which is then **built again**: the assemblies name the commit they are built from in their informational version, and the replaced commit would no longer exist. The version is tagged on the amended commit, and its build must have no impact (an error otherwise: the build is not reproducible). Amending keeps the commit depth, hence the version. The built commit must be the tip of the checked out branch and must not have been pushed: an error says so otherwise (and the impacts are left in the working folder). |
 | `discard` | Erased by the reset that follows the build (with a warning that lists them): a one-off, while the `.gitignore` pattern is written. |
 
 `publish`, `*publish` and `fix build`/`fix publish` have no option: what is published must be what is committed and
@@ -640,7 +640,9 @@ been computed and is not a dry-run:
    amended one after a `--build-impacts commit`) is recorded in the test-run cache (`RepoBuilder.SetTestRun`): only
    now, so that a build that failed, on its impacts for instance, runs its tests again (they may be what changes the
    working folder). A `BuilderFunction` never records it.
-9. Whatever happened, deletes the packages folder, resets the working folder and restores the original head.
+9. Whatever happened, deletes the packages folder, resets the working folder and restores the original head. The
+   exception is a build that fails on its impacts while the built commit is the checked out one: the working folder
+   keeps them, so that they can be committed or ignored.
 
 #### `DeleteBeforeBuild`: not reusing what a previous build generated
 

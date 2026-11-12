@@ -812,6 +812,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             }
         }
         bool resetDone = false;
+        // When the build fails on its impacts, they are left in the working folder (so that they can be committed
+        // or ignored) unless the build commit had to be checked out: restoring the head requires a clean folder.
+        bool keepImpacts = false;
         BuildOutput? output = null;
         // The tests that passed are recorded once the build succeeded: a build that fails (on its impacts for
         // instance) must run them again, they may be what changes the working folder.
@@ -850,10 +853,12 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                 }
                 if( buildImpacts == BuildImpacts.Error )
                 {
+                    keepImpacts = !mustCheckOut;
                     monitor.Error( $"""
                         The build of '{buildInfo}' changed {impacts.Count} files:
                         {impacts.Concatenate( Environment.NewLine )}
                         The files that a build creates, modifies or deletes must be committed or ignored: use "ckli build --build-impacts commit" (or "--build-impacts discard"), or ignore them with a '.gitignore' pattern.
+                        {GetKeptImpactsMessage( mustCheckOut )}
                         """ );
                     return null;
                 }
@@ -861,7 +866,11 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                 // The second build (of the amended commit) must have no impacts.
                 buildImpacts = BuildImpacts.Error;
                 var amended = CommitBuildImpacts( monitor, git, buildCommit, mustCheckOut, impacts, buildInfo );
-                if( amended == null ) return null;
+                if( amended == null )
+                {
+                    keepImpacts = !mustCheckOut;
+                    return null;
+                }
                 // The tests ran on the content of the amended commit (the working folder with the impacts):
                 // they are not run again and are recorded on the amended commit once it is built.
                 runTest = false;
@@ -910,7 +919,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         finally
         {
             if( output != null ) FileHelper.DeleteFolder( monitor, output.PackagesFolder );
-            if( !resetDone )
+            if( !resetDone && !keepImpacts )
             {
                 git.ResetHard( monitor, out var _ );
                 FileHelper.DeleteEmptyFoldersBelow( monitor, repo.WorkingFolder, CK.Core.LogLevel.Warn );
@@ -922,6 +931,11 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             }
         }
     }
+
+    // The last line of the error of a build that fails on its impacts: what became of them.
+    static string GetKeptImpactsMessage( bool mustCheckOut ) => mustCheckOut
+        ? "They have been discarded: the built commit is not the checked out one, the working folder is restored to its previous head."
+        : "They are left in the working folder: commit them, or discard them before building with \"--build-impacts\".";
 
     // The files that the build created, modified or deleted (ignored files are not impacts).
     static List<string> GetBuildImpacts( GitRepository git )
@@ -972,6 +986,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                 {impacts.Concatenate( Environment.NewLine )}
                 They cannot be committed (--build-impacts commit): {reason}.
                 Commit or ignore them, then build again.
+                {GetKeptImpactsMessage( mustCheckOut )}
                 """ );
             return null;
         }
