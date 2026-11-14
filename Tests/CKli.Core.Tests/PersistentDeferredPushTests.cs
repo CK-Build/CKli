@@ -93,4 +93,42 @@ public class PersistentDeferredPushTests
             remoteTags.IndexedTags.ContainsKey( "refs/tags/v2.0.0" ).ShouldBeTrue();
         }
     }
+
+    [Test]
+    public void a_removed_ref_spec_is_not_pushed()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var remotes = TestEnv.OpenRemotes( "One" );
+        var remoteUrl = remotes.GetUriFor( "OneRepo" );
+
+        var timPath = context.CurrentDirectory.AppendPart( "Tim" );
+        var deferredFile = timPath.Combine( ".git/CKLI_DEFERRED_PUSH" );
+        using var tim = GitRepository.Clone( TestHelper.Monitor,
+                                             new GitRepositoryKey( context.SecretsStore, remoteUrl, true ),
+                                             context.Committer,
+                                             timPath,
+                                             timPath.LastPart ).ShouldNotBeNull();
+        var tipSha = tim.Repository.Head.Tip.Sha;
+        tim.Repository.ApplyTag( "v1.0.0+fake", tipSha );
+        tim.Repository.ApplyTag( "v2.0.0+fake", tipSha );
+        tim.AddPersistentDeferredPushRefSpecs( TestHelper.Monitor, ["+refs/tags/v1.0.0+fake", "+refs/tags/v2.0.0+fake"] ).ShouldBeTrue();
+
+        // The tag is deleted before any push: its ref spec is forgotten (an unknown one is ignored).
+        tim.Repository.Tags.Remove( "v1.0.0+fake" );
+        tim.RemovePersistentDeferredPushRefSpecs( TestHelper.Monitor, ["+refs/tags/v1.0.0+fake", "+refs/tags/unknown"] ).ShouldBeTrue();
+        tim.PersistentDeferredPushRefSpecs.ShouldBe( ["+refs/tags/v2.0.0+fake"] );
+
+        // The push succeeds: the deleted tag is not pushed.
+        tim.PushTags( TestHelper.Monitor, [] ).ShouldBeTrue();
+        tim.PersistentDeferredPushRefSpecs.ShouldBeEmpty();
+        tim.GetRemoteTags( TestHelper.Monitor, out var remoteTags ).ShouldBeTrue();
+        remoteTags.IndexedTags.ContainsKey( "refs/tags/v2.0.0+fake" ).ShouldBeTrue();
+        remoteTags.IndexedTags.ContainsKey( "refs/tags/v1.0.0+fake" ).ShouldBeFalse();
+
+        // Removing the last one deletes the file.
+        tim.AddPersistentDeferredPushRefSpecs( TestHelper.Monitor, ["+refs/tags/v2.0.0+fake"] ).ShouldBeTrue();
+        File.Exists( deferredFile ).ShouldBeTrue();
+        tim.RemovePersistentDeferredPushRefSpecs( TestHelper.Monitor, ["+refs/tags/v2.0.0+fake"] ).ShouldBeTrue();
+        File.Exists( deferredFile ).ShouldBeFalse();
+    }
 }

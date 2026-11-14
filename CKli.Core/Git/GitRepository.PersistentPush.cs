@@ -49,7 +49,26 @@ public sealed partial class GitRepository
         return !changed || SavePersistentDeferredPushRefSpecs( monitor );
     }
 
-    string PersistentDeferredPushFilePath => Path.Combine( _git.Info.Path, _persistentDeferredPushFileName );
+    /// <summary>
+    /// Removes ref specs from the <see cref="PersistentDeferredPushRefSpecs"/> and saves them.
+    /// <para>
+    /// This must be called when a reference that has been registered is deleted before being pushed: a
+    /// "+refs/tags/X" whose local tag doesn't exist anymore would make every subsequent push fail.
+    /// Ref specs that are not registered are ignored.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="refSpecs">The ref specs to forget.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool RemovePersistentDeferredPushRefSpecs( IActivityMonitor monitor, IEnumerable<string> refSpecs )
+    {
+        var set = GetPersistentDeferredPushRefSpecs();
+        bool changed = false;
+        foreach( var spec in refSpecs ) changed |= set.Remove( spec );
+        return !changed || SavePersistentDeferredPushRefSpecs( monitor );
+    }
+
+    string PersistentDeferredPushFilePath =>Path.Combine( _git.Info.Path, _persistentDeferredPushFileName );
 
     HashSet<string> GetPersistentDeferredPushRefSpecs()
     {
