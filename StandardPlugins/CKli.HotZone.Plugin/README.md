@@ -205,8 +205,9 @@ of the World, or both. It is implemented by `HotZonePlugin.ProjectMove`.
   - across repositories, a `<ProjectReference>` that crosses the repository boundary becomes a `<PackageReference>`,
     and a `<PackageReference>` to a package that is now produced by the same repository becomes a
     `<ProjectReference>`. The version written is the one the repository already uses for this package, otherwise the
-    target's starting version for a package it receives, or the producer's highest version: a build must follow the
-    move, and it rewrites these versions anyway.
+    target's starting version for a package it receives, or the version the producer offers on the branch (its best
+    build for the branch, a CI or `local/` one included, or its greatest built version: a version that exists, so that
+    the consumer restores). A build must follow the move, and it rewrites these versions anyway.
 - **The target's starting version:** when it receives packable projects from other repositories, a `+fake` version
   tag is set on the target's `dev/` branch (`VersionTagPlugin.BumpVersion`) at the next patch above the highest version
   of the target and of these sources (their `+fake` included). A moved package is never produced again in a version a
@@ -228,8 +229,10 @@ It refuses, before changing anything, when:
 **`--dry-run`** runs the checks and displays the plan, and changes nothing: the moved folders and their solution
 folders, the target's starting version, the reference changes. The same plan is displayed after a move.
 
-A moved project whose depth changes may have other relative paths (an `Import`, an item with `..\`): they are not
-rewritten, and the plan warns about them. Nothing is committed (except the empty commit that may carry the `+fake` tag,
+The other relative paths of a moved project (an `Import`, an item with `..\` such as a linked file) are not rewritten:
+the plan warns about each one that wouldn't reach the same file after the move, whatever the depth (a file of a project
+that stays in the source repository, a path that changes of meaning with the depth). One that reaches a file that
+moves with it, at the same relative place, is fine. Nothing is committed (except the empty commit that may carry the `+fake` tag,
 on the target's `dev/` branch): review, build from the World root (the source and the target must both build), and
 commit.
 

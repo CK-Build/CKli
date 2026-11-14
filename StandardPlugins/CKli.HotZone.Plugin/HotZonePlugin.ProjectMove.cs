@@ -244,7 +244,7 @@ public sealed partial class HotZonePlugin
                     else
                     {
                         dependencies.Add( (finalRepoP, finalRepoQ) );
-                        var version = GetReferenceVersion( monitor, repoProjects, finalRepoP, q.Name, finalRepoQ, targetRepo, startVersion );
+                        var version = GetReferenceVersion( monitor, repoProjects, hotBranches, finalRepoP, q.Name, finalRepoQ, targetRepo, startVersion );
                         var qName = q.Name;
                         changes.Add( ($"{p.Name}: project reference '{oldInclude}' -> package reference '{qName}' {version}.",
                                       () => p.SetPackageReference( e, qName, version )) );
@@ -314,11 +314,11 @@ public sealed partial class HotZonePlugin
             plan.Add( (0, $"{changes.Count} reference changes:") );
             plan.AddRange( changes.Select( c => (2, c.Description) ) );
         }
-        foreach( var m in moved.Where( m => m.OldFolder.Parts.Count != m.NewFolder.Parts.Count ) )
+        foreach( var m in moved )
         {
-            foreach( var v in m.Project.OtherParentRelativePaths )
+            foreach( var warning in CheckOtherRelativePaths( m, moved, targetRepo ) )
             {
-                plan.Add( (0, $"Warning: '{m.Name}' changes of depth, its relative path '{v}' is not updated.") );
+                plan.Add( (0, warning) );
             }
         }
         if( dryRun )
@@ -417,6 +417,58 @@ public sealed partial class HotZonePlugin
         foreach( var (indent, line) in plan )
         {
             context.Screen.Display( s => s.Text( line )!.Box( marginLeft: 2 + indent ) );
+        }
+    }
+
+    // The paths that go up the folders ("..\", other than the project references that are rewritten) are not
+    // rewritten: they are checked. A path must reach after the move what it reached before: the same file of the
+    // source repository when it doesn't move (so never across repositories), or its new place when it moves with the
+    // projects. A path that would reach something else is a warning: a linked file of a sibling project that stays
+    // behind, a path that changes of meaning with the depth of the project...
+    static IEnumerable<string> CheckOtherRelativePaths( MovedProject m, List<MovedProject> moved, Repo targetRepo )
+    {
+        foreach( var value in m.Project.OtherParentRelativePaths )
+        {
+            foreach( var item in value.Split( ';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries ) )
+            {
+                // An MSBuild property or an item transform can't be resolved here.
+                if( item.Contains( "$(" ) || item.Contains( "@(" ) || item.Contains( "%(" ) ) continue;
+                if( !item.Contains( @"..\" ) && !item.Contains( "../" ) ) continue;
+                var relative = new NormalizedPath( item.Replace( '\\', '/' ) );
+                var before = Resolve( m.OldFolder, relative );
+                var after = Resolve( m.NewFolder, relative );
+                // Where the target is after the move: its new place when it is in a moved folder of the same source.
+                (Repo Repo, NormalizedPath Path)? expected = null;
+                if( before != null )
+                {
+                    var b = before.Value;
+                    var carrier = moved.FirstOrDefault( o => o.Source == m.Source && b.StartsWith( o.OldFolder, strict: false ) );
+                    expected = carrier != null
+                                ? (targetRepo, carrier.NewFolder.Combine( b.RemoveFirstPart( carrier.OldFolder.Parts.Count ) ))
+                                : (m.Source, b);
+                }
+                bool ok = expected != null
+                          && after != null
+                          && expected.Value.Repo == targetRepo
+                          && expected.Value.Path.Path.Equals( after.Value.Path, StringComparison.OrdinalIgnoreCase );
+                if( ok ) continue;
+                var where = expected == null
+                                ? "a path above the repository"
+                                : $"'{expected.Value.Repo.DisplayPath}/{expected.Value.Path}'";
+                yield return $"Warning: '{m.Name}': '{item}' reaches {where} and is not rewritten: it would be broken after the move.";
+            }
+        }
+
+        static NormalizedPath? Resolve( NormalizedPath folder, NormalizedPath relative )
+        {
+            try
+            {
+                return folder.Combine( relative ).ResolveDots();
+            }
+            catch( InvalidOperationException )
+            {
+                return null;
+            }
         }
     }
 
@@ -560,9 +612,11 @@ public sealed partial class HotZonePlugin
 
     // The version written in a new package reference: the one the consumer repository already uses for this package if any
     // (one version per package in a repository), otherwise the target's starting version for a package it receives, or the
-    // producer's highest version. A build must follow the move: it rewrites these versions.
+    // version the producer offers on the branch (see GetOfferedVersion). A build must follow the move: it rewrites these
+    // versions.
     SVersion GetReferenceVersion( IActivityMonitor monitor,
                                   Dictionary<Repo, List<MutableProject>> repoProjects,
+                                  Dictionary<Repo, HotBranch> hotBranches,
                                   Repo consumer,
                                   string packageId,
                                   Repo producer,
@@ -587,6 +641,24 @@ public sealed partial class HotZonePlugin
         }
         return startVersion != null && producer == targetRepo
                 ? startVersion
-                : GetHighestVersion( monitor, producer );
+                : GetOfferedVersion( monitor, producer, hotBranches[producer] );
+    }
+
+    // The version of the producer's packages that exists for the branch: its best build for the branch (a CI or a "local/"
+    // one included: the consumer restores it until a build rewrites it), otherwise its greatest built version. A "+fake"
+    // is never offered: nothing has been produced for it. (The Major.Minor.Patch of GetHighestVersion is not a version that
+    // exists: "16.0.0" for a "16.0.0-0.uc.0.ci.41".)
+    SVersion GetOfferedVersion( IActivityMonitor monitor, Repo producer, HotBranch hotBranch )
+    {
+        var vInfo = _versionTag.Get( monitor, producer );
+        var tip = (hotBranch.GitDevBranch ?? hotBranch.GitBranch)?.Tip;
+        var tree = tip != null ? vInfo.HotZone?.GetTagCommitTree( tip ) : null;
+        if( tree != null )
+        {
+            var (commit, version, _) = tree.GetBestBuildFor( hotBranch.BranchName, allowCI: true );
+            if( !commit.IsFakeVersion ) return version;
+        }
+        return vInfo.AllVersions.Select( v => v.Version ).Where( v => !v.HasFakeMetadata ).Max()
+               ?? GetHighestVersion( monitor, producer );
     }
 }
