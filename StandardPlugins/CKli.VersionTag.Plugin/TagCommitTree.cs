@@ -39,7 +39,8 @@ public sealed partial class TagCommitTree
 
     internal TagCommitTree( VersionTagInfo.HotZoneInfo hotZone, Commit tip, List<(TagCommit, int)> content, List<Commit> headCommits, TagCommit baseCommit )
     {
-        Throw.DebugAssert( content.Count > 0 && content[^1].Item1 == hotZone.LastStable );
+        Throw.DebugAssert( "The LastStable has been met (it is not necessarily the last one).",
+                           content.Any( c => c.Item1 == hotZone.LastStable ) );
         Throw.DebugAssert( baseCommit == hotZone.LastStable
                            || (baseCommit.IsBranchFake && baseCommit.Version > hotZone.LastStable.Version && content.Any( c => c.Item1 == baseCommit )) );
         _hotZone = hotZone;
@@ -71,7 +72,8 @@ public sealed partial class TagCommitTree
 
     /// <summary>
     /// Gets the versioned tag commits with their 0-based increasing level from the first one.
-    /// The last one is necessarily <see cref="LastStable"/>.
+    /// <see cref="LastStable"/> is necessarily one of them, but not necessarily the last one: a merge of the LastStable
+    /// and of one of its children that bears a hot version meets both at the same level.
     /// </summary>
     public IReadOnlyList<(TagCommit, int)> Content => _content;
 

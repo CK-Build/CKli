@@ -243,9 +243,13 @@ public sealed partial class VersionTagInfo
 
             Throw.DebugAssert( collector.Count == 0 || collector.Select( x => x.Item2 ).IsSortedLarge() );
 
-            return collector.Count == 0
-                    ? null
-                    : new TagCommitTree( this, tip, collector, headCommits, branchFake ?? _lastStable );
+            // The LastStable may not be the last collected one: a merge of the LastStable and of one of its children
+            // that bears a hot version (a branch that merged "stable" and "dev/stable") meets both at the same level.
+            // But it must have been met: a tip that doesn't contain it has no tree (even if hot versions have been
+            // collected on the way).
+            return collector.Any( x => x.Item1 == _lastStable )
+                    ? new TagCommitTree( this, tip, collector, headCommits, branchFake ?? _lastStable )
+                    : null;
 
             static int Collect( VersionTagInfo info,
                                  HashSet<string> commitSeen,
