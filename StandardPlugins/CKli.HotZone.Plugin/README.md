@@ -208,9 +208,11 @@ of the World, or both. It is implemented by `HotZonePlugin.ProjectMove`.
     target's starting version for a package it receives, or the producer's highest version: a build must follow the
     move, and it rewrites these versions anyway.
 - **The target's starting version:** when it receives packable projects from other repositories, a `+fake` version
-  tag is set on the target (`VersionTagPlugin.BumpVersion`, the `version bump` command for any repository) at the next
-  patch above the highest version of the target and of these sources. A moved package is never produced again in a
-  version a source already produced it in.
+  tag is set on the target's `dev/` branch (`VersionTagPlugin.BumpVersion`) at the next patch above the highest version
+  of the target and of these sources (their `+fake` included). A moved package is never produced again in a version a
+  source already produced it in. Out of the root branch, it is a **branch fake** (see the VersionTag README): the
+  starting version of this branch only, registered to be pushed by the next push, that reaches the root branch with
+  the integration of the branch. A branch that is never integrated leaves the root branch's versions untouched.
 
 It refuses, before changing anything, when:
 - a repository involved is not clean, or is not on the same branch of the branch model as the target (with or
@@ -227,8 +229,9 @@ It refuses, before changing anything, when:
 folders, the target's starting version, the reference changes. The same plan is displayed after a move.
 
 A moved project whose depth changes may have other relative paths (an `Import`, an item with `..\`): they are not
-rewritten, and the plan warns about them. Nothing is committed (except the empty commit that may carry the `+fake` tag):
-review, build from the World root (the source and the target must both build), and commit.
+rewritten, and the plan warns about them. Nothing is committed (except the empty commit that may carry the `+fake` tag,
+on the target's `dev/` branch): review, build from the World root (the source and the target must both build), and
+commit.
 
 ## How: `project retire`
 
@@ -260,9 +263,11 @@ the guideline's template (with the project's target framework, the first one of 
 it is inherited) and a `<Description>`. `MSBuild/<PackageId>.targets` holds the error (its target is named after the
 package id, so that several tombstones can be imported by the same project); `README.md` and `docs/Package.md` say only
 that the package is deprecated and what replaces it. CKli builds and publishes it as the next version of the package,
-**a new Major**: a tombstone breaks its consumers. The command sets a `+fake` version tag at the next Major above the
-versions the repository produced (`VersionTagPlugin.BumpVersion`), unless a pending `+fake` version already is a new
-Major (a previous retirement): the first build produces exactly this version.
+**a new Major**: a tombstone breaks its consumers. The command sets a `+fake` version tag on the `dev/` branch at the
+next Major above the versions the repository produced (`VersionTagPlugin.BumpVersion`), unless a pending `+fake`
+version that the branch contains already is a new Major (a previous retirement): the first build produces exactly this
+version. Out of the root branch, it is a branch fake, like the starting version of `project move`: the new Major
+reaches the root branch with the tombstones, when the branch is integrated.
 The plan warns when every package of a repository is retired.
 
 **A tombstone is published once.** Once its stable version is published (a version tag of the repository, neither

@@ -34,15 +34,19 @@ public sealed partial class TagCommitTree
     readonly List<(TagCommit, int)> _content;
     readonly List<Commit> _headCommits;
     readonly VersionTagInfo.HotZoneInfo _hotZone;
+    readonly TagCommit _base;
     SVersionChange? _versionChange;
 
-    internal TagCommitTree( VersionTagInfo.HotZoneInfo hotZone, Commit tip, List<(TagCommit, int)> content, List<Commit> headCommits )
+    internal TagCommitTree( VersionTagInfo.HotZoneInfo hotZone, Commit tip, List<(TagCommit, int)> content, List<Commit> headCommits, TagCommit baseCommit )
     {
         Throw.DebugAssert( content.Count > 0 && content[^1].Item1 == hotZone.LastStable );
+        Throw.DebugAssert( baseCommit == hotZone.LastStable
+                           || (baseCommit.IsBranchFake && baseCommit.Version > hotZone.LastStable.Version && content.Any( c => c.Item1 == baseCommit )) );
         _hotZone = hotZone;
         _tip = tip;
         _content = content;
         _headCommits = headCommits;
+        _base = baseCommit;
     }
 
     /// <summary>
@@ -54,6 +58,16 @@ public sealed partial class TagCommitTree
     /// Gets the <see cref="VersionTagInfo.HotZoneInfo.LastStable"/>.
     /// </summary>
     public TagCommit LastStable => _hotZone.LastStable;
+
+    /// <summary>
+    /// Gets the base of the versions produced from the <see cref="Tip"/>: the greatest branch fake that the
+    /// <see cref="Tip"/> contains (see <see cref="TagCommit.IsBranchFake"/>) if any, otherwise the <see cref="LastStable"/>.
+    /// <para>
+    /// Like a "+fake" <see cref="LastStable"/>, a branch fake is a starting version: the versions computed from it
+    /// keep its Major.Minor.Patch.
+    /// </para>
+    /// </summary>
+    public TagCommit Base => _base;
 
     /// <summary>
     /// Gets the versioned tag commits with their 0-based increasing level from the first one.
@@ -207,11 +221,11 @@ public sealed partial class TagCommitTree
         // we eventually want to produce v1.5.4 (not v1.5.5, v1.6.0 or v2.0.0) the initial version is the fake one,
         // not the next one: vChange is useless for +fake!
 
-        SVersion v = LastStable.Version;
+        SVersion v = _base.Version;
         Throw.DebugAssert( "Starting from the stable: no prerelease suffix to cleanup.", v.Prerelease.Length == 0 );
         // Ultimately use Patch (this is required by the caller: because we build then a minimal version change is expected).
         if( vChange == SVersionChange.None ) vChange = SVersionChange.Patch;
-        if( !LastStable.IsOrHasFakeVersion )
+        if( !_base.IsOrHasFakeVersion )
         {
             if( vChange < SVersionChange.Major )
             {
@@ -252,10 +266,10 @@ public sealed partial class TagCommitTree
         // Finalize with the CI number if required.
         if( ciBuild )
         {
-            int ciNumber = LastStable.Repo.GitRepository.ComputeCommitDepth( monitor, LastStable.Commit, _tip );
+            int ciNumber = _base.Repo.GitRepository.ComputeCommitDepth( monitor, _base.Commit, _tip );
             if( ciNumber < 0 )
             {
-                monitor.Error( $"Unable to compute commit depth from branch '{_tip.Sha.AsSpan(0,7)} {_tip.MessageShort}' to the base {LastStable}." );
+                monitor.Error( $"Unable to compute commit depth from branch '{_tip.Sha.AsSpan(0,7)} {_tip.MessageShort}' to the base {_base}." );
                 return null;
             }
             if( mustAddCommit ) ++ciNumber;
@@ -295,9 +309,16 @@ public sealed partial class TagCommitTree
             if( _tip.Sha != LastStable.Commit.Sha || _content.Count != 1 )
             {
                 // First, use the tags.
+                // The branch fakes and the versions they declare are not successors of the LastStable: they are
+                // ignored (a tree based on a branch fake doesn't compute a version change, see ComputeTargetVersion).
                 var last = LastStable.Version;
+                var branchFakes = _hotZone.VersionTagInfo.BranchFakes;
                 foreach( var x in _content )
                 {
+                    if( x.Item1.IsBranchFake || branchFakes.Any( f => f.Version.SameStableAs( x.Item1.Version ) ) )
+                    {
+                        continue;
+                    }
                     if( !last.IsPreviousVersionNumbersOf( x.Item1.Version, out var c ) )
                     {
                         Throw.CKException( $"The '{x.Item1}' doesn't follow LasStable version '{last}'." );

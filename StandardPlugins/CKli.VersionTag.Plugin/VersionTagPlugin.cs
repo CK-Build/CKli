@@ -112,7 +112,9 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         var monitor = e.Monitor;
         foreach( var r in e.Repos )
         {
-            Get( monitor, r ).CollectIssues( monitor, e.ScreenType, e.Add );
+            var info = Get( monitor, r );
+            info.CollectIssues( monitor, e.ScreenType, e.Add );
+            CollectAbandonedBranchFakesIssue( monitor, info, e.ScreenType, e.Add );
         }
     }
 
@@ -359,6 +361,44 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         return _artifactHandlerPlugin.DestroyLocalRelease( monitor, repo, version, tagContent, removeFromNuGetGlobalCache );
     }
 
+    // A "+fake" that none of the root branches ("stable", "dev/stable" and their "origin/" remote branches)
+    // contains is a branch fake (see TagCommit.IsBranchFake). When no root branch exists at all (the very
+    // first version is not yet created), every fake is a root one.
+    List<TagCommit>? ClassifyBranchFakes( Repository r, List<TagCommit> validTags )
+    {
+        List<TagCommit>? result = null;
+        List<Commit>? rootTips = null;
+        foreach( var tc in validTags )
+        {
+            if( !tc.IsFakeVersion ) continue;
+            rootTips ??= GetRootTips( r );
+            if( rootTips.Count == 0 ) return null;
+            if( !rootTips.Any( tip => VersionTagInfo.IsAncestorOrSelf( r, tc.Commit, tip ) ) )
+            {
+                tc.SetBranchFake();
+                result ??= new List<TagCommit>();
+                result.Add( tc );
+            }
+        }
+        return result;
+    }
+
+    // The tips of the root branches: "stable", "dev/stable" and their "origin/" remote branches.
+    List<Commit> GetRootTips( Repository r )
+    {
+        var root = _branchModel.BranchNamespace.Root;
+        var tips = new List<Commit>();
+        foreach( var name in new[] { root.Name, root.DevName, $"origin/{root.Name}", $"origin/{root.DevName}" } )
+        {
+            var tip = r.Branches[name]?.Tip;
+            if( tip != null ) tips.Add( tip );
+        }
+        return tips;
+    }
+
+    // Whether one of the root branches (see GetRootTips) contains the commit.
+    bool IsInRootBranch( Repository r, Commit c ) => GetRootTips( r ).Any( tip => VersionTagInfo.IsAncestorOrSelf( r, c, tip ) );
+
     (SVersion? Inf, SVersion? Sup) ReadRepoConfiguration( IActivityMonitor monitor, Repo repo )
     {
         var config = PrimaryPluginContext.GetConfigurationFor( repo );
@@ -467,6 +507,10 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                          ref lightweightOrUnreadableRegularTags,
                          ref ci0VersionTags );
 
+        // The "+fake" that the root branch doesn't contain are branch fakes: they are excluded from the
+        // topHot/lastStable election below, they are the base of the TagCommitTree that contain them.
+        var branchFakes = ClassifyBranchFakes( r, validTags );
+
         // Applies +invalid tags to badDeprecatedTags and lightweightOrUnreadableRegularTags (for ci0VersionTags
         // this is done below, when processing them).
         if( badDeprecatedTags != null && invalidTags != null )
@@ -529,8 +573,10 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                         tagConflicts.Add( ((exists.Version, exists.Tag), (newOne.Version, newOne.Tag), TagConflict.DuplicatedVersionTag) );
                         continue;
                     }
-                    // Easy (we ignore - but remember - the fake newOne or remove it if the regular or deprecated tag is published): 
-                    if( exists.IsBuildingOrLocal )
+                    // Easy (we ignore - but remember - the fake newOne or remove it if the regular or deprecated tag is published):
+                    // A branch fake is never attached: only the root branch produces stable versions, a "local/" of
+                    // the same version can only come from a root fake.
+                    if( exists.IsBuildingOrLocal && !newOne.IsBranchFake )
                     {
                         // The fake version has been built, but not published.
                         // We must keep the +fake until the version is published but we CANNOT do this:
@@ -553,7 +599,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                             lastStable = exists;
                         }
                     }
-                    else
+                    else if( !exists.IsBuildingOrLocal )
                     {
                         // The fake version has been published, we don't really need the +fake anymore.
                         if( _removeUselessFakeTag )
@@ -581,7 +627,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
                     if( newOne.IsBuildingOrLocal )
                     {
                         // Same version: attached whatever the commits are (see SetFake).
-                        newOne.SetFake( exists );
+                        // A branch fake is never attached (see above).
+                        if( !exists.IsBranchFake ) newOne.SetFake( exists );
                     }
                     else if( _removeUselessFakeTag )
                     {
@@ -742,6 +789,11 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             tagConflicts.Add( ((t1.Version, t1.Tag), (t2.Version, t2.Tag), TagConflict.MultipleVersionsOnSameCommit) );
         }
 
+        // The branch fakes that survived the passes (+invalid, conflicts): the ones that are the v2c entry of their version.
+        IReadOnlyList<TagCommit> finalBranchFakes = branchFakes == null
+                                                        ? []
+                                                        : branchFakes.Where( f => ReferenceEquals( v2c.GetValueOrDefault( f.Version ), f ) ).ToList();
+
         // topHot can be +deprecated... The correct workflow should be to deprecate a version after having produced at least one next version.
         // If this happens, we can:
         // - Restore the regular tag:
@@ -767,7 +819,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
             // The HotZoneInfo will create the required manual fix if topHot.Version > (lastStable.Major + 1, 0, 0)
             // (or equal to it without being an unpublished "building/" or "local/" release) or (when lastStable is a +fake or is a "local/" with an associated FakeVersion) if topHot is greater
             // to the fake version (a fake version is always stable).
-            hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, info, lastStable, topHot );
+            hotZone = VersionTagInfo.HotZoneInfo.Create( monitor, info, lastStable, topHot, finalBranchFakes );
         }
 
         // Time to work on the "ci.0" version tags.
@@ -864,6 +916,7 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
         info.Initialize( hotZone,
                          v2c,
                          sha2c,
+                         finalBranchFakes,
                          removableTags,
                          invalidTags,
                          tagConflicts,
@@ -1123,6 +1176,8 @@ public sealed partial class VersionTagPlugin : PrimaryRepoPlugin<VersionTagInfo>
 
         static void TrackTagCommit( ref TagCommit? topHot, ref TagCommit? lastStable, TagCommit newOne )
         {
+            // A branch fake is the base of the branches that contain it only: it is not a repository-wide version.
+            if( newOne.IsBranchFake ) return;
             if( topHot == null || topHot.Version < newOne.Version )
             {
                 topHot = newOne;

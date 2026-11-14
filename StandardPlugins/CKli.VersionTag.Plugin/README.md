@@ -176,7 +176,7 @@ Per-repo, under that repo's plugin configuration element:
 
 | `[CommandPath]` | Purpose |
 |---|---|
-| `version bump` | Sets a `+fake` version tag on the repo's root (or `dev/`) branch to retroactively start a new Major.Minor.Patch line above every currently known version, cleaning up now-superseded local builds and higher `+fake` tags first. |
+| `version bump` | Sets a `+fake` version tag on the repo's root (or `dev/`) branch to retroactively start a new Major.Minor.Patch line above every currently known version, cleaning up now-superseded local builds and higher `+fake` tags first (a pushed one is deleted from the remote: a `+invalid` can't cancel a `+fake`). |
 | `version deprecate` | Marks a published version as `+deprecated` (with an expiration date computed from `--immediate`/`--days`), and recursively propagates the deprecation to every repo/version in the Stack that (transitively) consumes it. Never the *alive* version of a repository (see below). |
 
 Both commands take `IActivityMonitor` and `CKliEnv` first, matching the plugin command convention. Selected
@@ -333,7 +333,7 @@ A version tag's `SVersion.ParsedPrefix` and build metadata drive how it's interp
 | *(none)* | A **regular**, published version. |
 | `local/v...` | A version built but not yet pushed — purely local ("rolling" build; replaced by the next local build on the same branch). |
 | `building/v...` | Same idea as `local/`, used while a build is in progress (both are `IsBuildingOrLocal`). |
-| `+fake` | Manually placed to bridge a gap the normal rules would reject (e.g. starting `v2.0.0` without a `v1.x.y` history), always stable, always considered published. Created by `version bump`. |
+| `+fake` | Manually placed to bridge a gap the normal rules would reject (e.g. starting `v2.0.0` without a `v1.x.y` history), always stable, always considered published. Created by `version bump`. A `+fake` that the root branch doesn't contain is a **branch fake** (see below). |
 | `+deprecated` | A published version that must no longer be reproduced/consumed; carries an expiration date and the original `BuildContentInfo`. Created/updated by `version deprecate`. |
 | `+invalid` | A "poison pill" that cancels a specific bad version everywhere it appears in the Stack; purely a coordination artifact, safe to remove once the bad tag is gone everywhere. |
 | `ci.0` / `--ci.0` (`CINumber == 0`) | A CI-numbered mirror of a non-CI tag on the *same* commit (same-commit dual versioning for "rank 0" repos with no upstream dependencies). |
@@ -381,16 +381,54 @@ multi-pass algorithm (see `VersionTagPlugin.cs`):
    `topHot > (lastStable.Major+1).0.0` with no `+fake` covering the gap) — this must be fixed manually.
    `topHot == (lastStable.Major+1).0.0` is accepted when it is a `building/` or `local/` release: that is what a
    breaking change builds, and it is not a `lastStable` until published (a published one would be the `lastStable`).
+   A `topHot` that is a version of a branch fake (`SameStableAs`) is accepted too.
+
+### Branch fakes
+
+**A `+fake` that none of the root branches contains is a branch fake** (`TagCommit.IsBranchFake`,
+`VersionTagInfo.BranchFakes`). The root branches are `stable`, `dev/stable` and their `origin/` remote branches; when
+none exists (the very first version), every fake is a root one. A branch fake is set by `BumpVersion` on another hot
+branch (`project move` and `project retire` run on an `explo/` or prerelease branch): a starting version decided on a
+branch belongs to that branch.
+- **It is not a repository-wide version:** it never is the `lastStable` nor the `topHot`, and it is not in the
+  `LastStables`. The root branch's versions are unchanged as long as the branch is not integrated, and the other
+  branches don't have to synchronize.
+- **It is the base of the trees that contain it:** `TagCommitTree.Base` is the greatest branch fake met by the walk
+  (greater than the `LastStable`), the `LastStable` otherwise. The walk still ends at the `LastStable`. A branch fake
+  is collected even when a version built on its commit is the `TagCommitsBySha` entry of the commit, and a branch fake
+  overtaken by the root branch (not greater than the `LastStable`) is ignored.
+- **It reaches the root branch with the integration of its branch** (`branch close`): contained by `dev/stable`, it is
+  a regular (root) `+fake` the next time the tags are read. A branch that is never integrated leaves the root
+  branch untouched.
+- **It is pushed by the next push** (`GitRepository.AddPersistentDeferredPushRefSpecs`): the branch's versions are
+  based on it, the other clones must see it to compute the same versions. A fake tag deleted before being pushed is
+  removed from them (`RemovePersistentDeferredPushRefSpecs`).
+- **It has a commit of its own:** on a branch tip that the root branch contains (a branch without commits of its own),
+  `BumpVersion` creates an empty commit for it, as it does when the tip already bears another version.
+- **Two fakes can't declare the same version:** a `BumpVersion` on a branch replaces only the branch fakes that
+  this branch contains (on the root, only the root fakes) and fails when another branch's fake has the same version.
+  `project move` and `project retire` start above every existing fake.
+- **It records its branch:** a branch fake is an annotated tag whose message names its branch and its `dev/` branch
+  (`TagCommit.RecordedBranchName`, `RecordedDevBranchName`).
+- **An abandoned branch fake is removed by `ckli issue --fix`.** It is abandoned when its recorded branch is not in
+  the branch model anymore (`branch close --discard`) AND no git branch has its name or its `dev/` name, locally or
+  as an `origin/` remote branch: as long as one exists, another clone may work on it and it is pending. The fix
+  destroys the `local/` versions based on it and deletes the tag, from the remote too when it has it (a `+invalid`
+  can't cancel a `+fake`: `vX+invalid` cancels every `vX`, and `vX+fake+invalid` is not conformant). Its persistent
+  deferred push is forgotten. A branch fake on which a published version is based (a version with its
+  Major.Minor.Patch on a commit that contains it) is kept: it is what makes that version understandable. A fake that
+  doesn't record its branch (created by hand) is never considered abandoned.
 
 ### Computing the next version
 
-`TagCommitTree.ComputeTargetVersion` (called by a Build plugin) starts from `HotZone.LastStable`, bumps it by the
+`TagCommitTree.ComputeTargetVersion` (called by a Build plugin) starts from the tree's `Base` (`HotZone.LastStable` or
+a branch fake, that keeps its Major.Minor.Patch like any `+fake`), bumps it by the
 requested/inferred `SVersionChange` (`GetVersionChange`, driven first by any intermediate tag's own delta, then by
 Conventional Commit headers / `BREAKING CHANGE` in the commit range up to the hot zone), applies the branch name as
 a prerelease suffix with an auto-incremented prerelease number, and finally sets the CI depth
 (`GitRepository.ComputeCommitDepth`) when a CI build is requested.
 
-**The CI number is the commit depth: the longest path from `LastStable` to the tip** (plus one when the build adds a
+**The CI number is the commit depth: the longest path from the `Base` to the tip** (plus one when the build adds a
 commit). A depth is not unique: another history from the same base can have the same one (a `dev/` branch replaced
 after its CI build, typically after an interrupted publication). When the CI version is already tagged (`building/`,
 `local/` or published) on another commit, the next free CI number is used (logged at Info): the build would
@@ -405,7 +443,8 @@ roadmap's propagation to the downstream repositories sees the capped change too.
 `VersionTagInfo.TryGetCommitBuildInfo` is the gate a Build plugin calls before producing that version: it checks
 `InfVersion`/`SupVersion` bounds, that the target commit/version pair doesn't collide with an existing one (unless
 `RebuildMode` explicitly allows it), that no tag conflicts exist, and (via `FindBaseCommitByVersion`) that there is
-no gap in the Major/Minor/Patch sequence relative to `LastStables` — unless bridged by a `+fake`. These sequence
+no gap in the Major/Minor/Patch sequence relative to `LastStables` — unless bridged by a `+fake` (a branch fake is the
+base of its versions on the commits that contain it). These sequence
 rules govern the creation of a version: a forced rebuild (`allowRebuildVersion`) of a published version on the commit
 that already bears its tag (a valid one or the lightweight/unreadable one being rebuilt) skips them, otherwise the
 first version of a repository (it has no base) or a version after a gap in the old history could never be rebuilt.

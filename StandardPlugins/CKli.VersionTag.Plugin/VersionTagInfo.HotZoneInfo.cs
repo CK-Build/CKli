@@ -29,11 +29,18 @@ public sealed partial class VersionTagInfo
             _hotZoneIssue = hotZoneIssue;
         }
 
-        internal static HotZoneInfo Create( IActivityMonitor monitor, VersionTagInfo info, TagCommit lastStable, TagCommit topHot )
+        internal static HotZoneInfo Create( IActivityMonitor monitor,
+                                            VersionTagInfo info,
+                                            TagCommit lastStable,
+                                            TagCommit topHot,
+                                            IReadOnlyList<TagCommit> branchFakes )
         {
             Throw.DebugAssert( lastStable.Version.IsStable );
             string? message = null;
-            if( topHot.Version != lastStable.Version )
+            // The versions of a branch fake (its prereleases and CI builds, on the branch that contains it) are
+            // not bound by the repository-wide LastStable: the branch fake is their base.
+            if( topHot.Version != lastStable.Version
+                && !branchFakes.Any( f => f.Version.SameStableAs( topHot.Version ) ) )
             {
                 if( lastStable.IsOrHasFakeVersion )
                 {
@@ -200,6 +207,9 @@ public sealed partial class VersionTagInfo
             // The commits from Tip to any TagCommits.
             var headCommits = new List<Commit>();
 
+            // The branch fakes met by the walk (greater than the LastStable): the greatest one is the tree's base.
+            TagCommit? branchFake = null;
+
             // The walk is breadth-first by level (a "0-1 BFS"): an untagged commit's parents stay at its level and are
             // processed first, a tagged commit's parents are one level up and wait for the current level to be over.
             // The commits are therefore processed in increasing level order: the collector is sorted by level (what
@@ -212,7 +222,7 @@ public sealed partial class VersionTagInfo
             {
                 var (c, l) = queue.First!.Value;
                 queue.RemoveFirst();
-                int nextL = Collect( _info, commitSeen, _lastStable, c, l, collector, headCommits );
+                int nextL = Collect( _info, commitSeen, _lastStable, c, l, collector, headCommits, ref branchFake );
                 if( nextL == l )
                 {
                     // Reversed so that the first parent is processed first.
@@ -235,7 +245,7 @@ public sealed partial class VersionTagInfo
 
             return collector.Count == 0
                     ? null
-                    : new TagCommitTree( this, tip, collector, headCommits );
+                    : new TagCommitTree( this, tip, collector, headCommits, branchFake ?? _lastStable );
 
             static int Collect( VersionTagInfo info,
                                  HashSet<string> commitSeen,
@@ -243,7 +253,8 @@ public sealed partial class VersionTagInfo
                                  Commit c,
                                  int level,
                                  List<(TagCommit, int)> collector,
-                                 List<Commit> headCommits )
+                                 List<Commit> headCommits,
+                                 ref TagCommit? branchFake )
             {
                 // Seen first: the LastStable is collected once, with its smallest level.
                 if( !commitSeen.Add( c.Sha ) )
@@ -255,7 +266,21 @@ public sealed partial class VersionTagInfo
                     collector.Add( (lastStable, level) );
                     return -1;
                 }
-                if( info.TagCommitsBySha.TryGetValue( c.Sha, out var tc ) )
+                // A branch fake is not necessarily the TagCommitsBySha entry of its commit: a version built on
+                // its commit takes it over. It is collected (before the produced version, at the same level) when
+                // it is greater than the LastStable: a branch fake overtaken by the root branch is ignored.
+                // The walk continues below it: the tree always ends with the LastStable.
+                bool tagged = false;
+                foreach( var f in info.BranchFakes )
+                {
+                    if( f.Sha == c.Sha && f.Version > lastStable.Version )
+                    {
+                        collector.Add( (f, level) );
+                        if( branchFake == null || branchFake.Version < f.Version ) branchFake = f;
+                        tagged = true;
+                    }
+                }
+                if( info.TagCommitsBySha.TryGetValue( c.Sha, out var tc ) && !tc.IsBranchFake )
                 {
                     // The tagged version must be greater than the last stable but we handle
                     // the +fake case thanks to the relaxed SameStableAs condition (a prerelease or
@@ -266,8 +291,9 @@ public sealed partial class VersionTagInfo
                         collector.Add( (tc, level) );
                         return level + 1;
                     }
-                    return -1;
+                    if( !tagged ) return -1;
                 }
+                if( tagged ) return level + 1;
                 if( level == 0 ) headCommits.Add( c );
                 return level;
             }

@@ -85,7 +85,8 @@ sealed class RoadmapPublisher : BasePublisher
         // => We push the tag except when we are building a non-CI stable version.
         if( !version.IsStable || isCI )
         {
-            var baseTagCommit = buildInfo.VersionInfo.HotZone.LastStable;
+            // The base is the branch's one: a branch fake (that only this branch contains) or the LastStable.
+            var baseTagCommit = buildInfo.VersionInfo.BaseBuild;
             fakeTagVersionToPush = baseTagCommit.IsFakeVersion ? baseTagCommit.Tag : baseTagCommit.FakeVersion?.Tag;
         }
         // A CI version published from the "dev/" branch pushes its base too when the remote doesn't have it; a non-CI

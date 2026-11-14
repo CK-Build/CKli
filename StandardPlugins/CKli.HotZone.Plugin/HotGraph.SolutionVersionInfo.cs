@@ -165,10 +165,11 @@ public sealed partial class HotGraph
         public TagCommitTree TagCommitTree => _tagCommitTree;
 
         /// <summary>
-        /// Gets the base commit that is the <see cref="VersionTagInfo.HotZoneInfo.LastStable"/>.
+        /// Gets the base commit that is the <see cref="TagCommitTree.Base"/>: the <see cref="VersionTagInfo.HotZoneInfo.LastStable"/>
+        /// or the branch fake that the branch contains (see <see cref="TagCommit.IsBranchFake"/>).
         /// Can be "+fake" or "+deprecated".
         /// </summary>
-        public TagCommit BaseBuild => _tagCommitTree.LastStable;
+        public TagCommit BaseBuild => _tagCommitTree.Base;
 
         /// <summary>
         /// Gets the last built version to consider in the regular <see cref="Solution.Branch"/> or its "dev/" branch.

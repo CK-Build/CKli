@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
 using CKli.ShallowSolution.Plugin;
+using CKli.VersionTag.Plugin;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -231,7 +232,7 @@ public sealed partial class HotZonePlugin
         var bumps = new List<(Repo Repo, SVersion Version)>();
         foreach( var r in involved.Where( r => retired.Any( x => x.Repo == r ) ) )
         {
-            var v = GetTombstoneVersion( monitor, r );
+            var v = GetTombstoneVersion( monitor, r, hotBranches[r] );
             if( v != null ) bumps.Add( (r, v) );
         }
 
@@ -267,11 +268,6 @@ public sealed partial class HotZonePlugin
 
         using( monitor.OpenInfo( $"Retiring {retired.Count} projects." ) )
         {
-            // The new Major first, while the working folders are clean (this may create an empty commit).
-            foreach( var (r, v) in bumps )
-            {
-                if( !_versionTag.BumpVersion( monitor, r, context.Committer, v ) ) return false;
-            }
             // Lands on the "dev/" branches (the working folders are clean).
             foreach( var (r, hb) in hotBranches )
             {
@@ -280,6 +276,13 @@ public sealed partial class HotZonePlugin
                 {
                     return false;
                 }
+            }
+            // The new Major, on the "dev/" branch while the working folders are clean (this may create an empty
+            // commit). Out of the root branch, it is a branch fake: it reaches the root branch with the integration
+            // of the branch, like the tombstones.
+            foreach( var (r, v) in bumps )
+            {
+                if( !_versionTag.BumpVersion( monitor, r, context.Committer, v, hotBranches[r] ) ) return false;
             }
             try
             {
@@ -330,13 +333,23 @@ public sealed partial class HotZonePlugin
 
     // The next Major above the versions the repository produced, or null when a pending "+fake" version is already
     // a new Major (a previous retirement, or a "version bump").
-    SVersion? GetTombstoneVersion( IActivityMonitor monitor, Repo repo )
+    SVersion? GetTombstoneVersion( IActivityMonitor monitor, Repo repo, HotBranch hotBranch )
     {
-        var versions = _versionTag.Get( monitor, repo ).AllVersions.Select( v => v.Version ).ToList();
-        var produced = versions.Where( v => !v.HasFakeMetadata ).Max();
+        var info = _versionTag.Get( monitor, repo );
+        var versions = info.AllVersions.ToList();
+        var produced = versions.Where( v => !v.Version.HasFakeMetadata ).Select( v => v.Version ).Max();
         var next = SVersion.Create( (produced?.Major ?? 0) + 1, 0, 0 );
-        var pending = versions.Where( v => v.HasFakeMetadata ).Max();
-        return pending != null && pending.Major >= next.Major ? null : next;
+        // The pending fakes of the branch: the ones it contains (a root fake, or a branch fake of this branch).
+        // A fake of another branch is not pending here, but its version is taken.
+        var tip = (hotBranch.GitDevBranch ?? hotBranch.GitBranch)?.Tip;
+        var git = repo.GitRepository.Repository;
+        var fakes = versions.Where( v => v.Version.HasFakeMetadata ).ToList();
+        var pending = fakes.Where( v => !v.Commit.IsBranchFake || (tip != null && VersionTagInfo.IsAncestorOrSelf( git, v.Commit.Commit, tip )) )
+                           .Select( v => v.Version )
+                           .Max();
+        if( pending != null && pending.Major >= next.Major ) return null;
+        while( fakes.Any( f => f.Version == next ) ) next = SVersion.Create( next.Major + 1, 0, 0 );
+        return next;
     }
 
     static bool IsTombstone( Repo r, MutableProject p ) => IsTombstone( XDocument.Load( r.WorkingFolder.Combine( p.Path ) ), p.Name );

@@ -304,7 +304,10 @@ public sealed partial class HotZonePlugin
         }
         if( startVersion != null )
         {
-            plan.Add( (0, $"Starting version of '{targetRepo.DisplayPath}': 'v{startVersion}+fake'.") );
+            Throw.DebugAssert( branch != null );
+            plan.Add( (0, branch.IsRoot
+                            ? $"Starting version of '{targetRepo.DisplayPath}': 'v{startVersion}+fake'."
+                            : $"Starting version of '{targetRepo.DisplayPath}' on '{branch.DevName}': 'v{startVersion}+fake' (it reaches '{branchNamespace.Root.Name}' with the integration of '{branch.Name}').") );
         }
         if( changes.Count > 0 )
         {
@@ -327,12 +330,6 @@ public sealed partial class HotZonePlugin
 
         using( monitor.OpenInfo( $"Moving {moved.Count} projects to '{targetRepo.DisplayPath}/{destinationFolder}'." ) )
         {
-            // The target's version first, while the working folders are clean (this may create an empty commit).
-            if( startVersion != null
-                && !_versionTag.BumpVersion( monitor, targetRepo, context.Committer, startVersion ) )
-            {
-                return false;
-            }
             // The move lands on the "dev/" branches: the working folders are still clean, the "dev/" branch is
             // created where it is missing (it may have been deleted as useless above) and checked out.
             foreach( var (r, hb) in hotBranches )
@@ -342,6 +339,14 @@ public sealed partial class HotZonePlugin
                 {
                     return false;
                 }
+            }
+            // The target's starting version, on its "dev/" branch while the working folders are clean (this may
+            // create an empty commit). Out of the root branch, it is a branch fake: it reaches the root branch with
+            // the integration of the branch, the root branch's versions are unchanged until then.
+            if( startVersion != null
+                && !_versionTag.BumpVersion( monitor, targetRepo, context.Committer, startVersion, hotBranches[targetRepo] ) )
+            {
+                return false;
             }
             // Moves the tracked files of the folders: the ignored files (build outputs, the state of a package manager,
             // a local setting...) are generated for their place, or are not ours to move. They stay where they are.

@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.ArtifactHandler.Plugin;
+using CKli.BranchModel.Plugin;
 using CKli.Core;
 using LibGit2Sharp;
 using System;
@@ -26,6 +27,7 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     BuildContentInfo? _buildContentInfo;
     DeprecatedTagInfo? _deprecatedInfo;
     TagCommit? _fakeVersion;
+    bool _isBranchFake;
 
     internal TagCommit( VersionTagInfo repoInfo,
                         SVersion version,
@@ -87,6 +89,57 @@ public sealed class TagCommit : IComparable<TagCommit>, IEquatable<TagCommit>, B
     /// Gets whether <see cref="IsFakeVersion"/> is true or an associated <see cref="FakeVersion"/> exists.
     /// </summary>
     public bool IsOrHasFakeVersion => _version.HasFakeMetadata || _fakeVersion != null;
+
+    /// <summary>
+    /// Gets whether this is a "+fake" that the root branch doesn't contain: it has been set on a hot branch
+    /// (typically by "ckli project move" on an "explo/" branch) and it is the starting version of the branches
+    /// that contain it only. It reaches the root branch with the integration of its branch.
+    /// <para>
+    /// A branch fake never is the <see cref="VersionTagInfo.HotZoneInfo.LastStable"/> and doesn't appear in the
+    /// <see cref="VersionTagInfo.LastStables"/>: it is the <see cref="TagCommitTree.Base"/> of the trees that contain it.
+    /// See <see cref="VersionTagInfo.BranchFakes"/>.
+    /// </para>
+    /// </summary>
+    public bool IsBranchFake => _isBranchFake;
+
+    internal void SetBranchFake()
+    {
+        Throw.DebugAssert( IsFakeVersion );
+        _isBranchFake = true;
+    }
+
+    const string _branchLinePrefix = "Branch: ";
+    const string _devBranchLinePrefix = "DevBranch: ";
+
+    /// <summary>
+    /// Gets the name of the branch on which this "+fake" has been set, when it records it: a branch fake created by
+    /// <see cref="VersionTagPlugin.BumpVersion"/> is an annotated tag whose message names its branch and its "dev/"
+    /// branch. Null for a lightweight "+fake" (a root fake, or one created by hand).
+    /// </summary>
+    public string? RecordedBranchName => ReadRecordedLine( _branchLinePrefix );
+
+    /// <summary>
+    /// Gets the name of the "dev/" branch of the <see cref="RecordedBranchName"/>. Null if not recorded.
+    /// </summary>
+    public string? RecordedDevBranchName => ReadRecordedLine( _devBranchLinePrefix );
+
+    string? ReadRecordedLine( string prefix )
+    {
+        if( !IsFakeVersion ) return null;
+        var message = _tag.Annotation?.Message;
+        if( message == null ) return null;
+        foreach( var line in message.Split( '\n' ) )
+        {
+            if( line.StartsWith( prefix, StringComparison.Ordinal ) )
+            {
+                var name = line.Substring( prefix.Length ).Trim();
+                return name.Length > 0 ? name : null;
+            }
+        }
+        return null;
+    }
+
+    internal static string CreateBranchFakeMessage( BranchName branch ) => $"{_branchLinePrefix}{branch.Name}\n{_devBranchLinePrefix}{branch.DevName}\n";
 
     /// <summary>
     /// Gets whether this version is a "building/" or "local/" one.

@@ -22,6 +22,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     [AllowNull] Dictionary<SVersion, TagCommit> _v2C;
     [AllowNull] Dictionary<string, TagCommit> _sha2C;
     [AllowNull] IReadOnlyList<Tag> _removableTags;
+    [AllowNull] IReadOnlyList<TagCommit> _branchFakes;
     HotZoneInfo? _hotZone;
     //
     // The +invalid tags are already handled, kept here but not used anymore:
@@ -51,6 +52,7 @@ public sealed partial class VersionTagInfo : RepoInfo
     internal void Initialize( HotZoneInfo? hotZone,
                               Dictionary<SVersion, TagCommit> v2c,
                               Dictionary<string, TagCommit> sha2c,
+                              IReadOnlyList<TagCommit> branchFakes,
                               List<Tag>? removableTags,
                               Dictionary<SVersion, (SVersion V, Tag T)>? invalidTags,
                               List<((SVersion V, Tag T) T1, (SVersion V, Tag T) T2, TagConflict C)>? tagConflicts,
@@ -60,6 +62,7 @@ public sealed partial class VersionTagInfo : RepoInfo
         _hotZone = hotZone;
         _v2C = v2c;
         _sha2C = sha2c;
+        _branchFakes = branchFakes;
         _removableTags = removableTags ?? [];
         _invalidTags = invalidTags;
         _tagConflicts = tagConflicts;
@@ -110,6 +113,9 @@ public sealed partial class VersionTagInfo : RepoInfo
     /// When this is empty, then <see cref="HotZone"/> is null and <see cref="HasIssue"/> is true.
     /// </para>
     /// <para>
+    /// The <see cref="BranchFakes"/> don't appear here.
+    /// </para>
+    /// <para>
     /// This can be updated when a TagCommit is removed or inserted.
     /// </para>
     /// </summary>
@@ -119,7 +125,7 @@ public sealed partial class VersionTagInfo : RepoInfo
         {
             if( _lastStables.IsDefault )
             {
-                _lastStables = _v2C.Values.Where( tc => tc.Version.IsStable ).Order().ToImmutableArray();
+                _lastStables = _v2C.Values.Where( tc => tc.Version.IsStable && !tc.IsBranchFake ).Order().ToImmutableArray();
                 Throw.DebugAssert( (_lastStables.Length >  0) == (_hotZone != null) );
             }
             return _lastStables;
@@ -193,6 +199,29 @@ public sealed partial class VersionTagInfo : RepoInfo
             }
             return null;
         }
+    }
+
+    /// <summary>
+    /// Gets the "+fake" versions that the root branch doesn't contain (see <see cref="TagCommit.IsBranchFake"/>).
+    /// <para>
+    /// They are the starting versions of the branches that contain them: they don't take part in the repository-wide
+    /// <see cref="HotZoneInfo.LastStable"/> and <see cref="LastStables"/>, they are the <see cref="TagCommitTree.Base"/>
+    /// of the trees that contain them. The integration of their branch into the root branch turns them into regular
+    /// (root) fakes.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<TagCommit> BranchFakes => _branchFakes;
+
+    /// <summary>
+    /// Gets whether <paramref name="ancestor"/> is <paramref name="commit"/> or one of its parents.
+    /// </summary>
+    /// <param name="r">The repository.</param>
+    /// <param name="ancestor">The candidate ancestor.</param>
+    /// <param name="commit">The commit.</param>
+    /// <returns>True if <paramref name="commit"/> contains <paramref name="ancestor"/>.</returns>
+    public static bool IsAncestorOrSelf( Repository r, Commit ancestor, Commit commit )
+    {
+        return ancestor.Sha == commit.Sha || r.ObjectDatabase.FindMergeBase( ancestor, commit )?.Sha == ancestor.Sha;
     }
 
     /// <summary>
@@ -680,7 +709,14 @@ public sealed partial class VersionTagInfo : RepoInfo
 
     TagCommit? FindBaseCommitByVersion( IActivityMonitor monitor, Commit buildCommit, SVersion version )
     {
-        TagCommit? baseCommit = null;
+        // A branch fake is the base of the versions it declares on the commits that contain it (the versions of
+        // the branch it has been set on). It is not in the LastStables: it is looked up first.
+        TagCommit? baseCommit = _branchFakes.FirstOrDefault( f => f.Version.SameStableAs( version )
+                                                                  && IsAncestorOrSelf( Repo.GitRepository.Repository, f.Commit, buildCommit ) );
+        if( baseCommit != null )
+        {
+            return baseCommit;
+        }
         if( version.Patch == 0 )
         {
             if( version.Minor == 0 )
