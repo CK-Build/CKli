@@ -97,7 +97,8 @@ sealed class PublishedProfileBuilder
 
     /// <summary>
     /// Gets the "local/" releases that must be published before the roadmap's own publication: the closure of
-    /// producers and consumers of every <see cref="PublishableStatus.IndirectPublishRequired"/> solution.
+    /// producers and consumers of every <see cref="PublishableStatus.IndirectPublishRequired"/> solution, without the
+    /// releases of the roadmap's own branch (its targets are published by the roadmap itself).
     /// Ordered producers first: a release can only be published once everything it consumes is on a feed.
     /// </summary>
     public ImmutableArray<RepoReleaseInfo> RequiredPublications => _requiredPublications;
@@ -337,6 +338,11 @@ sealed class PublishedProfileBuilder
             required.Add( info );
             foreach( var c in producers.Concat( consumers ) )
             {
+                // The consumers of a parent branch's release include the roadmap's own branch releases: they are
+                // not "from other branches". The roadmap's targets are published by the RoadmapPublisher (publishing
+                // them here too publishes them twice, and the second time fails because the first one removed their
+                // local artifacts), and an older unpublished release of the branch is superseded by its target.
+                if( c.Version.IsBuildingOrLocal() && roadmap.Graph.BranchName.Match( c.Version ) ) continue;
                 if( c.Version.IsLocal() ) required.Add( c );
                 else if( c.Version.IsBuilding() ) building.Add( c );
                 else
