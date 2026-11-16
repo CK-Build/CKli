@@ -128,19 +128,46 @@ function Remove-GlobalNuGetPackage
     }
 }
 
+# Gets the packages that "dotnet pack <solution> -c Debug" produced: only the pack output folder
+# ("<project>/bin/Debug/") of the solution's projects is read, test projects excluded.
+# The repository is NOT scanned recursively: the tests leave deep folders behind (CKli.Core.Tests'
+# "Cloned/" holds paths longer than MAX_PATH by design) that break a recursive Get-ChildItem.
+function Get-PackOutputPackages
+{
+    param(
+        [string] $SolutionPath,
+        [string] $Filter
+    )
+
+    $solutionDir = Split-Path $SolutionPath
+
+    [xml]$solution = Get-Content -LiteralPath $SolutionPath -Raw
+
+    $solution.SelectNodes( "//Project" ) |
+        ForEach-Object { $_.GetAttribute( "Path" ) } |
+        Where-Object { $_ -notmatch '^Tests[\\/]' } |
+        ForEach-Object {
+
+            $packOutput = Join-Path (Join-Path $solutionDir (Split-Path $_)) "bin/Debug"
+
+            if( Test-Path -LiteralPath $packOutput )
+            {
+                Get-ChildItem -LiteralPath $packOutput -File -Filter $Filter
+            }
+        }
+}
+
 function Publish-LocalPackage
 {
     param(
-        [string] $SearchRoot,
+        [string] $SolutionPath,
         [string] $PackageId,
         [string] $Version,
         [string] $LocalFeed
     )
 
-    $package = Get-ChildItem `
-        -Path $SearchRoot `
-        -Recurse `
-        -File `
+    $package = Get-PackOutputPackages `
+        -SolutionPath $SolutionPath `
         -Filter "$PackageId.$Version.nupkg" |
         Select-Object -First 1
 
@@ -250,7 +277,7 @@ try
     Invoke-Step "Publish CK.SVersion to local feed" {
 
         Publish-LocalPackage `
-            -SearchRoot (Split-Path $ckSVersionSolution) `
+            -SolutionPath $ckSVersionSolution `
             -PackageId "CK.SVersion" `
             -Version $version `
             -LocalFeed $localFeed
@@ -280,7 +307,7 @@ try
     Invoke-Step "Publish CK.Packaging.Abstractions to local feed" {
 
         Publish-LocalPackage `
-            -SearchRoot (Split-Path $ckPackagingSolution) `
+            -SolutionPath $ckPackagingSolution `
             -PackageId "CK.Packaging.Abstractions" `
             -Version $version `
             -LocalFeed $localFeed
@@ -315,15 +342,9 @@ try
 
     Invoke-Step "Populate local feed" {
 
-        Get-ChildItem `
-            -Path $scriptDir `
-            -Recurse `
-            -File `
-            -Filter "*.0.0.0-0.nupkg" |
-        Where-Object {
-            $_.FullName -match '[\\/]bin[\\/]Debug[\\/]' `
-            -and $_.FullName -notmatch '[\\/]Tests[\\/]'
-        } |
+        Get-PackOutputPackages `
+            -SolutionPath $ckliSolution `
+            -Filter "*.$version.nupkg" |
         ForEach-Object {
 
             Write-Host "Publishing $($_.Name)"
