@@ -535,7 +535,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             return Task.FromResult( false );
         }
         return dryRun
-                ? RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaxDoP )
+                ? RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaxDoP, runTest )
                 : DoRunAsync( monitor, context, vMaxDoP, runTest, buildImpacts, roadmap );
     }
 
@@ -560,9 +560,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return Task.FromResult( false );
         }
+        bool? runTest = forceTests ? true : null;
         return dryRun
-                ? RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaDxDop )
-                : DoRunAsync( monitor, context, vMaDxDop, runTest: forceTests ? true : null, buildImpacts, roadmap );
+                ? RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaDxDop, runTest )
+                : DoRunAsync( monitor, context, vMaDxDop, runTest, buildImpacts, roadmap );
     }
 
     async Task<bool> DoRunAsync( IActivityMonitor monitor, CKliEnv context, int vMaxDoP, bool? runTest, BuildImpacts buildImpacts, Roadmap roadmap )
@@ -574,10 +575,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             // succeeded: the roadmap is not complete, the RoadmapBuild event is not raised.
             return roadmap.IsStoppedAfterFocus;
         }
-        return await RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaxDoP ).ConfigureAwait( false );
+        return await RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaxDoP, runTest ).ConfigureAwait( false );
     }
 
-    async Task<bool> RaiseRoadmapBuildEvent( IActivityMonitor monitor, CKliEnv context, Roadmap roadmap, int maxDop )
+    async Task<bool> RaiseRoadmapBuildEvent( IActivityMonitor monitor, CKliEnv context, Roadmap roadmap, int maxDop, bool? runTest )
     {
         // Here, results.Length can be 0: everything was already built, we blindly raise the event,
         // it's up to the listeners to handle this (roadmap.SolutionBuildCount can be 0).
@@ -585,7 +586,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             using( monitor.OpenTrace( $"Raising RoadmapBuild event." ) )
             {
-                var e = new RoadmapBuildEventArgs( monitor, context, World, roadmap, maxDop );
+                var e = new RoadmapBuildEventArgs( monitor, context, World, roadmap, maxDop, runTest );
                 if( !await _onRoadmapBuild.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) || !e.Success )
                 {
                     return false;

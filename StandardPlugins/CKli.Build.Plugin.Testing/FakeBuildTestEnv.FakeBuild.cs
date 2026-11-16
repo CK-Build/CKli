@@ -108,9 +108,9 @@ public sealed partial class FakeBuildTestEnv
 
         // Instead of "dotnet test": tests always pass (the build plugin records the tested content once the
         // build succeeded). A test can simulate tests that change the working folder.
-        if( runTest )
+        if( runTest && !FakeTests( monitor, repo, buildInfo, declaring ) )
         {
-            declaring?.OnTest?.Invoke( repo.WorkingFolder );
+            return null;
         }
 
         // Same temporary output folder pattern as the real RepoBuilder.BuildAsync: on success, it belongs to
@@ -137,6 +137,40 @@ public sealed partial class FakeBuildTestEnv
         {
             if( output == null ) FileHelper.DeleteFolder( monitor, outputPath );
         }
+    }
+
+    /// <summary>
+    /// Fake <see cref="TestFunction"/>: the tests of an already built release (see <see cref="BuildPlugin.EnsureTestedAsync"/>).
+    /// Like the tests of <see cref="FakeBuildAsync"/>, they pass unless <see cref="FakeBuildRepo.FailTests"/> is set and
+    /// call <see cref="FakeBuildRepo.OnTest"/>.
+    /// </summary>
+    internal Task<bool> FakeTestAsync( IActivityMonitor monitor,
+                                       CKliEnv context,
+                                       VersionTagInfo versionInfo,
+                                       Commit testCommit,
+                                       RepoBuilder repoBuilder,
+                                       CommitBuildInfo buildInfo,
+                                       CancellationToken cancellation )
+    {
+        var repo = buildInfo.Repo;
+        using var gLog = monitor.OpenTrace( $"Fake tests for '{buildInfo}'." );
+        if( cancellation.IsCancellationRequested ) return Task.FromResult( false );
+        return Task.FromResult( FakeTests( monitor, repo, buildInfo, FindFakeBuildRepo( repo ) ) );
+    }
+
+    static bool FakeTests( IActivityMonitor monitor, Repo repo, CommitBuildInfo buildInfo, FakeBuildRepo? declaring )
+    {
+        if( declaring != null )
+        {
+            declaring.OnTestRun();
+            if( declaring.FailTests )
+            {
+                monitor.Error( RepoBuilder.DotNetTestFailedTag, $"Fake test failure requested by FakeBuildRepo.FailTests for '{buildInfo}'." );
+                return false;
+            }
+            declaring.OnTest?.Invoke( repo.WorkingFolder );
+        }
+        return true;
     }
 
     // A test declares things about a repository's fake build on its FakeBuildRepo (TransitivePackages,

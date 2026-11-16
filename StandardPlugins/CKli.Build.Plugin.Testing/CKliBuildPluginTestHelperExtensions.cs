@@ -37,9 +37,10 @@ public static partial class CKliBuildPluginTestHelperExtensions
         return new FakeBuildTestEnv( helper, wtfPath );
     }
 
-    internal static void OnDispose( BuilderFunction previous, IMonitorTestHelper helper )
+    internal static void OnDispose( BuilderFunction previous, TestFunction previousTest, IMonitorTestHelper helper )
     {
         BuildPlugin.SetBuilderFunction( previous );
+        BuildPlugin.SetTestFunction( previousTest );
         if( Interlocked.Decrement( ref _fileSystemWritePATCount ) == 0 )
         {
             helper.RemoveFileSystemWritePAT();

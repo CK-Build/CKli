@@ -21,6 +21,7 @@ public sealed partial class FakeBuildTestEnv : IDisposable
     readonly IMonitorTestHelper _helper;
     readonly NormalizedPath _path;
     readonly BuilderFunction _previous;
+    readonly TestFunction _previousTest;
     readonly GitFileProviderCache _fileProviderCache;
     int _disposed;
 
@@ -34,6 +35,7 @@ public sealed partial class FakeBuildTestEnv : IDisposable
         // tests create one at a time (and dispose it) so this is safe, but it is why the fake build is an
         // instance method: everything it reads (the FakeBuildRepo registry) belongs to the installed one.
         _previous = BuildPlugin.SetBuilderFunction( FakeBuildAsync );
+        _previousTest = BuildPlugin.SetTestFunction( FakeTestAsync );
     }
 
     /// <summary>
@@ -83,7 +85,7 @@ public sealed partial class FakeBuildTestEnv : IDisposable
     {
         if( Interlocked.Increment( ref _disposed ) == 1 )
         {
-            CKliBuildPluginTestHelperExtensions.OnDispose( _previous, _helper );
+            CKliBuildPluginTestHelperExtensions.OnDispose( _previous, _previousTest, _helper );
         }
     }
 

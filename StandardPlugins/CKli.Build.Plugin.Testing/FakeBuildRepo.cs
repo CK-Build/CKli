@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using CKli.Build.Plugin;
 
 namespace CKli;
 
@@ -123,6 +125,25 @@ public sealed partial class FakeBuildRepo
     /// ran on the content of the built commit). Defaults to null.
     /// </summary>
     public Action<NormalizedPath>? OnTest { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether this repository's fake tests must fail. Defaults to false.
+    /// <para>
+    /// This applies to the tests that a build runs and to the ones that a publication runs on an already built
+    /// release (see <see cref="BuildPlugin.EnsureTestedAsync"/>). Like <see cref="FailBuild"/>, this is settable
+    /// back to false.
+    /// </para>
+    /// </summary>
+    public bool FailTests { get; set; }
+
+    /// <summary>
+    /// Gets the number of times the fake tests of this repository have run (by a build or by a publication).
+    /// </summary>
+    public int TestRunCount => _testRunCount;
+
+    int _testRunCount;
+
+    internal void OnTestRun() => Interlocked.Increment( ref _testRunCount );
 
     /// <summary>
     /// Gets the <see cref="InitialVersion"/> or throws if this repository has been created without one:

@@ -688,6 +688,28 @@ across CKli invocations on the same machine. `ckli world lts create` **moves** i
 `$Local/@ltsName/` folder (a creation step of `RepositoryBuilderPlugin`'s `CreateLTS` handler): the LTS World is the
 one that keeps the code those tests ran on.
 
+#### `EnsureTestedAsync`: nothing is published untested
+
+`CoreBuildAsync` only tests what a roadmap **builds**. A `publish` that follows a `build --skip-tests` has nothing to
+build ("No repositories need to be built"): it would publish releases whose tests never ran. So before publishing
+anything, `PublishPlugin.OnRoadmapBuildAsync` calls `BuildPlugin.EnsureTestedAsync` on the releases the publication
+carries but the roadmap did not build: the direct `PublishRequired` ones and the `Gate.RequiredPublications` from other
+branches. The ones this roadmap built have already run their tests, so they are not tested again, even with
+`--force-tests`.
+
+- A release whose content is not in the test-run cache (all of them with `--force-tests`) is checked out, built and
+  tested by the injected `TestFunction` (`RealTestAsync` → `RepoBuilder.TestAsync`: `nuget.config`, `OnCoreBuild`,
+  then `DotNetBuildTest`, which is `DotNetBuildTestPack` without the pack). There's no pack, no `GenerateAssets` and
+  no tag: the release's artifacts already exist and are not touched. Its content is then recorded with `SetTestRun`.
+  What the tests change in the working folder is only reported (the release can't change anymore), then reset.
+- Repositories are tested in parallel (`--max-dop`), the releases of one repository one after the other, while the
+  publication lease is kept alive. A failure stops the publication before anything is pushed.
+- `--skip-tests` on `publish` skips this step and warns with the list of untested releases it publishes. A
+  `--dry-run` lists the releases whose tests the publication will run.
+- The fake harness installs `FakeTestAsync` (`BuildPlugin.SetTestFunction`). `FakeBuildRepo.FailTests` fails the fake
+  tests (of a build or of a publication), and `FakeBuildRepo.TestRunCount` counts them
+  (`Plugins.Tests/PublishTestRunTests`).
+
 ### `fix build` / `fix publish`: the Fix Workflow
 
 `BuildPlugin.Fix.cs` builds a `FixWorkflow` (owned by `CKli.HotZone.Plugin`, loaded via `FixWorkflow.Load(monitor, World,

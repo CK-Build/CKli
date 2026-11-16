@@ -6,6 +6,7 @@ using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -125,40 +126,9 @@ public class RepoBuilder : RepoInfo
         Throw.CheckState( "Repository must not be dirty when calling build.", !Repo.GitRepository.GetSimpleStatusInfo().IsDirty );
         Throw.CheckArgument( buildInfo.Repo == Repo );
 
-        // Calling "dotnet build --source <localFeed>" fails with:
-        //      error NU1100: Unable to resolve 'CKt.Core (>= 1.0.0)' for 'net8.0'.
-        //      PackageSourceMapping is enabled, the following source( s ) were not considered: <localFeed>
-        //
-        // Even when nuget.config doesn't contain any <packageSourceMapping>...
-        // 
-        // Before building, we modify the nuget.config (this helper ensures that <packageSourceMapping> exists
-        // with all the existing sources plus the one we add).
-        //
-        monitor.Trace( "Add the local feed to the 'nuget.config' file." );
-        var nugetConfigPath = Repo.WorkingFolder.AppendPart( "nuget.config" );
-        // The modified file is restored after the build: it must not appear among the impacts of the build.
-        var originalNuGetConfig = File.Exists( nugetConfigPath ) ? File.ReadAllBytes( nugetConfigPath ) : null;
-
-        var configRoot = NuGetHelper.GetConfigurationRoot( monitor, nugetConfigPath );
-        if( configRoot == null ) return null;
-
-        var localFeed = _repoArtifact.LocalFeedNuGetPath;
-        if( !NuGetHelper.SetOrRemoveNuGetSource( monitor, configRoot, "local-feed", localFeed ) )
+        if( !PrepareNuGetConfig( monitor, context, out var nugetConfigPath, out var originalNuGetConfig, out var configRoot ) )
         {
             return null;
-        }
-
-        if( !_artifactHandler.ApplyConfiguredNuGetFeeds( monitor, configRoot, out var actions, context.SecretsStore ) )
-        {
-            return null;
-        }
-
-        if( actions != null )
-        {
-            monitor.Warn( $"""
-                The 'nuget.config' file must be updated ({nugetConfigPath}):
-                {actions.Concatenate( Environment.NewLine )}
-                """ );
         }
 
         if( cancellation.IsCancellationRequested ) return null;
@@ -206,17 +176,116 @@ public class RepoBuilder : RepoInfo
                 FileHelper.DeleteFolder( monitor, outputPath );
             }
         }
+    }
 
-        static void RestoreNuGetConfig( NormalizedPath nugetConfigPath, byte[]? originalNuGetConfig )
+    /// <summary>
+    /// Builds the repository and runs its tests, without packaging nor generating the Deployment assets: this is
+    /// what runs the tests of an already built release (its artifacts exist and must not be touched).
+    /// <para>
+    /// The <see cref="RepositoryBuilderPlugin.OnCoreBuild"/> event is raised as for any build (with a true
+    /// <see cref="CoreBuildEventArgs.RunTest"/>): a hook that sets an <see cref="CoreBuildEventArgs.OutputHook"/>
+    /// has built and tested the repository, its output is discarded.
+    /// </para>
+    /// <para>
+    /// The "nuget.config" file is restored but the working folder is left as the build and the tests left it: the
+    /// caller resets it. The test run is recorded by the build plugin.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">Minimal CKli context.</param>
+    /// <param name="buildInfo">The build info of the release.</param>
+    /// <param name="cancellation">Cancellation token.</param>
+    /// <returns>True if the tests succeeded, false otherwise.</returns>
+    public async Task<bool> TestAsync( IActivityMonitor monitor,
+                                       CKliEnv context,
+                                       CommitBuildInfo buildInfo,
+                                       CancellationToken cancellation )
+    {
+        Throw.CheckState( "Repository must not be dirty when calling test.", !Repo.GitRepository.GetSimpleStatusInfo().IsDirty );
+        Throw.CheckArgument( buildInfo.Repo == Repo );
+
+        if( !PrepareNuGetConfig( monitor, context, out var nugetConfigPath, out var originalNuGetConfig, out var configRoot ) )
         {
-            if( originalNuGetConfig == null )
+            return false;
+        }
+
+        if( cancellation.IsCancellationRequested ) return false;
+
+        // A hook of the OnCoreBuild event may write its output here: it is always deleted.
+        var outputPath = FileUtil.CreateUniqueTimedFolder( Path.GetTempPath() + "CKliTest", null, DateTime.UtcNow );
+        try
+        {
+            try
             {
-                if( File.Exists( nugetConfigPath ) ) File.Delete( nugetConfigPath );
+                XmlHelper.SafeSave( configRoot, nugetConfigPath, SaveOptions.DisableFormatting );
+                var (success, hooked) = await _repositoryBuilder.RaiseOnCoreBuildAsync( monitor, context, buildInfo, outputPath, runTest: true, cancellation ).ConfigureAwait( false );
+                if( !success ) return false;
+                if( hooked != null ) return true;
+                return DotNetBuildTest( monitor, buildInfo, cancellation ) && !cancellation.IsCancellationRequested;
             }
-            else
+            finally
             {
-                File.WriteAllBytes( nugetConfigPath, originalNuGetConfig );
+                RestoreNuGetConfig( nugetConfigPath, originalNuGetConfig );
             }
+        }
+        finally
+        {
+            FileHelper.DeleteFolder( monitor, outputPath );
+        }
+    }
+
+    // Calling "dotnet build --source <localFeed>" fails with:
+    //      error NU1100: Unable to resolve 'CKt.Core (>= 1.0.0)' for 'net8.0'.
+    //      PackageSourceMapping is enabled, the following source( s ) were not considered: <localFeed>
+    //
+    // Even when nuget.config doesn't contain any <packageSourceMapping>...
+    //
+    // Before building, we modify the nuget.config (this helper ensures that <packageSourceMapping> exists
+    // with all the existing sources plus the one we add). The caller saves the configRoot and restores the
+    // original file after the build: it must not appear among the impacts of the build.
+    bool PrepareNuGetConfig( IActivityMonitor monitor,
+                             CKliEnv context,
+                             out NormalizedPath nugetConfigPath,
+                             out byte[]? originalNuGetConfig,
+                             [NotNullWhen( true )] out XElement? configRoot )
+    {
+        monitor.Trace( "Add the local feed to the 'nuget.config' file." );
+        nugetConfigPath = Repo.WorkingFolder.AppendPart( "nuget.config" );
+        originalNuGetConfig = File.Exists( nugetConfigPath ) ? File.ReadAllBytes( nugetConfigPath ) : null;
+
+        configRoot = NuGetHelper.GetConfigurationRoot( monitor, nugetConfigPath );
+        if( configRoot == null ) return false;
+
+        var localFeed = _repoArtifact.LocalFeedNuGetPath;
+        if( !NuGetHelper.SetOrRemoveNuGetSource( monitor, configRoot, "local-feed", localFeed ) )
+        {
+            return false;
+        }
+
+        if( !_artifactHandler.ApplyConfiguredNuGetFeeds( monitor, configRoot, out var actions, context.SecretsStore ) )
+        {
+            return false;
+        }
+
+        if( actions != null )
+        {
+            monitor.Warn( $"""
+                The 'nuget.config' file must be updated ({nugetConfigPath}):
+                {actions.Concatenate( Environment.NewLine )}
+                """ );
+        }
+        return true;
+    }
+
+    static void RestoreNuGetConfig( NormalizedPath nugetConfigPath, byte[]? originalNuGetConfig )
+    {
+        if( originalNuGetConfig == null )
+        {
+            if( File.Exists( nugetConfigPath ) ) File.Delete( nugetConfigPath );
+        }
+        else
+        {
+            File.WriteAllBytes( nugetConfigPath, originalNuGetConfig );
         }
     }
 
@@ -321,6 +390,42 @@ public class RepoBuilder : RepoInfo
             monitor.Error( DotNetPackFailedTag, $"Dotnet pack fails for '{buildInfo.Repo.DisplayPath}'." );
         }
         // Cancellation has no error message.
+        return false;
+    }
+
+    /// <summary>
+    /// Helper that calls <see cref="DotNetBuild"/> and <see cref="DotNetTest"/>: this is <see cref="DotNetBuildTestPack"/>
+    /// without the pack, used by <see cref="TestAsync"/>.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="buildInfo">The build information.</param>
+    /// <param name="cancellation">The cancellation token to consider.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    protected virtual bool DotNetBuildTest( IActivityMonitor monitor,
+                                            CommitBuildInfo buildInfo,
+                                            CancellationToken cancellation )
+    {
+        bool buildSuccess = true;
+        bool testSuccess = true;
+        if( !cancellation.IsCancellationRequested
+            && (buildSuccess = DotNetBuild( monitor,
+                                            buildInfo.Version,
+                                            buildInfo.InformationalVersion,
+                                            buildInfo.FileVersion,
+                                            buildInfo.ReleaseConfiguration,
+                                            cancellation ))
+            && (testSuccess = DotNetTest( monitor, buildInfo.ReleaseConfiguration, cancellation )) )
+        {
+            return true;
+        }
+        if( !buildSuccess )
+        {
+            monitor.Error( DotNetBuildFailedTag, $"Dotnet build fails for '{buildInfo.Repo.DisplayPath}'." );
+        }
+        else if( !testSuccess )
+        {
+            monitor.Error( DotNetTestFailedTag, $"Dotnet test fails for '{buildInfo.Repo.DisplayPath}'." );
+        }
         return false;
     }
 
