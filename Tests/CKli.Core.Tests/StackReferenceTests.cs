@@ -206,6 +206,48 @@ public class StackReferenceTests
     }
 
     /// <summary>
+    /// The url of a Stack can have any casing: "/one-stack" and "/One-Stack" are the same Stack. A reference
+    /// cloned from a lowercase url has the Stack's actual name, and the same Stack referenced again with another
+    /// casing is recognized as already handled by this clone (not as a Stack cloned elsewhere).
+    /// </summary>
+    [Test]
+    public async Task reference_urls_are_case_insensitive_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+        var withIssues = TestEnv.OpenRemotes( "WithIssues" );
+
+        var oneLowerCase = new Uri( one.StackUri.AbsoluteUri.Replace( "/One-Stack", "/one-stack", StringComparison.Ordinal ) );
+        // Note that on Windows, Uri.Equals is case insensitive for a "file:" url (not for a "https:" one): these
+        // file system remotes cannot show the CloneState comparers' difference there, but they do on Linux.
+        oneLowerCase.AbsoluteUri.ShouldNotBe( one.StackUri.AbsoluteUri );
+
+        // CKt -> one-stack, WithIssues; WithIssues -> One-Stack.
+        ArrangeStack( context, ckt.StackUri, "CKt",
+                      git => SetReferences( git.WorkingFolder.AppendPart( "CKt.xml" ),
+                                            $"""<Reference Url="{oneLowerCase}" />""",
+                                            $"""<Reference Url="{withIssues.StackUri}" />""" ) );
+        ArrangeStack( context, withIssues.StackUri, "WithIssues",
+                      git => SetReferences( git.WorkingFolder.AppendPart( "WithIssues.xml" ),
+                                            $"""<Reference Url="{one.StackUri}" />""" ) );
+
+        StackRepository.ClearRegistry( TestHelper.Monitor ).ShouldBeTrue();
+        var target = context.ChangeDirectory( "Target" );
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, target, "clone", ckt.StackUri )).ShouldBeTrue();
+            logs.ShouldContain( $"Reference to the default world of '{one.StackUri}' has already been handled." );
+            logs.ShouldNotContain( l => l.StartsWith( $"Referenced Stack '{one.StackUri}' is already cloned here:" ) );
+        }
+        Directory.EnumerateDirectories( target.CurrentDirectory )
+                 .Select( Path.GetFileName )
+                 .Order( StringComparer.Ordinal )
+                 .ToArray()
+                 .ShouldBe( ["CKt", "One", "WithIssues"], customMessage: "The Stack cloned from 'one-stack' has its actual name." );
+    }
+
+    /// <summary>
     /// Clones a Stack remote directly (into an "Arrange/" folder), applies an edit to its working
     /// folder and pushes it: this is how a &lt;Reference /&gt; reaches a remote that "ckli clone" then reads.
     /// </summary>

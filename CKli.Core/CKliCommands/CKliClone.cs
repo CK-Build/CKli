@@ -41,14 +41,30 @@ sealed class CKliClone : Command
         /// <summary>
         /// The (url,LTSName) worlds that have been handled: a reference cycle (or a Stack referenced
         /// twice for the same world) is handled once. This is what bounds the recursion.
+        /// <para>
+        /// The url can have any casing ("/ck-stack" and "/CK-Stack" are the same Stack): it is compared
+        /// case insensitively, as the Stack registry does.
+        /// </para>
         /// </summary>
-        public readonly HashSet<(Uri Url, string? LTSName)> HandledWorlds = new();
+        public readonly HashSet<(Uri Url, string? LTSName)> HandledWorlds = new( HandledWorldComparer.Instance );
 
         /// <summary>
         /// The <see cref="StackRepository.StackRoot"/> of the Stacks that THIS command has cloned. A Stack
         /// that was found already cloned elsewhere on this machine is not here: it is left as-is.
+        /// The url is compared case insensitively.
         /// </summary>
-        public readonly Dictionary<Uri, NormalizedPath> ClonedStacks = new();
+        public readonly Dictionary<Uri, NormalizedPath> ClonedStacks = new( GitRepositoryKey.OrdinalIgnoreCaseUrlEqualityComparer );
+
+        sealed class HandledWorldComparer : IEqualityComparer<(Uri Url, string? LTSName)>
+        {
+            public static readonly HandledWorldComparer Instance = new();
+
+            public bool Equals( (Uri Url, string? LTSName) x, (Uri Url, string? LTSName) y )
+                => x.LTSName == y.LTSName && GitRepositoryKey.OrdinalIgnoreCaseUrlEqualityComparer.Equals( x.Url, y.Url );
+
+            public int GetHashCode( (Uri Url, string? LTSName) obj )
+                => HashCode.Combine( GitRepositoryKey.OrdinalIgnoreCaseUrlEqualityComparer.GetHashCode( obj.Url ), obj.LTSName );
+        }
     }
 
     internal CKliClone()

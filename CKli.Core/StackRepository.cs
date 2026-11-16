@@ -1517,12 +1517,25 @@ public sealed partial class StackRepository : IDisposable
     static bool GetActualStackName( IActivityMonitor monitor, GitRepository gitStack, string stackNameFromUrl, [NotNullWhen( true )] out string? actualStackName )
     {
         actualStackName = null;
-        var definitionFilePath = gitStack.WorkingFolder.AppendPart( $"{stackNameFromUrl}.xml" );
-        if( !File.Exists( definitionFilePath ) )
+        // The url can have any casing ("/ck-stack" for a "CK" Stack): the file is looked up case insensitively,
+        // a case sensitive file system would otherwise miss "CK.xml" when looking for "ck.xml".
+        string? definitionFilePath = null;
+        try
+        {
+            definitionFilePath = Directory.EnumerateFiles( gitStack.WorkingFolder, "*.xml" )
+                                          .FirstOrDefault( f => Path.GetFileNameWithoutExtension( f ).Equals( stackNameFromUrl, StringComparison.OrdinalIgnoreCase ) );
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While looking for the default World definition file '{stackNameFromUrl}.xml'.", ex );
+            return false;
+        }
+        if( definitionFilePath == null )
         {
             monitor.Error( $"The expected default World definition file '{stackNameFromUrl}.xml' is missing at the root of the Stack repository." );
             return false;
         }
+        var fileStackName = Path.GetFileNameWithoutExtension( definitionFilePath );
         try
         {
             using var r = XmlReader.Create( definitionFilePath );
@@ -1542,6 +1555,16 @@ public sealed partial class StackRepository : IDisposable
                     """ );
                 return false;
 
+            }
+            // The World is later loaded from "{StackName}.xml": on a case sensitive file system, a file
+            // whose name differs in casing from its root element would not be found.
+            if( fileStackName != actualStackName )
+            {
+                monitor.Error( $"""
+                    The default World definition file '{fileStackName}.xml' has a root element named '{actualStackName}'.
+                    The file must be named '{actualStackName}.xml': this Stack repository is not valid.
+                    """ );
+                return false;
             }
             return true;
         }
