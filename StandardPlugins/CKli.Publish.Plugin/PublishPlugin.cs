@@ -441,25 +441,24 @@ public sealed class PublishPlugin : PrimaryPluginBase
                 var publish = PublishRoadmap.Create( e.Monitor, roadmap, _versionTag );
                 if( publish != null )
                 {
+                    // Nothing is published untested: a publication has no "--skip-tests".
+                    Throw.DebugAssert( e.RunTest != false );
                     // Always displays the verdict (this is the only output of a --dry-run). Mirroring how a
                     // PublishableStatus.BuildingPending roadmap is handled, a --dry-run only reports: it is the real
                     // publication that fails when the gate is closed.
-                    e.Screen.Display( s => publish.ToRenderable( s, _branchModel.BranchNamespace ) );
-                    if( roadmap.DryRun )
-                    {
-                        if( e.RunTest != false )
-                        {
-                            var untested = _build.GetUntestedReleases( monitor, GetReleasesToTest( publish ) );
-                            if( untested.Count > 0 )
-                            {
-                                monitor.Info( ScreenType.ScreenTag, $"""
-                                    {untested.Count} release(s) to publish have never been tested: the publication will run their tests.
-                                    {untested.Select( r => $"  {r.Repo.DisplayPath}/v{r.Version}" ).Concatenate( Environment.NewLine )}
-                                    """ );
-                            }
-                        }
-                    }
-                    else
+                    // The roadmap's rows show the tests of the direct releases, the required releases of the parent
+                    // branches show theirs: they are tested if they have never been (or with "--force-tests").
+                    var untestedRequired = e.RunTest == true
+                                            ? null
+                                            : _build.GetUntestedReleases( monitor, GetRequiredReleases( publish ) )
+                                                    .Select( r => (r.Repo, r.Version) )
+                                                    .ToHashSet();
+                    e.Screen.Display( s => publish.ToRenderable( s,
+                                                                 _branchModel.BranchNamespace,
+                                                                 r => untestedRequired == null || untestedRequired.Contains( (r.Repo, r.Version) )
+                                                                        ? TestStatus.WillTest
+                                                                        : TestStatus.Tested ) );
+                    if( !roadmap.DryRun )
                     {
                         if( !publish.CanPublish )
                         {
@@ -482,36 +481,22 @@ public sealed class PublishPlugin : PrimaryPluginBase
                             return;
                         }
                         // Nothing is published untested: the releases that this roadmap did not build (they have
-                        // been built before, possibly with "--skip-tests") run their tests now, unless "--skip-tests"
-                        // is specified. The tests work in the Repos and never touch the Stack repository, which is
-                        // what makes the concurrent renewal of the lease legal.
-                        if( e.RunTest != false )
+                        // been built before, possibly with "--skip-tests") run their tests now. The tests work in the
+                        // Repos and never touch the Stack repository, which is what makes the concurrent renewal of
+                        // the lease legal.
+                        var tests = _build.EnsureTestedAsync( e.Monitor,
+                                                              e.Context,
+                                                              GetReleasesToTest( publish ),
+                                                              forceTests: e.RunTest == true,
+                                                              e.MaxDop,
+                                                              cancellation );
+                        if( !(lease != null
+                                ? await lease.KeepAliveWhileAsync( monitor, tests ).ConfigureAwait( false )
+                                : await tests.ConfigureAwait( false )) )
                         {
-                            var tests = _build.EnsureTestedAsync( e.Monitor,
-                                                                  e.Context,
-                                                                  GetReleasesToTest( publish ),
-                                                                  forceTests: e.RunTest == true,
-                                                                  e.MaxDop,
-                                                                  cancellation );
-                            if( !(lease != null
-                                    ? await lease.KeepAliveWhileAsync( monitor, tests ).ConfigureAwait( false )
-                                    : await tests.ConfigureAwait( false )) )
-                            {
-                                monitor.Error( "Unable to publish: the tests of a release failed. Fix them, or use '--skip-tests' to publish anyway." );
-                                e.SetFailed();
-                                return;
-                            }
-                        }
-                        else
-                        {
-                            var untested = _build.GetUntestedReleases( monitor, GetReleasesToTest( publish ) );
-                            if( untested.Count > 0 )
-                            {
-                                monitor.Warn( $"""
-                                    Publishing {untested.Count} release(s) that have never been tested (--skip-tests):
-                                    {untested.Select( r => $"  {r.Repo.DisplayPath}/v{r.Version}" ).Concatenate( Environment.NewLine )}
-                                    """ );
-                            }
+                            monitor.Error( "Unable to publish: the tests of a release failed. Nothing is published untested: fix them." );
+                            e.SetFailed();
+                            return;
                         }
                         var packageSender = PackageSender.Create( monitor, _artifactHandler, _branchModel, e.Context.SecretsStore );
                         if( packageSender == null )
@@ -573,21 +558,28 @@ public sealed class PublishPlugin : PrimaryPluginBase
     }
 
     // The releases that the publication carries but that the roadmap did not build: the direct ones that were
-    // already built ("PublishRequired") and the required releases from other branches. The ones the roadmap built
-    // ran their tests in this build (unless "--skip-tests"): they are not tested again, even with "--force-tests".
+    // already built ("PublishRequired", their TestStatus is WillTest or Tested) and the required releases from
+    // other branches. The ones the roadmap built ran their tests in this build: they are not tested again, even
+    // with "--force-tests".
     static IEnumerable<BuildPlugin.ReleaseCommit> GetReleasesToTest( PublishRoadmap publish )
     {
         foreach( var s in publish.Roadmap.OrderedSolutions )
         {
             if( s.PublishableStatus == PublishableStatus.PublishRequired )
             {
+                Throw.DebugAssert( s.TestStatus is TestStatus.WillTest or TestStatus.Tested );
                 yield return new BuildPlugin.ReleaseCommit( s.Repo, s.LastBuild.Version, s.LastBuild.TagCommit.Commit );
             }
         }
-        foreach( var release in publish.Gate.RequiredPublications )
+        foreach( var r in GetRequiredReleases( publish ) )
         {
-            yield return new BuildPlugin.ReleaseCommit( release.Repo, release.Version, release.TagCommit.Commit );
+            yield return r;
         }
+    }
+
+    static IEnumerable<BuildPlugin.ReleaseCommit> GetRequiredReleases( PublishRoadmap publish )
+    {
+        return publish.Gate.RequiredPublications.Select( r => new BuildPlugin.ReleaseCommit( r.Repo, r.Version, r.TagCommit.Commit ) );
     }
 
 }

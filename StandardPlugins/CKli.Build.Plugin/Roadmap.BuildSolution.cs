@@ -25,6 +25,7 @@ public sealed partial class Roadmap
         HotGraph.SolutionVersionInfo.LastBuiltVersion _lastBuild;
         int _buildNumber;
         PublishableStatus _publishable;
+        TestStatus _testStatus;
         bool _isOutOfFocus;
 
         internal BuildSolution( Roadmap roadmap, HotGraph.Solution solution, HotGraph.SolutionVersionInfo versionInfo )
@@ -551,6 +552,30 @@ public sealed partial class Roadmap
                                             && !_lastBuild.TagCommit.IsBuildingOrLocal
                                             && _lastBuild.TagCommit.CI0VersionTag == null;
 
+        /// <summary>
+        /// Gets the tests of this solution once the roadmap is done.
+        /// </summary>
+        public TestStatus TestStatus => _testStatus;
+
+        // A built solution runs its tests unless "--skip-tests" (a new commit or a tested one: we don't care).
+        // The others run them with "--with-tests" when they are in its scope: a publication only tests what it
+        // publishes and a "--focus" that stops after the focus doesn't test the solutions out of it.
+        internal void InitializeTestStatus( Func<BuildSolution, bool> hasTestRun, bool? runTest, bool withTests )
+        {
+            if( MustBuild )
+            {
+                _testStatus = runTest == false ? TestStatus.Skipped : TestStatus.WillTest;
+                return;
+            }
+            bool tested = hasTestRun( this );
+            bool inScope = withTests
+                           && (!_roadmap.MustPublish || _publishable == PublishableStatus.PublishRequired)
+                           && (!_roadmap.StopAfterFocus || _solution.IsPivot || _solution.IsPivotUpstream);
+            _testStatus = inScope && (runTest == true || !tested)
+                            ? TestStatus.WillTest
+                            : tested ? TestStatus.Tested : TestStatus.Untested;
+        }
+
         internal IRenderable ToRenderable(  ref BuildIndexAndRankDisplayState head, ref RStats stats )
         {
             IRenderable r = head.MoveNext( _buildNumber > 0, marginRight: 0 );
@@ -558,6 +583,7 @@ public sealed partial class Roadmap
             {
                 r = r.AddRight( _solution.ToPivotPrefixRenderable( head.Screen, marginLeft: 1 ) );
             }
+            r = r.AddRight( _testStatus.ToRenderable( head.Screen ).Box( marginLeft: 1 ) );
 
             var statusAndName = Repo.ToNameRenderable( head.Screen, willBeWritten: MustBuild );
             r = r.AddRight( statusAndName );

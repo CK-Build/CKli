@@ -98,7 +98,7 @@ public sealed partial class BuildPlugin
                                                  [Description( "Run tests even if they have already run successfully on this commit." )]
                                                  bool forceTests = false )
     {
-        if( !HandleForceSkipTests( monitor, skipTests, forceTests, out bool? runTest ) )
+        if( !HandleForceSkipTests( monitor, skipTests, forceTests, withTests: false, out bool? runTest ) )
         {
             return false;
         }

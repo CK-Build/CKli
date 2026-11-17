@@ -37,8 +37,9 @@ public sealed class RoadmapBuildEventArgs : BuildBaseEventArgs
     /// Gets the tests option of the command: null by default (the tests run when they never ran on the content),
     /// false for "--skip-tests" and true for "--force-tests".
     /// <para>
-    /// This applies to the builds and to the publication: by default, a release that is published but has not been
-    /// built by this roadmap must have been tested (see <see cref="BuildPlugin.EnsureTestedAsync"/>).
+    /// This applies to the builds and to the publication. A publication is never "--skip-tests" (this is never false):
+    /// a release that is published but has not been built by this roadmap must have been tested
+    /// (see <see cref="BuildPlugin.EnsureTestedAsync"/>).
     /// </para>
     /// </summary>
     public bool? RunTest => _runTest;

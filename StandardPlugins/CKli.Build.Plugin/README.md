@@ -110,8 +110,9 @@ All build-family commands share a common set of options (declared once as `const
 | `--max-dop <n>` (positional `maxDop`) | Maximal degree of parallelism for the build and, for `publish`/`*publish`, for the publication (see [the parallel publication](../CKli.Publish.Plugin/README.md#the-parallel-publication-step-3)). Defaults to 4. |
 | `--regular` | Build regular exploratory/prerelease/stable versions instead of CI (`dev/` branch) versions. **The build commands are in CI by default**: this flag is what asks for the integrating, releasing mode. |
 | `--ci.0` | Forces a CI version even when a *published* regular version is already available on the commit. It is not needed to switch a pending `local/` release to CI - a plain CI build rolls that one (see `RollingLocal` below). Exclusive with `--regular`, which asks for the opposite. |
-| `skipTests` | Don't run tests even if they never ran locally on the commit (ignored - with a warning - for `--regular` builds). |
+| `skipTests` | `build` and `*build` only. Don't run tests even if they never ran locally on the commit (ignored - with a warning - for `--regular` builds). A publication has no `--skip-tests`: nothing is published untested (see [below](#ensuretestedasync-nothing-is-published-untested)). |
 | `forceTests` | Run tests even if they already ran successfully on the commit. Mutually exclusive with `skipTests`. |
+| `withTests` | `build` and `*build` only. Also run the tests of the repositories that are **not** built when they never ran on their current commit (all of them with `--force-tests`) - see [below](#build---with-tests-and-the-tests-column). Mutually exclusive with `skipTests`. A publication always behaves this way on what it publishes. |
 | `--dry-run,-d` | Only compute and display the roadmap; no build/publish is performed (`OnRoadmapBuild` is still raised, with `Roadmap.DryRun == true`). |
 | `all` | Consider all Repos of the World as pivots, not only the ones reachable from the current directory. |
 | `--focus` | `build` only. The pivots' upstreams are built too, the pivots are built before anything else, the build stops once they are built (or at the first failure) - see [below](#build---focus-working-in-a-pivot-and-its-upstreams). CI only: exclusive with `--regular`. |
@@ -523,6 +524,8 @@ than with two implementations that agree today:
 | The pivot marker | `HotGraph.Solution.ToPivotPrefixRenderable` (`CKli.HotZone.Plugin`) | How the repository relates to the [pivots](#the-roadmap-computing-what-to-build). |
 | The name | `Repo.ToNameRenderable` (`CKli.Core`) | The `DisplayPath`, linked to the working folder, preceded by `✱` when the repository is dirty. Its inner half, `Repo.ToInlineNameRenderable`, is the same without the alignment gutter, for inline lists of repositories. |
 
+A roadmap row adds the [tests column](#build---with-tests-and-the-tests-column) between the two.
+
 The marker has nine cases, all exactly **3 columns wide** - so a column of them aligns with no table layout
 involved - and it is displayed only when `HotGraph.HasPivots` is true. When it is false every repository is
 (or is not) a pivot, so the three flags are all false and the whole column is dropped rather than marking
@@ -704,11 +707,35 @@ branches. The ones this roadmap built have already run their tests, so they are 
   What the tests change in the working folder is only reported (the release can't change anymore), then reset.
 - Repositories are tested in parallel (`--max-dop`), the releases of one repository one after the other, while the
   publication lease is kept alive. A failure stops the publication before anything is pushed.
-- `--skip-tests` on `publish` skips this step and warns with the list of untested releases it publishes. A
-  `--dry-run` lists the releases whose tests the publication will run.
+- A publication has no `--skip-tests`: this step always runs. The roadmap's tests column shows the direct releases
+  it tests (`T`) and the "Also publishing ... from parent branches" list of the gate shows the same glyph in front
+  of each required release.
 - The fake harness installs `FakeTestAsync` (`BuildPlugin.SetTestFunction`). `FakeBuildRepo.FailTests` fails the fake
   tests (of a build or of a publication), and `FakeBuildRepo.TestRunCount` counts them
   (`Plugins.Tests/PublishTestRunTests`).
+
+#### `build --with-tests` and the tests column
+
+`CoreBuildAsync` only tests what a roadmap builds, so after a `build --skip-tests` a plain `build` (that has
+nothing to build) leaves the skipped tests unrun. `--with-tests` makes `build`/`*build` call the same
+`EnsureTestedAsync` on the roadmap's solutions that are not built and whose current commit (the last build's
+`TagCommit`) never ran its tests - on all of them with `--force-tests`. This runs once the builds succeeded (or once
+a `--focus` stopped after its focus, restricted to the pivots and their upstreams). A publication never needs it: it
+tests what it publishes on its own (above).
+
+Every roadmap row has a one-character **tests column** (`Roadmap.BuildSolution.TestStatus`, computed by
+`Roadmap.Create` once the `PublishableStatus` are known, rendered by `TestStatusExtensions.ToRenderable`):
+
+| Glyph | `TestStatus` | Meaning |
+|---|---|---|
+| `T` (black on cyan) | `WillTest` | This command runs the tests: a built row (the default), a row that is not built but in the scope of `--with-tests` (a publication: the `PublishRequired` rows) and never tested, or any such row with `--force-tests`. |
+| `✓` | `Tested` | Not built and already tested on its commit. |
+| `?` | `Untested` | Not built, never tested, and this command doesn't test it. Outside of a publication, the roadmap's summary suggests `--with-tests`. |
+| `✗` | `Skipped` | Built with `--skip-tests`: the new version is untested. |
+
+A built row is `T` even if its build commit happens to have been tested already (the build then skips its tests):
+the column says what the command guarantees, not what it will actually execute.
+`Plugins.Tests/BuildWithTestsTests` covers the column and the option.
 
 ### `fix build` / `fix publish`: the Fix Workflow
 

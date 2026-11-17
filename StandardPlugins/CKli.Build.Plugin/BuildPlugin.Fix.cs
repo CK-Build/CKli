@@ -37,7 +37,7 @@ public sealed partial class BuildPlugin
                                      [Description( "Force a rebuild." )]
                                      bool rebuild = false )
     {
-        if( !HandleForceSkipTests( monitor, skipTests, forceTests, out bool? runTest )
+        if( !HandleForceSkipTests( monitor, skipTests, forceTests, withTests: false, out bool? runTest )
             || !FixWorkflow.Load( monitor, World, out var workflow ) )
         {
             return Task.FromResult( false );

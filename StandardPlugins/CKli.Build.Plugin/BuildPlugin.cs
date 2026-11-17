@@ -9,6 +9,7 @@ using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -52,6 +53,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     const string _oCIForce = "--ci.0";
     const string _dSkipTests = "Don't run tests even if they have never locally run on the commit.";
     const string _dForceTests = "Run tests even if they have already run successfully on the commit.";
+    const string _dWithTests = """
+                               Also run the tests of the repositories that are not built when they have never run on their
+                               current commit (with '--force-tests', the tests of all of them run).
+                               """;
     const string _dDryRun = "Only display the build roadmap.";
     const string _oDryRun = "--dry-run,-d";
     const string _dBuildImpacts = """
@@ -258,6 +263,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="ciForce"></param>
     /// <param name="skipTests"></param>
     /// <param name="forceTests"></param>
+    /// <param name="withTests"></param>
     /// <param name="dryRun"></param>
     /// <param name="all"></param>
     /// <param name="focus"></param>
@@ -286,6 +292,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                   bool skipTests = false,
                                   [Description( _dForceTests )]
                                   bool forceTests = false,
+                                  [Description( _dWithTests )]
+                                  bool withTests = false,
                                   [Description( _dDryRun )]
                                   [OptionName(_oDryRun)]
                                   bool dryRun = false,
@@ -324,12 +332,16 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             return Task.FromResult( false );
         }
         return regular
-            ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: false, vBuildImpacts )
-            : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: false, vBuildImpacts, focus, continueOnSuccess );
+            ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, dryRun, isPullBuild: false, publish: false, vBuildImpacts )
+            : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, ciForce, dryRun, isPullBuild: false, publish: false, vBuildImpacts, focus, continueOnSuccess );
     }
 
     /// <summary>
     /// Extends build by publishing the build artefacts on success.
+    /// <para>
+    /// Nothing is published untested: there is no "--skip-tests" and the releases that are published but not built
+    /// run their tests if they never ran on their commit (as with "--with-tests").
+    /// </para>
     /// </summary>
     /// <param name="monitor"></param>
     /// <param name="context"></param>
@@ -337,7 +349,6 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="maxDop"></param>
     /// <param name="regular"></param>
     /// <param name="ciForce"></param>
-    /// <param name="skipTests"></param>
     /// <param name="forceTests"></param>
     /// <param name="dryRun"></param>
     /// <param name="all"></param>
@@ -358,8 +369,6 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                     [Description( _dCIForce )]
                                     [OptionName(_oCIForce)]
                                     bool ciForce = false,
-                                    [Description( _dSkipTests )]
-                                    bool skipTests = false,
                                     [Description( _dForceTests )]
                                     bool forceTests = false,
                                     [Description( _dDryRun )]
@@ -370,8 +379,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     {
         if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
         return UnderPublishLockAsync( monitor, dryRun, () => regular
-          ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: false, publish: true, BuildImpacts.Error )
-          : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: false, publish: true, BuildImpacts.Error ) );
+          ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, dryRun, isPullBuild: false, publish: true, BuildImpacts.Error )
+          : DoCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, ciForce, dryRun, isPullBuild: false, publish: true, BuildImpacts.Error ) );
     }
 
     /// <summary>
@@ -385,6 +394,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="ciForce"></param>
     /// <param name="skipTests"></param>
     /// <param name="forceTests"></param>
+    /// <param name="withTests"></param>
     /// <param name="dryRun"></param>
     /// <param name="all"></param>
     /// <returns></returns>
@@ -414,6 +424,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                       bool skipTests = false,
                                       [Description( _dForceTests )]
                                       bool forceTests = false,
+                                      [Description( _dWithTests )]
+                                      bool withTests = false,
                                       [Description( _dDryRun )]
                                       [OptionName(_oDryRun)]
                                       bool dryRun = false,
@@ -426,12 +438,12 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             return Task.FromResult( false );
         }
         return regular
-         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: false, vBuildImpacts )
-         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: false, vBuildImpacts );
+         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, dryRun, isPullBuild: true, publish: false, vBuildImpacts )
+         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, ciForce, dryRun, isPullBuild: true, publish: false, vBuildImpacts );
     }
 
     /// <summary>
-    /// "Upstream Build" and publish artefacts on success.
+    /// "Upstream Build" and publish artefacts on success. Nothing is published untested (see <see cref="PublishAsync"/>).
     /// </summary>
     /// <param name="monitor"></param>
     /// <param name="context"></param>
@@ -439,7 +451,6 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     /// <param name="maxDop"></param>
     /// <param name="regular"></param>
     /// <param name="ciForce"></param>
-    /// <param name="skipTests"></param>
     /// <param name="forceTests"></param>
     /// <param name="dryRun"></param>
     /// <param name="all"></param>
@@ -463,8 +474,6 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                         [Description( _dCIForce )]
                                         [OptionName(_oCIForce)]
                                         bool ciForce = false,
-                                        [Description( _dSkipTests )]
-                                        bool skipTests = false,
                                         [Description( _dForceTests )]
                                         bool forceTests = false,
                                         [Description( _dDryRun )]
@@ -475,8 +484,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     {
         if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
         return UnderPublishLockAsync( monitor, dryRun, () => regular
-         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, dryRun, isPullBuild: true, publish: true, BuildImpacts.Error )
-         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, ciForce, dryRun, isPullBuild: true, publish: true, BuildImpacts.Error ) );
+         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, dryRun, isPullBuild: true, publish: true, BuildImpacts.Error )
+         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, ciForce, dryRun, isPullBuild: true, publish: true, BuildImpacts.Error ) );
     }
 
     // "--build-impacts <commit|discard>": no value is BuildImpacts.Error.
@@ -516,6 +525,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                           bool all,
                           bool skipTests,
                           bool forceTests,
+                          bool withTests,
                           bool ciForce,
                           bool dryRun,
                           bool isPullBuild,
@@ -525,11 +535,11 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                           bool continueOnSuccess = false )
     {
         if( !ParseInteger( monitor, "--max-dop", maxDop, out var vMaxDoP, 4 )
-            || !HandleForceSkipTests( monitor, skipTests, forceTests, out bool? runTest ) )
+            || !HandleForceSkipTests( monitor, skipTests, forceTests, withTests, out bool? runTest ) )
         {
             return Task.FromResult( false );
         }
-        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all, dryRun, focus, continueOnSuccess );
+        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all, dryRun, runTest, withTests, focus, continueOnSuccess );
         if( roadmap == null )
         {
             return Task.FromResult( false );
@@ -546,6 +556,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                              bool all,
                              bool skipTests,
                              bool forceTests,
+                             bool withTests,
                              bool dryRun,
                              bool isPullBuild,
                              bool publish,
@@ -555,12 +566,16 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             monitor.Info( ScreenType.ScreenTag, $"The --skip-tests option is ignored when building a regular version ('{_oRegular}')." );
         }
-        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.Regular, mustPublish: publish, branch, all, dryRun );
+        // "--skip-tests" is ignored: only the "--force-tests" and "--with-tests" combination is checked.
+        if( !HandleForceSkipTests( monitor, skipTests: false, forceTests, withTests, out bool? runTest ) )
+        {
+            return Task.FromResult( false );
+        }
+        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.Regular, mustPublish: publish, branch, all, dryRun, runTest, withTests );
         if( roadmap == null || !ParseInteger( monitor, "--max-dop", maxDop, out var vMaDxDop, 4 ) )
         {
             return Task.FromResult( false );
         }
-        bool? runTest = forceTests ? true : null;
         return dryRun
                 ? RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaDxDop, runTest )
                 : DoRunAsync( monitor, context, vMaDxDop, runTest, buildImpacts, roadmap );
@@ -569,11 +584,30 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     async Task<bool> DoRunAsync( IActivityMonitor monitor, CKliEnv context, int vMaxDoP, bool? runTest, BuildImpacts buildImpacts, Roadmap roadmap )
     {
         var results = await roadmap.BuildAsync( monitor, context, this, runTest, buildImpacts, vMaxDoP, PrimaryPluginContext.Cancellation ).ConfigureAwait( false );
+        if( results == null && !roadmap.IsStoppedAfterFocus )
+        {
+            return false;
+        }
+        // "--with-tests": the solutions that are not built and must be tested (their TestStatus says so). A
+        // publication tests what it publishes itself (with the releases of the parent branches) while it
+        // holds the publication lock: the Publish plugin calls EnsureTestedAsync.
+        if( !roadmap.MustPublish )
+        {
+            var toTest = roadmap.OrderedSolutions
+                                .Where( s => !s.MustBuild && s.TestStatus == TestStatus.WillTest )
+                                .Select( s => new ReleaseCommit( s.Repo, s.LastBuild.Version, s.LastBuild.TagCommit.Commit ) )
+                                .ToList();
+            if( toTest.Count > 0
+                && !await EnsureTestedAsync( monitor, context, toTest, forceTests: runTest == true, vMaxDoP, PrimaryPluginContext.Cancellation ).ConfigureAwait( false ) )
+            {
+                return false;
+            }
+        }
         if( results == null )
         {
             // A "--focus" build that stopped after the successful builds of the pivots and their upstreams
             // succeeded: the roadmap is not complete, the RoadmapBuild event is not raised.
-            return roadmap.IsStoppedAfterFocus;
+            return true;
         }
         return await RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaxDoP, runTest ).ConfigureAwait( false );
     }
@@ -608,6 +642,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                        string? branch,
                                        bool all,
                                        bool dryRun,
+                                       bool? runTest,
+                                       bool withTests,
                                        bool focus = false,
                                        bool continueOnSuccess = false )
     {
@@ -665,7 +701,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         }
         var roadmap = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish, dryRun,
                                       focus,
-                                      stopAfterFocus: focus && !continueOnSuccess );
+                                      stopAfterFocus: focus && !continueOnSuccess,
+                                      s => _repoBuilder.Get( monitor, s.Repo ).HasTestRun( monitor, s.LastBuild.TagCommit.Commit ),
+                                      runTest,
+                                      withTests );
         if( roadmap != null  )
         {
             context.Screen.Display( roadmap.ToRenderable );
@@ -676,9 +715,14 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         string GetBranchName( IActivityMonitor monitor, Repo r ) => _branchModel.BranchNamespace.RemoveDevPrefix( r.GitStatus.CurrentBranchName, out _ );
     }
 
-    static bool HandleForceSkipTests( IActivityMonitor monitor, bool skipTests, bool forceTests, out bool? runTest )
+    static bool HandleForceSkipTests( IActivityMonitor monitor, bool skipTests, bool forceTests, bool withTests, out bool? runTest )
     {
         runTest = null;
+        if( withTests && skipTests )
+        {
+            monitor.Error( $"Invalid flags combination: --skip-tests and --with-tests cannot be both specified." );
+            return false;
+        }
         if( forceTests )
         {
             if( skipTests )

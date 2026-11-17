@@ -383,18 +383,19 @@ sealed class PublishedProfileBuilder
     /// <summary>
     /// Renders the verdict: null when there is nothing to say.
     /// </summary>
-    internal IRenderable? ToRenderable( ScreenType screen, Roadmap roadmap, BranchNamespace branches )
+    internal IRenderable? ToRenderable( ScreenType screen, Roadmap roadmap, BranchNamespace branches, Func<RepoReleaseInfo, TestStatus> requiredTestStatus )
     {
         IRenderable? r = null;
         if( !_requiredPublications.IsEmpty )
         {
             // The publication order (producers first) is irrelevant to the reader: what matters is that releases
-            // of other branches are published by this command.
+            // of other branches are published by this command. Each one shows its tests, as the roadmap's rows do.
             r = Add( r, Releases( screen,
                                   screen.Text( $"Also publishing {Count( _requiredPublications.Length )} from parent branches:", TextEffect.Italic ),
                                   _requiredPublications,
                                   branches,
-                                  indent: 0 ) );
+                                  indent: 0,
+                                  requiredTestStatus ) );
         }
         if( !_alreadyPublishedAliens.IsEmpty )
         {
@@ -442,18 +443,36 @@ sealed class PublishedProfileBuilder
 
         // One row per branch, in the branch model order (the root first), the releases keeping their order in a row.
         // A TextBlock trims its content: the indentation is a Box margin.
+        // With a testStatus, each release is preceded by its TestStatus glyph.
         static IRenderable Releases( ScreenType screen,
                                      IRenderable header,
                                      ImmutableArray<RepoReleaseInfo> releases,
                                      BranchNamespace branches,
-                                     int indent )
+                                     int indent,
+                                     Func<RepoReleaseInfo, TestStatus>? testStatus = null )
         {
             var rows = releases.GroupBy( release => branches.Find( release.Version ) )
                                .OrderBy( g => g.Key?.Index ?? int.MaxValue )
                                .Select( g => screen.Text( g.Key?.Name ?? g.First().Version.BranchName ?? "?" )
                                                    .Box( marginLeft: indent + 2, marginRight: 2 )
-                                                   .AddRight( screen.Text( g.Select( release => release.ToString() ).Concatenate( ", " ) ) ) );
+                                                   .AddRight( testStatus == null
+                                                                ? screen.Text( g.Select( release => release.ToString() ).Concatenate( ", " ) )
+                                                                : WithTests( screen, g.ToList(), testStatus ) ) );
             return header.Box( marginLeft: indent ).AddBelow( screen.Unit.AddBelow( rows ).TableLayout() );
+        }
+
+        // "T X-Core/v1.0.0, ✓ X-Util/v2.1.0": a TextBlock trims its content, the spaces are Box margins.
+        static IRenderable WithTests( ScreenType screen, List<RepoReleaseInfo> releases, Func<RepoReleaseInfo, TestStatus> testStatus )
+        {
+            IRenderable r = screen.Unit;
+            for( int i = 0; i < releases.Count; ++i )
+            {
+                var release = releases[i];
+                bool last = i == releases.Count - 1;
+                r = r.AddRight( testStatus( release ).ToRenderable( screen ).Box( marginRight: 1 ),
+                                screen.Text( last ? release.ToString() : release + "," ).Box( marginRight: last ? 0 : 1 ) );
+            }
+            return r;
         }
     }
 

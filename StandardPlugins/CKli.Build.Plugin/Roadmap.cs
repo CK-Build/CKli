@@ -45,6 +45,8 @@ public sealed partial class Roadmap
     PublishableStatus _publishable;
     bool? _buildSuccess;
     bool _isStoppedAfterFocus;
+    bool _withTests;
+    int _untestedCount;
 
     Roadmap( HotGraph graph,
              HotGraph.PackageUpdater packageUpdater,
@@ -94,7 +96,10 @@ public sealed partial class Roadmap
                                      bool mustPublish,
                                      bool dryRun,
                                      bool focus,
-                                     bool stopAfterFocus )
+                                     bool stopAfterFocus,
+                                     Func<BuildSolution, bool> hasTestRun,
+                                     bool? runTest,
+                                     bool withTests )
     {
 
         // Refactor this?...
@@ -136,7 +141,19 @@ public sealed partial class Roadmap
         {
             return null;
         }
+        roadmap.InitializeTestStatus( hasTestRun, runTest, withTests );
         return roadmap;
+    }
+
+    // Once the PublishableStatus are known (a publication only tests what it publishes).
+    void InitializeTestStatus( Func<BuildSolution, bool> hasTestRun, bool? runTest, bool withTests )
+    {
+        _withTests = withTests;
+        foreach( var s in _orderedSolutions )
+        {
+            s.InitializeTestStatus( hasTestRun, runTest, withTests );
+            if( s.TestStatus == TestStatus.Untested ) _untestedCount++;
+        }
     }
 
     /// <summary>
@@ -392,7 +409,8 @@ public sealed partial class Roadmap
                             int directPublishCount,
                             int ciForceCandidateCount,
                             int afterFocusCount,
-                            IEnumerable<BuildSolution> buildingPending )
+                            IEnumerable<BuildSolution> buildingPending,
+                            int untestedCount )
     {
         IRenderable? _uDepHead;
         IRenderable? _cDepHead;
@@ -492,6 +510,13 @@ public sealed partial class Roadmap
                 }
             }
 
+            if( untestedCount > 0 )
+            {
+                r = r.AddBelow( screen.Text( untestedCount > 1
+                                                ? $"({untestedCount} repositories that are not built have never been tested: use '--with-tests' to test them.)"
+                                                : "(1 repository that is not built has never been tested: use '--with-tests' to test it.)",
+                                             TextEffect.Italic ) );
+            }
             if( isPublish && publishableStatus is PublishableStatus.BuildingPending )
             {
                 r = r.AddBelow( screen.Text( $"⚠ Publish blocked by unsuccessful build: '{buildingPending.Select( s => $"{s.Repo.DisplayPath}/v{s.LastBuild.Version}" ).Concatenate("', '")}'.", foreColor: ConsoleColor.Red ) );
@@ -536,7 +561,9 @@ public sealed partial class Roadmap
                                 _stopAfterFocus
                                     ? _orderedSolutions.Count( s => s.MustBuild && !s.Solution.IsPivot && !s.Solution.IsPivotUpstream )
                                     : 0,
-                                _buildSolutions.Where( s => s.PublishableStatus == PublishableStatus.BuildingPending ) );
+                                _buildSolutions.Where( s => s.PublishableStatus == PublishableStatus.BuildingPending ),
+                                // A publication doesn't test what it doesn't publish: "--with-tests" is not the answer.
+                                _mustPublish || _withTests ? 0 : _untestedCount );
         var renderables = ImmutableArray.CreateBuilder<IRenderable>( _orderedSolutions.Length );
 
         var indexAndRank = new BuildIndexAndRankDisplayState( screen,

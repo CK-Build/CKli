@@ -62,9 +62,12 @@ sealed class PublishRoadmap
     /// </summary>
     public IEnumerable<Roadmap.BuildSolution> DirectAlreadyPublished => _roadmap.OrderedSolutions.Where( s => s.PublishableStatus == PublishableStatus.AlreadyPublished );
 
-    internal IRenderable ToRenderable( ScreenType screen, BranchNamespace branches )
+    /// <param name="screen">The screen type.</param>
+    /// <param name="branches">The branch namespace.</param>
+    /// <param name="requiredTestStatus">The tests of the required releases from the parent branches.</param>
+    internal IRenderable ToRenderable( ScreenType screen, BranchNamespace branches, Func<RepoReleaseInfo, TestStatus> requiredTestStatus )
     {
-        return _gate.ToRenderable( screen, _roadmap, branches ) ?? screen.Unit;
+        return _gate.ToRenderable( screen, _roadmap, branches, requiredTestStatus ) ?? screen.Unit;
     }
 
     /// <param name="lease">
