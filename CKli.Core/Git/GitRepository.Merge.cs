@@ -55,16 +55,57 @@ public sealed partial class GitRepository
                                       MergeSidesAligner? aligner,
                                       out IReadOnlyList<string> conflicts )
     {
+        return PredictMerge( monitor, target, other, aligner, out conflicts, out _ );
+    }
+
+    /// <summary>
+    /// Predicts the merge of <paramref name="other"/> into <paramref name="target"/> (see
+    /// <see cref="PredictMerge(IActivityMonitor, Commit, Commit, MergeSidesAligner?, out IReadOnlyList{string})"/>)
+    /// and the content it results in: the <paramref name="target"/>'s content when <see cref="MergeOutcome.UpToDate"/>,
+    /// the <paramref name="other"/>'s one for a <see cref="MergeOutcome.FastForward"/> and the merged content for a
+    /// <see cref="MergeOutcome.Merge"/>. Without aligner, this is the content that
+    /// <see cref="MergeBranchContent(IActivityMonitor, ref Branch, Commit)"/> leaves on a branch whose tip is
+    /// <paramref name="target"/>.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="target">The commit that receives the merge (the tip of the target branch).</param>
+    /// <param name="other">The commit to merge.</param>
+    /// <param name="aligner">The optional aligner of the two sides, called only when the merge conflicts.</param>
+    /// <param name="conflicts">Outputs the paths that would be in conflict when the outcome is <see cref="MergeOutcome.Conflict"/>.</param>
+    /// <param name="result">Outputs the resulting content, null for a <see cref="MergeOutcome.Conflict"/> or <see cref="MergeOutcome.Failed"/>.</param>
+    /// <returns>The outcome.</returns>
+    public MergeOutcome PredictMerge( IActivityMonitor monitor,
+                                      Commit target,
+                                      Commit other,
+                                      MergeSidesAligner? aligner,
+                                      out IReadOnlyList<string> conflicts,
+                                      out Tree? result )
+    {
         conflicts = [];
-        var d = _git.ObjectDatabase.CalculateHistoryDivergence( other, target );
-        if( d.AheadBy is 0 ) return MergeOutcome.UpToDate;
-        if( d.BehindBy is 0 ) return MergeOutcome.FastForward;
-        // Same content: no merge is needed (see MergeBranchContent), unless other brings a tagged commit.
-        if( target.Tree.Sha == other.Tree.Sha ) return BringsTaggedCommit( target, other ) ? MergeOutcome.Merge : MergeOutcome.UpToDate;
+        result = null;
+        var kind = GetMergeKind( target, other, skipSameContent: true );
+        if( kind == MergeOutcome.UpToDate )
+        {
+            result = target.Tree;
+            return kind;
+        }
+        if( kind == MergeOutcome.FastForward )
+        {
+            result = other.Tree;
+            return kind;
+        }
+        // An empty merge commit for a tagged commit brought with the same content: nothing to compute.
+        if( target.Tree.Sha == other.Tree.Sha )
+        {
+            result = target.Tree;
+            return MergeOutcome.Merge;
+        }
         var merge = MergeTrees( monitor, target, other, aligner, mustResolveAll: false );
         if( merge.Failed ) return MergeOutcome.Failed;
         conflicts = merge.Conflicts;
-        return conflicts.Count == 0 ? MergeOutcome.Merge : MergeOutcome.Conflict;
+        if( conflicts.Count > 0 ) return MergeOutcome.Conflict;
+        result = merge.Tree;
+        return MergeOutcome.Merge;
     }
 
     /// <summary>

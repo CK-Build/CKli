@@ -992,6 +992,28 @@ public sealed partial class GitRepository : IDisposable
         return DoMergeBranch( monitor, ref branch, commit, skipSameContent: true );
     }
 
+    // The single decision of every merge of "other" into "target" (MergeBranch, MergeBranchContent, PredictMerge):
+    // - UpToDate when "other" is already reachable from "target" or, with skipSameContent, when the two have
+    //   diverged with the same content and "other" brings no tagged commit (no empty merge commit is created).
+    // - FastForward when "target" is behind "other". The history comes first: a fast-forward creates no commit, so it
+    //   is never skipped, even when the two tips have the same content. Skipping it would leave the commits of "other"
+    //   out of the branch: a "dev/" branch holding only a "Producing 'vX' from unchanged head." commit would be
+    //   integrated without it and then deleted, orphaning the version tag it carries.
+    // - Merge otherwise: a merge commit is needed (it is empty when the two have the same content).
+    MergeOutcome GetMergeKind( Commit target, Commit other, bool skipSameContent )
+    {
+        var d = _git.ObjectDatabase.CalculateHistoryDivergence( other, target );
+        if( d?.AheadBy is 0 ) return MergeOutcome.UpToDate;
+        if( d?.BehindBy is 0 ) return MergeOutcome.FastForward;
+        // Unless "other" brings a tagged commit: like a fast-forward, skipping it would leave the version tag out of
+        // the target's history.
+        if( skipSameContent && target.Tree.Sha == other.Tree.Sha && !BringsTaggedCommit( target, other ) )
+        {
+            return MergeOutcome.UpToDate;
+        }
+        return MergeOutcome.Merge;
+    }
+
     // True when a commit reachable from "other" but not from "target" carries a tag: merging "other" is then
     // required even when the content is the same, otherwise the tag is not in the target's history.
     internal bool BringsTaggedCommit( Commit target, Commit other )
@@ -1078,28 +1100,12 @@ public sealed partial class GitRepository : IDisposable
                                           string trackedName,
                                           bool skipSameContent )
         {
-            // The history comes first: a fast-forward creates no commit, so it is never skipped, even when the
-            // two tips have the same content. Skipping it would leave the commits of otherTip out of the branch:
-            // a "dev/" branch holding only a "Producing 'vX' from unchanged head." commit would be integrated
-            // without it and then deleted, orphaning the version tag it carries.
-            var div = git.Repository.ObjectDatabase.CalculateHistoryDivergence( branch.Tip, otherTip );
-            if( div?.BehindBy is 0 )
+            switch( git.GetMergeKind( branch.Tip, otherTip, skipSameContent ) )
             {
-                // No-op: otherTip is already reachable from branch.
-                return branch.Tip;
-            }
-            if( div?.AheadBy is 0 )
-            {
+                // No-op: otherTip is already reachable from branch, or there is no content to merge.
+                case MergeOutcome.UpToDate: return branch.Tip;
                 // Fast-forward "branch" to "otherTip".
-                return otherTip;
-            }
-            // The two have diverged. When skipSameContent is true, we don't create an empty merge commit,
-            // unless otherTip brings a tagged commit: like a fast-forward, skipping it would leave the version
-            // tag out of the branch's history.
-            if( skipSameContent && branch.Tip.Tree.Sha == otherTip.Tree.Sha && !git.BringsTaggedCommit( branch.Tip, otherTip ) )
-            {
-                // No-op: there is no content to merge.
-                return branch.Tip;
+                case MergeOutcome.FastForward: return otherTip;
             }
             // This creates a merge commit, even if the two tips have the same content (the merge commit
             // is then empty) when skipSameContent is false.

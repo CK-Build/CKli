@@ -380,11 +380,19 @@ public partial class GitRepositoryTests
 
         // Bob "ckli pull": there's no conflict here but a merged commit is created.
         bob.FetchRemoteBranches( TestHelper.Monitor, withTags: false ).ShouldBeTrue();
+        // The merged content is predicted without merging anything.
+        bob.PredictMerge( TestHelper.Monitor,
+                          bob.Repository.Branches["test-1"].Tip,
+                          bob.Repository.Branches["origin/test-1"].Tip,
+                          null,
+                          out _,
+                          out var predicted ).ShouldBe( MergeOutcome.Merge );
         bob.MergeRemoteBranches( TestHelper.Monitor ).ShouldBeTrue();
         // ==> AROBAS here:
         bobBranch = bob.Repository.Branches["test-1"];
         bobBranch.IsTracking.ShouldBeTrue();
         bobBranch.Tip.Sha.ShouldNotBe( bob.Repository.Branches["origin/test-1"].Tip.Sha );
+        predicted.ShouldNotBeNull().Sha.ShouldBe( bobBranch.Tip.Tree.Sha );
 
         // Bob pushes test-1 (autoCreateRemoteBranch can be true or false because the branch is tracking).
         bob.PushBranch( TestHelper.Monitor, bobBranch, autoCreateRemoteBranch: false ).ShouldBeTrue();
@@ -438,8 +446,10 @@ public partial class GitRepositoryTests
         // be integrated without it). This is checked on another branch: "master" is left to the pull.
         {
             var content = bob.Repository.Branches.Add( "content-check", bobMaster.Tip );
+            bob.PredictMerge( TestHelper.Monitor, content.Tip, bobMaster.TrackedBranch.Tip, null, out _, out var predicted ).ShouldBe( MergeOutcome.FastForward );
             bob.MergeBranchContent( TestHelper.Monitor, ref content, bobMaster.TrackedBranch ).ShouldBeTrue();
             content.Tip.Sha.ShouldBe( bobMaster.TrackedBranch.Tip.Sha, "Fast-forwarded." );
+            predicted.ShouldNotBeNull().Sha.ShouldBe( content.Tip.Tree.Sha );
             bob.Repository.Branches.Remove( content );
             bob.Repository.Head.Tip.Sha.ShouldBe( bobMaster.Tip.Sha );
         }
@@ -467,7 +477,8 @@ public partial class GitRepositoryTests
             var before = content;
             bob.MergeBranchContent( TestHelper.Monitor, ref content, bobMaster.TrackedBranch ).ShouldBeTrue();
             content.ShouldBeSameAs( before, "Nothing done: the branch has not been rewritten." );
-            bob.PredictMerge( TestHelper.Monitor, content.Tip, bobMaster.TrackedBranch.Tip, null, out _ ).ShouldBe( MergeOutcome.UpToDate );
+            bob.PredictMerge( TestHelper.Monitor, content.Tip, bobMaster.TrackedBranch.Tip, null, out _, out var predicted ).ShouldBe( MergeOutcome.UpToDate );
+            predicted.ShouldNotBeNull().Sha.ShouldBe( content.Tip.Tree.Sha );
             bob.Repository.Branches.Remove( content );
         }
 
@@ -476,10 +487,11 @@ public partial class GitRepositoryTests
         {
             var tag = bob.Repository.Tags.Add( "v1.0.0", timLast );
             var content = bob.Repository.Branches.Add( "content-check", bobMaster.Tip );
-            bob.PredictMerge( TestHelper.Monitor, content.Tip, bobMaster.TrackedBranch.Tip, null, out _ ).ShouldBe( MergeOutcome.Merge );
+            bob.PredictMerge( TestHelper.Monitor, content.Tip, bobMaster.TrackedBranch.Tip, null, out _, out var predicted ).ShouldBe( MergeOutcome.Merge );
             bob.MergeBranchContent( TestHelper.Monitor, ref content, bobMaster.TrackedBranch ).ShouldBeTrue();
             content.Tip.Parents.Select( p => p.Sha ).ShouldBe( [bobLast.Sha, timLast.Sha] );
             content.Tip.Tree.Sha.ShouldBe( bobLast.Tree.Sha );
+            predicted.ShouldNotBeNull().Sha.ShouldBe( content.Tip.Tree.Sha );
             bob.Repository.Branches.Remove( content );
             bob.Repository.Tags.Remove( tag );
         }
