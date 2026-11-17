@@ -78,10 +78,17 @@ public class RepoBuilder : RepoInfo
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="commit">The commit.</param>
     /// <returns>True if the tests have already successfully run, false otherwise.</returns>
-    public bool HasTestRun( IActivityMonitor monitor, Commit commit )
+    public bool HasTestRun( IActivityMonitor monitor, Commit commit ) => HasTestRun( monitor, commit.Tree );
+
+    /// <summary>
+    /// Checks whether tests has already successfully run on a content.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="tree">The content.</param>
+    /// <returns>True if the tests have already successfully run, false otherwise.</returns>
+    public bool HasTestRun( IActivityMonitor monitor, Tree tree )
     {
-        string testKey = commit.Tree.Sha;
-        return _repositoryBuilder._shaTestRunCache.Contains( monitor, testKey );
+        return _repositoryBuilder._shaTestRunCache.Contains( monitor, tree.Sha );
     }
 
     /// <summary>

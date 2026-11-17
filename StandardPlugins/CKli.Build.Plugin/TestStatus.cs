@@ -10,13 +10,15 @@ namespace CKli.Build.Plugin;
 public enum TestStatus
 {
     /// <summary>
-    /// Not built: the tests have already run successfully on the commit's content.
+    /// The tests have already run successfully on the content: a repository that is not built or a built one
+    /// whose build doesn't change its content (no dependency update: a code change only, for instance).
     /// </summary>
     Tested,
 
     /// <summary>
-    /// The command runs the tests: a built repository (unless "--skip-tests"), an untested repository that is not
-    /// built with "--with-tests" (or any of them with "--force-tests") or a release to publish.
+    /// The command runs the tests: a built repository whose content has never been tested (any of them with
+    /// "--force-tests") unless "--skip-tests", an untested repository that is not built with "--with-tests"
+    /// (or any of them with "--force-tests") or a release to publish.
     /// </summary>
     WillTest,
 

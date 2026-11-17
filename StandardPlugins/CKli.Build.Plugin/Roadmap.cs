@@ -4,6 +4,7 @@ using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
+using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -97,7 +98,7 @@ public sealed partial class Roadmap
                                      bool dryRun,
                                      bool focus,
                                      bool stopAfterFocus,
-                                     Func<BuildSolution, bool> hasTestRun,
+                                     Func<Repo, Tree, bool> hasTestRun,
                                      bool? runTest,
                                      bool withTests )
     {
@@ -141,19 +142,31 @@ public sealed partial class Roadmap
         {
             return null;
         }
-        roadmap.InitializeTestStatus( hasTestRun, runTest, withTests );
+        roadmap.InitializeTestStatus( monitor, hasTestRun, runTest, withTests );
         return roadmap;
     }
 
     // Once the PublishableStatus are known (a publication only tests what it publishes).
-    void InitializeTestStatus( Func<BuildSolution, bool> hasTestRun, bool? runTest, bool withTests )
+    void InitializeTestStatus( IActivityMonitor monitor, Func<Repo, Tree, bool> hasTestRun, bool? runTest, bool withTests )
     {
         _withTests = withTests;
         foreach( var s in _orderedSolutions )
         {
-            s.InitializeTestStatus( hasTestRun, runTest, withTests );
+            s.InitializeTestStatus( monitor, hasTestRun, runTest, withTests );
             if( s.TestStatus == TestStatus.Untested ) _untestedCount++;
         }
+    }
+
+    /// <summary>
+    /// Gets the releases that this roadmap doesn't build and whose tests must run: the solutions that are not built
+    /// and whose <see cref="BuildSolution.TestStatus"/> is <see cref="TestStatus.WillTest"/> ("--with-tests", the
+    /// releases that a publication publishes). See <see cref="BuildPlugin.EnsureTestedAsync"/>.
+    /// </summary>
+    /// <returns>The releases to test.</returns>
+    public IEnumerable<BuildPlugin.ReleaseCommit> GetReleasesToTest()
+    {
+        return _orderedSolutions.Where( s => !s.MustBuild && s.TestStatus == TestStatus.WillTest )
+                                .Select( s => new BuildPlugin.ReleaseCommit( s.Repo, s.LastBuild.Version, s.LastBuild.TagCommit.Commit ) );
     }
 
     /// <summary>

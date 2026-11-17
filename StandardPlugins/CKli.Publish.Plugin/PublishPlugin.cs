@@ -558,23 +558,12 @@ public sealed class PublishPlugin : PrimaryPluginBase
     }
 
     // The releases that the publication carries but that the roadmap did not build: the direct ones that were
-    // already built ("PublishRequired", their TestStatus is WillTest or Tested) and the required releases from
-    // other branches. The ones the roadmap built ran their tests in this build: they are not tested again, even
-    // with "--force-tests".
+    // already built ("PublishRequired" solutions whose TestStatus is WillTest: never tested, or "--force-tests")
+    // and the required releases from other branches. The ones the roadmap built ran their tests in this build:
+    // they are not tested again, even with "--force-tests".
     static IEnumerable<BuildPlugin.ReleaseCommit> GetReleasesToTest( PublishRoadmap publish )
     {
-        foreach( var s in publish.Roadmap.OrderedSolutions )
-        {
-            if( s.PublishableStatus == PublishableStatus.PublishRequired )
-            {
-                Throw.DebugAssert( s.TestStatus is TestStatus.WillTest or TestStatus.Tested );
-                yield return new BuildPlugin.ReleaseCommit( s.Repo, s.LastBuild.Version, s.LastBuild.TagCommit.Commit );
-            }
-        }
-        foreach( var r in GetRequiredReleases( publish ) )
-        {
-            yield return r;
-        }
+        return publish.Roadmap.GetReleasesToTest().Concat( GetRequiredReleases( publish ) );
     }
 
     static IEnumerable<BuildPlugin.ReleaseCommit> GetRequiredReleases( PublishRoadmap publish )

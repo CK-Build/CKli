@@ -593,10 +593,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         // holds the publication lock: the Publish plugin calls EnsureTestedAsync.
         if( !roadmap.MustPublish )
         {
-            var toTest = roadmap.OrderedSolutions
-                                .Where( s => !s.MustBuild && s.TestStatus == TestStatus.WillTest )
-                                .Select( s => new ReleaseCommit( s.Repo, s.LastBuild.Version, s.LastBuild.TagCommit.Commit ) )
-                                .ToList();
+            var toTest = roadmap.GetReleasesToTest().ToList();
             if( toTest.Count > 0
                 && !await EnsureTestedAsync( monitor, context, toTest, forceTests: runTest == true, vMaxDoP, PrimaryPluginContext.Cancellation ).ConfigureAwait( false ) )
             {
@@ -702,7 +699,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         var roadmap = Roadmap.Create( monitor, _versionTag, _artifactHandler, hotGraph, isPullBuild, ciBuildMode, mustPublish, dryRun,
                                       focus,
                                       stopAfterFocus: focus && !continueOnSuccess,
-                                      s => _repoBuilder.Get( monitor, s.Repo ).HasTestRun( monitor, s.LastBuild.TagCommit.Commit ),
+                                      ( repo, tree ) => _repoBuilder.Get( monitor, repo ).HasTestRun( monitor, tree ),
                                       runTest,
                                       withTests );
         if( roadmap != null  )

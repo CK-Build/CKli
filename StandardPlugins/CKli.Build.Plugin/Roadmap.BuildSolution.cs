@@ -4,6 +4,7 @@ using CKli.Core;
 using CKli.HotZone.Plugin;
 using CKli.ShallowSolution.Plugin;
 using CKli.VersionTag.Plugin;
+using LibGit2Sharp;
 using System;
 using System.Diagnostics.CodeAnalysis;
 
@@ -557,23 +558,55 @@ public sealed partial class Roadmap
         /// </summary>
         public TestStatus TestStatus => _testStatus;
 
-        // A built solution runs its tests unless "--skip-tests" (a new commit or a tested one: we don't care).
+        // A built solution runs its tests unless "--skip-tests" or, by default, when the content it builds has
+        // already been tested: when no dependency is updated, the build commits nothing (but an empty commit that
+        // a version may require), its content is the one of the build branch (see GetBuildTree). An updated
+        // dependency is a new content: its tests run.
         // The others run them with "--with-tests" when they are in its scope: a publication only tests what it
         // publishes and a "--focus" that stops after the focus doesn't test the solutions out of it.
-        internal void InitializeTestStatus( Func<BuildSolution, bool> hasTestRun, bool? runTest, bool withTests )
+        internal void InitializeTestStatus( IActivityMonitor monitor, Func<Repo, Tree, bool> hasTestRun, bool? runTest, bool withTests )
         {
             if( MustBuild )
             {
-                _testStatus = runTest == false ? TestStatus.Skipped : TestStatus.WillTest;
+                const MustBuildReason newContent = MustBuildReason.UpstreamBuild
+                                                   | MustBuildReason.UpstreamVersion
+                                                   | MustBuildReason.DependencyUpdate;
+                _testStatus = runTest switch
+                {
+                    false => TestStatus.Skipped,
+                    null when (BuildInfo.BuildReason & newContent) == 0
+                              && GetBuildTree( monitor ) is Tree buildTree
+                              && hasTestRun( Repo, buildTree ) => TestStatus.Tested,
+                    _ => TestStatus.WillTest
+                };
                 return;
             }
-            bool tested = hasTestRun( this );
+            bool tested = hasTestRun( Repo, _lastBuild.TagCommit.Commit.Tree );
             bool inScope = withTests
                            && (!_roadmap.MustPublish || _publishable == PublishableStatus.PublishRequired)
                            && (!_roadmap.StopAfterFocus || _solution.IsPivot || _solution.IsPivotUpstream);
             _testStatus = inScope && (runTest == true || !tested)
                             ? TestStatus.WillTest
                             : tested ? TestStatus.Tested : TestStatus.Untested;
+        }
+
+        // The content that the build of this solution starts from, before any dependency update: what
+        // RoadmapExecutor.EnsureAndCheckoutBranch checks out.
+        // - A missing build branch is created on the commit the solution has been read from.
+        // - A CI build works on the "dev/" branch (created on the branch's tip when missing).
+        // - A regular build integrates the "dev/" branch into the branch (BranchLink.IntegrateMerge, that is
+        //   GitRepository.MergeBranchContent): GitRepository.PredictMerge gives the resulting content without
+        //   merging anything. A conflict (no content) fails the build: null is returned.
+        Tree? GetBuildTree( IActivityMonitor monitor )
+        {
+            var b = BuildInfo.BuildBranch;
+            Throw.DebugAssert( "A solution that must build has a build branch.", b != null );
+            if( !b.Exists || b.GitBranch == null ) return _solution.GitSolution.Commit.Tree;
+            var dev = b.GitDevBranch;
+            if( dev == null ) return b.GitBranch.Tip.Tree;
+            if( _roadmap.IsCIBuild ) return dev.Tip.Tree;
+            Repo.GitRepository.PredictMerge( monitor, b.GitBranch.Tip, dev.Tip, aligner: null, out _, out var result );
+            return result;
         }
 
         internal IRenderable ToRenderable(  ref BuildIndexAndRankDisplayState head, ref RStats stats )

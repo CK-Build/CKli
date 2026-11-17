@@ -728,13 +728,19 @@ Every roadmap row has a one-character **tests column** (`Roadmap.BuildSolution.T
 
 | Glyph | `TestStatus` | Meaning |
 |---|---|---|
-| `T` (black on cyan) | `WillTest` | This command runs the tests: a built row (the default), a row that is not built but in the scope of `--with-tests` (a publication: the `PublishRequired` rows) and never tested, or any such row with `--force-tests`. |
-| `✓` | `Tested` | Not built and already tested on its commit. |
+| `T` (black on cyan) | `WillTest` | This command runs the tests: a built row whose content has never been tested (any built row with `--force-tests`), a row that is not built but in the scope of `--with-tests` (a publication: the `PublishRequired` rows) and never tested, or any such row with `--force-tests`. |
+| `✓` | `Tested` | Already tested: a row that is not built, or a built row whose build doesn't change the content (see below). |
 | `?` | `Untested` | Not built, never tested, and this command doesn't test it. Outside of a publication, the roadmap's summary suggests `--with-tests`. |
 | `✗` | `Skipped` | Built with `--skip-tests`: the new version is untested. |
 
-A built row is `T` even if its build commit happens to have been tested already (the build then skips its tests):
-the column says what the command guarantees, not what it will actually execute.
+A built row is `✓` when the content it builds is in the test-run cache: its build reasons contain no
+`UpstreamBuild`, `UpstreamVersion` nor `DependencyUpdate` (a `CodeChange` only, typically after a CI build that ran
+the tests), so the build commits nothing but an empty commit a version may require, and the tree it builds has been
+tested. That tree is computed the way `RoadmapExecutor.EnsureAndCheckoutBranch` will obtain it
+(`BuildSolution.GetBuildTree`): the `dev/` branch's tip for a CI build and, for a regular build, the result of the
+integration of the `dev/` branch, that `GitRepository.PredictMerge` (`CKli.Core`) computes without merging
+anything - with the very decision `GitRepository.MergeBranchContent` applies (`GitRepository.GetMergeKind`). `CoreBuildAsync` then finds
+the same tree in the cache and skips the tests.
 `Plugins.Tests/BuildWithTestsTests` covers the column and the option.
 
 ### `fix build` / `fix publish`: the Fix Workflow
