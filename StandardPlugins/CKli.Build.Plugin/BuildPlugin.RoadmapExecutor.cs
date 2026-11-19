@@ -391,7 +391,8 @@ public sealed partial class BuildPlugin
         /// monitor carries the <see cref="ScreenType.NoScreenTag"/>: they are not displayed elsewhere.
         /// <para>
         /// The error that concludes a failed <see cref="RepoBuilder"/> step names the repository: the row says the
-        /// step instead (<see cref="RepoBuilder.GetFailedStep(CKTrait)"/>) and this error is not repeated.
+        /// step instead (<see cref="RepoBuilder.GetFailedStep(CKTrait)"/>) and this error is not repeated. The log
+        /// file it names (<see cref="RepoBuilder.GetLogFilePath(string)"/>) is displayed last, as a link.
         /// </para>
         /// <para>
         /// A build that failed without an error has been stopped (by "--focus" or the cancellation): it has
@@ -409,13 +410,18 @@ public sealed partial class BuildPlugin
             var screen = _context.Screen;
             var s = screen.ScreenType;
             IRenderable outcome;
+            string? logFile = null;
             if( result == null )
             {
                 string? failedStep = null;
                 var shown = new List<ActivityMonitorSimpleCollector.Entry>( entries.Count );
                 foreach( var e in entries )
                 {
-                    if( failedStep == null && (failedStep = RepoBuilder.GetFailedStep( e.Tags )) != null ) continue;
+                    if( failedStep == null && (failedStep = RepoBuilder.GetFailedStep( e.Tags )) != null )
+                    {
+                        logFile = RepoBuilder.GetLogFilePath( e.Text );
+                        continue;
+                    }
                     shown.Add( e );
                 }
                 entries = shown;
@@ -434,6 +440,13 @@ public sealed partial class BuildPlugin
             if( entries.Count > 0 )
             {
                 display = display.AddBelow( entries.Select( e => s.CreateLog( e.MaskedLevel, e.Text ).Box( marginLeft: 4 ) ) );
+            }
+            if( logFile != null )
+            {
+                // The Text trims the trailing space of the prefix: the link has a left margin.
+                display = display.AddBelow( s.Text( RepoBuilder.LogFilePrefix )
+                                             .AddRight( s.Text( logFile, ConsoleColor.Blue ).HyperLink( new Uri( logFile ) ).Box( marginLeft: 1 ) )
+                                             .Box( marginLeft: 8 ) );
             }
             screen.Display( display );
         }

@@ -5,9 +5,12 @@ using CKli.VersionTag.Plugin;
 
 using LibGit2Sharp;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -52,6 +55,37 @@ public class RepoBuilder : RepoInfo
                                                                 : tags.Overlaps( DotNetPackFailedTag )
                                                                     ? "dotnet pack"
                                                                     : null;
+
+    /// <summary>
+    /// Prefix of the line of the concluding error of a failed step that names the log file that contains the
+    /// output of the failed process (see <see cref="GetLogFilePath(string)"/>).
+    /// </summary>
+    public const string LogFilePrefix = "Log file: ";
+
+    /// <summary>
+    /// Gets the log file path that the text of a concluding error of a failed step names (on a line that
+    /// starts with <see cref="LogFilePrefix"/>), or null when it names none.
+    /// </summary>
+    /// <param name="text">The text of an error.</param>
+    /// <returns>The log file path or null.</returns>
+    public static string? GetLogFilePath( string text )
+    {
+        int idx = text.IndexOf( "\n" + LogFilePrefix, StringComparison.Ordinal );
+        if( idx < 0 ) return null;
+        var path = text.AsSpan( idx + 1 + LogFilePrefix.Length );
+        int end = path.IndexOfAny( '\r', '\n' );
+        return (end < 0 ? path : path.Slice( 0, end )).Trim().ToString();
+    }
+
+    /// <summary>
+    /// The maximal number of lines of <see cref="LogFailureExcerpt"/>.
+    /// </summary>
+    public const int MaxExcerptLines = 10;
+
+    // "<file>(1,1): error CS0116: ... [<project>]", "<file> : error NU1100: ...", "MSBUILD : error MSB1009: ...".
+    static readonly Regex _rErrorLine = new Regex( @":\s+error\s+[A-Z]+\d+\s*:|:\s+error\s*:", RegexOptions.CultureInvariant );
+    // The " [<project path>]" that MSBuild appends to the errors.
+    static readonly Regex _rProjectSuffix = new Regex( @"\s\[[^\[\]]+\.\w+proj(::[^\]]*)?\]$", RegexOptions.CultureInvariant );
 
     readonly RepositoryBuilderPlugin _repositoryBuilder;
     readonly ArtifactHandlerPlugin _artifactHandler;
@@ -386,17 +420,108 @@ public class RepoBuilder : RepoInfo
         }
         if( !buildSuccess )
         {
-            monitor.Error( DotNetBuildFailedTag, $"Dotnet build fails for '{buildInfo.Repo.DisplayPath}'." );
+            LogStepFailure( monitor, DotNetBuildFailedTag, $"Dotnet build fails for '{buildInfo.Repo.DisplayPath}'." );
         }
         else if( !testSuccess )
         {
-            monitor.Error( DotNetTestFailedTag, $"Dotnet test fails for '{buildInfo.Repo.DisplayPath}'." );
+            LogStepFailure( monitor, DotNetTestFailedTag, $"Dotnet test fails for '{buildInfo.Repo.DisplayPath}'." );
         }
         else if( !packSuccess )
         {
-            monitor.Error( DotNetPackFailedTag, $"Dotnet pack fails for '{buildInfo.Repo.DisplayPath}'." );
+            LogStepFailure( monitor, DotNetPackFailedTag, $"Dotnet pack fails for '{buildInfo.Repo.DisplayPath}'." );
         }
         // Cancellation has no error message.
+        return false;
+    }
+
+    /// <summary>
+    /// Logs the error that concludes a failed step. The current text log file (that contains the output of the
+    /// failed process) is closed first so that it can be opened right away: the error names it on a line
+    /// that starts with <see cref="LogFilePrefix"/> (see <see cref="GetLogFilePath(string)"/>).
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="tag">The tag of the failed step.</param>
+    /// <param name="message">The error message.</param>
+    protected static void LogStepFailure( IActivityMonitor monitor, CKTrait tag, string message )
+    {
+        var logFile = CKliRootEnv.CloseCurrentTextLogFile();
+        monitor.Error( tag, logFile != null ? $"{message}{Environment.NewLine}{LogFilePrefix}{logFile}" : message );
+    }
+
+    /// <summary>
+    /// Logs an error with the first error lines of the output of a failed "dotnet" process (at most
+    /// <see cref="MaxExcerptLines"/>): the "error XX0000:" lines (without the MSBuild duplicates nor the
+    /// project path suffix) and, for "dotnet test", the failed tests with their error message.
+    /// Nothing is logged when no such line is found.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="output">The captured standard output and error of the process.</param>
+    protected void LogFailureExcerpt( IActivityMonitor monitor, string output )
+    {
+        var root = Repo.WorkingFolder.Path + '/';
+        var rootBackslash = root.Replace( '/', '\\' );
+        var lines = new List<string>();
+        var seen = new HashSet<string>();
+        int more = 0;
+        bool inTestMessage = false;
+        int testMessageLines = 0;
+        foreach( var raw in output.Split( '\n' ) )
+        {
+            var line = raw.TrimEnd();
+            var trimmed = line.TrimStart();
+            string? kept = null;
+            if( trimmed.StartsWith( "Error Message:", StringComparison.Ordinal ) )
+            {
+                inTestMessage = true;
+                testMessageLines = 0;
+                continue;
+            }
+            if( inTestMessage )
+            {
+                if( trimmed.Length == 0
+                    || trimmed.StartsWith( "Stack Trace:", StringComparison.Ordinal )
+                    || trimmed.StartsWith( "Standard Output Messages:", StringComparison.Ordinal )
+                    || ++testMessageLines > 3 )
+                {
+                    inTestMessage = false;
+                }
+                else
+                {
+                    kept = "  " + trimmed;
+                }
+            }
+            if( kept == null )
+            {
+                if( trimmed.StartsWith( "Failed ", StringComparison.Ordinal ) && !trimmed.StartsWith( "Failed!", StringComparison.Ordinal ) )
+                {
+                    kept = trimmed;
+                }
+                else if( _rErrorLine.IsMatch( trimmed ) )
+                {
+                    kept = _rProjectSuffix.Replace( trimmed, "" ).Replace( root, "" ).Replace( rootBackslash, "" );
+                    // MSBuild repeats the errors in its final summary.
+                    if( !seen.Add( kept ) ) continue;
+                }
+            }
+            if( kept == null ) continue;
+            if( lines.Count < MaxExcerptLines ) lines.Add( kept );
+            else ++more;
+        }
+        if( lines.Count == 0 ) return;
+        if( more > 0 ) lines.Add( $"(+{more} more)" );
+        monitor.Error( lines.Concatenate( Environment.NewLine ) );
+    }
+
+    bool RunDotnetStep( IActivityMonitor monitor, string args, CancellationToken cancellation )
+    {
+        // The standard output and error are received concurrently: they need their own collector.
+        var stdOut = new StringBuilder();
+        var stdErr = new StringBuilder();
+        if( Repo.RunDotnet( monitor, args, stdOut: stdOut, stdErr: stdErr, cancellation: cancellation ) )
+        {
+            return true;
+        }
+        LogFailureExcerpt( monitor, stdOut.Append( stdErr ).ToString() );
         return false;
     }
 
@@ -427,11 +552,11 @@ public class RepoBuilder : RepoInfo
         }
         if( !buildSuccess )
         {
-            monitor.Error( DotNetBuildFailedTag, $"Dotnet build fails for '{buildInfo.Repo.DisplayPath}'." );
+            LogStepFailure( monitor, DotNetBuildFailedTag, $"Dotnet build fails for '{buildInfo.Repo.DisplayPath}'." );
         }
         else if( !testSuccess )
         {
-            monitor.Error( DotNetTestFailedTag, $"Dotnet test fails for '{buildInfo.Repo.DisplayPath}'." );
+            LogStepFailure( monitor, DotNetTestFailedTag, $"Dotnet test fails for '{buildInfo.Repo.DisplayPath}'." );
         }
         return false;
     }
@@ -456,14 +581,14 @@ public class RepoBuilder : RepoInfo
         // Currently, we always set ContinuousIntegrationBuild.
         // This may impact the SourceRoot for SourceLink: this can allow a local UX that debugs straight to the right source file.
         // If not, we may differentiate "pure local" and "publishable" builds so that local builds can source link to the local file paths.
-        return Repo.RunDotnet( monitor, $"""
+        return RunDotnetStep( monitor, $"""
             build -tl:off --nologo --no-incremental -c {(release ? "Release" : "Debug")
             } /p:Version="{version
             }" /p:InformationalVersion="{informationalVersion
             }" /p:FileVersion="{fileVersion
             }" /p:ContinuousIntegrationBuild=true
             """,
-            cancellation: cancellation );
+            cancellation );
     }
 
     /// <summary>
@@ -483,7 +608,7 @@ public class RepoBuilder : RepoInfo
     protected bool DotNetTest( IActivityMonitor monitor, bool release, CancellationToken cancellation )
     {
         // The test run is recorded by the build plugin once the build succeeded (see SetTestRun).
-        return Repo.RunDotnet( monitor, $"test -tl:off -c {(release ? "Release" : "Debug")} --nologo --no-build --blame-hang-timeout {TestHangTimeout}", cancellation: cancellation );
+        return RunDotnetStep( monitor, $"test -tl:off -c {(release ? "Release" : "Debug")} --nologo --no-build --blame-hang-timeout {TestHangTimeout}", cancellation );
     }
 
     /// <summary>
@@ -497,9 +622,9 @@ public class RepoBuilder : RepoInfo
     /// <returns>True on success, false otherwise.</returns>
     protected bool DotNetPack( IActivityMonitor monitor, SVersion version, bool release, string outputPath, CancellationToken cancellation )
     {
-        return Repo.RunDotnet( monitor, $"""
-            pack -tl:off /p:Version={version} /p:ContinuousIntegrationBuild=true -c {(release ? "Release" : "Debug")} --nologo --no-build -o "{outputPath}" 
-            """, cancellation: cancellation );
+        return RunDotnetStep( monitor, $"""
+            pack -tl:off /p:Version={version} /p:ContinuousIntegrationBuild=true -c {(release ? "Release" : "Debug")} --nologo --no-build -o "{outputPath}"
+            """, cancellation );
     }
 
 

@@ -585,6 +585,23 @@ been computed and is not a dry-run:
   tag of the error that concludes it (`RepoBuilder.GetFailedStep`): that error names the repository for the other
   commands that build (`fix build`, `issue --fix`, the rebuilds), the row doesn't repeat it. Any other failure is
   `build failed.` with its errors below.
+  A failed `dotnet` step also says why and where to read more:
+  ```
+   E  Samples/CKt-Sample-Monitoring ⏚/v0.0.0 dotnet build failed.
+       E  CKt.Sample.Monitoring\Bug.cs(1,2): error CS1001: Identifier expected
+          CKt.Sample.Monitoring\Bug.cs(1,32): error CS1002: ; expected
+          Log file: C:\...\Logs\Text\T-2026-11-19 12h49.21.7430457.log
+  ```
+  - `RepoBuilder` captures the output of the process and, on failure, logs an error with its first
+    `MaxExcerptLines` meaningful lines (`LogFailureExcerpt`): the `error XX0000:` lines, without MSBuild's
+    end-of-build duplicates, the ` [project]` suffix and the repository prefix; for `dotnet test`, the `Failed <test>`
+    lines with their `Error Message:`.
+  - The concluding error (`LogStepFailure`) first closes the current text log file
+    (`CKliRootEnv.CloseCurrentTextLogFile`) and names it on a `Log file: ` line (`RepoBuilder.GetLogFilePath`).
+    Closing it is what gives the exact path, and it gives the final one: an open log file is `.log.tmp` and is renamed
+    when closed. The file contains the whole output of the failed step and can be opened right away. The cost:
+    the run's log is split in several files (`ckli log` opens the last one).
+  - The row displays that path last, as a hyperlink (clickable in an ANSI terminal).
   The build's monitor (a pool monitor, or the command's one for a single build) carries the
   `ScreenType.NoScreenTag` while it builds and its warnings and errors are collected (`CollectEntries`): the
   screen logger doesn't echo them on their own, the row displays them. This holds for every failure, wherever it
