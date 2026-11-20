@@ -16,6 +16,7 @@ namespace CKli.ShallowSolution.Plugin;
 public partial class GitSolutionContent
 {
     readonly HashSet<PackageInstance> _consumed;
+    readonly HashSet<PackageInstance> _scriptConsumed;
     readonly List<Project> _projects;
     // The version first met for each package identifier and the file that carries it: this is what
     // rejects a solution referencing one identifier in two versions. Only used while loading.
@@ -33,11 +34,32 @@ public partial class GitSolutionContent
     public IReadOnlySet<PackageInstance> Consumed => _consumed;
 
     /// <summary>
+    /// Gets the "second class" package references: the "#:package Name@Version" directives of the
+    /// "Deployment/GenerateAssets.cs" script (see <see cref="GenerateAssetsScript"/>).
+    /// <para>
+    /// They order the builds (the script runs with the packages of its World) and they are upgraded
+    /// like the <see cref="Consumed"/> ones when the solution is built, but they never trigger a build on their
+    /// own: they are not considered by the <c>HasUpdates</c> methods. The one version per package identifier
+    /// rule covers both sets.
+    /// </para>
+    /// </summary>
+    public IReadOnlySet<PackageInstance> ScriptConsumed => _scriptConsumed;
+
+    /// <summary>
     /// Gets whether the solution has at least one dependency that must be updated considering the <paramref name="mapping"/>. 
     /// </summary>
     /// <param name="mapping">The package mapping to consider.</param>
     /// <returns>True if the dependencies should be updated, false otherwise.</returns>
     public bool HasUpdates( IPackageMapping mapping ) => _consumed.Any( p => mapping.TryGetMappedVersion( p.PackageId, p.Version, out var version ) && p.Version != version );
+
+    /// <summary>
+    /// Gets whether at least one of the <see cref="ScriptConsumed"/> must be updated considering the <paramref name="mapping"/>.
+    /// This never triggers a build: when the solution is built for another reason, this tells that its
+    /// "GenerateAssets.cs" will be updated (a commit is added).
+    /// </summary>
+    /// <param name="mapping">The package mapping to consider.</param>
+    /// <returns>True if the script will be updated, false otherwise.</returns>
+    public bool HasScriptUpdates( IPackageMapping mapping ) => _scriptConsumed.Any( p => mapping.TryGetMappedVersion( p.PackageId, p.Version, out var version ) && p.Version != version );
 
     /// <summary>
     /// Gets whether the solution has at least one dependency that must be updated considering the <paramref name="mapping"/> and collects these updates.
@@ -89,6 +111,7 @@ public partial class GitSolutionContent
     private protected GitSolutionContent()
     {
         _consumed = new HashSet<PackageInstance>();
+        _scriptConsumed = new HashSet<PackageInstance>();
         _projects = new List<Project>();
         _firstMet = new Dictionary<string, (SVersion, NormalizedPath)>( StringComparer.OrdinalIgnoreCase );
     }
@@ -105,7 +128,32 @@ public partial class GitSolutionContent
                                                    files,
                                                    doc.Root!,
                                                    LoadOptions.None,
-                                                   AddProjectFile );
+                                                   AddProjectFile )
+               && ReadScriptPackages( monitor, files );
+    }
+
+    // After the project files: a version conflict names the project file first.
+    bool ReadScriptPackages( IActivityMonitor monitor, INormalizedFileProvider files )
+    {
+        var f = files.GetFileInfo( GenerateAssetsScript.FilePath );
+        if( f == null ) return true;
+        string text;
+        try
+        {
+            using var r = new System.IO.StreamReader( f.CreateReadStream() );
+            text = r.ReadToEnd();
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"Unable to read file '{GenerateAssetsScript.FilePath}'.", ex );
+            return false;
+        }
+        // A package of this solution is ignored: the script can only use a version that exists before the build
+        // (the built one reaches the local feed after the script ran), it is never upgraded.
+        return GenerateAssetsScript.ReadPackages( monitor,
+                                                  text,
+                                                  ( packageId, version ) => _projects.Any( p => p.Name.Equals( packageId, StringComparison.OrdinalIgnoreCase ) )
+                                                                            || AddConsumed( monitor, GenerateAssetsScript.FilePath, packageId, version, _scriptConsumed ) );
     }
 
     bool AddProjectFile( IActivityMonitor monitor, NormalizedPath path, XElement project )
@@ -196,7 +244,7 @@ public partial class GitSolutionContent
     // and healed by the build (the greatest referenced version wins). Only this repository local case is
     // an error, and it is one precisely because nothing can heal it: aligning it would silently rewrite
     // one of the two references and change what the developer wrote.
-    bool AddConsumed( IActivityMonitor monitor, NormalizedPath path, string packageId, SVersion version )
+    bool AddConsumed( IActivityMonitor monitor, NormalizedPath path, string packageId, SVersion version, HashSet<PackageInstance>? target = null )
     {
         if( _firstMet.TryGetValue( packageId, out var already ) )
         {
@@ -218,7 +266,7 @@ public partial class GitSolutionContent
         {
             _firstMet.Add( packageId, (version, path) );
         }
-        _consumed.Add( new PackageInstance( packageId, version ) );
+        (target ?? _consumed).Add( new PackageInstance( packageId, version ) );
         return true;
     }
 }

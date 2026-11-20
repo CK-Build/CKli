@@ -282,6 +282,7 @@ public sealed class MutableSolution
                     XmlHelper.SafeSave( p.Project.Document!, _repo.WorkingFolder.Combine( p.Path ) );
                 }
             }
+            return UpdateScriptPackages( monitor, mapping, updated );
         }
         return true;
 
@@ -378,6 +379,44 @@ public sealed class MutableSolution
             }
         }
 
+    }
+
+    // The "#:package Name@Version" directives of "Deployment/GenerateAssets.cs" (GitSolutionContent.ScriptConsumed)
+    // are upgraded like the project files: each build of the solution moves them to the World's current version.
+    bool UpdateScriptPackages( IActivityMonitor monitor, IPackageMapping mapping, PackageMapper? updated )
+    {
+        var path = _repo.WorkingFolder.Combine( GenerateAssetsScript.FilePath );
+        if( !File.Exists( path ) ) return true;
+        try
+        {
+            // Written back in UTF-8 without BOM (File.WriteAllText), the line endings are kept.
+            var text = File.ReadAllText( path );
+            // A package of this solution is never upgraded (see GitSolutionContent.ScriptConsumed).
+            var ownPackages = new HashSet<string>( ProjectPaths.Select( p => Path.GetFileNameWithoutExtension( p.LastPart ) ),
+                                                   StringComparer.OrdinalIgnoreCase );
+            var newText = GenerateAssetsScript.UpdatePackages( text, ( packageId, from ) =>
+            {
+                if( !ownPackages.Contains( packageId )
+                    && mapping.TryGetMappedVersion( packageId, from, out var to )
+                    && to != from )
+                {
+                    updated?.TryAdd( packageId, from, to );
+                    return to;
+                }
+                return null;
+            } );
+            if( newText != text )
+            {
+                monitor.Info( $"Updating package versions in '{GenerateAssetsScript.FilePath}'." );
+                File.WriteAllText( path, newText );
+            }
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While updating '{path}'.", ex );
+            return false;
+        }
     }
 
     /// <summary>

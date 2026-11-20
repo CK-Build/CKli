@@ -116,7 +116,9 @@ actual solution walker:
 |---|---|
 | `Projects` (`IReadOnlyList<Project>`) | One entry per `.csproj`. `Project.Path`, `Project.Name` (file name without `.csproj`), and `Project.IsPackable` (lazily read from `<PropertyGroup><IsPackable>`, `null` if absent). |
 | `Consumed` (`IReadOnlySet<PackageInstance>`) | Every package id + `SVersion` found across `<PackageReference>` (in `.csproj` and `Directory.Build.props`) and `<PackageVersion>` (in `Directory.Packages.props`, i.e. NuGet Central Package Management). A `<PackageReference VersionOverride="...">` wins over its own `Version`; a `<PackageReference>` with neither attribute contributes nothing (its version is assumed centrally managed). **One version per package identifier** — see below. |
+| `ScriptConsumed` (`IReadOnlySet<PackageInstance>`) | The "second class" references: the `#:package Name@Version` directives of `Deployment/GenerateAssets.cs` (`GenerateAssetsScript`). A directive without version is centrally managed (skipped), a floating or invalid version is warned and skipped, a package of the solution itself is ignored (the script can only use a version that exists before the build). The one version per package identifier rule covers both sets. They order the builds and are upgraded with the projects, but the `HasUpdates` methods don't consider them: they never trigger a build. |
 | `HasUpdates(mapping)` | Whether any consumed package would change version under a single `IPackageMapping`. |
+| `HasScriptUpdates(mapping)` | Whether a `ScriptConsumed` package would change version: when the solution is built for another reason, the script update is one more change to commit. |
 | `HasUpdates(mapping, ref updates)` | Same, and collects the diffs into a `PackageMapper`. |
 | `HasUpdates(action, mappings...)` | Checks several mappings in priority order per package, invoking `action(package, newVersion, mappingIndex)` for each match. |
 
@@ -176,7 +178,9 @@ solution folders left empty are removed) and `AddProject` (in the solution folde
 and `Directory.(Build|Packages).props` file via `CommonSolution.LoadAllProjectFiles` (this time with
 `LoadOptions.PreserveWhitespace`, to keep diffs minimal), rewrites each `<PackageReference>`'s `VersionOverride`
 and/or `Version` attribute (and each `<PackageVersion>`'s `Version` attribute) using
-`IPackageMapping.TryGetMappedVersion`, and saves every touched document back with `XmlHelper.SafeSave`. Which
+`IPackageMapping.TryGetMappedVersion`, and saves every touched document back with `XmlHelper.SafeSave`. It then rewrites
+the `#:package Name@Version` lines of `Deployment/GenerateAssets.cs` the same way (a text rewrite of the version only;
+the packages of the solution itself are left alone). Which
 identifiers it looks at, and which unmapped version it complains about, is decided by `IPackageMapping.GetMappingType`
 (see below): a `None` identifier is skipped without even reading its version, a `Mapped` one whose current version the
 mapping doesn't recognize produces a warning — not an error — and a `KnownName` one is left alone silently. The method's

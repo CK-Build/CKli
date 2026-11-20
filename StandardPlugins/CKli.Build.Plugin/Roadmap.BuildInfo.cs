@@ -35,6 +35,7 @@ public sealed partial class Roadmap
         readonly PackageMapper? _cUpdates;
         readonly PackageMapper? _dUpdates;
         readonly ImmutableArray<BuildSolution> _directRequirements;
+        readonly ImmutableArray<BuildSolution> _scriptRequirements;
         SVersion _targetVersion;
 
         readonly Lock _buildTaskLock;
@@ -47,6 +48,7 @@ public sealed partial class Roadmap
                             SVersionChange versionChange,
                             SVersion targetVersion,
                             BuildSolution[] directRequirements,
+                            BuildSolution[] scriptRequirements,
                             PackageMapper? uUpdates,
                             PackageMapper? cUpdates,
                             PackageMapper? dUpdates )
@@ -60,6 +62,7 @@ public sealed partial class Roadmap
             _cUpdates = cUpdates;
             _dUpdates = dUpdates;
             _directRequirements = ImmutableCollectionsMarshal.AsImmutableArray( directRequirements );
+            _scriptRequirements = ImmutableCollectionsMarshal.AsImmutableArray( scriptRequirements );
             _buildTaskLock = new Lock();
 
             Throw.DebugAssert( "Currently the version can never be a +fake (the +fake is not skippable).", !_targetVersion.HasFakeMetadata );
@@ -125,6 +128,13 @@ public sealed partial class Roadmap
         public ImmutableArray<BuildSolution> DirectRequirements => _directRequirements;
 
         /// <summary>
+        /// Gets the <see cref="BuildSolution"/> that produce a "#:package" of the "Deployment/GenerateAssets.cs" script of
+        /// this one (see <see cref="HotGraph.Solution.ScriptRequirements"/>): when they must be built, this build waits
+        /// for theirs (the script runs with their new version) but they don't trigger it.
+        /// </summary>
+        public ImmutableArray<BuildSolution> ScriptRequirements => _scriptRequirements;
+
+        /// <summary>
         /// Gets the intra World reference package updates if any.
         /// </summary>
         public PackageMapper? UUpdates => _uUpdates;
@@ -174,10 +184,13 @@ public sealed partial class Roadmap
         {
             Throw.DebugAssert( MustBuild );
             // Wait for requirements.
-            if( _directRequirements.Length > 0 )
+            if( _directRequirements.Length > 0 || _scriptRequirements.Length > 0 )
             {
                 // Checks that all required builds went fine (or return null).
-                var all = _directRequirements.Where( s => s.MustBuild ).Select( s => s.BuildInfo.BuildAsync( builder ) ).ToArray();
+                var all = _directRequirements.Concat( _scriptRequirements )
+                                             .Where( s => s.MustBuild )
+                                             .Select( s => s.BuildInfo.BuildAsync( builder ) )
+                                             .ToArray();
                 BuildResult?[] req = await Task.WhenAll( all ).ConfigureAwait( false );
                 foreach( var r in req )
                 {

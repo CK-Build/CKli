@@ -24,6 +24,7 @@ public sealed partial class HotGraph
         readonly BranchModelInfo _branchInfo;
         readonly HotBranch _branch;
         readonly List<Solution> _directRequirements;
+        readonly List<Solution> _scriptRequirements;
         readonly HashSet<Solution> _allRequirements;
         readonly List<PackageInstance> _externalDependencies;
         readonly bool _isPivot;
@@ -50,6 +51,7 @@ public sealed partial class HotGraph
             _solution = solution;
             _isPivot = isPivot;
             _directRequirements = new List<Solution>();
+            _scriptRequirements = new List<Solution>();
             _allRequirements = new HashSet<Solution>();
             _externalDependencies = new List<PackageInstance>();
             _rank = -1;
@@ -106,6 +108,16 @@ public sealed partial class HotGraph
         /// Gets the closure of the <see cref="DirectRequirements"/>.
         /// </summary>
         public IReadOnlySet<Solution> AllRequirements => _allRequirements;
+
+        /// <summary>
+        /// Gets the solutions that produce a package of the <see cref="GitSolutionContent.ScriptConsumed"/> ("second class"
+        /// references of the "Deployment/GenerateAssets.cs" script) and that are not already in <see cref="AllRequirements"/>.
+        /// <para>
+        /// They are ranked before this one and a build of this solution waits for theirs, but they are not requirements:
+        /// a build of one of them doesn't trigger a build of this one and they don't change the pivot flags.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<Solution> ScriptRequirements => _scriptRequirements;
 
         /// <summary>
         /// Gets the shallow solution. This may loaded from the "dev/<see cref="Branch"/>" branch if it exists and <see cref="IsDevSolution"/>
@@ -270,6 +282,7 @@ public sealed partial class HotGraph
             _isPivotUpstream = false;
             _isPivotDownstream = false;
             _directRequirements.Clear();
+            _scriptRequirements.Clear();
             _allRequirements.Clear();
             _externalDependencies.Clear();
         }
@@ -284,6 +297,12 @@ public sealed partial class HotGraph
             // Upgrade if a pivot requires this.
             if( isPivotUpstream.HasValue )
             {
+                // A solution already ranked through a "second class" script reference (that carries false) may be
+                // reached later by a pivot: its upstreams must be upgraded too.
+                if( isPivotUpstream.Value && !_isPivotUpstream && _rank >= 0 )
+                {
+                    PropagatePivotUpstream();
+                }
                 _isPivotUpstream |= isPivotUpstream.Value;
             }
             rank = _rank;
@@ -346,6 +365,34 @@ public sealed partial class HotGraph
                     _externalDependencies.Add( c );
                 }
             }
+            // The "second class" references of the GenerateAssets.cs script only order the builds: the pivot flags
+            // are not propagated (false) and their solutions are not requirements.
+            foreach( PackageInstance c in _solution.ScriptConsumed )
+            {
+                if( _graph._p2s.TryGetValue( c.PackageId, out Solution? required ) && required != this )
+                {
+                    if( !required.UpdateRank( monitor, out int reqRank, ref cycle, false, out bool _ ) )
+                    {
+                        Throw.DebugAssert( cycle != null );
+                        cycle ??= new List<string>();
+                        cycle.Add( $"{c.PackageId} ({required.Repo.DisplayPath.LastPart}, GenerateAssets.cs)" );
+                        return false;
+                    }
+                    if( !_scriptRequirements.Contains( required ) )
+                    {
+                        _scriptRequirements.Add( required );
+                        ++reqRank;
+                        if( rank < reqRank )
+                        {
+                            rank = reqRank;
+                            if( _graph._maxRank < rank )
+                            {
+                                _graph._maxRank = rank;
+                            }
+                        }
+                    }
+                }
+            }
             // Finalize direct and closure requirements.
             for( int i = 0; i < _directRequirements.Count; ++i )
             {
@@ -357,9 +404,20 @@ public sealed partial class HotGraph
                     _directRequirements.RemoveAt( i-- );
                 }
             }
+            // A script requirement that is a real one is not a script requirement.
+            _scriptRequirements.RemoveAll( _allRequirements.Contains );
             isPivotDownstream = _isPivotDownstream;
             _rank = rank;
             return true;
+        }
+
+        void PropagatePivotUpstream()
+        {
+            _isPivotUpstream = true;
+            foreach( var d in _directRequirements )
+            {
+                if( !d._isPivotUpstream ) d.PropagatePivotUpstream();
+            }
         }
 
         /// <summary>

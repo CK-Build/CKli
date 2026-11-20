@@ -449,6 +449,11 @@ For every `HotGraph.Solution` (ordered topologically, `OrderedSolutions`), a `Ro
 | `CI0` | `--ci.0` is used, there is no other reason to build, and the last version is a *published* non-CI build with no `ci.0` yet on this commit - forces a `ci.0` rebuild, opening a new version line above the published one. From another branch's version (the first build of a prerelease branch on a stable commit) the version cannot be a `ci.0`, which is always on the branch of its base: it gets its own commit, becomes a `ci.1`, and the roadmap displays `(CI0+branch)`. |
 | `RollingLocal` | A CI build is done (the default mode is enough), there is no other reason to build, and the last version is a regular build still pending as a `local/`/`building/` release - the CI version takes its place on the same commit. |
 
+No reason comes from the `#:package` directives of `Deployment/GenerateAssets.cs` (`GitSolutionContent.ScriptConsumed`): a
+build of the solution that produces one of them doesn't build the script's solution. When that solution is built for
+another reason, the script is upgraded with the projects (`UpdateDependenciesAndCommit`), and `HasScriptUpdates` tells
+the target version computation that this adds a commit (the CI number depends on it).
+
 `CI0` and `RollingLocal` are the two halves of "the commit already carries a version, build it in CI anyway", split
 on whether that version is published. Both are guarded by `buildReason == None`, so each can only ever be the *sole*
 reason to build.
@@ -553,7 +558,8 @@ been computed and is not a dry-run:
 
 - **Single solution** (`Roadmap.SolutionBuildCount == 1`): built directly, no channel/monitor-pool machinery.
 - **Multiple solutions**: each `BuildSolution` that must build has a `Roadmap.BuildInfo.BuildAsync(executor)` task that
-  first awaits its own `DirectRequirements`' build tasks (recursively, memoized via a `Lock`-guarded `_buildTask`) and
+  first awaits its own `DirectRequirements`' and `ScriptRequirements`' build tasks (recursively, memoized via a
+  `Lock`-guarded `_buildTask`) and
   only then calls `RoadmapExecutor.ParallelBuildAsync`, so the dependency order is enforced by the task graph itself
   rather than by an explicit scheduler loop.
 - Parallelism is bounded by `--max-dop` through a hand-written **`IActivityMonitor` pool**: an unbounded `Channel<object>`

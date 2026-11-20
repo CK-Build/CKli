@@ -81,6 +81,7 @@ public sealed partial class Roadmap
             // If upstreams are built, always build.
             if( !InitializeUpstreams( monitor,
                                       out BuildSolution[] directRequirements,
+                                      out BuildSolution[] scriptRequirements,
                                       out SVersionChange vChange,
                                       out bool mustBuildFromUpstreams ) )
             {
@@ -222,6 +223,7 @@ public sealed partial class Roadmap
                                                 vChange,
                                                 vTarget,
                                                 directRequirements,
+                                                scriptRequirements,
                                                 packageUpdates.Updates,
                                                 packageUpdates.Configuration,
                                                 packageUpdates.Discrepancies );
@@ -240,7 +242,10 @@ public sealed partial class Roadmap
             //
             // If we are building from the upstreams or the dependencies must be updated, then we need one more
             // commit to update the dependencies.
-            bool mustAddCommit = (buildReason & (MustBuildReason.UpstreamBuild | MustBuildReason.DependencyUpdate)) != 0;
+            // The "#:package" of GenerateAssets.cs never trigger a build but, when we build, their update is
+            // committed with the other ones: it may be the only one.
+            bool mustAddCommit = (buildReason & (MustBuildReason.UpstreamBuild | MustBuildReason.DependencyUpdate)) != 0
+                                 || _solution.GitSolution.HasScriptUpdates( _roadmap._packageMapping );
             SVersion? targetVersion = _versionInfo.TagCommitTree.ComputeTargetVersion( monitor,
                                                                                        ref vChange,
                                                                                        _roadmap.Graph.BranchName,
@@ -303,6 +308,7 @@ public sealed partial class Roadmap
                                         vChange,
                                         targetVersion,
                                         directRequirements,
+                                        scriptRequirements,
                                         packageUpdates.Updates,
                                         packageUpdates.Configuration,
                                         packageUpdates.Discrepancies );
@@ -385,6 +391,7 @@ public sealed partial class Roadmap
 
         bool InitializeUpstreams( IActivityMonitor monitor,
                                   out BuildSolution[] directRequirements,
+                                  out BuildSolution[] scriptRequirements,
                                   out SVersionChange maxVersionChange,
                                   out bool mustBuild )
         {
@@ -392,6 +399,19 @@ public sealed partial class Roadmap
             maxVersionChange = SVersionChange.None;
             mustBuild = false;
             directRequirements = new BuildSolution[solutionRequirements.Count];
+            // The script requirements are initialized (their BuildInfo is needed by the package mapping) but
+            // they don't change the version nor force the build: they are only awaited by a build.
+            var solutionScriptRequirements = _solution.ScriptRequirements;
+            scriptRequirements = new BuildSolution[solutionScriptRequirements.Count];
+            for( int i = 0; i < scriptRequirements.Length; ++i )
+            {
+                var sReq = _roadmap.OrderedSolutions[solutionScriptRequirements[i].OrderedIndex];
+                if( !sReq.Initialize( monitor ) )
+                {
+                    return false;
+                }
+                scriptRequirements[i] = sReq;
+            }
             int idxReq = 0;
             foreach( var req in solutionRequirements )
             {
