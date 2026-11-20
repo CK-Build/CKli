@@ -108,6 +108,12 @@ public sealed partial class FakeBuildRepo
     public bool FailBuild { get; set; }
 
     /// <summary>
+    /// Gets the "--with-assets" request of the last fake build of this repository: null when the
+    /// "Deployment/GenerateAssets.cs" scripts are skipped, empty for every asset (a publication).
+    /// </summary>
+    public ImmutableArray<string>? LastWithAssets { get; internal set; }
+
+    /// <summary>
     /// Gets or sets an action that the fake build calls with the working folder of this repository, after it
     /// has "built" the checked out commit: it simulates a build that creates, modifies or deletes files (the
     /// impacts of the build, see "--build-impacts"). Defaults to null.

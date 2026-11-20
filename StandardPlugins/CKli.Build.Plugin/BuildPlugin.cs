@@ -9,6 +9,7 @@ using CKli.VersionTag.Plugin;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -66,6 +67,12 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     const string _oBuildImpacts = "--build-impacts";
     const string _oFocus = "--focus";
     const string _oContinue = "--continue";
+    const string _dWithAssets = """
+        Runs the "Deployment/GenerateAssets.cs" scripts (skipped by default): without values, every asset is
+        generated, otherwise the values are given to the scripts after the version. A version built without them
+        (or with other values) is built again.
+        """;
+    const string _oWithAssets = "--with-assets";
 
     readonly VersionTagPlugin _versionTag;
     readonly BranchModelPlugin _branchModel;
@@ -282,6 +289,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                   [Description( _dBuildImpacts )]
                                   [OptionName( _oBuildImpacts )]
                                   string? buildImpacts = null,
+                                  [Description( _dWithAssets )]
+                                  [OptionName( _oWithAssets )]
+                                  string[]? withAssets = null,
                                   [Description( _dRegular )]
                                   [OptionName( _oRegular )]
                                   bool regular = false,
@@ -315,7 +325,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                   bool continueOnSuccess = false )
     {
         if( !CheckRegularAndCIForce( monitor, regular, ciForce )
-            || !ParseBuildImpacts( monitor, buildImpacts, out var vBuildImpacts ) )
+            || !ParseBuildImpacts( monitor, buildImpacts, out var vBuildImpacts )
+            || !ParseWithAssets( monitor, withAssets, out var vWithAssets ) )
         {
             return Task.FromResult( false );
         }
@@ -332,8 +343,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             return Task.FromResult( false );
         }
         return regular
-            ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, dryRun, isPullBuild: false, publish: false, vBuildImpacts )
-            : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, ciForce, dryRun, isPullBuild: false, publish: false, vBuildImpacts, focus, continueOnSuccess );
+            ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, dryRun, isPullBuild: false, publish: false, vBuildImpacts, vWithAssets )
+            : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, ciForce, dryRun, isPullBuild: false, publish: false, vBuildImpacts, vWithAssets, focus, continueOnSuccess );
     }
 
     /// <summary>
@@ -379,8 +390,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     {
         if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
         return UnderPublishLockAsync( monitor, dryRun, () => regular
-          ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, dryRun, isPullBuild: false, publish: true, BuildImpacts.Error )
-          : DoCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, ciForce, dryRun, isPullBuild: false, publish: true, BuildImpacts.Error ) );
+          ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, dryRun, isPullBuild: false, publish: true, BuildImpacts.Error, withAssets: [] )
+          : DoCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, ciForce, dryRun, isPullBuild: false, publish: true, BuildImpacts.Error, withAssets: [] ) );
     }
 
     /// <summary>
@@ -414,6 +425,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                       [Description( _dBuildImpacts )]
                                       [OptionName( _oBuildImpacts )]
                                       string? buildImpacts = null,
+                                      [Description( _dWithAssets )]
+                                      [OptionName( _oWithAssets )]
+                                      string[]? withAssets = null,
                                       [Description( _dRegular )]
                                       [OptionName( _oRegular )]
                                       bool regular = false,
@@ -433,13 +447,14 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                       bool all = false )
     {
         if( !CheckRegularAndCIForce( monitor, regular, ciForce )
-            || !ParseBuildImpacts( monitor, buildImpacts, out var vBuildImpacts ) )
+            || !ParseBuildImpacts( monitor, buildImpacts, out var vBuildImpacts )
+            || !ParseWithAssets( monitor, withAssets, out var vWithAssets ) )
         {
             return Task.FromResult( false );
         }
         return regular
-         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, dryRun, isPullBuild: true, publish: false, vBuildImpacts )
-         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, ciForce, dryRun, isPullBuild: true, publish: false, vBuildImpacts );
+         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, dryRun, isPullBuild: true, publish: false, vBuildImpacts, vWithAssets )
+         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests, forceTests, withTests, ciForce, dryRun, isPullBuild: true, publish: false, vBuildImpacts, vWithAssets );
     }
 
     /// <summary>
@@ -484,8 +499,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     {
         if( !CheckRegularAndCIForce( monitor, regular, ciForce ) ) return Task.FromResult( false );
         return UnderPublishLockAsync( monitor, dryRun, () => regular
-         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, dryRun, isPullBuild: true, publish: true, BuildImpacts.Error )
-         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, ciForce, dryRun, isPullBuild: true, publish: true, BuildImpacts.Error ) );
+         ? DoNonCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, dryRun, isPullBuild: true, publish: true, BuildImpacts.Error, withAssets: [] )
+         : DoCIAsync( monitor, context, branch, maxDop, all, skipTests: false, forceTests, withTests: true, ciForce, dryRun, isPullBuild: true, publish: true, BuildImpacts.Error, withAssets: [] ) );
     }
 
     // "--build-impacts <commit|discard>": no value is BuildImpacts.Error.
@@ -505,6 +520,22 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         }
         monitor.Error( $"Invalid '{_oBuildImpacts}' value '{value}': it must be 'commit' or 'discard'." );
         return false;
+    }
+
+    // "--with-assets [values]": null when absent, empty for everything, otherwise the distinct sorted values (they are
+    // recorded in the version tag: BuildContentInfo.AssetsRequest).
+    static bool ParseWithAssets( IActivityMonitor monitor, string[]? values, out ImmutableArray<string>? withAssets )
+    {
+        withAssets = null;
+        if( values == null ) return true;
+        var invalid = values.Where( v => !BuildContentInfo.IsValidAssetsRequestValue( v ) ).ToList();
+        if( invalid.Count > 0 )
+        {
+            monitor.Error( $"Invalid '{_oWithAssets}' values: {invalid.Select( v => $"'{v}'" ).Concatenate()}. A value cannot be empty nor contain a comma or a white space." );
+            return false;
+        }
+        withAssets = values.Distinct().Order( StringComparer.Ordinal ).ToImmutableArray();
+        return true;
     }
 
     // "--ci.0" asks for a CI version: it cannot be combined with "--regular", which asks for the opposite.
@@ -531,6 +562,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                           bool isPullBuild,
                           bool publish,
                           BuildImpacts buildImpacts,
+                          ImmutableArray<string>? withAssets,
                           bool focus = false,
                           bool continueOnSuccess = false )
     {
@@ -539,7 +571,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return Task.FromResult( false );
         }
-        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all, dryRun, runTest, withTests, focus, continueOnSuccess );
+        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all, dryRun, runTest, withTests, withAssets, focus, continueOnSuccess );
         if( roadmap == null )
         {
             return Task.FromResult( false );
@@ -560,7 +592,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                              bool dryRun,
                              bool isPullBuild,
                              bool publish,
-                             BuildImpacts buildImpacts )
+                             BuildImpacts buildImpacts,
+                             ImmutableArray<string>? withAssets )
     {
         if( skipTests )
         {
@@ -571,7 +604,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return Task.FromResult( false );
         }
-        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.Regular, mustPublish: publish, branch, all, dryRun, runTest, withTests );
+        var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.Regular, mustPublish: publish, branch, all, dryRun, runTest, withTests, withAssets );
         if( roadmap == null || !ParseInteger( monitor, "--max-dop", maxDop, out var vMaDxDop, 4 ) )
         {
             return Task.FromResult( false );
@@ -641,6 +674,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                        bool dryRun,
                                        bool? runTest,
                                        bool withTests,
+                                       ImmutableArray<string>? withAssets,
                                        bool focus = false,
                                        bool continueOnSuccess = false )
     {
@@ -701,7 +735,8 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                       stopAfterFocus: focus && !continueOnSuccess,
                                       ( repo, tree ) => _repoBuilder.Get( monitor, repo ).HasTestRun( monitor, tree ),
                                       runTest,
-                                      withTests );
+                                      withTests,
+                                      withAssets );
         if( roadmap != null  )
         {
             context.Screen.Display( roadmap.ToRenderable );
@@ -744,6 +779,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                              bool? runTest,
                                              bool forceRebuild,
                                              BuildImpacts buildImpacts,
+                                             ImmutableArray<string>? withAssets,
                                              CancellationToken cancellation )
     {
         // We reproduce the "building/", "local/" or nothing (published): we don't set
@@ -762,7 +798,10 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         // this supports a "natural" force rebuild for the user by deleting the version tag.
         if( !forceRebuild )
         {
-            if( versionInfo.TryGetTagCommit( targetVersion, out var buildTagCommit ) && !buildTagCommit.IsFakeVersion )
+            // A version built without the requested assets is built again.
+            if( versionInfo.TryGetTagCommit( targetVersion, out var buildTagCommit )
+                && !buildTagCommit.IsFakeVersion
+                && buildTagCommit.BuildContentInfo.HasGeneratedAssets( withAssets ) )
             {
                 if( _artifactHandler.HasAllArtifacts( monitor, versionInfo.Repo, targetVersion, buildTagCommit.BuildContentInfo, out var assetsFolder ) )
                 {
@@ -791,7 +830,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         {
             return null;
         }
-        var result = await CheckedOutBuildAsync( monitor, context, versionInfo, buildCommit, targetVersion, runTest.Value, forceRebuild, buildImpacts, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
+        var result = await CheckedOutBuildAsync( monitor, context, versionInfo, buildCommit, targetVersion, runTest.Value, forceRebuild, buildImpacts, withAssets, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
         // A forced rebuild of a published version updates its version tag content: this is locally complete
         // and must be shared, other clones would otherwise keep the previous tag and have to rebuild it again.
         // ("building/" versions are the roadmap and fix workflows: they are published, if ever, by the publish step.)
@@ -820,6 +859,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                                    bool runTest,
                                                    bool forceRebuild,
                                                    BuildImpacts buildImpacts,
+                                                   ImmutableArray<string>? withAssets,
                                                    RepoBuilder repoBuilder,
                                                    CommitBuildInfo buildInfo,
                                                    CancellationToken cancellation )
@@ -874,7 +914,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                 }
                 try
                 {
-                    output = await _builderFunction( monitor, context, versionInfo, buildCommit, runTest, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
+                    output = await _builderFunction( monitor, context, versionInfo, buildCommit, runTest, withAssets, repoBuilder, buildInfo, cancellation ).ConfigureAwait( false );
                 }
                 catch( Exception ex )
                 {
@@ -945,7 +985,9 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             var content = new BuildContentInfo( output.Consumed,
                                                 publishedPackages,
                                                 output.AssetFileNames,
-                                                output.Transitive );
+                                                output.Transitive,
+                                                output.AssetsNotGenerated,
+                                                output.AssetsRequest );
             var (tag, version) = buildInfo.ApplyReleaseBuildTag( monitor, context, content );
             if( tag == null )
             {
@@ -1052,6 +1094,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                                     VersionTagInfo versionInfo,
                                                     Commit buildCommit,
                                                     bool runTest,
+                                                    ImmutableArray<string>? withAssets,
                                                     RepoBuilder repoBuilder,
                                                     CommitBuildInfo buildInfo,
                                                     CancellationToken cancellation )
@@ -1060,6 +1103,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
                                              context,
                                              buildInfo,
                                              runTest,
+                                             withAssets,
                                              cancellation ).ConfigureAwait( false );
     }
 

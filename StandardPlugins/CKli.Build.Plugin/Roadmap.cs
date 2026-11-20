@@ -36,6 +36,7 @@ public sealed partial class Roadmap
     readonly bool _isPullBuild;
     readonly bool _focus;
     readonly bool _stopAfterFocus;
+    readonly ImmutableArray<string>? _withAssets;
     readonly ImmutableArray<BuildSolution> _orderedSolutions;
     readonly ImmutableArray<BuildSolution> _pivots;
     readonly BuildSolutionList _buildSolutions;
@@ -56,7 +57,8 @@ public sealed partial class Roadmap
              bool mustPublish,
              bool dryRun,
              bool focus,
-             bool stopAfterFocus )
+             bool stopAfterFocus,
+             ImmutableArray<string>? withAssets )
     {
         Throw.DebugAssert( "'--focus' is ignored without pivots.", !focus || graph.HasPivots );
         Throw.DebugAssert( !stopAfterFocus || focus );
@@ -65,6 +67,7 @@ public sealed partial class Roadmap
         _isPullBuild = isPullBuild;
         _focus = focus;
         _stopAfterFocus = stopAfterFocus;
+        _withAssets = withAssets;
         _ciBuildMode = ciBuildMode;
         _mustPublish = mustPublish;
         _dryRun = dryRun;
@@ -100,7 +103,8 @@ public sealed partial class Roadmap
                                      bool stopAfterFocus,
                                      Func<Repo, Tree, bool> hasTestRun,
                                      bool? runTest,
-                                     bool withTests )
+                                     bool withTests,
+                                     ImmutableArray<string>? withAssets )
     {
 
         // Refactor this?...
@@ -125,7 +129,7 @@ public sealed partial class Roadmap
             var packageUpdater = graph.GetPackageUpdater( monitor, versionTag );
             if( packageUpdater == null ) return null;
 
-            roadmap = new Roadmap( graph, packageUpdater, isPullBuild, ciBuildMode, mustPublish, dryRun, focus, stopAfterFocus );
+            roadmap = new Roadmap( graph, packageUpdater, isPullBuild, ciBuildMode, mustPublish, dryRun, focus, stopAfterFocus, withAssets );
             if( !roadmap.Initialize( monitor ) )
             {
                 return null;
@@ -244,6 +248,12 @@ public sealed partial class Roadmap
     /// </para>
     /// </summary>
     public IPackageMapping PackageMapping => _packageMapping;
+
+    /// <summary>
+    /// Gets the assets that the builds must generate: null to skip the "Deployment/GenerateAssets.cs" scripts (a
+    /// "ckli build" without "--with-assets"), empty for every asset (a publication), otherwise the values of "--with-assets".
+    /// </summary>
+    public ImmutableArray<string>? WithAssets => _withAssets;
 
     /// <summary>
     /// Gets whether a publication should follow the build.

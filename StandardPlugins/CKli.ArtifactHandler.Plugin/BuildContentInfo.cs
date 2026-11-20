@@ -28,6 +28,8 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
     readonly ImmutableArray<string> _produced;
     readonly ImmutableArray<string> _assetFileNames;
     readonly ImmutableArray<PackageInstance> _transitive;
+    readonly bool _assetsNotGenerated;
+    readonly ImmutableArray<string> _assetsRequest;
     string? _toString;
 
     /// <summary>
@@ -47,10 +49,17 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
     /// unique and sorted. Defaults to <c>default</c>, which is NOT the empty array: it means "not recorded"
     /// (see <see cref="HasTransitive"/>) where an empty array means "recorded, and there is none".
     /// </param>
+    /// <param name="assetsNotGenerated">See <see cref="AssetsNotGenerated"/>. The <paramref name="assetFileNames"/> must be empty.</param>
+    /// <param name="assetsRequest">
+    /// See <see cref="AssetsRequest"/>: default or empty for "everything". Must be empty when <paramref name="assetsNotGenerated"/> is true.
+    /// Must be unique, lexicographically sorted, have no comma nor white space.
+    /// </param>
     public BuildContentInfo( ImmutableArray<PackageInstance> consumed,
                              ImmutableArray<string> produced,
                              ImmutableArray<string> assetFileNames,
-                             ImmutableArray<PackageInstance> transitive = default )
+                             ImmutableArray<PackageInstance> transitive = default,
+                             bool assetsNotGenerated = false,
+                             ImmutableArray<string> assetsRequest = default )
     {
         Throw.CheckArgument( !consumed.IsDefault && consumed.IsSortedStrict() );
 
@@ -72,7 +81,30 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
         _produced = produced;
         _assetFileNames = assetFileNames;
         _transitive = transitive;
+        Throw.CheckArgument( !assetsNotGenerated || assetFileNames.Length == 0 );
+        if( assetsRequest.IsDefault ) assetsRequest = [];
+        Throw.CheckArgument( !assetsNotGenerated || assetsRequest.Length == 0 );
+        Throw.CheckArgument( IsValidAssetsRequest( assetsRequest ) );
+        _assetsNotGenerated = assetsNotGenerated;
+        _assetsRequest = assetsRequest;
     }
+
+    /// <summary>
+    /// Checks that values given to "Deployment/GenerateAssets.cs" can be recorded by <see cref="AssetsRequest"/>:
+    /// unique, lexicographically sorted (ordinal), each one valid (see <see cref="IsValidAssetsRequestValue(string)"/>).
+    /// </summary>
+    /// <param name="request">The values to check.</param>
+    /// <returns>True when they can be recorded.</returns>
+    public static bool IsValidAssetsRequest( ImmutableArray<string> request ) => request.IsSortedStrict( StringComparer.Ordinal.Compare )
+                                                                                 && request.All( IsValidAssetsRequestValue );
+
+    /// <summary>
+    /// Checks that a value given to "Deployment/GenerateAssets.cs" can be recorded by <see cref="AssetsRequest"/>:
+    /// it is not empty and has no comma nor white space.
+    /// </summary>
+    /// <param name="value">The value to check.</param>
+    /// <returns>True when it can be recorded.</returns>
+    public static bool IsValidAssetsRequestValue( string value ) => value.Length > 0 && !value.Any( c => c == ',' || char.IsWhiteSpace( c ) );
 
     /// <summary>
     /// Deserialization constructor.
@@ -97,6 +129,8 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
             }
             _transitive = t.MoveToImmutable();
         }
+        _assetsNotGenerated = r.ReadBoolean();
+        _assetsRequest = Read( r );
 
         static ImmutableArray<string> Read( ICKBinaryReader r )
         {
@@ -139,6 +173,8 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
                 w.WriteSharedString( p.Version.ToString() );
             }
         }
+        w.Write( _assetsNotGenerated );
+        Write( w, _assetsRequest );
 
         static void Write( ICKBinaryWriter w, ImmutableArray<string> a )
         {
@@ -183,7 +219,46 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
     public bool HasTransitive => !_transitive.IsDefault;
 
     /// <summary>
-    /// Implements value equality semantics.
+    /// Gets whether the repository has a "Deployment/GenerateAssets.cs" that has not been run by the build ("ckli build"
+    /// without "--with-assets"): the <see cref="AssetFileNames"/> are empty because they have not been generated.
+    /// <para>
+    /// This is an optional fifth section of the textual form ("Assets not generated."), written only when true.
+    /// </para>
+    /// </summary>
+    public bool AssetsNotGenerated => _assetsNotGenerated;
+
+    /// <summary>
+    /// Gets the values that have been given to "Deployment/GenerateAssets.cs" ("ckli build --with-assets A B"): only
+    /// the assets of this request have been generated. Empty when everything has been generated (a publication, a
+    /// "--with-assets" without values) or when there is no script. Always empty when <see cref="AssetsNotGenerated"/> is true.
+    /// <para>
+    /// This is an optional fifth section of the textual form ("Assets generated for: A, B"), written only when not empty.
+    /// </para>
+    /// </summary>
+    public ImmutableArray<string> AssetsRequest => _assetsRequest;
+
+    /// <summary>
+    /// Gets whether the assets of this version satisfy a request: <paramref name="request"/> is null when no assets
+    /// are required, empty for "everything", otherwise the values given to "Deployment/GenerateAssets.cs".
+    /// The script is the only one to know what "everything" is: a request is compared to the recorded one,
+    /// not to the asset files.
+    /// </summary>
+    /// <param name="request">The requested assets.</param>
+    /// <returns>True if this version doesn't have to be built again to satisfy the request.</returns>
+    public bool HasGeneratedAssets( ImmutableArray<string>? request )
+    {
+        if( request == null ) return true;
+        if( _assetsNotGenerated ) return false;
+        if( _assetsRequest.Length == 0 ) return true;
+        var r = request.Value;
+        return r.Length > 0 && r.All( v => _assetsRequest.Contains( v, StringComparer.Ordinal ) );
+    }
+
+    const string AssetsNotGeneratedSection = "Assets not generated.";
+    const string AssetsRequestSection = "Assets generated for:";
+
+    /// <summary>
+    /// Implements value equality semantics (including <see cref="AssetsNotGenerated"/>).
     /// </summary>
     /// <param name="other">The other content.</param>
     /// <returns>True if this content is the same as the other one.</returns>
@@ -194,6 +269,8 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
         return _consumed.SequenceEqual( other._consumed )
                && _produced.SequenceEqual( other._produced )
                && _assetFileNames.SequenceEqual( other._assetFileNames )
+               && _assetsNotGenerated == other._assetsNotGenerated
+               && _assetsRequest.SequenceEqual( other._assetsRequest )
                // An unrecorded transitive set differs from a recorded empty one.
                && (_transitive.IsDefault
                     ? other._transitive.IsDefault
@@ -214,6 +291,8 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
         {
             foreach( var t in _transitive ) hash.Add( t.GetHashCode() );
         }
+        hash.Add( _assetsNotGenerated );
+        foreach( var a in _assetsRequest ) hash.Add( a.GetHashCode() );
         return hash.ToHashCode();
     }
 
@@ -257,7 +336,23 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
             {
                 transitive = t;
             }
-            info = new BuildContentInfo( consumed, produced, assets, transitive );
+            // The optional FIFTH section, after the transitive packages when they are here: same pattern.
+            if( transitive.IsDefault ) rest = text;
+            bool assetsNotGenerated = false;
+            var assetsRequest = ImmutableArray<string>.Empty;
+            rest.SkipWhiteSpaces();
+            if( assetsCount == 0 && rest.TryMatch( AssetsNotGeneratedSection ) )
+            {
+                assetsNotGenerated = true;
+            }
+            else if( rest.TryMatch( AssetsRequestSection ) )
+            {
+                int eol = rest.IndexOfAny( '\r', '\n' );
+                var line = (eol < 0 ? rest : rest.Slice( 0, eol )).ToString();
+                var values = line.Split( ',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries ).ToImmutableArray();
+                if( values.Length > 0 && IsValidAssetsRequest( values ) ) assetsRequest = values;
+            }
+            info = new BuildContentInfo( consumed, produced, assets, transitive, assetsNotGenerated, assetsRequest );
             return true;
         }
         info = null;
@@ -368,6 +463,14 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
             b.Append( _transitive.Length ).Append( " Transitive Packages: " )
              .AppendJoin( ", ", _transitive ).AppendLine();
         }
+        if( _assetsNotGenerated )
+        {
+            b.Append( AssetsNotGeneratedSection ).AppendLine();
+        }
+        else if( _assetsRequest.Length > 0 )
+        {
+            b.Append( AssetsRequestSection ).Append( ' ' ).AppendJoin( ", ", _assetsRequest ).AppendLine();
+        }
 
 #if DEBUG
         Throw.Assert( TryParse( b.ToString().AsSpan( previousLength ), out var clone )
@@ -375,6 +478,8 @@ public sealed class BuildContentInfo : IEquatable<BuildContentInfo>
                       && clone.Produced.SequenceEqual( _produced )
                       && clone.AssetFileNames.SequenceEqual( _assetFileNames )
                       && clone.HasTransitive == HasTransitive
+                      && clone.AssetsNotGenerated == _assetsNotGenerated
+                      && clone.AssetsRequest.SequenceEqual( _assetsRequest )
                       && (_transitive.IsDefault || clone.Transitive.SequenceEqual( _transitive )) );
 
 #endif

@@ -69,6 +69,14 @@ public sealed partial class Roadmap
         /// </para>
         /// </summary>
         RollingLocal = 128,
+
+        /// <summary>
+        /// The last version has not generated the requested assets of its "Deployment/GenerateAssets.cs": it has been
+        /// built without "--with-assets" or with other values (see <c>BuildContentInfo.HasGeneratedAssets</c>). A
+        /// publication always requires every asset (this is not skippable), a "ckli build --with-assets" requires the
+        /// ones it asks for (this is skippable: a solution out of the scope of the pivots is not built for this).
+        /// </summary>
+        MissingAssets = 256,
     }
 
 }

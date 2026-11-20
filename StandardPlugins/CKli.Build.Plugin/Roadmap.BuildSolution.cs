@@ -126,6 +126,14 @@ public sealed partial class Roadmap
                                 ? MustBuildReason.FakeVersion
                                 : MustBuildReason.DeprecatedVersion;
             }
+            // The last build may not have generated the requested assets. A publication requires every asset of
+            // what it publishes: this is not skippable. For a "ckli build --with-assets", this is skippable.
+            bool missingAssets = _lastBuild.TagCommit.BuildContentInfo is { } lastContent
+                                 && !lastContent.HasGeneratedAssets( _roadmap._withAssets );
+            if( missingAssets && _roadmap._mustPublish )
+            {
+                buildReason |= MustBuildReason.MissingAssets;
+            }
 
             // Still none? Save the "last build failed" case.
             // When the last build consumes packages in the alreadyBuiltMapping in a different version, it means that
@@ -157,7 +165,7 @@ public sealed partial class Roadmap
                                && !(_roadmap._focus && _solution.IsPivotUpstream);
                 if( !canSkip )
                 {
-                    UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, ref buildReason );
+                    UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, missingAssets, ref buildReason );
                     // Destroying a pending release is a side effect the user did not name: say so. This can only
                     // be reached when RollingLocal is the sole reason to build - when anything else triggers the
                     // build, superseding the local release is the ordinary "rolling local build" and needs no warning.
@@ -173,7 +181,7 @@ public sealed partial class Roadmap
                 {
                     // A "*build" would have built it: this is what "--focus" leaves out of the build.
                     var wouldBuild = MustBuildReason.None;
-                    UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, ref wouldBuild );
+                    UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, missingAssets, ref wouldBuild );
                     _isOutOfFocus = wouldBuild != MustBuildReason.None;
                 }
                 if( buildReason == MustBuildReason.None )
@@ -234,7 +242,7 @@ public sealed partial class Roadmap
             }
             Throw.DebugAssert( "We must build.", buildReason != MustBuildReason.None );
             // Since we must build, let's update the reason with all its reasons for coherency (and its costs nothing).
-            UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, ref buildReason );
+            UpdateSkippableBuildReason( packageUpdates, _lastBuild, _roadmap._ciBuildMode, missingAssets, ref buildReason );
 
             // We must now compute the target version. This uses the vChange that may have been set by the upstream and
             // if the upstreams don't force a Major, we compute the vChange from the code in this repository (previous version
@@ -320,7 +328,18 @@ public sealed partial class Roadmap
             static void UpdateSkippableBuildReason( PackagesUpdateDetails packageUpdates,
                                                     HotGraph.SolutionVersionInfo.LastBuiltVersion lastBuild,
                                                     CIBuildMode ciBuildMode,
+                                                    bool missingAssets,
                                                     ref MustBuildReason buildReason )
+            {
+                // Last: RollingLocal and CI0 are only considered when there is no other reason.
+                DoUpdateSkippableBuildReason( packageUpdates, lastBuild, ciBuildMode, ref buildReason );
+                if( missingAssets ) buildReason |= MustBuildReason.MissingAssets;
+            }
+
+            static void DoUpdateSkippableBuildReason( PackagesUpdateDetails packageUpdates,
+                                                      HotGraph.SolutionVersionInfo.LastBuiltVersion lastBuild,
+                                                      CIBuildMode ciBuildMode,
+                                                      ref MustBuildReason buildReason )
             {
                 if( lastBuild.HasCodeChange )
                 {

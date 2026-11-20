@@ -118,6 +118,7 @@ All build-family commands share a common set of options (declared once as `const
 | `--focus` | `build` only. The pivots' upstreams are built too, the pivots are built before anything else, the build stops once they are built (or at the first failure) - see [below](#build---focus-working-in-a-pivot-and-its-upstreams). CI only: exclusive with `--regular`. |
 | `--continue` | `build --focus` only. Once the pivots and their upstreams are successfully built, goes on with the other builds (their consumers). |
 | `--build-impacts <commit\|discard>` | `build` and `*build` only. What to do with the files that a build creates, modifies or deletes: they fail the build by default - see [below](#build-impacts-what-a-build-leaves-in-the-working-folder). |
+| `--with-assets [values...]` | `build` and `*build` only. Runs the `Deployment/GenerateAssets.cs` scripts, which a `build` skips by default (a publication always runs them, without values). Without values every asset is generated, otherwise the values are given to the scripts after the version (no white space nor comma). The version tag records the request (`BuildContentInfo.AssetsNotGenerated`/`AssetsRequest`): a version that doesn't satisfy a request is built again (`MissingAssets`). CKli doesn't know what "everything" is: a request is compared to the recorded one, `--with-assets A` is satisfied by "everything" or by a request that contains `A`, and "everything" only by "everything". |
 
 | `[CommandPath]` | Method | Description |
 |---|---|---|
@@ -448,6 +449,7 @@ For every `HotGraph.Solution` (ordered topologically, `OrderedSolutions`), a `Ro
 | `CodeChange` | The commit's own code changed since the last build (conventional-commit/version-tag driven). |
 | `CI0` | `--ci.0` is used, there is no other reason to build, and the last version is a *published* non-CI build with no `ci.0` yet on this commit - forces a `ci.0` rebuild, opening a new version line above the published one. From another branch's version (the first build of a prerelease branch on a stable commit) the version cannot be a `ci.0`, which is always on the branch of its base: it gets its own commit, becomes a `ci.1`, and the roadmap displays `(CI0+branch)`. |
 | `RollingLocal` | A CI build is done (the default mode is enough), there is no other reason to build, and the last version is a regular build still pending as a `local/`/`building/` release - the CI version takes its place on the same commit. |
+| `MissingAssets` | The last version didn't generate the requested assets of its `Deployment/GenerateAssets.cs` (built without `--with-assets`, or with other values). Not skippable for a publication (it requires every asset), skippable for a `build --with-assets` (a solution out of the pivots' scope is not built for this). |
 
 No reason comes from the `#:package` directives of `Deployment/GenerateAssets.cs` (`GitSolutionContent.ScriptConsumed`): a
 build of the solution that produces one of them doesn't build the script's solution. When that solution is built for
@@ -705,8 +707,9 @@ a hook inside `RepoBuilder` would never run under the fake harness (nor under a 
 3. Otherwise calls `DotNetBuildTestPack` (`protected virtual`, overridable by a specialized `RepoBuilder`): `dotnet
    build` (with `/p:Version`, `/p:InformationalVersion`, `/p:FileVersion`, `ContinuousIntegrationBuild=true`), optionally
    `dotnet test`, then `dotnet pack` to a temporary output folder, and reads the consumed packages.
-4. On success: runs the `Deployment/GenerateAssets.cs` convention if present (via `dotnet run` and
-   `ArtifactHandlerPlugin`'s asset publishing) **with the local feed**: its `#:package` may be a version that only the
+4. On success: runs the `Deployment/GenerateAssets.cs` convention if present and requested (`withAssets` is not null:
+   `dotnet run GenerateAssets.cs -- {version} {values...}` and `ArtifactHandlerPlugin`'s asset publishing; a skipped
+   script sets `BuildOutput.AssetsNotGenerated`) **with the local feed**: its `#:package` may be a version that only the
    local feed has. Then restores the original `nuget.config` (its modification is not an impact of the build) and
    returns the `BuildOutput`. The working folder is left as the build left it: `CoreBuildAsync` reads its impacts, then
    resets it.

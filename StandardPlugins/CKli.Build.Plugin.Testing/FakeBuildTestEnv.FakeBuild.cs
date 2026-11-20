@@ -44,7 +44,10 @@ public sealed partial class FakeBuildTestEnv
     ///     set instead would assert that a restore brings nothing, which is a different and false statement.
     ///     </item>
     ///     <item>
-    ///     The "Deployment" assets are not faked: <see cref="BuildContentInfo.AssetFileNames"/> is always empty.
+    ///     The "Deployment" assets are not faked: <see cref="BuildContentInfo.AssetFileNames"/> is always empty. But when the
+    ///     commit has a "Deployment/GenerateAssets.cs", the request is recorded like the real build does: "not generated"
+    ///     without "--with-assets", otherwise the values (<see cref="BuildContentInfo.AssetsRequest"/>). The last request
+    ///     is available on <see cref="FakeBuildRepo.LastWithAssets"/>.
     ///     </item>
     /// </list>
     /// Everything else (handling the impacts of the build, publishing to the local NuGet feed and tagging the
@@ -55,17 +58,19 @@ public sealed partial class FakeBuildTestEnv
                                               VersionTagInfo versionInfo,
                                               Commit buildCommit,
                                               bool runTest,
+                                              ImmutableArray<string>? withAssets,
                                               RepoBuilder repoBuilder,
                                               CommitBuildInfo buildInfo,
                                               CancellationToken cancellation )
     {
-        return Task.FromResult( FakeBuild( monitor, context, buildCommit, runTest, repoBuilder, buildInfo, cancellation ) );
+        return Task.FromResult( FakeBuild( monitor, context, buildCommit, runTest, withAssets, repoBuilder, buildInfo, cancellation ) );
     }
 
     BuildOutput? FakeBuild( IActivityMonitor monitor,
                             CKliEnv context,
                             Commit buildCommit,
                             bool runTest,
+                            ImmutableArray<string>? withAssets,
                             RepoBuilder repoBuilder,
                             CommitBuildInfo buildInfo,
                             CancellationToken cancellation )
@@ -126,7 +131,17 @@ public sealed partial class FakeBuildTestEnv
             if( cancellation.IsCancellationRequested ) return null;
             // A test can simulate a build that creates, modifies or deletes files in the working folder.
             declaring?.OnBuild?.Invoke( repo.WorkingFolder );
-            return output = new BuildOutput( outputPath, consumed, GetTransitivePackages( repo ), assetsFolder: default, assetFileNames: [] );
+            if( declaring != null ) declaring.LastWithAssets = withAssets;
+            // Same as RepoBuilder.HandleDeployAssets: without a script, there is nothing to generate.
+            bool hasScript = buildCommit[GenerateAssetsScript.FilePath] != null;
+            bool notGenerated = hasScript && withAssets == null;
+            return output = new BuildOutput( outputPath,
+                                             consumed,
+                                             GetTransitivePackages( repo ),
+                                             assetsFolder: default,
+                                             assetFileNames: [],
+                                             notGenerated,
+                                             hasScript && !notGenerated ? withAssets!.Value : [] );
         }
         catch( Exception ex )
         {

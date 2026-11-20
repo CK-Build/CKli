@@ -62,6 +62,13 @@ Two folders are created under the World's local data folder (`$Local/<World>/...
 
 `BuildContentInfo` is the durable, serializable description of one build: the packages it **consumed** (`ImmutableArray<PackageInstance>`, the top level references), the packages it **produced**, the asset file names it generated, and the **transitive** packages (what a restore brings beyond the consumed ones). It supports both binary serialization (`ICKBinaryReader`/`ICKBinaryWriter`) and a round-trippable text format (`Write(StringBuilder)` / `TryParse(...)`) — this text form is what gets stored as the **annotation message of the version's Git tag** (`refs/tags/vX.Y.Z`), so the release's contents can be recovered later just by reading the tag, without needing to rebuild.
 
+The text form is a sequence of sections and a reader stops at the last one it knows: a new section is appended and
+optional. After the transitive packages, an optional line records what `Deployment/GenerateAssets.cs` was asked for:
+`Assets not generated.` (`AssetsNotGenerated`: a `ckli build` without `--with-assets`) or `Assets generated for: A, B`
+(`AssetsRequest`: the values of `--with-assets`). Without it, every asset has been generated (or there is no script),
+which is how every annotation written before it reads. `HasGeneratedAssets(request)` tells whether a version satisfies
+a request (null: none, empty: everything): CKli doesn't know what "everything" is, so it compares requests, not files.
+
 The text form is therefore a **stored format**, and it is a sequence of sections that a reader stops at the last one it knows. That is what keeps it readable in both directions, and it is the rule any future field must follow: **append a section and make it optional**. `Transitive` was added that way, so an annotation written before it has three sections and reads back with `HasTransitive` false, while a CKli that predates it reads the three sections it knows and ignores the fourth. Note that `HasTransitive` false (`default`) is *not* an empty `Transitive`: the first says the transitive packages are unknown, the second says a restore brings nothing.
 
 `Transitive` is **NuGet's own resolution**, read from `dotnet package list --include-transitive` by `BuildResult.GetConsumedPackages` in the same call that reads the consumed ones: target framework aware, pruned (a framework provided package is not listed) and one version per identifier. It is an answer, not the input to a closure computation.

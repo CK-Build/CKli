@@ -526,6 +526,7 @@ public sealed partial class BuildPlugin
                                                             _runTest,
                                                             forceRebuild: !build.TargetVersion.IsCI,
                                                             _buildImpacts,
+                                                            _roadmap.WithAssets,
                                                             _cancellation ).ConfigureAwait( false );
             // "--build-impacts commit" may have amended the head of the build branch.
             if( result != null && !buildBranch.Refresh( monitor ) )

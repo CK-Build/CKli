@@ -164,12 +164,17 @@ public class RepoBuilder : RepoInfo
     /// <param name="context">Minimal CKli context.</param>
     /// <param name="buildInfo">The build info.</param>
     /// <param name="runTest">Whether tests should be run or not.</param>
+    /// <param name="withAssets">
+    /// Null to skip the "Deployment/GenerateAssets.cs" script, empty to generate everything, otherwise the values
+    /// given to the script after the version.
+    /// </param>
     /// <param name="cancellation">Cancellation token.</param>
     /// <returns>The build output on success, null otherwise.</returns>
     public async Task<BuildOutput?> BuildAsync( IActivityMonitor monitor,
                                                 CKliEnv context,
                                                 CommitBuildInfo buildInfo,
                                                 bool runTest,
+                                                ImmutableArray<string>? withAssets,
                                                 CancellationToken cancellation )
     {
         Throw.CheckState( "Repository must not be dirty when calling build.", !Repo.GitRepository.GetSimpleStatusInfo().IsDirty );
@@ -209,11 +214,17 @@ public class RepoBuilder : RepoInfo
                 // local feed. Its "#:package" (and what it restores in turn) may be a version that only the local
                 // feed has, and nothing else of the repository put it in the NuGet global cache.
                 var deploymentFolder = Repo.WorkingFolder.AppendPart( ArtifactHandlerPlugin.DeployFolderName );
-                if( !HandleDeployAssets( monitor, deploymentFolder, buildInfo.Version, cancellation, out var assetsFolder, out var assetFileNames ) )
+                if( !HandleDeployAssets( monitor, deploymentFolder, buildInfo.Version, withAssets, cancellation, out var assetsFolder, out var assetFileNames, out var notGenerated ) )
                 {
                     return null;
                 }
-                return output = new BuildOutput( outputPath, consumedPackages, transitivePackages, assetsFolder, assetFileNames );
+                return output = new BuildOutput( outputPath,
+                                                 consumedPackages,
+                                                 transitivePackages,
+                                                 assetsFolder,
+                                                 assetFileNames,
+                                                 notGenerated,
+                                                 notGenerated ? [] : withAssets ?? [] );
             }
             finally
             {
@@ -343,12 +354,15 @@ public class RepoBuilder : RepoInfo
     bool HandleDeployAssets( IActivityMonitor monitor,
                              NormalizedPath deploymentFolder,
                              SVersion version,
+                             ImmutableArray<string>? withAssets,
                              CancellationToken cancellation,
                              out NormalizedPath assetsFolder,
-                             out ImmutableArray<string> fileNames )
+                             out ImmutableArray<string> fileNames,
+                             out bool notGenerated )
     {
         assetsFolder = default;
         fileNames = [];
+        notGenerated = false;
         if( !Directory.Exists( deploymentFolder ) )
         {
             // No Deployment assets.
@@ -363,6 +377,13 @@ public class RepoBuilder : RepoInfo
             {
                 // Not an error, not even a warning: a "Deployment" folder may exist before its assets.
                 monitor.Trace( $"Ignoring '{deploymentFolder}' because no 'GenerateAssets.cs' file exists." );
+                return true;
+            }
+            if( withAssets == null )
+            {
+                // "ckli build" without "--with-assets": the version records that its assets are not generated.
+                monitor.Info( $"Skipping '{generateFileApp}': the assets are not generated (use '--with-assets')." );
+                notGenerated = true;
                 return true;
             }
             var repoAssetsFolder = deploymentFolder.AppendPart( ArtifactHandlerPlugin.DeployAssetsName );
@@ -381,12 +402,14 @@ public class RepoBuilder : RepoInfo
                 File.WriteAllText( gitignoreAssets, "Assets/" );
             }
             Directory.CreateDirectory( repoAssetsFolder );
+            // The values of "--with-assets" follow the version (BuildContentInfo checked that they have no white space).
+            var scriptValues = string.Concat( withAssets.Value.Select( v => " " + v ) );
             // The standard output and error are received concurrently: they need their own collector.
             var stdOut = new StringBuilder();
             var stdErr = new StringBuilder();
             var e = ProcessRunner.RunProcess( monitor.ParallelLogger,
                                               "dotnet",
-                                              $"run GenerateAssets.cs -- {version}",
+                                              $"run GenerateAssets.cs -- {version}{scriptValues}",
                                               deploymentFolder,
                                               stdOut: stdOut,
                                               stdErr: stdErr,

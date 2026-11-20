@@ -283,6 +283,7 @@ public sealed partial class BuildPlugin
                                            runTest,
                                            forceRebuild: rebuild || moveVersion,
                                            BuildImpacts.Error,
+                                           withAssets: [],
                                            PrimaryPluginContext.Cancellation ).ConfigureAwait( false );
         if( result == null )
         {
