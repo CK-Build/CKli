@@ -197,7 +197,9 @@ public class RepoBuilder : RepoInfo
                 {
                     return null;
                 }
-                RestoreNuGetConfig( nugetConfigPath, originalNuGetConfig );
+                // The "nuget.config" is restored by the finally below, not before: "GenerateAssets.cs" needs the
+                // local feed. Its "#:package" (and what it restores in turn) may be a version that only the local
+                // feed has, and nothing else of the repository put it in the NuGet global cache.
                 var deploymentFolder = Repo.WorkingFolder.AppendPart( ArtifactHandlerPlugin.DeployFolderName );
                 if( !HandleDeployAssets( monitor, deploymentFolder, buildInfo.Version, out var assetsFolder, out var assetFileNames ) )
                 {

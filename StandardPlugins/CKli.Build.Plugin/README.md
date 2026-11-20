@@ -696,10 +696,11 @@ a hook inside `RepoBuilder` would never run under the fake harness (nor under a 
 3. Otherwise calls `DotNetBuildTestPack` (`protected virtual`, overridable by a specialized `RepoBuilder`): `dotnet
    build` (with `/p:Version`, `/p:InformationalVersion`, `/p:FileVersion`, `ContinuousIntegrationBuild=true`), optionally
    `dotnet test`, then `dotnet pack` to a temporary output folder, and reads the consumed packages.
-4. On success: restores the original `nuget.config` (its modification is not an impact of the build), runs the
-   `Deployment/GenerateAssets.cs` convention if present (via `dotnet run` and `ArtifactHandlerPlugin`'s asset
-   publishing) and returns the `BuildOutput`. The working folder is left as the build left it: `CoreBuildAsync` reads
-   its impacts, then resets it.
+4. On success: runs the `Deployment/GenerateAssets.cs` convention if present (via `dotnet run` and
+   `ArtifactHandlerPlugin`'s asset publishing) **with the local feed**: its `#:package` may be a version that only the
+   local feed has. Then restores the original `nuget.config` (its modification is not an impact of the build) and
+   returns the `BuildOutput`. The working folder is left as the build left it: `CoreBuildAsync` reads its impacts, then
+   resets it.
 
 `RepoBuilder.HasTestRun`/the successful-test cache is backed by `LocalStringCache` (`RepoBuilder/LocalStringCache.cs`): a
 trivial newline-delimited set of keys persisted under the World's `$Local` folder (`TestRun.Sha.txt`), shared by every
