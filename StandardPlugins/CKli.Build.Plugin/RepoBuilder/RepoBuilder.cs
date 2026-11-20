@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -42,9 +43,14 @@ public class RepoBuilder : RepoInfo
     public static readonly CKTrait DotNetPackFailedTag = ActivityMonitor.Tags.Register( "DotNetPackFailed" );
 
     /// <summary>
-    /// Gets the failed step that the tags of a concluding error name ("dotnet build", "dotnet test" or
-    /// "dotnet pack"), or null when they name none: a display that already names the repository says
-    /// the step rather than repeating that error.
+    /// Tags the error that concludes a failed "Deployment/GenerateAssets.cs" run of <see cref="BuildAsync"/>.
+    /// </summary>
+    public static readonly CKTrait GenerateAssetsFailedTag = ActivityMonitor.Tags.Register( "GenerateAssetsFailed" );
+
+    /// <summary>
+    /// Gets the failed step that the tags of a concluding error name ("dotnet build", "dotnet test",
+    /// "dotnet pack" or "GenerateAssets.cs"), or null when they name none: a display that already names the
+    /// repository says the step rather than repeating that error.
     /// </summary>
     /// <param name="tags">The tags of an error.</param>
     /// <returns>The failed step or null.</returns>
@@ -54,7 +60,9 @@ public class RepoBuilder : RepoInfo
                                                                 ? "dotnet test"
                                                                 : tags.Overlaps( DotNetPackFailedTag )
                                                                     ? "dotnet pack"
-                                                                    : null;
+                                                                    : tags.Overlaps( GenerateAssetsFailedTag )
+                                                                        ? "GenerateAssets.cs"
+                                                                        : null;
 
     /// <summary>
     /// Prefix of the line of the concluding error of a failed step that names the log file that contains the
@@ -201,7 +209,7 @@ public class RepoBuilder : RepoInfo
                 // local feed. Its "#:package" (and what it restores in turn) may be a version that only the local
                 // feed has, and nothing else of the repository put it in the NuGet global cache.
                 var deploymentFolder = Repo.WorkingFolder.AppendPart( ArtifactHandlerPlugin.DeployFolderName );
-                if( !HandleDeployAssets( monitor, deploymentFolder, buildInfo.Version, out var assetsFolder, out var assetFileNames ) )
+                if( !HandleDeployAssets( monitor, deploymentFolder, buildInfo.Version, cancellation, out var assetsFolder, out var assetFileNames ) )
                 {
                     return null;
                 }
@@ -335,6 +343,7 @@ public class RepoBuilder : RepoInfo
     bool HandleDeployAssets( IActivityMonitor monitor,
                              NormalizedPath deploymentFolder,
                              SVersion version,
+                             CancellationToken cancellation,
                              out NormalizedPath assetsFolder,
                              out ImmutableArray<string> fileNames )
     {
@@ -352,8 +361,8 @@ public class RepoBuilder : RepoInfo
             var generateFileApp = deploymentFolder.AppendPart( "GenerateAssets.cs" );
             if( !File.Exists( generateFileApp ) )
             {
-                // Not an error.
-                monitor.Warn( $"Ignoring '{deploymentFolder}' because no 'GenerateAssets.cs' file exists." );
+                // Not an error, not even a warning: a "Deployment" folder may exist before its assets.
+                monitor.Trace( $"Ignoring '{deploymentFolder}' because no 'GenerateAssets.cs' file exists." );
                 return true;
             }
             var repoAssetsFolder = deploymentFolder.AppendPart( ArtifactHandlerPlugin.DeployAssetsName );
@@ -372,13 +381,24 @@ public class RepoBuilder : RepoInfo
                 File.WriteAllText( gitignoreAssets, "Assets/" );
             }
             Directory.CreateDirectory( repoAssetsFolder );
+            // The standard output and error are received concurrently: they need their own collector.
+            var stdOut = new StringBuilder();
+            var stdErr = new StringBuilder();
             var e = ProcessRunner.RunProcess( monitor.ParallelLogger,
                                               "dotnet",
                                               $"run GenerateAssets.cs -- {version}",
-                                              deploymentFolder );
+                                              deploymentFolder,
+                                              stdOut: stdOut,
+                                              stdErr: stdErr,
+                                              cancellation: cancellation );
             if( e != 0 )
             {
-                monitor.Error( $"Running '{generateFileApp}' failed with code '{e}'." );
+                // A stopped run has nothing to say.
+                if( e == null && cancellation.IsCancellationRequested ) return false;
+                // The script runs any code (here, CK.AppDeployment runs "dotnet publish"): its error lines may
+                // not be "error XX0000:" ones (an unhandled exception), its last lines are the best guess.
+                LogFailureExcerpt( monitor, stdOut.Append( stdErr ).ToString(), lastLinesFallback: true );
+                LogStepFailure( monitor, GenerateAssetsFailedTag, $"Running '{generateFileApp}' failed with code '{e}'." );
                 return false;
             }
             return _repoArtifact.PublishGeneratedAssets( monitor, version, out assetsFolder, out fileNames );
@@ -454,11 +474,13 @@ public class RepoBuilder : RepoInfo
     /// Logs an error with the first error lines of the output of a failed "dotnet" process (at most
     /// <see cref="MaxExcerptLines"/>): the "error XX0000:" lines (without the MSBuild duplicates nor the
     /// project path suffix) and, for "dotnet test", the failed tests with their error message.
-    /// Nothing is logged when no such line is found.
+    /// Nothing is logged when no such line is found, unless <paramref name="lastLinesFallback"/> is true:
+    /// the last non empty lines of the output are logged instead.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="output">The captured standard output and error of the process.</param>
-    protected void LogFailureExcerpt( IActivityMonitor monitor, string output )
+    /// <param name="lastLinesFallback">True to log the last lines when no error line is found.</param>
+    protected void LogFailureExcerpt( IActivityMonitor monitor, string output, bool lastLinesFallback = false )
     {
         var root = Repo.WorkingFolder.Path + '/';
         var rootBackslash = root.Replace( '/', '\\' );
@@ -509,7 +531,13 @@ public class RepoBuilder : RepoInfo
             if( lines.Count < MaxExcerptLines ) lines.Add( kept );
             else ++more;
         }
-        if( lines.Count == 0 ) return;
+        if( lines.Count == 0 )
+        {
+            if( !lastLinesFallback ) return;
+            var last = output.Split( '\n' ).Select( l => l.TrimEnd() ).Where( l => l.Length > 0 ).TakeLast( MaxExcerptLines );
+            lines.AddRange( last.Select( l => l.Replace( root, "" ).Replace( rootBackslash, "" ) ) );
+            if( lines.Count == 0 ) return;
+        }
         if( more > 0 ) lines.Add( $"(+{more} more)" );
         monitor.Error( lines.Concatenate( Environment.NewLine ) );
     }

@@ -581,11 +581,12 @@ been computed and is not a dry-run:
    i  Core/Basic/CK-Monitoring ⏚/v27.1.0-mike.0.ci.3 built: 2 packages.
    E  ✱ Misc/CK-Mailer ⏚/v14.0.0-juliet.0.ci.8 dotnet build failed.
   ```
-  The failure is the `RepoBuilder` step that failed (`dotnet build`, `dotnet test` or `dotnet pack`), read from the
+  The failure is the `RepoBuilder` step that failed (`dotnet build`, `dotnet test`, `dotnet pack` or
+  `GenerateAssets.cs`), read from the
   tag of the error that concludes it (`RepoBuilder.GetFailedStep`): that error names the repository for the other
   commands that build (`fix build`, `issue --fix`, the rebuilds), the row doesn't repeat it. Any other failure is
   `build failed.` with its errors below.
-  A failed `dotnet` step also says why and where to read more:
+  A failed step also says why and where to read more:
   ```
    E  Samples/CKt-Sample-Monitoring ⏚/v0.0.0 dotnet build failed.
        E  CKt.Sample.Monitoring\Bug.cs(1,2): error CS1001: Identifier expected
@@ -596,6 +597,8 @@ been computed and is not a dry-run:
     `MaxExcerptLines` meaningful lines (`LogFailureExcerpt`): the `error XX0000:` lines, without MSBuild's
     end-of-build duplicates, the ` [project]` suffix and the repository prefix; for `dotnet test`, the `Failed <test>`
     lines with their `Error Message:`.
+  - `Deployment/GenerateAssets.cs` runs any code (CK.AppDeployment runs `dotnet publish`): when its output has no
+    such line (an unhandled exception), its last `MaxExcerptLines` non empty lines are logged instead.
   - The concluding error (`LogStepFailure`) first closes the current text log file
     (`CKliRootEnv.CloseCurrentTextLogFile`) and names it on a `Log file: ` line (`RepoBuilder.GetLogFilePath`).
     Closing it is what gives the exact path, and it gives the final one: an open log file is `.log.tmp` and is renamed
