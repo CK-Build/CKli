@@ -316,6 +316,27 @@ When `--all` is specified, this applies to all the Repos of the current World (e
 The layout issue is fixed like `layout fix` without `--delete-aliens`: repositories not defined in the World
 are reported, never deleted.
 
+#### The Git line endings check
+
+Every `issue` checks that Git checks text files out with the newline of the platform: CRLF on Windows, LF
+everywhere else. For each considered repository (and for the Stack repository), the effective `core.autocrlf` and
+`core.eol` settings are read:
+
+- `core.autocrlf` true gives CRLF, `input` gives LF;
+- otherwise `core.eol` decides: `crlf`, `lf`, and the newline of the platform for `native` or when it is not set.
+
+When the result is not the newline of the platform, a manual issue (✋) names the setting and its level. CKli only
+reports: it never changes a Git setting, with or without `--fix`. The issue gives the command to run:
+
+- `git config --global --unset <key>` for a setting of the user (one issue for the World, whatever the number of
+  repositories);
+- `git config --system --unset <key>` for a setting of the machine;
+- `git -C "<working folder>" config --local --unset <key>` for a setting of a repository (one issue per repository).
+
+Files that are already checked out keep their line endings: the repositories must be checked out again afterwards.
+
+Limit: the settings given to `git` through the `GIT_CONFIG_*` environment variables are not seen.
+
 ### `exec ... --ckli-continue-on-error --ckli-all`
 
 This command execute any external process on the current Repo (or all of them if `--ckli-all` is specified).

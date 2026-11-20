@@ -56,6 +56,17 @@ public static partial class CKliTestHelperExtensions
         var localDataFolder = TestHelper.SolutionFolder.AppendPart( "$Local" );
         if( ltsName != null ) localDataFolder = localDataFolder.AppendPart( ltsName );
 
+        // The tests must not depend on the Git settings of the machine (the line endings check of "ckli issue"
+        // reads them): the machine levels are a folder that only defines a user (the first commit of an empty
+        // repository needs an author).
+        var emptyGitConfig = localDataFolder.AppendPart( "TestGitConfig" );
+        Directory.CreateDirectory( emptyGitConfig );
+        File.WriteAllText( emptyGitConfig.AppendPart( ".gitconfig" ), "[user]\n\tname = CKli Test\n\temail = test@ckli.invalid\n" );
+        foreach( var level in (ReadOnlySpan<ConfigurationLevel>)[ConfigurationLevel.Global, ConfigurationLevel.Xdg, ConfigurationLevel.System, ConfigurationLevel.ProgramData] )
+        {
+            GlobalSettings.SetConfigSearchPaths( level, emptyGitConfig );
+        }
+
         // We must ensure that the CKli.Plugins.CompiledPlugins is available before loading this assembly
         // in the load context because once loaded, we won't be able to "update" it if the compiled plugins
         // weren't available...
