@@ -51,8 +51,17 @@ public sealed partial class PublishedFolder
     /// its profiles going through this folder: the merge of two Stacks merges the index file line by line,
     /// which is not an index (its order and even its Json may be broken).
     /// </para>
+    /// <para>
+    /// Any pending change is saved first: this moves the legacy "v{Year.DayOfYear.Number}.json" files to their
+    /// current name, so that the index names the files that exist.
+    /// </para>
     /// </summary>
-    public void RebuildIndex() => WriteIndex();
+    public void RebuildIndex()
+    {
+        LoadAll();
+        Save();
+        WriteIndex();
+    }
 
     // Called by Save once the profile files are up to date: the index reflects them, so it is written last
     // and only when at least one of them actually changed.

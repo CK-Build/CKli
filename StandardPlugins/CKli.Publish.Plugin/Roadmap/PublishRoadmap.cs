@@ -79,7 +79,7 @@ sealed class PublishRoadmap
     /// <param name="maxDop">The maximal number of repositories published concurrently.</param>
     internal async Task<bool> PublishAsync( IActivityMonitor monitor,
                                             World world,
-                                            SVersion profileVersion,
+                                            TimeVersion profileVersion,
                                             RoadmapPublisher publisher,
                                             IndirectPublisher indirectPublisher,
                                             GitRepository.DistributedLock.Lease? lease,

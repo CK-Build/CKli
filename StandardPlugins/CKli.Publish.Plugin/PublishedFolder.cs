@@ -15,7 +15,7 @@ namespace CKli.Publish.Plugin;
 /// <para>
 /// A profile is stored in a "v{Version}.json" file at its <see cref="PublishedProfile.GetProfilePath"/>:
 /// in the <see cref="RootPath"/> for stable versions (and their CI builds) and in a
-/// <see cref="SVersion.BranchName"/> subordinated folder for prereleases ("alpha" to "zulu") and
+/// <see cref="TimeVersion.BranchName"/> subordinated folder for prereleases ("alpha" to "zulu") and
 /// exploratory versions ("explo/{name}").
 /// </para>
 /// <para>
@@ -26,19 +26,27 @@ namespace CKli.Publish.Plugin;
 /// a projection of the profile files for whoever reads this folder from the outside. This folder never
 /// reads it back - it is a reflection, never a source.
 /// </para>
+/// <para>
+/// The profiles published before the <see cref="TimeVersion"/> are in "v{Year.DayOfYear.Number}.json" files:
+/// they are read as their <see cref="TimeVersion"/> (2026.325.1 is 2026.11.21.1) and <see cref="Save"/> moves
+/// them to their "v{Year.Month.Day}.json" (or "v{Year.Month.Day.ClashNumber}.json") file.
+/// </para>
 /// </summary>
 public sealed partial class PublishedFolder
 {
     readonly string _rootPath;
-    readonly Dictionary<SVersion, FileCacheInfo> _profiles;
+    readonly Dictionary<TimeVersion, FileCacheInfo> _profiles;
     bool _allLoaded;
 
     sealed class FileCacheInfo
     {
         // The version is the key.
-        readonly SVersion _version;
+        readonly TimeVersion _version;
         // The full path to the json profile file (GetProfileFilePath method).
         readonly string _jsonFilePath;
+        // The "v{Year.DayOfYear.Number}.json" file this profile has been read from: Save moves it
+        // to the _jsonFilePath. Null when the profile is (or will be) in its _jsonFilePath.
+        string? _legacyFilePath;
         // The profile that is currently in the file. Null when the file doesn't exist
         // or cannot be read (_loadError is then not null).
         PublishedProfile? _saved;
@@ -47,21 +55,25 @@ public sealed partial class PublishedFolder
         // Current profile (initially _saved).
         PublishedProfile? _current;
 
-        FileCacheInfo( SVersion version,
+        FileCacheInfo( TimeVersion version,
                        string jsonFilePath,
+                       string? legacyFilePath,
                        PublishedProfile? saved,
                        Exception? loadError )
         {
             _version = version;
             _jsonFilePath = jsonFilePath;
+            _legacyFilePath = legacyFilePath;
             _saved = saved;
             _loadError = loadError;
             _current = saved;
         }
 
-        public SVersion Version => _version;
+        public TimeVersion Version => _version;
 
         public string JsonFilePath => _jsonFilePath;
+
+        public string? LegacyFilePath => _legacyFilePath;
 
         public Exception? LoadError => _loadError;
 
@@ -79,25 +91,28 @@ public sealed partial class PublishedFolder
         /// </summary>
         public bool IsUsed => _saved != null || _current != null || _loadError != null;
 
-        internal static FileCacheInfo NoFile( SVersion version, string jsonFilePath )
+        internal static FileCacheInfo NoFile( TimeVersion version, string jsonFilePath )
         {
-            return new FileCacheInfo( version, jsonFilePath, null, null );
+            return new FileCacheInfo( version, jsonFilePath, null, null, null );
         }
 
-        internal static FileCacheInfo Read( SVersion version, string jsonFilePath )
+        // Reads the jsonFilePath, or the legacyFilePath when it is not null.
+        internal static FileCacheInfo Read( TimeVersion version, string jsonFilePath, string? legacyFilePath )
         {
+            var path = legacyFilePath ?? jsonFilePath;
             try
             {
-                var profile = PublishedProfile.Parse( File.ReadAllBytes( jsonFilePath ) );
+                // A legacy profile file contains its legacy version: reading it converts it.
+                var profile = PublishedProfile.Parse( File.ReadAllBytes( path ) );
                 if( profile.Version != version )
                 {
-                    throw new JsonException( $"File '{jsonFilePath}' contains the version '{profile.Version}'." );
+                    throw new JsonException( $"File '{path}' contains the version '{profile.Version}'." );
                 }
-                return new FileCacheInfo( version, jsonFilePath, profile, null );
+                return new FileCacheInfo( version, jsonFilePath, legacyFilePath, profile, null );
             }
             catch( Exception ex )
             {
-                return new FileCacheInfo( version, jsonFilePath, null, ex );
+                return new FileCacheInfo( version, jsonFilePath, legacyFilePath, null, ex );
             }
         }
 
@@ -105,6 +120,7 @@ public sealed partial class PublishedFolder
         {
             _saved = _current;
             _loadError = null;
+            _legacyFilePath = null;
         }
     }
 
@@ -130,7 +146,7 @@ public sealed partial class PublishedFolder
         _rootPath = Path.EndsInDirectorySeparator( rootPath )
                         ? rootPath
                         : rootPath + Path.DirectorySeparatorChar;
-        _profiles = new Dictionary<SVersion, FileCacheInfo>();
+        _profiles = new Dictionary<TimeVersion, FileCacheInfo>();
     }
 
     /// <summary>
@@ -147,25 +163,31 @@ public sealed partial class PublishedFolder
     /// <summary>
     /// Gets the full path of the file that contains (or would contain) the profile of a version.
     /// </summary>
-    /// <param name="version">The version. Must be a Conformant SVersion.</param>
+    /// <param name="version">The version.</param>
     /// <returns>The full path of the Json file.</returns>
-    public string GetProfileFilePath( SVersion version )
+    public string GetProfileFilePath( TimeVersion version )
     {
         // RootPath ends with the directory separator: it is the prefix.
         return PublishedProfile.GetProfilePath( version, _rootPath, ".json", Path.DirectorySeparatorChar );
     }
 
+    // The "v{Year.DayOfYear.Number}.json" file of a version: the profile files written before the TimeVersion.
+    string GetLegacyProfileFilePath( TimeVersion version )
+    {
+        return PublishedProfile.GetLegacyProfilePath( version, _rootPath, ".json", Path.DirectorySeparatorChar );
+    }
+
     /// <summary>
-    /// Creates a free, time based version for a new profile: the <see cref="SVersion.Major"/> is the year,
-    /// the <see cref="SVersion.Minor"/> is the day in the year and the <see cref="SVersion.Patch"/> starts at
-    /// 0 and is incremented until no profile of this folder uses the resulting version.
+    /// Creates a free, time based version for a new profile: the <see cref="TimeVersion.Date"/> is the
+    /// (utc) day and the <see cref="TimeVersion.ClashNumber"/> starts at 0 (no fourth part) and is incremented
+    /// until no profile of this folder uses the resulting version.
     /// <para>
     /// The <paramref name="branchKind"/>, <paramref name="exploratoryName"/> and <paramref name="isCIBuild"/>
     /// describe the build this profile comes from: they place the version - and hence its file - on the branch
     /// that produced it.
     /// </para>
     /// <para>
-    /// A version whose file exists but cannot be read (see <see cref="GetLoadError(SVersion)"/>) counts as used:
+    /// A version whose file exists but cannot be read (see <see cref="GetLoadError(TimeVersion)"/>) counts as used:
     /// <see cref="Save"/> would replace that file.
     /// </para>
     /// </summary>
@@ -179,14 +201,14 @@ public sealed partial class PublishedFolder
     /// </param>
     /// <param name="isCIBuild">True when the build is a CI build: the version is a CI one.</param>
     /// <param name="utcNow">Optional time to use instead of <see cref="DateTime.UtcNow"/>.</param>
-    /// <returns>A Conformant SVersion that no profile of this folder uses.</returns>
-    public SVersion CreateNewProfileVersion( CSVersionKind branchKind,
-                                             ReadOnlySpan<char> exploratoryName = default,
-                                             bool isCIBuild = false,
-                                             DateTime? utcNow = null )
+    /// <returns>A version that no profile of this folder uses.</returns>
+    public TimeVersion CreateNewProfileVersion( CSVersionKind branchKind,
+                                                ReadOnlySpan<char> exploratoryName = default,
+                                                bool isCIBuild = false,
+                                                DateTime? utcNow = null )
     {
         var now = utcNow ?? DateTime.UtcNow;
-        var v = SVersion.Create( now.Year, now.DayOfYear, 0, mustBeCSVersion: true );
+        var v = TimeVersion.Create( DateOnly.FromDateTime( now ) );
         if( branchKind is CSVersionKind.Exploratory )
         {
             if( exploratoryName.Length == 0 )
@@ -205,68 +227,61 @@ public sealed partial class PublishedFolder
         }
         if( isCIBuild )
         {
-            // These numbers are minted, they don't follow a released version: unlike a regular CI build, the
-            // "--ci" form must not shift the Patch number that the conflict resolution below owns.
-            v = v.SetCINumber( 0, impactStablePatchNumber: false );
+            v = v.SetCINumber( 0 );
         }
-        return FindFreePatch( v );
+        return FindFreeClashNumber( v );
     }
 
     /// <summary>
     /// Creates the version of the profile that supersedes <paramref name="origin"/>: the same
-    /// <see cref="SVersion.Major"/>, <see cref="SVersion.Minor"/> and branch - as if it had been built the
-    /// same day - with the next free <see cref="SVersion.Patch"/>.
+    /// <see cref="TimeVersion.Date"/> and branch - as if it had been built the same day - with the next free
+    /// <see cref="TimeVersion.ClashNumber"/>.
     /// </summary>
-    /// <param name="origin">The version of the profile being superseded. Must be a Conformant SVersion.</param>
-    /// <returns>A Conformant SVersion that no profile of this folder uses.</returns>
-    public SVersion CreateSupersedingProfileVersion( SVersion origin )
+    /// <param name="origin">The version of the profile being superseded.</param>
+    /// <returns>A version that no profile of this folder uses.</returns>
+    public TimeVersion CreateSupersedingProfileVersion( TimeVersion origin )
     {
         ArgumentNullException.ThrowIfNull( origin );
-        if( origin.BranchName == null )
-        {
-            throw new ArgumentException( $"Version '{origin}' must be a Conformant SVersion.", nameof( origin ) );
-        }
-        return FindFreePatch( origin.SetVersionNumbers( origin.Major, origin.Minor, origin.Patch + 1 ) );
+        return FindFreeClashNumber( origin.SetClashNumber( origin.ClashNumber + 1 ) );
     }
 
-    // Mints the Patch above every version already used that day on that branch - never in a hole - and the
-    // regular and the CI form of a branch SHARE that counter (SVersion.BranchName is the same for both).
+    // Mints the ClashNumber above every version already used that day on that branch - never in a hole - and the
+    // regular and the CI form of a branch SHARE that counter (TimeVersion.BranchName is the same for both).
     // This is what makes the numbers meaningful once RemoveSupersededCIProfiles deletes profiles: reusing a
     // freed number would let a version stop identifying a publication, and would let a freshly minted CI
     // form sort below the release it actually follows.
     // A file that exists but cannot be read counts as used: Save would replace it.
-    SVersion FindFreePatch( SVersion v )
+    TimeVersion FindFreeClashNumber( TimeVersion v )
     {
         LoadAll();
-        int patch = v.Patch;
+        int clashNumber = v.ClashNumber;
         foreach( var (version, info) in _profiles )
         {
             if( info.IsUsed
-                && version.Patch >= patch
-                && version.Major == v.Major
-                && version.Minor == v.Minor
+                && version.ClashNumber >= clashNumber
+                && version.Date == v.Date
                 && version.BranchName == v.BranchName )
             {
-                patch = version.Patch + 1;
+                clashNumber = version.ClashNumber + 1;
             }
         }
-        return patch == v.Patch ? v : v.SetVersionNumbers( v.Major, v.Minor, patch );
+        return v.SetClashNumber( clashNumber );
     }
 
     /// <summary>
     /// Gets the profile of a version. The file is read on demand: when this is null,
-    /// <see cref="GetLoadError(SVersion)"/> tells whether the file was missing or unreadable.
+    /// <see cref="GetLoadError(TimeVersion)"/> tells whether the file was missing or unreadable.
     /// </summary>
     /// <param name="version">The version to find.</param>
     /// <returns>The profile or null.</returns>
-    public PublishedProfile? Find( SVersion version ) => LoadInfo( version ).Current;
+    public PublishedProfile? Find( TimeVersion version ) => LoadInfo( version ).Current;
 
     /// <summary>
     /// Gets the error that occurred while reading the file of a version. The file is read on demand.
     /// </summary>
     /// <param name="version">The version.</param>
     /// <returns>The error or null.</returns>
-    public Exception? GetLoadError( SVersion version ) => LoadInfo( version ).LoadError;
+    public Exception? GetLoadError( TimeVersion version ) => LoadInfo( version ).LoadError;
 
     /// <summary>
     /// Gets all the profiles, ordered by descending
@@ -287,7 +302,7 @@ public sealed partial class PublishedFolder
     /// <summary>
     /// Gets the files that cannot be read, ordered by descending version. All the files are read.
     /// </summary>
-    public IEnumerable<(SVersion Version, Exception Error)> LoadErrors
+    public IEnumerable<(TimeVersion Version, Exception Error)> LoadErrors
     {
         get
         {
@@ -302,7 +317,7 @@ public sealed partial class PublishedFolder
     /// Adds a profile. Throw if a profile with the same
     /// <see cref="PublishedProfile.Version"/> already exists.
     /// <para>
-    /// An existing file that cannot be read (see <see cref="GetLoadError(SVersion)"/>) doesn't prevent
+    /// An existing file that cannot be read (see <see cref="GetLoadError(TimeVersion)"/>) doesn't prevent
     /// the add: <see cref="Save"/> replaces the invalid file.
     /// </para>
     /// </summary>
@@ -323,7 +338,7 @@ public sealed partial class PublishedFolder
     /// </summary>
     /// <param name="version">The profile's version to remove.</param>
     /// <returns>True if the profile has been found and removed, false otherwise.</returns>
-    public bool Remove( SVersion version )
+    public bool Remove( TimeVersion version )
     {
         var info = LoadInfo( version );
         if( info.Current == null ) return false;
@@ -347,21 +362,14 @@ public sealed partial class PublishedFolder
     /// a problem and is left alone. The non CI profiles are never removed. All the files are read.
     /// </para>
     /// </summary>
-    /// <param name="publishedVersion">
-    /// The version of the profile that has just been published. Must be a Conformant <see cref="SVersion"/>.
-    /// </param>
+    /// <param name="publishedVersion">The version of the profile that has just been published.</param>
     /// <returns>The removed versions, in ascending order. Empty when nothing was superseded.</returns>
-    public ImmutableArray<SVersion> RemoveSupersededCIProfiles( SVersion publishedVersion )
+    public ImmutableArray<TimeVersion> RemoveSupersededCIProfiles( TimeVersion publishedVersion )
     {
         ArgumentNullException.ThrowIfNull( publishedVersion );
         var branchName = publishedVersion.BranchName;
-        if( branchName == null )
-        {
-            throw new ArgumentException( $"Version '{publishedVersion}' must be a Conformant SVersion.",
-                                         nameof( publishedVersion ) );
-        }
         LoadAll();
-        var removed = ImmutableArray.CreateBuilder<SVersion>();
+        var removed = ImmutableArray.CreateBuilder<TimeVersion>();
         foreach( var info in _profiles.Values )
         {
             var p = info.Current;
@@ -383,7 +391,7 @@ public sealed partial class PublishedFolder
     /// </summary>
     /// <param name="version">The version to deprecate.</param>
     /// <returns>True if the profile has been found and actually deprecated. False otherwise.</returns>
-    public bool Deprecate( SVersion version )
+    public bool Deprecate( TimeVersion version )
     {
         var info = LoadInfo( version );
         var p = info.Current;
@@ -593,30 +601,41 @@ public sealed partial class PublishedFolder
     /// <summary>
     /// Writes the added and updated profiles, deletes the files of the removed ones and, when at least one
     /// of them changed, refreshes the <see cref="IndexFileName"/> file (see <see cref="CreateIndex"/>).
+    /// <para>
+    /// The legacy "v{Year.DayOfYear.Number}.json" files that have been read are moved to their
+    /// "v{Year.Month.Day}.json" (or "v{Year.Month.Day.ClashNumber}.json") file (and the index is refreshed): this is not a change of the profile,
+    /// it doesn't count.
+    /// </para>
     /// </summary>
     /// <returns>The number of created, updated or deleted profile files. The index doesn't count.</returns>
     public int Save()
     {
         int count = 0;
+        bool migrated = false;
         foreach( var info in _profiles.Values )
         {
-            if( !info.IsDirty ) continue;
+            bool isDirty = info.IsDirty;
+            var legacyPath = info.LegacyFilePath;
             var p = info.Current;
+            // An unreadable legacy file stays where it is (a dirty one is replaced below).
+            if( !isDirty && (legacyPath == null || p == null) ) continue;
             if( p == null )
             {
-                File.Delete( info.JsonFilePath );
+                File.Delete( legacyPath ?? info.JsonFilePath );
             }
             else
             {
                 var dirPath = Path.GetDirectoryName( info.JsonFilePath );
                 if( dirPath != null ) Directory.CreateDirectory( dirPath );
                 File.WriteAllBytes( info.JsonFilePath, p.ToUtf8Bytes() );
+                if( legacyPath != null ) File.Delete( legacyPath );
             }
+            migrated |= legacyPath != null;
             info.OnSaved();
-            ++count;
+            if( isDirty ) ++count;
         }
         // The index reflects the profile files: it is written last, and only when they moved.
-        if( count > 0 ) WriteIndex();
+        if( count > 0 || migrated ) WriteIndex();
         return count;
     }
 
@@ -629,16 +648,24 @@ public sealed partial class PublishedFolder
         _allLoaded = false;
     }
 
-    FileCacheInfo LoadInfo( SVersion version )
+    FileCacheInfo LoadInfo( TimeVersion version )
     {
         if( _profiles.TryGetValue( version, out var info ) )
         {
             return info;
         }
         var path = GetProfileFilePath( version );
-        info = File.Exists( path )
-                ? FileCacheInfo.Read( version, path )
-                : FileCacheInfo.NoFile( version, path );
+        if( File.Exists( path ) )
+        {
+            info = FileCacheInfo.Read( version, path, null );
+        }
+        else
+        {
+            var legacyPath = GetLegacyProfileFilePath( version );
+            info = File.Exists( legacyPath )
+                    ? FileCacheInfo.Read( version, path, legacyPath )
+                    : FileCacheInfo.NoFile( version, path );
+        }
         _profiles.Add( version, info );
         return info;
     }
@@ -653,17 +680,21 @@ public sealed partial class PublishedFolder
             // optional leading 'v' and forwards the head on success.
             // This is also what excludes the IndexFileName: "index" is not a version, so the index this
             // folder writes can never be read back as one of its own profiles.
-            if( !SVersion.TryMatch( ref fName, out var version, mustBeCSVersion: true ) || fName.Length != 0 )
+            if( !SVersion.TryMatch( ref fName, out var sVersion ) || fName.Length != 0 )
             {
                 continue;
             }
-            // Skip any duplicate. Already loaded, bad +metadata...
-            if( _profiles.ContainsKey( version ) ) continue;
+            // A legacy "Year.DayOfYear.Number" file: its DayOfYear is greater than 12 (see AsTimeVersion).
+            bool isLegacy = sVersion.Minor > 12;
+            var version = sVersion.AsTimeVersion( acceptDayOfYear: true );
+            // Skip any version that is not a profile one and any duplicate (already loaded, bad +metadata...).
+            if( version == null || _profiles.ContainsKey( version ) ) continue;
             // Skip any file that is not at its canonical path: a file in the wrong branch folder
             // is not a profile of this folder.
             var path = GetProfileFilePath( version );
-            if( !path.Equals( f, StringComparison.OrdinalIgnoreCase ) ) continue;
-            _profiles.Add( version, FileCacheInfo.Read( version, path ) );
+            var expectedPath = isLegacy ? GetLegacyProfileFilePath( version ) : path;
+            if( !expectedPath.Equals( f, StringComparison.OrdinalIgnoreCase ) ) continue;
+            _profiles.Add( version, FileCacheInfo.Read( version, path, isLegacy ? f : null ) );
         }
         _allLoaded = true;
     }

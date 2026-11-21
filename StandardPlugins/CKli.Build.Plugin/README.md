@@ -234,7 +234,7 @@ Three decisions worth keeping:
   already made on state somebody else has moved.
 - **A publication starts by pulling the World, once the lock is held.** The Stack (`World.PullStackAsync`), where
   the profile is written, then every repository (`World.PullAsync`, what `ckli pull` does). A publication made on
-  a stale Stack would take the profile version (the next free Patch of the day) that a teammate's publication
+  a stale Stack would take the profile version (the next free number of the day) that a teammate's publication
   already took, and its Stack could not be pushed. Any conflict fails the command and nothing is left in
   progress: `ckli pull --branch <branch>` handles it (its merge that conflicts is left in progress there). A remote Stack that changed this World's definition file or its plugins cannot
   be pulled under the running World either: that is an error that asks for a `ckli pull` first. `build` and

@@ -213,7 +213,7 @@ sealed class PublishedProfileBuilder
     internal PublishedProfile? BuildFinalProfile( IActivityMonitor monitor,
                                                   Roadmap roadmap,
                                                   World world,
-                                                  SVersion profileVersion )
+                                                  TimeVersion profileVersion )
     {
         using var g = monitor.OpenTrace( "Building the published profile." );
         var produced = new ProducedPackages();
@@ -569,7 +569,7 @@ sealed class PublishedProfileBuilder
         /// <returns>The profile or null.</returns>
         public PublishedProfile? Build( IActivityMonitor monitor,
                                         World world,
-                                        SVersion profileVersion,
+                                        TimeVersion profileVersion,
                                         ImmutableArray<PackageInstance>? directDependencies,
                                         TransitiveDependencies? transitiveDependencies )
         {

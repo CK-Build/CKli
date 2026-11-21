@@ -119,7 +119,7 @@ whatever it already pushed, so that a retry can finish it.
 A fix also invalidates whatever the World already published: a profile that carries a fixed version now
 describes produced packages nobody should pick up. The Publish plugin reacts by adding a **superseding
 profile** beside each one — the same produced packages with the fixed versions replaced, at the same
-`Major.Minor` with the next free `Patch` — leaving the original as the record of what was actually
+date with the next free number — leaving the original as the record of what was actually
 published. See
 [`CKli.Publish.Plugin`'s README](CKli.Publish.Plugin/README.md#onfixbuildasync--fix-build--fix-publish).
 

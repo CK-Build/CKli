@@ -125,7 +125,7 @@ Three rules govern it, and they are what the method's shape is for:
 | Rule | Why |
 |---|---|
 | The superseded profile is **left untouched**. | A profile records what was actually published; a fix does not change the past. The successor sits beside it. |
-| The successor keeps its origin's `Major.Minor` and branch, with the next free `Patch` — "as if built the same day". | The publication it describes never happened on its own day; it belongs with the profile it corrects. `CreateSupersedingProfileVersion` does this. |
+| The successor keeps its origin's `Date` and branch, with the next free `ClashNumber` — "as if built the same day". | The publication it describes never happened on its own day; it belongs with the profile it corrects. `CreateSupersedingProfileVersion` does this. |
 | A **deprecated profile is locked** and gets no successor. | It is dead: deprecation is monotonic and there is no un-deprecate, so a successor would resurrect produced packages nobody should pick up. |
 
 `fixedPackages` is keyed by `PackageInstance` — the package identifier **and** the version being fixed —
@@ -373,13 +373,16 @@ screen) and never gated: the profile records them anyway.
 A profile's version is the version of the **publication**, not of anything it carries: several
 repositories at several versions are published together, so no package version can name the set.
 `PublishedFolder.CreateNewProfileVersion(branchKind, exploratoryName, isCIBuild)` mints it from the
-day of the publication:
+day of the publication. It is a `TimeVersion` (see
+[CK.Packaging.Abstractions](https://github.com/CK-Build/CK-Packaging-Abstractions/blob/stable/CK.Packaging.Abstractions/README.md#timeversion)),
+not a package version:
 
-- `Major` is the year and `Minor` is the day in the year — `2026.254` is the 11th of September 2026.
-- `Patch` starts at 0 and is minted **above every version already used that day on that branch** -
-  never in a hole. A file that exists but cannot be read counts as used, since `Save` would replace it.
-  The regular and the CI form of a branch **share** that counter (they have the same
-  `SVersion.BranchName`): a number is never reused, so a version keeps identifying one publication even
+- The first three parts are the (utc) `Year.Month.Day` — `2026.9.11` is the 11th of September 2026.
+- The `ClashNumber` tells apart the publications of the same day on the same branch: the first one has none
+  (`2026.9.11`), the next ones have it as a fourth part (`2026.9.11.1`, `2026.9.11.2`). It is minted **above
+  every version already used that day on that branch** - never in a hole. A file that exists but cannot be read counts as used, since `Save` would
+  replace it. The regular and the CI form of a branch **share** that counter (they have the same
+  `TimeVersion.BranchName`): a number is never reused, so a version keeps identifying one publication even
   though a superseded CI profile gets deleted - see [Superseded CI profiles](#superseded-ci-profiles).
 - `branchKind`, `exploratoryName` and `isCIBuild` come from what is actually built
   (`roadmap.Graph.BranchName.VersionKind`, `roadmap.Graph.BranchName.ExploratoryName` and
@@ -388,14 +391,20 @@ day of the publication:
 
 | Branch built | CI | Profile version | File |
 |---|---|---|---|
-| root (`stable`) | no | `2026.254.0` | `Published/v2026.254.0.json` |
-| root (`stable`) | yes | `2026.254.0--ci.0` | `Published/v2026.254.0--ci.0.json` |
-| `alpha` | no | `2026.254.0-alpha` | `Published/alpha/v2026.254.0-alpha.json` |
-| `alpha` | yes | `2026.254.0-alpha.0.ci.0` | `Published/alpha/v2026.254.0-alpha.0.ci.0.json` |
-| `explo/spike` | no | `2026.254.0-0.spike` | `Published/explo/spike/v2026.254.0-0.spike.json` |
+| root (`stable`) | no | `2026.9.11` | `Published/v2026.9.11.json` |
+| root (`stable`) | yes | `2026.9.11--ci.0` | `Published/v2026.9.11--ci.0.json` |
+| `alpha` | no | `2026.9.11-alpha` | `Published/alpha/v2026.9.11-alpha.json` |
+| `alpha` | yes | `2026.9.11-alpha.0.ci.0` | `Published/alpha/v2026.9.11-alpha.0.ci.0.json` |
+| `explo/spike` | no | `2026.9.11-0.spike` | `Published/explo/spike/v2026.9.11-0.spike.json` |
 
-The CI number is always 0: the `Patch` is what distinguishes two publications of the same day on the
+The CI number is always 0: the `ClashNumber` is what distinguishes two publications of the same day on the
 same branch, so a CI profile never collides with the non-CI one that sits beside it.
+
+The profiles published before the `TimeVersion` have a `Year.DayOfYear.Number` version (`2026.254.0`) and file
+name. `PublishedFolder` reads them as their `TimeVersion` (`2026.9.11`) and its next `Save` (the next
+publication, deprecation or fix, or the index rebuild after a merge of the Stack) moves them to their current
+file name: this is not a change of a profile, `Save` doesn't count it. The readers of other Stacks
+(`ckli deps update`) convert the legacy versions of an index or a profile the same way.
 
 ### Superseded CI profiles
 

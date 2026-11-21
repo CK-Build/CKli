@@ -222,7 +222,7 @@ public sealed partial class UpgradeMap
                                                            string folder,
                                                            WorldReference r,
                                                            string? ltsName,
-                                                           SVersion version,
+                                                           TimeVersion version,
                                                            CancellationToken cancellation )
     {
         var path = PublishedProfile.GetProfilePath( version, folder, ".json" );
@@ -233,6 +233,18 @@ public sealed partial class UpgradeMap
                                                                      refName: StackRepository.BranchName,
                                                                      cancellation: cancellation )
                                               .ConfigureAwait( false );
+        if( success && content == null )
+        {
+            // A Stack that has published nothing since the TimeVersion still has its profiles in their
+            // "v{Year.DayOfYear.Number}.json" files (its index is converted when read).
+            path = PublishedProfile.GetLegacyProfilePath( version, folder, ".json" );
+            (success, content) = await provider.GetFileContentAsync( monitor,
+                                                                    repoPath,
+                                                                    path,
+                                                                    refName: StackRepository.BranchName,
+                                                                    cancellation: cancellation )
+                                               .ConfigureAwait( false );
+        }
         if( !success || content == null )
         {
             monitor.Warn( $"Unable to read '{path}' from reference '{r.Url}' even though its index lists it." );
