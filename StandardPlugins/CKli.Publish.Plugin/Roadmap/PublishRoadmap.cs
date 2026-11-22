@@ -6,6 +6,7 @@ using CKli.Core;
 using CKli.VersionTag.Plugin;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -77,9 +78,11 @@ sealed class PublishRoadmap
     /// The gate that refuses to START without the lock is in <c>PublishPlugin.OnRoadmapBuildAsync</c>.
     /// </param>
     /// <param name="maxDop">The maximal number of repositories published concurrently.</param>
+    /// <param name="feeds">The feeds the packages are pushed to: the profile records them.</param>
     internal async Task<bool> PublishAsync( IActivityMonitor monitor,
                                             World world,
                                             TimeVersion profileVersion,
+                                            ImmutableArray<PublishedFeed> feeds,
                                             RoadmapPublisher publisher,
                                             IndirectPublisher indirectPublisher,
                                             GitRepository.DistributedLock.Lease? lease,
@@ -89,7 +92,7 @@ sealed class PublishRoadmap
         Throw.DebugAssert( CanPublish );
         // The builds are done: the real content is now available, so the profile this publication carries can be
         // built. Nothing is pushed if it has any conflict.
-        _finalProfile = _gate.BuildFinalProfile( monitor, _roadmap, world, profileVersion );
+        _finalProfile = _gate.BuildFinalProfile( monitor, _roadmap, world, profileVersion, feeds );
         if( _finalProfile == null )
         {
             return false;

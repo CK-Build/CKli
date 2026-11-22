@@ -209,11 +209,15 @@ sealed class PublishedProfileBuilder
     /// The version of the profile, obtained from <see cref="PublishedFolder.CreateNewProfileVersion"/>: this is the
     /// version of the publication itself, not of any of the packages it carries.
     /// </param>
+    /// <param name="feeds">
+    /// The World's feeds (<see cref="PackageSender.PublishedFeeds"/>): the profile records where its packages are.
+    /// </param>
     /// <returns>The profile or null if it has any conflict (logged).</returns>
     internal PublishedProfile? BuildFinalProfile( IActivityMonitor monitor,
                                                   Roadmap roadmap,
                                                   World world,
-                                                  TimeVersion profileVersion )
+                                                  TimeVersion profileVersion,
+                                                  ImmutableArray<PublishedFeed> feeds )
     {
         using var g = monitor.OpenTrace( "Building the published profile." );
         var produced = new ProducedPackages();
@@ -280,7 +284,7 @@ sealed class PublishedProfileBuilder
         var transitiveDependencies = directDependencies == null
                                         ? null
                                         : transitive.Build( monitor, produced, direct );
-        return produced.Build( monitor, world, profileVersion, directDependencies, transitiveDependencies );
+        return produced.Build( monitor, world, profileVersion, directDependencies, transitiveDependencies, feeds );
 
         static bool TryGetFinalContent( Roadmap.BuildSolution s, out SVersion version, out BuildContentInfo content )
         {
@@ -566,12 +570,14 @@ sealed class PublishedProfileBuilder
         /// <param name="transitiveDependencies">
         /// What a restore brings beyond them. Null when the <paramref name="directDependencies"/> are.
         /// </param>
+        /// <param name="feeds">The World's feeds.</param>
         /// <returns>The profile or null.</returns>
         public PublishedProfile? Build( IActivityMonitor monitor,
                                         World world,
                                         TimeVersion profileVersion,
                                         ImmutableArray<PackageInstance>? directDependencies,
-                                        TransitiveDependencies? transitiveDependencies )
+                                        TransitiveDependencies? transitiveDependencies,
+                                        ImmutableArray<PublishedFeed> feeds )
         {
             if( _conflictCount > 0 )
             {
@@ -593,10 +599,12 @@ sealed class PublishedProfileBuilder
                                                 profileVersion,
                                                 repositories,
                                                 directDependencies.Value,
-                                                transitiveDependencies );
+                                                transitiveDependencies,
+                                                feeds: feeds );
             monitor.Trace( $"Published profile '{profile}' carries {_packages.Count} produced package(s) from "
                            + $"{repositories.Length} repository(ies), {directDependencies.Value.Length} direct "
-                           + $"dependency(ies) and {profile.TransitiveDependencies} transitive one(s)." );
+                           + $"dependency(ies), {profile.TransitiveDependencies} transitive one(s) and "
+                           + $"{profile.Feeds.Length} feed(s)." );
             return profile;
         }
     }

@@ -150,6 +150,9 @@ moves with it, and a resolution the superseding version has caught up with stops
 so such an ambiguity shrinks or disappears. `SameProducedPackages` still compares produced packages
 only, so none of this affects idempotency.
 
+The `Feeds` are the exception: the successor carries the World's **current** feeds, not its origin's,
+since the fixed packages have just been pushed to them.
+
 It is idempotent. A retry of an interrupted fix publication finds that some profile already carries the
 resulting produced packages — `OnFixedPackages` compares produced packages, not versions — and adds
 nothing. As with the other `PublishedFolder` writers, the Stack is then committed with a message naming
@@ -295,7 +298,7 @@ that branch's last profile stays coherent but is behind until its next publicati
 
 ### `PublishedProfile` — the published profile
 
-`BuildFinalProfile(monitor, roadmap, world, profileVersion)` builds a
+`BuildFinalProfile(monitor, roadmap, world, profileVersion, feeds)` builds a
 [`CK.Packaging.Abstractions.PublishedProfile`](https://github.com/CK-Build/CK-Packaging-Abstractions/blob/stable/CK.Packaging.Abstractions/README.md) — the serializable **contract**
 itself, not a plugin-private type — from the **real** content: `BuildResult` for built solutions,
 version tags for the others. The set of package identifiers a solution produces is only known once
@@ -309,6 +312,7 @@ it has been built, so this is the only place a complete profile exists.
 | `Repositories` | One `Repository` per `Repo`, keyed by `(Repo.OriginUrl, Repo.CKliRepoId)` and holding the `PackageInstance`s it **produces**. |
 | `DirectDependencies` | Every `BuildContentInfo.Consumed` package that the final produced index does not carry. |
 | `TransitiveDependencies` | The union of every `BuildContentInfo.Transitive` — NuGet's own resolution — classified against the two sets above. |
+| `Feeds` | The World's configured feeds (`ArtifactHandlerPlugin.GetConfiguredNuGetFeeds`), the very ones the `PackageSender` pushes to, mapped by `PackageSender.ToPublishedFeeds`: a feed's `Credentials` becomes its `SecretKey` (a name in the secrets store, never a secret), its `PublicReadCredentials` are copied (they are committed in `nuget.config`). A profile is then enough to obtain its packages. |
 
 A package always belongs to the repository that *produces* it: a version that appears only because
 another solution consumes it is recorded against its producer, never against its consumer. So a

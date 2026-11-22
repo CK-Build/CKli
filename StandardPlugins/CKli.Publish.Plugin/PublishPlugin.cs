@@ -380,10 +380,20 @@ public sealed class PublishPlugin : PrimaryPluginBase
     // Such a profile is not rewritten - it records what was actually published - so the fix adds a
     // superseding profile beside each one, as if it had been built on the same day: same Major.Minor,
     // next free Patch. A deprecated profile is locked and gets none.
+    //
+    // The superseding profiles carry the World's current feeds, not their origin's: the fixed packages
+    // have just been pushed to these.
     void OnFixedProfiles( IActivityMonitor monitor, FixWorkflow fixWorkflow, ImmutableArray<BuildResult> results )
     {
         var folder = PublishedFolder;
         ImmutableArray<PublishedProfile> created;
+        // The publication has just read them successfully.
+        if( !_artifactHandler.GetConfiguredNuGetFeeds( monitor, out var configuredFeeds ) )
+        {
+            monitor.Error( $"Unable to read the NuGet feeds: the published profiles superseded by the fix '{fixWorkflow}' are not created." );
+            return;
+        }
+        var feeds = PackageSender.ToPublishedFeeds( configuredFeeds );
         try
         {
             // The fix build forbids a fix from changing its produced package identifiers, so the packages
@@ -404,7 +414,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                     fixedPackages.Add( new PackageInstance( packageId, target.ToFixVersion ), target.TargetVersion );
                 }
             }
-            created = folder.OnFixedPackages( fixedPackages );
+            created = folder.OnFixedPackages( fixedPackages, feeds );
             // OnFixedPackages read every file: an unreadable one has not been considered at all.
             foreach( var (version, error) in folder.LoadErrors )
             {
@@ -517,6 +527,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                         if( !await publish.PublishAsync( e.Monitor,
                                                          World,
                                                          profileVersion,
+                                                         packageSender.PublishedFeeds,
                                                          roadmapPublisher,
                                                          indirectPublisher,
                                                          lease,

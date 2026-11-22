@@ -479,8 +479,13 @@ public sealed partial class PublishedFolder
     /// Maps each fixed <see cref="PackageInstance"/> - the package identifier in the version that was fixed -
     /// to the version that now supersedes it.
     /// </param>
+    /// <param name="feeds">
+    /// The World's current feeds, carried by every created profile (not their origin's: the fixed packages are
+    /// pushed now). Defaults to empty (unknown).
+    /// </param>
     /// <returns>The created profiles, in ascending version order. Empty when nothing was superseded.</returns>
-    public ImmutableArray<PublishedProfile> OnFixedPackages( IReadOnlyDictionary<PackageInstance, SVersion> fixedPackages )
+    public ImmutableArray<PublishedProfile> OnFixedPackages( IReadOnlyDictionary<PackageInstance, SVersion> fixedPackages,
+                                                             ImmutableArray<PublishedFeed> feeds = default )
     {
         ArgumentNullException.ThrowIfNull( fixedPackages );
         if( fixedPackages.Count == 0 ) return ImmutableArray<PublishedProfile>.Empty;
@@ -497,7 +502,7 @@ public sealed partial class PublishedFolder
         var created = ImmutableArray.CreateBuilder<PublishedProfile>();
         foreach( var origin in origins )
         {
-            var updated = CreateSupersedingProfile( origin, fixedPackages );
+            var updated = CreateSupersedingProfile( origin, fixedPackages, feeds );
             if( updated == null || known.Any( o => SameProducedPackages( o, updated ) ) ) continue;
             Add( updated );
             known.Add( updated );
@@ -531,7 +536,12 @@ public sealed partial class PublishedFolder
     // released line. The one thing that CANNOT be carried verbatim is an ambiguity anchored on a produced
     // package whose version the fix moves: its anchor has to move with it, and resolutions that the new
     // version has caught up with stop being disagreements at all.
-    PublishedProfile? CreateSupersedingProfile( PublishedProfile origin, IReadOnlyDictionary<PackageInstance, SVersion> fixedPackages )
+    //
+    // The feeds are NOT carried over: the successor's are the World's current ones, where the fixed packages
+    // have just been pushed.
+    PublishedProfile? CreateSupersedingProfile( PublishedProfile origin,
+                                                IReadOnlyDictionary<PackageInstance, SVersion> fixedPackages,
+                                                ImmutableArray<PublishedFeed> feeds )
     {
         ImmutableArray<Repository>.Builder? repositories = null;
         for( int i = 0; i < origin.Repositories.Length; ++i )
@@ -559,7 +569,8 @@ public sealed partial class PublishedFolder
                                         CreateSupersedingProfileVersion( origin.Version ),
                                         repositories.DrainToImmutable(),
                                         origin.DirectDependencies,
-                                        CarryTransitiveDependencies( origin, fixedPackages ) );
+                                        CarryTransitiveDependencies( origin, fixedPackages ),
+                                        feeds: feeds );
     }
 
     // Re-anchors the ambiguities that name a fixed produced package and drops the ones the fix resolved.

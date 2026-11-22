@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Packaging.Abstractions;
 using CKli.ArtifactHandler.Plugin;
 using CKli.BranchModel.Plugin;
 using CKli.Core;
@@ -37,6 +38,30 @@ sealed class PackageSender
         _clients = new NuGetFeedClient[_feeds.Length];
         _senders = new Sender[2 * _branches.Branches.Length];
         _lock = new Lock();
+    }
+
+    /// <summary>
+    /// Gets the configured feeds, as a published profile records them: the very feeds this sender pushes to.
+    /// </summary>
+    public ImmutableArray<PublishedFeed> PublishedFeeds => ToPublishedFeeds( _feeds );
+
+    /// <summary>
+    /// Maps the configured feeds to the <see cref="PublishedFeed"/> that a <see cref="PublishedProfile"/> records,
+    /// in their configuration order. No secret is involved: the <see cref="NuGetFeed.Credentials"/> are only
+    /// named (their <see cref="NuGetFeedCredentials.SecretKey"/> is a key in the secrets store) and the
+    /// <see cref="NuGetFeed.PublicReadCredentials"/> are not secrets (they are committed in the nuget.config).
+    /// </summary>
+    /// <param name="feeds">The configured feeds.</param>
+    /// <returns>The published feeds.</returns>
+    public static ImmutableArray<PublishedFeed> ToPublishedFeeds( ImmutableArray<NuGetFeed> feeds )
+    {
+        return feeds.Select( f => new PublishedFeed( f.Name,
+                                                     f.Url.ToString(),
+                                                     f.PushQualityFilter,
+                                                     f.Credentials?.SecretKey,
+                                                     f.PublicReadCredentials?.UserNameKey,
+                                                     f.PublicReadCredentials?.SecretKey ) )
+                    .ToImmutableArray();
     }
 
     /// <summary>
