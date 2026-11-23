@@ -63,7 +63,7 @@ public sealed partial class BranchModelPlugin
                 context.Screen.Display( context.Screen.ScreenType.Text( $"Dry run: '{b.Name}' would be removed from the branch model. Nothing has been changed." ) );
                 return true;
             }
-            return SaveBranchNamespace( monitor, _namespace.Remove( b ) );
+            return RemoveClosedBranch( monitor, b );
         }
         var scope = World.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
         var all = World.GetAllDefinedRepo( monitor );
@@ -100,6 +100,14 @@ public sealed partial class BranchModelPlugin
                           $"Branch '{b.Name}' closed in {Repositories( toClose.Count )}, still opened in {Repositories( stillOpened )}." );
             return true;
         }
+        return RemoveClosedBranch( monitor, b );
+    }
+
+    // The branch leaves the branch model, and the profiles of the World References that it recorded ("ckli deps update")
+    // leave the World definition file: both are saved and committed when the Stack is closed.
+    bool RemoveClosedBranch( IActivityMonitor monitor, BranchName b )
+    {
+        World.DefinitionFile.RemoveReferenceProfiles( monitor, b.VersionBranchName );
         return SaveBranchNamespace( monitor, _namespace.Remove( b ) );
     }
 

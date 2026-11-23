@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Packaging.Abstractions;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
@@ -259,6 +260,13 @@ public sealed partial class Roadmap
     /// Gets whether a publication should follow the build.
     /// </summary>
     public bool MustPublish => _mustPublish;
+
+    /// <summary>
+    /// Gets the recorded profiles of the World References (see <see cref="WorldReference.Profiles"/>) that the World
+    /// consumes, checked before any build: what a publication names as its <see cref="PublishedProfile.Upstreams"/>.
+    /// Empty when nothing has been checked (a CI build) or when no reference has a recorded profile that agrees.
+    /// </summary>
+    public ImmutableArray<PublishedProfile> UpstreamProfiles { get; internal set; } = [];
 
     /// <summary>
     /// Gets whether this is a --dry-run: no real build or publication must be done.

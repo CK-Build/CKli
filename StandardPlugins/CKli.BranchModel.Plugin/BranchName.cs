@@ -22,6 +22,7 @@ public sealed class BranchName : IEquatable<BranchName>
 {
     readonly string _name;
     string? _devName;
+    string? _versionBranchName;
     readonly BranchName? _parent;
     readonly int _index;
     readonly CSVersionKind _versionKind;
@@ -106,6 +107,19 @@ public sealed class BranchName : IEquatable<BranchName>
     public ReadOnlySpan<char> ExploratoryName => _versionKind is CSVersionKind.Exploratory
                                                     ? _name.AsSpan( _ltsPrefixLength + 6 )
                                                     : default;
+
+    /// <summary>
+    /// Gets the version side name of this branch: the empty string for the root one, "alpha".."zulu" for a
+    /// prerelease and "explo/{name}" for an exploratory one. Unlike the <see cref="Name"/>, it has no
+    /// <see cref="WorldName.LTSName"/> prefix.
+    /// <para>
+    /// This is how a published index groups its profiles (without the CI suffix) and how a World Reference records
+    /// the profile of each branch (see <see cref="WorldReference.Profiles"/>).
+    /// </para>
+    /// </summary>
+    public string VersionBranchName => _versionBranchName ??= _versionKind is CSVersionKind.Exploratory
+                                                                ? $"explo/{new string( ExploratoryName )}"
+                                                                : _versionKind.ToBranchName();
 
     /// <summary>
     /// Gets whether this branch corresponds to the <paramref name="version"/>.

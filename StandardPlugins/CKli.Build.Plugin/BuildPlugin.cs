@@ -558,7 +558,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         return true;
     }
 
-    Task<bool> DoCIAsync( IActivityMonitor monitor,
+    async Task<bool> DoCIAsync( IActivityMonitor monitor,
                           CKliEnv context,
                           string? branch,
                           string? maxDop,
@@ -578,19 +578,25 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         if( !ParseInteger( monitor, "--max-dop", maxDop, out var vMaxDoP, 4 )
             || !HandleForceSkipTests( monitor, skipTests, forceTests, withTests, out bool? runTest ) )
         {
-            return Task.FromResult( false );
+            return false;
         }
         var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, ciForce ? CIBuildMode.CIForce : CIBuildMode.CI, mustPublish: publish, branch, all, dryRun, runTest, withTests, withAssets, focus, continueOnSuccess );
         if( roadmap == null )
         {
-            return Task.FromResult( false );
+            return false;
+        }
+        // A CI build doesn't check the upstreams. A CI publication does, with warnings only: it names the upstreams
+        // that agree.
+        if( publish && !await CheckUpstreamsAsync( monitor, context, roadmap, isRegular: false ).ConfigureAwait( false ) )
+        {
+            return false;
         }
         return dryRun
-                ? RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaxDoP, runTest )
-                : DoRunAsync( monitor, context, vMaxDoP, runTest, buildImpacts, roadmap );
+                ? await RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaxDoP, runTest ).ConfigureAwait( false )
+                : await DoRunAsync( monitor, context, vMaxDoP, runTest, buildImpacts, roadmap ).ConfigureAwait( false );
     }
 
-    Task<bool> DoNonCIAsync( IActivityMonitor monitor,
+    async Task<bool> DoNonCIAsync( IActivityMonitor monitor,
                              CKliEnv context,
                              string? branch,
                              string? maxDop,
@@ -611,16 +617,22 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         // "--skip-tests" is ignored: only the "--force-tests" and "--with-tests" combination is checked.
         if( !HandleForceSkipTests( monitor, skipTests: false, forceTests, withTests, out bool? runTest ) )
         {
-            return Task.FromResult( false );
+            return false;
         }
         var roadmap = ComputeAndDisplayRoadmap( monitor, context, isPullBuild, CIBuildMode.Regular, mustPublish: publish, branch, all, dryRun, runTest, withTests, withAssets );
         if( roadmap == null || !ParseInteger( monitor, "--max-dop", maxDop, out var vMaDxDop, 4 ) )
         {
-            return Task.FromResult( false );
+            return false;
+        }
+        // Before any build (a regular build integrates the "dev/" branches) and also for a --dry-run, which then
+        // reports what the real run would refuse.
+        if( !await CheckUpstreamsAsync( monitor, context, roadmap, isRegular: true ).ConfigureAwait( false ) )
+        {
+            return false;
         }
         return dryRun
-                ? RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaDxDop, runTest )
-                : DoRunAsync( monitor, context, vMaDxDop, runTest, buildImpacts, roadmap );
+                ? await RaiseRoadmapBuildEvent( monitor, context, roadmap, vMaDxDop, runTest ).ConfigureAwait( false )
+                : await DoRunAsync( monitor, context, vMaDxDop, runTest, buildImpacts, roadmap ).ConfigureAwait( false );
     }
 
     async Task<bool> DoRunAsync( IActivityMonitor monitor, CKliEnv context, int vMaxDoP, bool? runTest, BuildImpacts buildImpacts, Roadmap roadmap )

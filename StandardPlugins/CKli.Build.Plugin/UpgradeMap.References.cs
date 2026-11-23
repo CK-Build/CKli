@@ -20,6 +20,9 @@ public sealed partial class UpgradeMap
     /// <see cref="PublishedProfile.DirectDependencies"/> and its
     /// <see cref="TransitiveDependencies.Regular"/>. Inside one profile the produced packages win.
     /// </para>
+    /// <para>
+    /// The profile chosen for each reference is collected in <paramref name="referenceProfiles"/>.
+    /// </para>
     /// </summary>
     static async Task<Dictionary<string, ReferenceAnchor>?> ReadReferencesAsync( IActivityMonitor monitor,
                                                                                 CKliEnv context,
@@ -27,6 +30,7 @@ public sealed partial class UpgradeMap
                                                                                 BranchName branchName,
                                                                                 Options options,
                                                                                 bool hasBounds,
+                                                                                List<ReferenceProfile> referenceProfiles,
                                                                                 CancellationToken cancellation )
     {
         var anchors = new Dictionary<string, ReferenceAnchor>( StringComparer.OrdinalIgnoreCase );
@@ -66,6 +70,7 @@ public sealed partial class UpgradeMap
                 }
                 var profile = await ReadProfileAsync( monitor, context, r, world.Name.LTSName, branchName, options.ConsiderCI, cancellation ).ConfigureAwait( false );
                 if( profile == null ) continue;
+                referenceProfiles.Add( new ReferenceProfile( r, profile ) );
                 // The produced packages come first: inside a profile they win over what it depends on.
                 foreach( var (packageId, p) in profile.ProducedPackages )
                 {
@@ -128,6 +133,68 @@ public sealed partial class UpgradeMap
                                                            bool considerCI,
                                                            CancellationToken cancellation )
     {
+        var published = await ReadPublishedFolderAsync( monitor, context, r, worldLTSName, cancellation ).ConfigureAwait( false );
+        if( published == null ) return null;
+        var (provider, repoPath, folder, ltsName, index) = published.Value;
+        // Walk the branch and its parents up to the root: the first branch that published something wins,
+        // whatever the versions are - this is the branch model's fallback order, not a version order.
+        for( var b = branchName; b != null; b = b.Parent )
+        {
+            var versionBranchName = b.VersionBranchName;
+            // With --ci the CI group of the level is considered first: a folder holds at most one alive CI
+            // profile per branch and it is newer than every non CI publication of that branch, so the one
+            // that is there applies. Without --ci the CI publications are simply not candidates.
+            if( considerCI )
+            {
+                var ci = index.GetAlive( PublishedIndex.GetGroupName( versionBranchName, isCI: true ) );
+                foreach( var v in ci )
+                {
+                    var p = await LoadProfileAsync( monitor, provider, repoPath, folder, r, ltsName, v, cancellation ).ConfigureAwait( false );
+                    if( p != null ) return p;
+                }
+            }
+            var alive = index.GetAlive( PublishedIndex.GetGroupName( versionBranchName, isCI: false ) );
+            foreach( var v in alive )
+            {
+                var p = await LoadProfileAsync( monitor, provider, repoPath, folder, r, ltsName, v, cancellation ).ConfigureAwait( false );
+                if( p != null ) return p;
+            }
+        }
+        monitor.Warn( $"Reference '{r.Url}' published no profile for branch '{branchName}' nor any of its parents." );
+        return null;
+    }
+
+    /// <summary>
+    /// Reads one profile of a World Reference: the one its <see cref="WorldReference.Profiles"/> records.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The command context.</param>
+    /// <param name="r">The World Reference.</param>
+    /// <param name="worldLTSName">The LTS name of the World (null for a default World).</param>
+    /// <param name="version">The profile version.</param>
+    /// <param name="cancellation">The cancellation token.</param>
+    /// <returns>The profile or null if it cannot be read (logged as a warning or an error).</returns>
+    internal static async Task<PublishedProfile?> ReadRecordedProfileAsync( IActivityMonitor monitor,
+                                                                            CKliEnv context,
+                                                                            WorldReference r,
+                                                                            string? worldLTSName,
+                                                                            TimeVersion version,
+                                                                            CancellationToken cancellation )
+    {
+        var published = await ReadPublishedFolderAsync( monitor, context, r, worldLTSName, cancellation ).ConfigureAwait( false );
+        if( published == null ) return null;
+        var (provider, repoPath, folder, ltsName, _) = published.Value;
+        return await LoadProfileAsync( monitor, provider, repoPath, folder, r, ltsName, version, cancellation ).ConfigureAwait( false );
+    }
+
+    // Resolves the published folder of a reference (it is World scoped) and reads its index.
+    static async Task<(GitHostingProvider Provider, NormalizedPath RepoPath, string Folder, string? LTSName, PublishedIndex Index)?>
+        ReadPublishedFolderAsync( IActivityMonitor monitor,
+                                  CKliEnv context,
+                                  WorldReference r,
+                                  string? worldLTSName,
+                                  CancellationToken cancellation )
+    {
         Throw.DebugAssert( r.Url != null );
         var key = new GitRepositoryKey( context.SecretsStore, r.Url, !r.IsPrivate );
         if( !key.TryGetHostingInfo( monitor, out var provider, out var repoPath ) )
@@ -179,32 +246,7 @@ public sealed partial class UpgradeMap
             monitor.Error( $"Invalid '{folder}{PublishedIndex.IndexFileName}' in reference '{r.Url}'.", ex );
             return null;
         }
-        // Walk the branch and its parents up to the root: the first branch that published something wins,
-        // whatever the versions are - this is the branch model's fallback order, not a version order.
-        for( var b = branchName; b != null; b = b.Parent )
-        {
-            var versionBranchName = GetVersionBranchName( b );
-            // With --ci the CI group of the level is considered first: a folder holds at most one alive CI
-            // profile per branch and it is newer than every non CI publication of that branch, so the one
-            // that is there applies. Without --ci the CI publications are simply not candidates.
-            if( considerCI )
-            {
-                var ci = index.GetAlive( PublishedIndex.GetGroupName( versionBranchName, isCI: true ) );
-                foreach( var v in ci )
-                {
-                    var p = await LoadProfileAsync( monitor, provider, repoPath, folder, r, ltsName, v, cancellation ).ConfigureAwait( false );
-                    if( p != null ) return p;
-                }
-            }
-            var alive = index.GetAlive( PublishedIndex.GetGroupName( versionBranchName, isCI: false ) );
-            foreach( var v in alive )
-            {
-                var p = await LoadProfileAsync( monitor, provider, repoPath, folder, r, ltsName, v, cancellation ).ConfigureAwait( false );
-                if( p != null ) return p;
-            }
-        }
-        monitor.Warn( $"Reference '{r.Url}' published no profile for branch '{branchName}' nor any of its parents." );
-        return null;
+        return (provider, repoPath, folder, ltsName, index);
 
         // The Stack branch is named explicitly: letting this default to the remote's default branch would
         // read whatever that happens to be, and a (true, null) answer cannot tell a missing file from a
@@ -266,14 +308,5 @@ public sealed partial class UpgradeMap
             monitor.Error( $"Invalid profile '{path}' in reference '{r.Url}'.", ex );
             return null;
         }
-    }
-
-    // The version side of a branch: the empty string for the root one, "alpha".."zulu" for a prerelease and
-    // "explo/{name}" for an exploratory one. This is what a PublishedIndex groups by.
-    static string GetVersionBranchName( BranchName b )
-    {
-        return b.VersionKind == CSVersionKind.Exploratory
-                ? $"explo/{new string( b.ExploratoryName )}"
-                : b.VersionKind.ToBranchName();
     }
 }

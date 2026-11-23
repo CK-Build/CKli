@@ -538,7 +538,8 @@ public sealed partial class PublishedFolder
     // version has caught up with stop being disagreements at all.
     //
     // The feeds are NOT carried over: the successor's are the World's current ones, where the fixed packages
-    // have just been pushed.
+    // have just been pushed. The upstreams ARE carried over: a fix rebuilds produced packages, it doesn't change
+    // what the World is aligned on.
     PublishedProfile? CreateSupersedingProfile( PublishedProfile origin,
                                                 IReadOnlyDictionary<PackageInstance, SVersion> fixedPackages,
                                                 ImmutableArray<PublishedFeed> feeds )
@@ -570,7 +571,8 @@ public sealed partial class PublishedFolder
                                         repositories.DrainToImmutable(),
                                         origin.DirectDependencies,
                                         CarryTransitiveDependencies( origin, fixedPackages ),
-                                        feeds: feeds );
+                                        feeds: feeds,
+                                        upstreams: origin.Upstreams );
     }
 
     // Re-anchors the ambiguities that name a fixed produced package and drops the ones the fix resolved.

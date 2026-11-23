@@ -144,7 +144,8 @@ public sealed partial class BuildPlugin
         if( map == null ) return false;
 
         DisplayUpgrades( monitor, context, map, byRepo );
-        return dryRun || Apply( monitor, context, map, branchName, allowDowngrade );
+        if( !dryRun && !Apply( monitor, context, map, branchName, allowDowngrade ) ) return false;
+        return RecordReferenceProfiles( monitor, map, branchName, dryRun );
     }
 
     // Writes the upgrades: the participants come upstream first (Upgrades is ordered by the solutions'

@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Packaging.Abstractions;
 using CKli.ArtifactHandler.Plugin;
 using CKli.Core;
 using CKli.HotZone.Plugin;
@@ -37,6 +38,7 @@ public sealed partial class UpgradeMap
     readonly ImmutableArray<RepoUpgrades> _upgrades;
     readonly ImmutableArray<Target> _targets;
     readonly Options _options;
+    readonly ImmutableArray<ReferenceProfile> _referenceProfiles;
 
     /// <summary>
     /// Options that drive the analysis.
@@ -240,13 +242,32 @@ public sealed partial class UpgradeMap
         public override string ToString() => $"{Repo.DisplayPath}: {Upgrades.Length} upgrade(s)";
     }
 
-    UpgradeMap( HotGraph graph, Options options, ImmutableArray<RepoUpgrades> upgrades, ImmutableArray<Target> targets )
+    UpgradeMap( HotGraph graph,
+                Options options,
+                ImmutableArray<RepoUpgrades> upgrades,
+                ImmutableArray<Target> targets,
+                ImmutableArray<ReferenceProfile> referenceProfiles )
     {
         _graph = graph;
         _options = options;
         _upgrades = upgrades;
         _targets = targets;
+        _referenceProfiles = referenceProfiles;
     }
+
+    /// <summary>
+    /// The published profile of a World Reference that this map aligns on.
+    /// </summary>
+    /// <param name="Reference">The World Reference.</param>
+    /// <param name="Profile">The profile of the referenced Stack that has been chosen.</param>
+    public readonly record struct ReferenceProfile( WorldReference Reference, PublishedProfile Profile );
+
+    /// <summary>
+    /// Gets the profile chosen for each World Reference, in the references' order. A reference whose profile
+    /// cannot be read (it is not reachable, it publishes nothing for the branch, etc.) is not here: it anchors
+    /// nothing.
+    /// </summary>
+    public ImmutableArray<ReferenceProfile> ReferenceProfiles => _referenceProfiles;
 
     /// <summary>
     /// Gets the graph this map has been computed from.
@@ -316,7 +337,8 @@ public sealed partial class UpgradeMap
         {
             var bounds = versionTag.GetPackagesConfiguration( monitor );
             if( bounds == null ) return null;
-            var references = await ReadReferencesAsync( monitor, context, world, graph.BranchName, options, !bounds.IsEmpty, cancellation )
+            var referenceProfiles = new List<ReferenceProfile>();
+            var references = await ReadReferencesAsync( monitor, context, world, graph.BranchName, options, !bounds.IsEmpty, referenceProfiles, cancellation )
                                         .ConfigureAwait( false );
             if( references == null ) return null;
             // Without --with-nuget nothing is asked to any feed, so the feeds are not even read from the
@@ -356,7 +378,7 @@ public sealed partial class UpgradeMap
                                               upgrades.ToImmutableArray(),
                                               needsBranch: !s.CanBeDevSolution ) );
             }
-            return new UpgradeMap( graph, options, result.DrainToImmutable(), resolver.GetTargets() );
+            return new UpgradeMap( graph, options, result.DrainToImmutable(), resolver.GetTargets(), [.. referenceProfiles] );
         }
     }
 

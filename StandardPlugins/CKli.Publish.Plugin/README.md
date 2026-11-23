@@ -167,7 +167,8 @@ so such an ambiguity shrinks or disappears. `SameProducedPackages` still compare
 only, so none of this affects idempotency.
 
 The `Feeds` are the exception: the successor carries the World's **current** feeds, not its origin's,
-since the fixed packages have just been pushed to them.
+since the fixed packages have just been pushed to them. The `Upstreams` are carried like the dependencies:
+a fix rebuilds produced packages, it doesn't change what the World is aligned on.
 
 It is idempotent. A retry of an interrupted fix publication finds that some profile already carries the
 resulting produced packages — `OnFixedPackages` compares produced packages, not versions — and adds
@@ -332,6 +333,7 @@ it has been built, so this is the only place a complete profile exists.
 | `DirectDependencies` | Every `BuildContentInfo.Consumed` package that the final produced index does not carry. |
 | `TransitiveDependencies` | The union of every `BuildContentInfo.Transitive` — NuGet's own resolution — classified against the two sets above. |
 | `Feeds` | The World's configured feeds (`ArtifactHandlerPlugin.GetConfiguredNuGetFeeds`), the very ones the `PackageSender` pushes to, mapped by `PackageSender.ToPublishedFeeds`: a feed's `Credentials` becomes its `SecretKey` (a name in the secrets store, never a secret), its `PublicReadCredentials` are copied (they are committed in `nuget.config`). A profile is then enough to obtain its packages. |
+| `Upstreams` | The profiles of the World References this World is aligned on: `Roadmap.UpstreamProfiles`, the recorded profiles (`<Reference><Profile /></Reference>`, written by `ckli deps update`) that the Build plugin checked against the direct dependencies before any build. `GetUpstreams` checks them again against the final `DirectDependencies` and the regular `TransitiveDependencies` (only known now): one that disagrees is not named, with a warning. See the Build plugin's [recorded profiles and upstream check](../CKli.Build.Plugin/README.md#the-recorded-profiles-and-the-upstream-check). |
 
 A package always belongs to the repository that *produces* it: a version that appears only because
 another solution consumes it is recorded against its producer, never against its consumer. So a

@@ -381,7 +381,44 @@ to do, and it is the only step that could move a tip away from what the report d
 | `prerelease` / `stable` | Override the stable/not filter of the feeds. Mutually exclusive, and both require `--with-nuget`. |
 | `allowDowngrade` | Apply the updates that move a version **down**. A World Reference may legitimately pin lower than what this World references - alignment is the point - but without this flag a map containing a downgrade reports and writes nothing. |
 | `--by-repo` | Group the report by repository instead of by package. Display only - it changes nothing about what is computed or written. |
-| `--dry-run,-d` | Only display the upgrades. |
+| `--dry-run,-d` | Only display the upgrades (and log the profiles that would be recorded). |
+
+#### The recorded profiles and the upstream check
+
+`deps update` chooses **one profile per World Reference** (the walk above) and, unless `--dry-run`, **records**
+it in the World definition file: a `<Profile Branch="â¦" Version="â¦" />` child of the `<Reference>`, one per branch of
+this World (`WorldReference.Profiles`, see the
+[CKli.Core README](../../CKli.Core/README.md#profile--the-recorded-profile-of-a-reference-per-branch)).
+`RecordReferenceProfiles` calls `WorldDefinitionFile.SetReferenceProfiles`, which saves the file and commits in
+the Stack repository when something changes. It records even when nothing is upgraded: running `deps update`
+again is how a World moves its recorded profile forward (an Engine fixed while the Model it consumes didn't
+change). A reference whose profile cannot be read keeps its record. The branch key is
+`BranchName.VersionBranchName` (empty for the root, `alpha`, `explo/{name}`), and closing a branch removes its
+records (BranchModel plugin).
+
+The record is a committed fact, like a lock file, and the versions can still drift from it (a hand edit,
+`--narrow` or pivots that leave repositories behind, an unreachable reference). So `CheckUpstreamsAsync`
+(`BuildPlugin.Upstreams.cs`) checks it **before any build**, right after the roadmap is computed:
+
+- For each reference, the record of the built branch or, when it has none, of its closest parent that has one.
+  A reference without a record is only logged (run `deps update` to record one).
+- The recorded profile is read (`UpgradeMap.ReadRecordedProfileAsync`: same published folder as above, by
+  version instead of "latest alive").
+- What the World consumes is what the roadmap will build with: for a solution that builds, its external
+  dependencies mapped by `Roadmap.PackageMapping`; for one that doesn't, the `Consumed` of its last build.
+  Only the **direct** dependencies are known before a restore.
+- Every consumed package that the recorded profile **produces** must be at the produced version. Otherwise
+  it is a **mixed upstream**, reported with the repositories that disagree.
+
+| Run | Mixed upstream, recorded CI profile | Unreadable recorded profile |
+|---|---|---|
+| `build --regular`, `publish --regular` (and their `--dry-run`) | Error: nothing is built, nothing is integrated. | Warning: not an upstream. |
+| CI publication | Warning: not an upstream. | Warning: not an upstream. |
+| CI build | Not checked. | Not checked. |
+
+The profiles that agree become `Roadmap.UpstreamProfiles`: the Publish plugin writes them in the published
+profile's `Upstreams`. The check runs in `DoNonCIAsync` and `DoCIAsync`, before `DoRunAsync` raises
+`OnRoadmapBuilding`: that event is not raised for a `--dry-run`, and a `--dry-run` must report the drift too.
 
 #### The report: by package, or `--by-repo`
 

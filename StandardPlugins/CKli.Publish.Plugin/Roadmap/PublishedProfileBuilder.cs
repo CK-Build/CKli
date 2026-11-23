@@ -284,7 +284,10 @@ sealed class PublishedProfileBuilder
         var transitiveDependencies = directDependencies == null
                                         ? null
                                         : transitive.Build( monitor, produced, direct );
-        return produced.Build( monitor, world, profileVersion, directDependencies, transitiveDependencies, feeds );
+        var upstreams = directDependencies == null || transitiveDependencies == null
+                            ? []
+                            : GetUpstreams( monitor, roadmap, world, directDependencies.Value, transitiveDependencies );
+        return produced.Build( monitor, world, profileVersion, directDependencies, transitiveDependencies, feeds, upstreams );
 
         static bool TryGetFinalContent( Roadmap.BuildSolution s, out SVersion version, out BuildContentInfo content )
         {
@@ -571,13 +574,15 @@ sealed class PublishedProfileBuilder
         /// What a restore brings beyond them. Null when the <paramref name="directDependencies"/> are.
         /// </param>
         /// <param name="feeds">The World's feeds.</param>
+        /// <param name="upstreams">The profiles of the World References the World is aligned on.</param>
         /// <returns>The profile or null.</returns>
         public PublishedProfile? Build( IActivityMonitor monitor,
                                         World world,
                                         TimeVersion profileVersion,
                                         ImmutableArray<PackageInstance>? directDependencies,
                                         TransitiveDependencies? transitiveDependencies,
-                                        ImmutableArray<PublishedFeed> feeds )
+                                        ImmutableArray<PublishedFeed> feeds,
+                                        ImmutableArray<UpstreamProfile> upstreams )
         {
             if( _conflictCount > 0 )
             {
@@ -600,13 +605,61 @@ sealed class PublishedProfileBuilder
                                                 repositories,
                                                 directDependencies.Value,
                                                 transitiveDependencies,
-                                                feeds: feeds );
+                                                feeds: feeds,
+                                                upstreams: upstreams );
             monitor.Trace( $"Published profile '{profile}' carries {_packages.Count} produced package(s) from "
                            + $"{repositories.Length} repository(ies), {directDependencies.Value.Length} direct "
-                           + $"dependency(ies), {profile.TransitiveDependencies} transitive one(s) and "
-                           + $"{profile.Feeds.Length} feed(s)." );
+                           + $"dependency(ies), {profile.TransitiveDependencies} transitive one(s), "
+                           + $"{profile.Feeds.Length} feed(s) and {profile.Upstreams.Length} upstream(s)." );
             return profile;
         }
+    }
+
+    /// <summary>
+    /// The upstreams of the profile: the <see cref="Roadmap.UpstreamProfiles"/> (the recorded profiles of the World
+    /// References, checked by the Build plugin before any build against the direct dependencies) that the final
+    /// dependencies still agree with. The transitive dependencies are only known now: an upstream that a regular
+    /// transitive dependency disagrees with is not named, with a warning (the builds are done: this cannot refuse).
+    /// </summary>
+    static ImmutableArray<UpstreamProfile> GetUpstreams( IActivityMonitor monitor,
+                                                         Roadmap roadmap,
+                                                         World world,
+                                                         ImmutableArray<PackageInstance> directDependencies,
+                                                         TransitiveDependencies transitiveDependencies )
+    {
+        if( roadmap.UpstreamProfiles.IsEmpty ) return [];
+        var result = ImmutableArray.CreateBuilder<UpstreamProfile>( roadmap.UpstreamProfiles.Length );
+        foreach( var upstream in roadmap.UpstreamProfiles )
+        {
+            var u = new UpstreamProfile( upstream );
+            // The PublishedProfile constructor refuses these: a World that references itself, or two references
+            // to the same World.
+            if( u.IsSameWorld( new UpstreamProfile( world.StackRepository.OriginUrl, world.Name, upstream.Version ) ) )
+            {
+                monitor.Warn( $"Upstream '{u}' is a profile of this World: it is ignored." );
+                continue;
+            }
+            if( result.Any( already => already.IsSameWorld( u ) ) )
+            {
+                monitor.Warn( $"Upstream '{u}' is a second profile of the same World: it is ignored." );
+                continue;
+            }
+            var disagree = directDependencies.Concat( transitiveDependencies.Regular )
+                                             .Where( p => upstream.ProducedPackages.TryGetValue( p.PackageId, out var produced )
+                                                          && produced.Version != p.Version )
+                                             .Select( p => $"'{p}' ('{upstream}' produces '{upstream.ProducedPackages[p.PackageId].Version}')" )
+                                             .ToList();
+            if( disagree.Count > 0 )
+            {
+                monitor.Warn( $"""
+                    The published profile doesn't name '{u}' as an upstream: it consumes other versions of what it produces:
+                    {disagree.Concatenate( Environment.NewLine )}
+                    """ );
+                continue;
+            }
+            result.Add( u );
+        }
+        return result.DrainToImmutable();
     }
 
     /// <summary>
