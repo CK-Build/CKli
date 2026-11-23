@@ -30,6 +30,9 @@ This assembly provides some general helpers that are use by all CKli ecosystem:
     an auto-tag of a monitor whose warnings and errors are collected and displayed with the outcome of an
     operation (`ScreenType.CreateLog( level, IRenderable )` gives them the same level head as a logged line).
 - The [`Helpers/`](Helpers) folder contains basic helpers. Plugins are invited to use them as much as possible in order to centralize behavior.
+  `XmlHelper.SafeSave` writes no XML declaration and no BOM, and keeps the newline of an existing file
+  (`XmlHelper.ReadNewLine`): a file of a repository rewritten with the platform's newline would change every line
+  when the repository stores it with the other one and Git doesn't convert it.
 
 
 ## Design Notes

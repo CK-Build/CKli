@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Text;
 using System.Xml;
@@ -19,16 +20,47 @@ public static partial class XmlHelper
     /// To avoid "white-space  only" commits, <see cref="XDocument.Load(string, LoadOptions)"/> (or <see cref="XElement.Load(string, LoadOptions)"/>)
     /// with <see cref="LoadOptions.PreserveWhitespace"/> must be used.
     /// </para>
+    /// <para>
+    /// An existing file keeps its newline (see <see cref="ReadNewLine(string)"/>): rewriting a file with the newline of the
+    /// platform would change every line of it when the repository stores it with the other one (and Git doesn't convert
+    /// it). A new file uses <see cref="Environment.NewLine"/>.
+    /// </para>
     /// </summary>
     /// <param name="c">This documentation.</param>
     /// <param name="path">The file path to save.</param>
     /// <param name="saveOptions">Save options.</param>
     public static void SafeSave( this XContainer c, string path, SaveOptions saveOptions = SaveOptions.None )
     {
-        using( XmlWriter xw = XmlWriter.Create( path, CreateSettings( saveOptions ) ) )
+        // Read before the writer truncates the file.
+        var settings = CreateSettings( saveOptions );
+        settings.NewLineChars = ReadNewLine( path ) ?? Environment.NewLine;
+        using( XmlWriter xw = XmlWriter.Create( path, settings ) )
         {
             DoSave( c, xw );
         }
+    }
+
+    /// <summary>
+    /// Reads the newline of an existing text file: the one that ends its first line, "\r\n" or "\n".
+    /// <para>
+    /// A tool that rewrites a file must keep it: otherwise every line changes when the repository stores the file with
+    /// the other newline. A file with mixed newlines is rewritten with the one of its first line.
+    /// </para>
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <returns>The newline, or null when the file doesn't exist or has no newline.</returns>
+    public static string? ReadNewLine( string path )
+    {
+        if( !File.Exists( path ) ) return null;
+        using var f = new FileStream( path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 4096 );
+        int previous = -1;
+        int b;
+        while( (b = f.ReadByte()) >= 0 )
+        {
+            if( b == '\n' ) return previous == '\r' ? "\r\n" : "\n";
+            previous = b;
+        }
+        return null;
     }
 
     /// <summary>
