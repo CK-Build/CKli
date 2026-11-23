@@ -73,6 +73,11 @@ public sealed class CKliIssue : Command
             IReadOnlyList<Repo>? repos = all
                                           ? world.GetAllDefinedRepo( monitor )
                                           : world.GetAllDefinedRepo( monitor, context.CurrentDirectory, allowEmpty: false );
+            if( repos != null )
+            {
+                // Core check (reported, never fixed by CKli): the Git settings must check out the newline of the platform.
+                world.AddGitNewLineIssues( monitor, context.Screen.ScreenType, stack.GitRepository, repos, issues );
+            }
             if( repos != null 
                 && world.Events.SafeRaiseEvent( monitor, new IssueEventArgs( monitor, context, world, repos, issues ) )
                 && await world.HandleIssuesAsync( monitor, context, issues, displayIssues: !fix, fix, scopeAlive ).ConfigureAwait( false ) )

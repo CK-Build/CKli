@@ -22,6 +22,7 @@ static partial class TestEnv
     readonly static NormalizedPath _nugetSourcePath = TestHelper.TestProjectFolder.AppendPart( "NuGetSource" );
     readonly static NormalizedPath _packagedPluginsPath = TestHelper.TestProjectFolder.AppendPart( "PackagedPlugins" );
     static NormalizedPath _clonedPath = TestHelper.TestProjectFolder.AppendPart( "Cloned" );
+    readonly static NormalizedPath _gitConfigPath = TestHelper.TestProjectFolder.AppendPart( "GitConfig" );
 
     static SVersion? _cKliPluginsCoreVersion;
     static XDocument? _packagedDirectoryPackagesProps;
@@ -40,10 +41,42 @@ static partial class TestEnv
 
     static void Initialize()
     {
+        HideMachineGitConfig();
         CKliRootEnv.Initialize( "Test", screen: new StringScreen(), findCurrentStackPath: false, isTestRun: true );
         InitializeRemotes();
         InitializeNuGetSource();
         World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
+    }
+
+    // The tests must not depend on the Git settings of the machine: the Global level is our (empty by default)
+    // "GitConfig/" folder, the other machine levels are an empty folder.
+    static void HideMachineGitConfig()
+    {
+        var empty = _gitConfigPath.AppendPart( "Empty" );
+        Directory.CreateDirectory( empty );
+        File.WriteAllText( _gitConfigPath.AppendPart( ".gitignore" ), "*" );
+        SetMachineGitConfig( null );
+        GlobalSettings.SetConfigSearchPaths( ConfigurationLevel.Global, _gitConfigPath );
+        GlobalSettings.SetConfigSearchPaths( ConfigurationLevel.Xdg, empty );
+        GlobalSettings.SetConfigSearchPaths( ConfigurationLevel.System, empty );
+        GlobalSettings.SetConfigSearchPaths( ConfigurationLevel.ProgramData, empty );
+    }
+
+    /// <summary>
+    /// Gets the folder that replaces the user's home for Git: its ".gitconfig" is the Global level of the tests.
+    /// </summary>
+    public static NormalizedPath GitConfigFolder => _gitConfigPath;
+
+    /// <summary>
+    /// Sets the Global Git configuration seen by the tests (the ".gitconfig" of <see cref="GitConfigFolder"/>).
+    /// </summary>
+    /// <param name="content">The content of the file. Added to the test user. Can be null.</param>
+    public static void SetMachineGitConfig( string? content )
+    {
+        var path = _gitConfigPath.AppendPart( ".gitconfig" );
+        // The file always exists: a repository that is already opened sees its changes.
+        // It always has a user: the first commit of an empty repository needs an author.
+        File.WriteAllText( path, "[user]\n\tname = CKli Test\n\temail = test@ckli.invalid\n" + content );
     }
 
     static void InitializeNuGetSource()
