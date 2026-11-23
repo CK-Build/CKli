@@ -476,6 +476,8 @@ The folder is **bound to its World**: `ckli world lts create` moves the default 
 LTS World's `{LTSName}/Published/` (a creation step of the `CreateLTS` handler): what has been published so far is
 below the cut, so it belongs to the LTS World. The default World is left with an empty folder and an empty
 `index.json` - so that a reader tells "nothing published yet" from "no such folder" - until its first publication.
+That empty index already names the new LTS World (see [the LTS Worlds](#the-lts-worlds-in-the-default-worlds-index)
+below).
 
 Because the folder lives inside the Stack repository's working folder, the
 `World.StackRepository.PushChanges` that follows a successful publication commits and pushes the new
@@ -520,6 +522,23 @@ the outside**, including another World, with `PublishedIndex.Parse` and without 
   one (the pull a publication does under its lock).
 - **A Stack that cannot be pushed fails the publication.** The publication itself is done, but the remotes
   don't describe it: the error asks for a `ckli push --stack-only`.
+
+#### The LTS Worlds in the default World's index
+
+A consumer that only knows a Stack url can't list its Worlds: a raw url can't list a folder, and the default
+World's definition file doesn't name the LTS ones. So the default World's `Published/index.json` names them in
+its `PublishedIndex.LTSWorlds` (`"LTSWorlds": [ "@net8" ]`): the Stack url leads to this index, it is the entry
+point.
+
+- **Who:** `PublishedFolder.LTSWorldsProvider` is called each time the index is created. Only the default World's
+  folder has one (`PublishPlugin.PublishedFolder`, and the folder `RebuildIndex` uses after a merge): the LTS Worlds
+  of `StackRepository.WorldNames` that have a `Published` folder - a World that never published has nothing to read.
+- **When:** every write of the default World's index (its publications, deprecations, fixes, the rebuild after a
+  merge), and the `CreateLTS` creation step: the emptied index names the new LTS World (whose definition file is
+  not written yet), otherwise it would stay invisible until the default World publishes again. That step also
+  makes sure the new LTS World has its own index.
+- **What doesn't:** a publication of an LTS World writes only its own index, without the list: the default
+  World's list names Worlds, not versions, and it doesn't change.
 
 The suffix that separates a branch's CI builds from its regular versions (`alpha-ci`, `explo/spike-ci`,
 `(stable-ci)`) cannot collide with a branch name, and that guarantee is enforced on this side: an

@@ -1,4 +1,6 @@
 using CK.Packaging.Abstractions;
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -22,6 +24,16 @@ public sealed partial class PublishedFolder
     public string IndexFilePath => _rootPath + IndexFileName;
 
     /// <summary>
+    /// Gets or initializes the function that gives the <see cref="PublishedIndex.LTSWorlds"/> of the index,
+    /// called each time the index is created. Null (the default) for none.
+    /// <para>
+    /// Only the folder of a Stack's default World has one: its index names the Long Term Support Worlds that
+    /// publish. They are computed when the index is written, not when this folder is created.
+    /// </para>
+    /// </summary>
+    public Func<IEnumerable<string>>? LTSWorldsProvider { get; init; }
+
+    /// <summary>
     /// Gets the <see cref="PublishedIndex"/> of this folder: the "Alive" and "Deprecated" profile
     /// versions, grouped by branch. All the files are read.
     /// <para>
@@ -35,7 +47,8 @@ public sealed partial class PublishedFolder
     {
         LoadAll();
         return PublishedIndex.Create( _profiles.Values.Where( i => i.Current != null )
-                                                      .Select( i => i.Current! ) );
+                                                      .Select( i => i.Current! ),
+                                      LTSWorldsProvider?.Invoke() );
     }
 
     /// <summary>

@@ -87,7 +87,7 @@ public sealed class PublishPlugin : PrimaryPluginBase
                 {
                     try
                     {
-                        new PublishedFolder( folderPath ).RebuildIndex();
+                        new PublishedFolder( folderPath ) { LTSWorldsProvider = GetLTSWorldsProvider( worldName ) }.RebuildIndex();
                         rebuilt.Add( folderPath.RemovePrefix( stack.StackWorkingFolder ).Path );
                     }
                     catch( Exception ex )
@@ -159,14 +159,24 @@ public sealed class PublishPlugin : PrimaryPluginBase
         }
     }
 
+    // Only the index of the default World names the Long Term Support Worlds: the Stack url leads to it.
+    Func<IEnumerable<string>>? GetLTSWorldsProvider( WorldName worldName ) => worldName.IsDefaultWorld ? GetPublishingLTSWorlds : null;
+
+    // The LTS Worlds that publish: the ones that have a Published folder (a World that never published has nothing to read).
+    IEnumerable<string> GetPublishingLTSWorlds() => World.StackRepository.WorldNames
+                                                        .Where( n => !n.IsDefaultWorld && Directory.Exists( n.SharedDataFolder.AppendPart( "Published" ) ) )
+                                                        .Select( n => n.LTSName! );
+
     // The Published folder is bound to the World: what the default World has published so far now belongs to the new
     // Long Term Support world (its versions are the ones below the cut). The default World starts with an empty
     // folder - with its index, so that a reader tells "nothing published yet" from "no such folder" - waiting for
-    // its first publication.
+    // its first publication. This index names the new LTS World (its definition file is not written yet, the Stack
+    // doesn't know it): otherwise it would stay invisible until the default World publishes again.
     void LTSCreated( IActivityMonitor monitor, CreateLTSEventArgs e )
     {
         var source = PublishedFolder.RootPath;
         var target = e.LTSWorldName.SharedDataFolder.AppendPart( "Published" );
+        var newLTSName = e.LTSWorldName.LTSName!;
         e.AddCreationStep( m =>
         {
             m.Info( $"Moving '{source}' to '{target}'." );
@@ -177,7 +187,17 @@ public sealed class PublishPlugin : PrimaryPluginBase
             }
             try
             {
-                var emptied = new PublishedFolder( source, createIfMissing: true );
+                // The new LTS World publishes: it has its Published folder and its index, even if the default
+                // World never published.
+                var moved = new PublishedFolder( target, createIfMissing: true );
+                if( !File.Exists( moved.IndexFilePath ) )
+                {
+                    File.WriteAllBytes( moved.IndexFilePath, moved.CreateIndexUtf8Bytes() );
+                }
+                var emptied = new PublishedFolder( source, createIfMissing: true )
+                {
+                    LTSWorldsProvider = () => GetPublishingLTSWorlds().Append( newLTSName ).Distinct()
+                };
                 File.WriteAllBytes( emptied.IndexFilePath, emptied.CreateIndexUtf8Bytes() );
                 _publishedFolder = null;
                 return true;
@@ -289,7 +309,10 @@ public sealed class PublishPlugin : PrimaryPluginBase
     /// ("{SharedDataFolder}/{World}-Plugins") and the CommonFiles folder ("{SharedDataFolder}/Common").
     /// </para>
     /// </summary>
-    public PublishedFolder PublishedFolder => _publishedFolder ??= new PublishedFolder( World.Name.SharedDataFolder.AppendPart( "Published" ), createIfMissing: true );
+    public PublishedFolder PublishedFolder => _publishedFolder ??= new PublishedFolder( World.Name.SharedDataFolder.AppendPart( "Published" ), createIfMissing: true )
+    {
+        LTSWorldsProvider = GetLTSWorldsProvider( World.Name )
+    };
 
     async Task OnFixBuildAsync( IActivityMonitor monitor, FixBuildEventArgs e, CancellationToken cancellation )
     {
