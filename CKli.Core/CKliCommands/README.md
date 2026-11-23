@@ -342,8 +342,9 @@ World is a LTS one (`CK@Net8`), `--allow-lts` must be specified — and a warnin
 the references of the **default** World only: a reference declared in a LTS World is never cloned.
 
 ### `world reference list`
-Lists the references of the current World with their `DefaultClone`, `Private` and `LTSName` state and where each
-referenced Stack is cloned on this machine (or that it is not).
+Lists the references of the current World with their `DefaultClone`, `Private` and `LTSName` state, the profiles
+recorded for each branch by `ckli deps update` (`v2026.11.21, alpha: v2026.11.22-alpha`) and where each referenced
+Stack is cloned on this machine (or that it is not).
 
 ### `world reference set <stackUrlOrName> --lts-name <@ltsName> --default-world --no-default-clone --default-clone --private --public --allow-lts`
 Creates or updates a reference. The `<stackUrlOrName>` is the url of the referenced Stack; the **name** of a Stack

@@ -1,6 +1,7 @@
 using CK.Core;
 using CKli.Core;
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -74,6 +75,16 @@ sealed class CKliWorldReferenceList : Command
                                                      // referenced Stack's default world is used.
                                                      s.Text( r.LTSName ?? "(default world)",
                                                              r.LTSName != null ? ConsoleColor.DarkCyan : ConsoleColor.DarkGray )
+                                                      .Box( marginRight: 1 ),
+                                                     // The profiles recorded by "ckli deps update", per branch
+                                                     // of this world (the root one has no name).
+                                                     s.Text( r.Profiles.Count > 0
+                                                                ? string.Join( ", ", r.Profiles.OrderBy( p => p.Key, StringComparer.Ordinal )
+                                                                                               .Select( p => p.Key.Length == 0
+                                                                                                                ? $"v{p.Value}"
+                                                                                                                : $"{p.Key}: v{p.Value}" ) )
+                                                                : "(no recorded profile)",
+                                                             r.Profiles.Count > 0 ? ConsoleColor.DarkCyan : ConsoleColor.DarkGray )
                                                       .Box( marginRight: 1 ),
                                                      s.Text( where.Count > 0
                                                                 ? where[0].RemoveLastPart().Path

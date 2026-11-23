@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Packaging.Abstractions;
 using NUnit.Framework;
 using Shouldly;
 using System;
@@ -651,11 +652,142 @@ public class StackReferenceTests
         text.ShouldContain( "public" );
         text.ShouldContain( "(default world)", customMessage: "No LTSName attribute." );
         text.ShouldContain( "(not cloned here)", customMessage: "The One-Stack has not been cloned by this test." );
+        text.ShouldContain( "(no recorded profile)" );
+
+        Edit( context, d => d.SetReferenceProfiles( TestHelper.Monitor, "alpha", [(d.References[0], TimeVersion.Parse( "2026.11.22-alpha" ))] )
+                            && d.SetReferenceProfiles( TestHelper.Monitor, "", [(d.References[0], TimeVersion.Parse( "2026.11.21" ))] ) )
+            .ShouldBeTrue();
+        display.Clear();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "world", "reference", "list" )).ShouldBeTrue();
+        display.ToString().ShouldContain( "v2026.11.21, alpha: v2026.11.22-alpha" );
 
         (await Set( context, one.StackUri, "--lts-name", "@net8" )).ShouldBeTrue();
         display.Clear();
         (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "world", "reference", "list" )).ShouldBeTrue();
         display.ToString().ShouldContain( "@net8" );
+    }
+
+    [Test]
+    public async Task the_profiles_of_a_reference_are_recorded_per_branch_Async()
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+        var withIssues = TestEnv.OpenRemotes( "WithIssues" );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", ckt.StackUri )).ShouldBeTrue();
+        context = context.ChangeDirectory( "CKt" );
+        var xmlPath = context.CurrentDirectory.Combine( ".PublicStack/CKt.xml" );
+        (await Set( context, one.StackUri )).ShouldBeTrue();
+        (await Set( context, withIssues.StackUri )).ShouldBeTrue();
+
+        // The root branch, then a prerelease one that recorded a profile of the referenced root branch (its
+        // parent fallback).
+        Edit( context, d => d.SetReferenceProfiles( TestHelper.Monitor, "", [(d.References[0], TimeVersion.Parse( "2026.11.21" )),
+                                                                              (d.References[1], TimeVersion.Parse( "2026.11.20.1" ))] ) )
+            .ShouldBeTrue();
+        CheckStackCommit( context, "Recorded the profiles of the World References of the root branch in world 'CKt'." );
+        Edit( context, d => d.SetReferenceProfiles( TestHelper.Monitor, "alpha", [(d.References[0], TimeVersion.Parse( "2026.11.22-alpha" )),
+                                                                                   (d.References[1], TimeVersion.Parse( "2026.11.20.1" ))] ) )
+            .ShouldBeTrue();
+        CheckStackCommit( context, "Recorded the profiles of the World References of branch 'alpha' in world 'CKt'." );
+        var references = ReadReferences( context );
+        references[0].Elements().Select( e => e.ToString() ).ShouldBe( [
+            """<Profile Version="2026.11.21" />""",
+            """<Profile Branch="alpha" Version="2026.11.22-alpha" />""" ] );
+        Read( context, d =>
+        {
+            var profiles = d.References[1].Profiles;
+            profiles.Count.ShouldBe( 2 );
+            profiles[""].ShouldBe( TimeVersion.Parse( "2026.11.20.1" ) );
+            profiles["alpha"].ShouldBe( TimeVersion.Parse( "2026.11.20.1" ) );
+        } );
+
+        // Recording the same profiles changes nothing: no commit.
+        var head = StackHead( context );
+        Edit( context, d => d.SetReferenceProfiles( TestHelper.Monitor, "", [(d.References[0], TimeVersion.Parse( "2026.11.21" ))] ) )
+            .ShouldBeTrue();
+        StackHead( context ).ShouldBe( head );
+
+        // A new version replaces the record and a null one removes it.
+        Edit( context, d => d.SetReferenceProfiles( TestHelper.Monitor, "", [(d.References[0], TimeVersion.Parse( "2026.11.23" )),
+                                                                              (d.References[1], null)] ) )
+            .ShouldBeTrue();
+        Read( context, d =>
+        {
+            d.References[0].Profiles[""].ShouldBe( TimeVersion.Parse( "2026.11.23" ) );
+            d.References[1].Profiles.Keys.ShouldBe( ["alpha"] );
+        } );
+
+        // Closing a branch removes its records: the file is saved and committed when the Stack is closed.
+        Edit( context, d => d.RemoveReferenceProfiles( TestHelper.Monitor, "alpha" ) == 2 ).ShouldBeTrue();
+        CheckStackCommit( context, "Updated Definition file." );
+        Read( context, d =>
+        {
+            d.References[0].Profiles.Keys.ShouldBe( [""] );
+            d.References[1].Profiles.ShouldBeEmpty();
+        } );
+        XDocument.Load( xmlPath ).Root!.Descendants( XNames.Profile ).Count().ShouldBe( 1 );
+    }
+
+    [TestCase( """<Profile Version="nope" />""", "A <Profile /> must have a valid Version attribute (a published profile version), got 'nope'." )]
+    [TestCase( """<Profile />""", "A <Profile /> must have a valid Version attribute (a published profile version), got ''." )]
+    [TestCase( """<Profile Branch=" " Version="2026.11.21" />""", "A <Profile /> Branch attribute cannot be empty" )]
+    [TestCase( """<Profile Version="2026.11.21" /><Profile Version="2026.11.22" />""", "The root branch has more than one <Profile />." )]
+    [TestCase( """<Profile Branch="alpha" Version="2026.11.21" /><Profile Branch="alpha" Version="2026.11.22" />""", "Branch 'alpha' has more than one <Profile />." )]
+    public async Task an_invalid_reference_profile_prevents_the_world_to_be_loaded_Async( string profiles, string message )
+    {
+        var context = TestEnv.EnsureCleanFolder();
+        var ckt = TestEnv.OpenRemotes( "CKt" );
+        var one = TestEnv.OpenRemotes( "One" );
+
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", ckt.StackUri )).ShouldBeTrue();
+        context = context.ChangeDirectory( "CKt" );
+        var xmlPath = context.CurrentDirectory.Combine( ".PublicStack/CKt.xml" );
+
+        SetReferences( xmlPath, $"""<Reference Url="{one.StackUri}">{profiles}</Reference>""" );
+        using( TestHelper.Monitor.CollectEntries( out var entries ) )
+        {
+            using var stack = StackRepository.TryOpenFromPath( TestHelper.Monitor, context, out _, skipPullStack: true )
+                                             .ShouldNotBeNull();
+            stack.DefaultWorldName.LoadDefinitionFile( TestHelper.Monitor ).ShouldBeNull();
+            entries.ShouldContain( e => e.Exception != null && e.Exception.Message.Contains( message ) );
+        }
+    }
+
+    /// <summary>
+    /// Opens the World (without its plugins), calls the action on its definition file and closes the Stack:
+    /// a file left dirty is saved and committed by the close.
+    /// </summary>
+    static bool Edit( CKliEnv context, Func<WorldDefinitionFile, bool> action )
+    {
+        var (stack, world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor,
+                                                                   context,
+                                                                   out var error,
+                                                                   skipPullStack: true,
+                                                                   withPlugins: false );
+        error.ShouldBeFalse();
+        stack.ShouldNotBeNull();
+        try
+        {
+            return action( world.ShouldNotBeNull().DefinitionFile );
+        }
+        finally
+        {
+            // Close, not Dispose: this is what saves and commits a dirty definition file (as a command does).
+            stack.Close( TestHelper.Monitor ).ShouldBeTrue();
+        }
+    }
+
+    static void Read( CKliEnv context, Action<WorldDefinitionFile> action )
+    {
+        Edit( context, d => { action( d ); return true; } );
+    }
+
+    static string StackHead( CKliEnv context )
+    {
+        using var git = new LibGit2Sharp.Repository( context.CurrentDirectory.AppendPart( ".PublicStack" ) );
+        return git.Head.Tip.Sha;
     }
 
     static ValueTask<bool> Set( CKliEnv context, Uri stackUrl, params string[] flags )

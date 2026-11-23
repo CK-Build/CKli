@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Packaging.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -462,6 +463,105 @@ public sealed class WorldDefinitionFile
         }
         return SaveFile( monitor )
                && _world.Stack.Commit( monitor, $"Removed reference to Stack '{url}' from world '{_world.FullName}'." );
+    }
+
+    /// <summary>
+    /// Records the published profiles of some <see cref="References"/> for a branch of this world (as
+    /// <see cref="WorldReference.Profiles"/>), saves this file and commits the change in the Stack repository.
+    /// <para>
+    /// A null version removes the record of the branch. When nothing changes, nothing is saved nor committed.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="versionBranchName">
+    /// The version side name of the branch: the empty string for the root one, "alpha".."zulu" or "explo/{name}".
+    /// </param>
+    /// <param name="profiles">
+    /// The references and their profile versions. The references must be current ones of <see cref="References"/>.
+    /// </param>
+    /// <returns>True on success, false on error.</returns>
+    public bool SetReferenceProfiles( IActivityMonitor monitor,
+                                      string versionBranchName,
+                                      IEnumerable<(WorldReference Reference, TimeVersion? Version)> profiles )
+    {
+        Throw.CheckNotNullArgument( versionBranchName );
+        Throw.CheckArgument( versionBranchName.Length == 0 || !string.IsNullOrWhiteSpace( versionBranchName ) );
+        Throw.CheckNotNullArgument( profiles );
+        var changes = profiles.ToList();
+        Throw.CheckArgument( "The references must be current ones.", changes.All( c => _references.Contains( c.Reference ) ) );
+        bool changed = false;
+        using( StartEdit() )
+        {
+            foreach( var (r, version ) in changes )
+            {
+                changed |= SetProfile( r.XElement, versionBranchName, version );
+            }
+            if( changed ) RefreshReferences();
+        }
+        if( !changed ) return true;
+        var branch = versionBranchName.Length == 0 ? "the root branch" : $"branch '{versionBranchName}'";
+        return SaveFile( monitor )
+               && _world.Stack.Commit( monitor, $"Recorded the profiles of the World References of {branch} in world '{_world.FullName}'." );
+
+        static bool SetProfile( XElement reference, string versionBranchName, TimeVersion? version )
+        {
+            var e = FindProfile( reference, versionBranchName );
+            if( version == null )
+            {
+                if( e == null ) return false;
+                e.Remove();
+                return true;
+            }
+            var v = version.ToString();
+            if( e == null )
+            {
+                e = new XElement( XNames.Profile );
+                if( versionBranchName.Length > 0 ) e.SetAttributeValue( XNames.Branch, versionBranchName );
+                e.SetAttributeValue( XNames.Version, v );
+                // The root branch comes first.
+                if( versionBranchName.Length == 0 ) reference.AddFirst( e );
+                else reference.Add( e );
+                return true;
+            }
+            if( e.Attribute( XNames.Version )?.Value == v ) return false;
+            e.SetAttributeValue( XNames.Version, v );
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Removes the recorded profiles of a branch of this world from all the <see cref="References"/> (see
+    /// <see cref="WorldReference.Profiles"/>). This is called when the branch is closed.
+    /// <para>
+    /// This file is not saved here: it is saved and committed when the Stack is closed, with the other changes of
+    /// the command (see <see cref="IsDirty"/>).
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="versionBranchName">The version side name of the branch ("alpha".."zulu" or "explo/{name}").</param>
+    /// <returns>The number of removed profiles.</returns>
+    public int RemoveReferenceProfiles( IActivityMonitor monitor, string versionBranchName )
+    {
+        Throw.CheckNotNullOrWhiteSpaceArgument( versionBranchName );
+        var toRemove = _references.Select( r => FindProfile( r.XElement, versionBranchName ) )
+                                  .Where( e => e != null )
+                                  .ToList();
+        if( toRemove.Count > 0 )
+        {
+            using( StartEdit() )
+            {
+                foreach( var e in toRemove ) e!.Remove();
+                RefreshReferences();
+            }
+            monitor.Info( $"Removed the {toRemove.Count} recorded profile(s) of branch '{versionBranchName}' from the World References." );
+        }
+        return toRemove.Count;
+    }
+
+    static XElement? FindProfile( XElement reference, string versionBranchName )
+    {
+        return reference.Elements( XNames.Profile )
+                        .FirstOrDefault( p => (p.Attribute( XNames.Branch )?.Value ?? "") == versionBranchName );
     }
 
     void RefreshReferences()

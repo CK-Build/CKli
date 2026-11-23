@@ -1,5 +1,7 @@
 using CK.Core;
+using CK.Packaging.Abstractions;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Xml.Linq;
@@ -9,6 +11,10 @@ namespace CKli.Core;
 /// <summary>
 /// A &lt;Reference Url="..." /&gt; element of a world definition file: another Stack that the world uses.
 /// See <see cref="WorldDefinitionFile.References"/>.
+/// <para>
+/// Its optional &lt;Profile Branch="..." Version="..." /&gt; children record, per branch of the world, the published
+/// profile of the referenced Stack that the world is aligned on (see <see cref="Profiles"/>).
+/// </para>
 /// <para>
 /// This is a read-only view of the element. It is created when the definition file is loaded and after
 /// each edit of it, so a reference obtained before a <see cref="WorldDefinitionFile.SetReference"/> or a
@@ -23,6 +29,7 @@ public sealed class WorldReference
     readonly string? _ltsName;
     readonly bool _defaultClone;
     readonly bool _isPrivate;
+    readonly Dictionary<string, TimeVersion> _profiles;
 
     internal WorldReference( XElement element )
     {
@@ -38,6 +45,45 @@ public sealed class WorldReference
         _defaultClone = (bool?)element.Attribute( XNames.DefaultClone ) is not false;
         _isPrivate = (bool?)element.Attribute( XNames.Private ) is true;
         _ltsName = element.Attribute( XNames.LTSName )?.Value;
+        _profiles = ReadProfiles( element );
+    }
+
+    // An invalid or duplicate <Profile /> throws: like the attributes above, this prevents the world to be loaded
+    // rather than failing later in the command that consumes it.
+    static Dictionary<string, TimeVersion> ReadProfiles( XElement element )
+    {
+        var profiles = new Dictionary<string, TimeVersion>();
+        foreach( var p in element.Elements( XNames.Profile ) )
+        {
+            var branch = p.Attribute( XNames.Branch )?.Value;
+            if( branch != null && string.IsNullOrWhiteSpace( branch ) )
+            {
+                Throw.CKException( $"""
+                    Invalid element:
+                    {element}
+                    A <Profile /> Branch attribute cannot be empty: the root branch is the one without a Branch attribute.
+                    """ );
+            }
+            branch ??= "";
+            var v = p.Attribute( XNames.Version )?.Value;
+            if( !TimeVersion.TryParse( v, out var version ) )
+            {
+                Throw.CKException( $"""
+                    Invalid element:
+                    {element}
+                    A <Profile /> must have a valid Version attribute (a published profile version), got '{v}'.
+                    """ );
+            }
+            if( !profiles.TryAdd( branch, version ) )
+            {
+                Throw.CKException( $"""
+                    Invalid element:
+                    {element}
+                    {(branch.Length == 0 ? "The root branch" : $"Branch '{branch}'")} has more than one <Profile />.
+                    """ );
+            }
+        }
+        return profiles;
     }
 
     /// <summary>
@@ -97,6 +143,21 @@ public sealed class WorldReference
     /// </para>
     /// </summary>
     public string? LTSName => _ltsName;
+
+    /// <summary>
+    /// Gets the recorded profiles of the referenced Stack, indexed by the version side name of the branch of this
+    /// world that recorded them: the empty string for the root branch (the &lt;Profile /&gt; without a Branch
+    /// attribute), "alpha".."zulu" for a prerelease branch and "explo/{name}" for an exploratory one (the group
+    /// names of a <see cref="PublishedIndex"/>, without their CI suffix).
+    /// <para>
+    /// The branch of the recorded profile itself is its <see cref="TimeVersion.BranchName"/>: it can be a parent of
+    /// the recording branch, the one the referenced Stack published from.
+    /// </para>
+    /// <para>
+    /// "ckli deps update" records them (see <see cref="WorldDefinitionFile.SetReferenceProfiles"/>).
+    /// </para>
+    /// </summary>
+    public IReadOnlyDictionary<string, TimeVersion> Profiles => _profiles;
 
     /// <summary>
     /// Gets whether this reference matches a stack name or url.

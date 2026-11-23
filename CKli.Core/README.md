@@ -242,7 +242,8 @@ invalid one throws when the file is loaded rather than reaching a consumer.
 (the reference would be useless to anyone who can read the public Stack but not the private one).
 
 `WorldDefinitionFile.References` exposes them as `IReadOnlyList<WorldReference>` — a read-only view of the
-element with the 4 attributes above already read: `Url`, `DefaultClone`, `IsPrivate` and `LTSName`. They are
+element with the 4 attributes above already read: `Url`, `DefaultClone`, `IsPrivate` and `LTSName` (and the
+`Profiles` of its `<Profile />` children, below). They are
 honored by the `ckli clone` command **only**: `StackRepository.CloneAsync` clones one Stack and its default
 world repositories, nothing more.
 
@@ -276,6 +277,31 @@ url is cloned once. Two flags override the `DefaultClone` attributes:
 | `ckli clone <url>` | Clones the references whose `DefaultClone` is not `false`. |
 | `ckli clone <url> --with-ref-clone` | Clones every reference. |
 | `ckli clone <url> --without-ref-clone` | Clones no reference at all. |
+
+#### `<Profile />`: the recorded profile of a reference, per branch
+
+A reference can have `<Profile />` children: one per branch of **this** World, the published profile of the
+referenced Stack that the branch is aligned on. `ckli deps update` writes them (Build plugin), and the regular
+builds and publications check that the World still consumes what that profile produces:
+
+```xml
+<Reference Url="https://github.com/signature-opensource/CK-Stack">
+  <Profile Version="2026.11.21" />
+  <Profile Branch="alpha" Version="2026.11.22-alpha" />
+</Reference>
+```
+
+- `Branch` is the version side name of the branch that recorded it, the group name of a `PublishedIndex`
+  without its CI suffix: absent for the root branch, `alpha`..`zulu` for a prerelease and `explo/{name}` for an
+  exploratory one.
+- `Version` is the profile's `TimeVersion`. Its own branch, the one the referenced Stack published from, is in it:
+  `alpha` can record a profile of the referenced root branch (the branch model's parent fallback).
+
+An invalid `Version`, an empty `Branch` or two `<Profile />` of the same branch throw when the file is loaded.
+`WorldReference.Profiles` indexes them by branch (`""` for the root). `WorldDefinitionFile.SetReferenceProfiles`
+records the profiles of one branch (a null version removes one), saves the file and commits, or does nothing
+when nothing changes. `RemoveReferenceProfiles` removes the records of a closed branch: it only edits the file,
+which the Stack's `Close` saves and commits with the rest of the command.
 
 `LTSName` selects **which world of the referenced Stack is used**, and `ckli clone` honors it: the referenced
 Stack is cloned as usual and then the repositories of that world are the ones cloned, in the world's own
