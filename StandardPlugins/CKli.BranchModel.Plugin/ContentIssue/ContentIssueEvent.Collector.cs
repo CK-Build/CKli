@@ -281,7 +281,7 @@ public sealed partial class ContentIssueEventArgs
                 }
             }
 
-            return h;
+            return r.AddBelow( h );
         }
 
         internal bool Execute( IActivityMonitor monitor, CKliEnv context, Repo repo, IRenderable body )
