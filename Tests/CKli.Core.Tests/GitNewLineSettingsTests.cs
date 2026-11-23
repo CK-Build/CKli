@@ -163,4 +163,25 @@ public class GitNewLineSettingsTests
             TestEnv.SetMachineGitConfig( null );
         }
     }
+
+    [TestCase( "", "", true )]
+    [TestCase( "a\nb\n", "a\nb\n", true )]
+    [TestCase( "a\r\nb\r\n", "a\nb\n", true )]
+    [TestCase( "a\nb\n", "a\r\nb\r\n", true )]
+    [TestCase( "a\r\nb\n", "a\nb\r\n", true )]
+    [TestCase( "a\nb\n", "a\nb", false )]
+    [TestCase( "a\nb\n", "a\nc\n", false )]
+    [TestCase( "a\rb", "ab", false )]
+    [TestCase( "a\rb", "a\nb", false )]
+    [TestCase( "a\r\n", "a\r", false )]
+    [TestCase( "\uFEFFa\n", "a\n", false )]
+    [TestCase( "a\0\r\nb", "a\0\nb", false )]
+    [TestCase( "a\0\r\nb", "a\0\r\nb", true )]
+    public void same_content_whatever_the_newlines( string a, string b, bool expected )
+    {
+        var bA = System.Text.Encoding.UTF8.GetBytes( a );
+        var bB = System.Text.Encoding.UTF8.GetBytes( b );
+        GitNewLineSettings.HasSameContent( bA, bB ).ShouldBe( expected );
+        GitNewLineSettings.HasSameContent( bB, bA ).ShouldBe( expected );
+    }
 }
