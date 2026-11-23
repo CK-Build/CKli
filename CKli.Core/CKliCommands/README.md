@@ -144,7 +144,7 @@ of the last log file.
 On Linux the last log file is shown by the first of these that works:
 1. the command in the `CKLI_PAGER` environment variable (for instance `CKLI_PAGER=code`),
 2. the command in the `PAGER` environment variable,
-3. `xdg-open`,
+3. `xdg-open` (only when a graphical display is available),
 4. `less`,
 5. plain output to the console.
 

@@ -92,9 +92,11 @@ static class PlatformHelper
 
     static bool OpenPathLinux( IActivityMonitor monitor, string path, bool isFolder )
     {
+        bool hasDisplay = !string.IsNullOrEmpty( Environment.GetEnvironmentVariable( "DISPLAY" ) )
+                          || !string.IsNullOrEmpty( Environment.GetEnvironmentVariable( "WAYLAND_DISPLAY" ) );
         if( isFolder )
         {
-            if( RunShell( "xdg-open \"$1\" >/dev/null 2>&1", path ) != 0 )
+            if( !hasDisplay || RunShell( "xdg-open \"$1\" >/dev/null 2>&1", path ) != 0 )
             {
                 Console.Out.WriteLine( path );
             }
@@ -102,11 +104,13 @@ static class PlatformHelper
         }
         var scripts = LinuxLogViewer.GetScripts( Environment.GetEnvironmentVariable( "CKLI_PAGER" ),
                                                  Environment.GetEnvironmentVariable( "PAGER" ),
+                                                 hasDisplay,
                                                  Console.IsOutputRedirected );
         foreach( var script in scripts )
         {
             int code = RunShell( script, path );
-            if( code == 0 ) return true;
+            // Above 128, the viewer has been killed by a signal (Ctrl+C): the user is done.
+            if( code == 0 || code > 128 ) return true;
             // 127 is the shell's "command not found": the viewer is simply not installed.
             if( code == 127 ) monitor.Trace( $"Log viewer '{script}' is not available." );
             else monitor.Warn( $"Log viewer '{script}' failed with exit code {code}." );

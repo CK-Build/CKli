@@ -35,6 +35,8 @@ sealed class CKliLog : Command
         }
         Throw.DebugAssert( LogFile.RootLogPath != null && LogFile.RootLogPath[^1] == Path.DirectorySeparatorChar );
 
+        // The log viewer owns the terminal from now on.
+        if( context.Screen is AnsiScreen ansi ) ansi.HideAnimation();
         bool success = true;
         try
         {
