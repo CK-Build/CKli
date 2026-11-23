@@ -23,9 +23,9 @@ need to be re-run.
 - It drives the actual build (`dotnet build`/`test`/`pack`) through a per-Repo **`RepoBuilder`**, coordinates parallel
   builds with a bounded degree of parallelism, and updates each repository's `.csproj` package references to point to the
   versions that were just built (or reused).
-- It exposes two extensibility events (`OnRoadmapBuild`, `OnFixBuild`) that let other plugins react once a build
-  succeeds - in practice this is how `CKli.Publish.Plugin` gets triggered: `CKli.Build.Plugin` computes and builds, and on
-  success fires the event that the publish plugin listens to. Building and publishing are deliberately two different
+- It exposes extensibility events (`OnRoadmapBuilding`, `OnRoadmapBuild`, `OnFixBuild`) that let other plugins refuse a
+  roadmap before it is built, and react once a build succeeds - in practice this is how `CKli.Publish.Plugin` gets
+  triggered: `CKli.Build.Plugin` computes and builds, and on success fires the event that the publish plugin listens to. Building and publishing are deliberately two different
   plugins so that "build" stays a repeatable, side-effect-contained computation while "publish" owns the sensitive,
   one-shot act of pushing artifacts to the world.
 
@@ -266,6 +266,7 @@ repository — a renewal commits to it and pushes it. See
 
 | Event | Raised by | Payload | Purpose |
 |---|---|---|---|
+| `BuildPlugin.OnRoadmapBuilding` | Once a `Roadmap` is computed and displayed, **before any build** (not for `--dry-run`, which builds nothing) | `RoadmapBuildingEventArgs` (`Roadmap`, `ShouldPublish`, `RunTest`) | Lets a listener refuse a roadmap whose fate is known from the roadmap alone: `e.SetFailed()` stops the command with nothing built. A regular build integrates the `dev/` branches into their base branch before building them, so a refusal after the builds would leave them moved. `CKli.Publish.Plugin` refuses a closed publication gate here. |
 | `BuildPlugin.OnRoadmapBuild` | After a `Roadmap` build succeeds, or immediately for `--dry-run` | `RoadmapBuildEventArgs` (`Roadmap`, `ShouldPublish`, `BuildDate`) | Lets a listener (typically `CKli.Publish.Plugin`) act on the outcome; `Roadmap.SolutionBuildCount` can be 0 (nothing needed building). Handlers call `e.SetFailed()` to fail the command. |
 | `BuildPlugin.OnFixBuild` | After all targets of a `FixWorkflow` build succeed | `FixBuildEventArgs` (`FixWorkflow`, `Results`, `KeepBranchOnSuccessfulPublish`, `ShouldPublish`) | Same purpose for the `fix build`/`fix publish` pipeline. |
 | `RepositoryBuilderPlugin.OnCoreBuild` | Right before `RepoBuilder` runs `dotnet build/test/pack` for one repository | `CoreBuildEventArgs` (`CommitBuildInfo`, `OutputPath`, `RunTest`, `Cancellation`, settable `OutputHook`) | Lets a handler short-circuit the actual build by setting `OutputHook` to a `BuildOutput` (whose packages folder should be the `OutputPath`). |

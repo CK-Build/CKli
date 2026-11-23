@@ -52,6 +52,8 @@ public sealed class PublishPlugin : PrimaryPluginBase
         // A test harness (and a user who wants to keep playing with the produced artifacts) sets
         // <Publish KeepLocalReleaseAfterPublish="true" /> to skip that housekeeping.
         _keepLocalReleaseAfterPublish = (bool?)primaryContext.Configuration.XElement.Attribute( XNames.KeepLocalReleaseAfterPublish ) ?? false;
+        // Sync: the gate is computed from the roadmap and the version tags, there is nothing to await.
+        _build.OnRoadmapBuilding.Sync += OnRoadmapBuilding;
         _build.OnRoadmapBuild.Async += OnRoadmapBuildAsync;
         _build.OnFixBuild.Async += OnFixBuildAsync;
         // Sync: this handler is file IO and git, there is nothing to await. The event is a PerfectEvent,
@@ -440,6 +442,50 @@ public sealed class PublishPlugin : PrimaryPluginBase
         PushStack( monitor, World );
     }
 
+    // Before any build: a closed gate is known from the roadmap alone, and a regular build integrates the "dev/"
+    // branches into their base branch before building them. Refusing after the builds would leave the base branches
+    // moved (nothing pushed, but not what the developer left). The gate is computed again after the builds by
+    // OnRoadmapBuildAsync: that one is the gate of the publication, this one only refuses early.
+    void OnRoadmapBuilding( IActivityMonitor monitor, RoadmapBuildingEventArgs e )
+    {
+        if( !e.ShouldPublish ) return;
+        var roadmap = e.Roadmap;
+        Throw.DebugAssert( "Not raised by a --dry-run.", !roadmap.DryRun );
+        Throw.DebugAssert( roadmap.PublishableStatus > PublishableStatus.None );
+        if( roadmap.PublishableStatus is > PublishableStatus.AlreadyPublished and < PublishableStatus.BuildingPending )
+        {
+            var publish = PublishRoadmap.Create( monitor, roadmap, _versionTag );
+            if( publish == null )
+            {
+                e.SetFailed();
+            }
+            else if( !publish.CanPublish )
+            {
+                DisplayVerdict( monitor, e.Screen, publish, e.RunTest );
+                monitor.Error( $"Unable to publish: the profile of branch '{roadmap.Graph.BranchName}' would be incoherent. Nothing has been built." );
+                e.SetFailed();
+            }
+        }
+    }
+
+    // The roadmap's rows show the tests of the direct releases, the required releases of the parent branches show
+    // theirs: they are tested if they have never been (or with "--force-tests").
+    void DisplayVerdict( IActivityMonitor monitor, IScreen screen, PublishRoadmap publish, bool? runTest )
+    {
+        // Nothing is published untested: a publication has no "--skip-tests".
+        Throw.DebugAssert( runTest != false );
+        var untestedRequired = runTest == true
+                                ? null
+                                : _build.GetUntestedReleases( monitor, GetRequiredReleases( publish ) )
+                                        .Select( r => (r.Repo, r.Version) )
+                                        .ToHashSet();
+        screen.Display( s => publish.ToRenderable( s,
+                                                   _branchModel.BranchNamespace,
+                                                   r => untestedRequired == null || untestedRequired.Contains( (r.Repo, r.Version) )
+                                                          ? TestStatus.WillTest
+                                                          : TestStatus.Tested ) );
+    }
+
     async Task OnRoadmapBuildAsync( IActivityMonitor monitor, RoadmapBuildEventArgs e, CancellationToken cancellation )
     {
         if( e.ShouldPublish )
@@ -451,25 +497,15 @@ public sealed class PublishPlugin : PrimaryPluginBase
                 var publish = PublishRoadmap.Create( e.Monitor, roadmap, _versionTag );
                 if( publish != null )
                 {
-                    // Nothing is published untested: a publication has no "--skip-tests".
-                    Throw.DebugAssert( e.RunTest != false );
                     // Always displays the verdict (this is the only output of a --dry-run). Mirroring how a
                     // PublishableStatus.BuildingPending roadmap is handled, a --dry-run only reports: it is the real
                     // publication that fails when the gate is closed.
-                    // The roadmap's rows show the tests of the direct releases, the required releases of the parent
-                    // branches show theirs: they are tested if they have never been (or with "--force-tests").
-                    var untestedRequired = e.RunTest == true
-                                            ? null
-                                            : _build.GetUntestedReleases( monitor, GetRequiredReleases( publish ) )
-                                                    .Select( r => (r.Repo, r.Version) )
-                                                    .ToHashSet();
-                    e.Screen.Display( s => publish.ToRenderable( s,
-                                                                 _branchModel.BranchNamespace,
-                                                                 r => untestedRequired == null || untestedRequired.Contains( (r.Repo, r.Version) )
-                                                                        ? TestStatus.WillTest
-                                                                        : TestStatus.Tested ) );
+                    DisplayVerdict( monitor, e.Screen, publish, e.RunTest );
                     if( !roadmap.DryRun )
                     {
+                        // A real run has already refused a closed gate before any build (OnRoadmapBuilding). The gate
+                        // is computed again on the state after the builds: if it closed in between, this is the
+                        // safety net, and the "dev/" branches are already integrated.
                         if( !publish.CanPublish )
                         {
                             monitor.Error( $"Unable to publish: the profile of branch '{roadmap.Graph.BranchName}' would be incoherent." );

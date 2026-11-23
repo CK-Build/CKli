@@ -82,6 +82,7 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
     readonly RepositoryBuilderPlugin _repoBuilder;
     readonly ArtifactHandlerPlugin _artifactHandler;
     readonly ShallowSolutionPlugin _solutionPlugin;
+    readonly PerfectEventSender<RoadmapBuildingEventArgs> _onRoadmapBuilding;
     readonly PerfectEventSender<RoadmapBuildEventArgs> _onRoadmapBuild;
     readonly PerfectEventSender<FixBuildEventArgs> _onFixBuild;
     GitRepository.DistributedLock.Lease? _publishLease;
@@ -134,9 +135,17 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
         _artifactHandler = artifactHandler;
         _solutionPlugin = solutionPlugin;
         World.Events.Issue += IssueRequested;
+        _onRoadmapBuilding = new PerfectEventSender<RoadmapBuildingEventArgs>();
         _onRoadmapBuild = new PerfectEventSender<RoadmapBuildEventArgs>();
         _onFixBuild = new PerfectEventSender<FixBuildEventArgs>();
     }
+
+    /// <summary>
+    /// Raised when a <see cref="Roadmap"/> is about to be built, before any build (and before a regular build
+    /// integrates the "dev/" branches). A listener that calls <see cref="BuildBaseEventArgs.SetFailed()"/> stops the
+    /// command: nothing is built. Not raised when <see cref="Roadmap.DryRun"/> is true.
+    /// </summary>
+    public PerfectEvent<RoadmapBuildingEventArgs> OnRoadmapBuilding => _onRoadmapBuilding.PerfectEvent;
 
     /// <summary>
     /// Raised whenever a <see cref="Roadmap"/> has been successfully built or when <see cref="Roadmap.DryRun"/> is true (no real build must be done).
@@ -616,6 +625,19 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
 
     async Task<bool> DoRunAsync( IActivityMonitor monitor, CKliEnv context, int vMaxDoP, bool? runTest, BuildImpacts buildImpacts, Roadmap roadmap )
     {
+        // Before any build: a regular build integrates the "dev/" branches into their base branch, so what can be
+        // refused from the roadmap alone (the publication gate) must be refused here.
+        if( _onRoadmapBuilding.HasHandlers )
+        {
+            using( monitor.OpenTrace( $"Raising RoadmapBuilding event." ) )
+            {
+                var e = new RoadmapBuildingEventArgs( monitor, context, World, roadmap, runTest );
+                if( !await _onRoadmapBuilding.SafeRaiseAsync( monitor, e ).ConfigureAwait( false ) || !e.Success )
+                {
+                    return false;
+                }
+            }
+        }
         var results = await roadmap.BuildAsync( monitor, context, this, runTest, buildImpacts, vMaxDoP, PrimaryPluginContext.Cancellation ).ConfigureAwait( false );
         if( results == null && !roadmap.IsStoppedAfterFocus )
         {

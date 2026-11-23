@@ -55,12 +55,28 @@ public sealed class PublishPlugin : PrimaryPluginBase
 `PublishPlugin` derives from `PrimaryPluginBase` (always instantiated) and takes the four
 collaborator plugins above through constructor injection. In its constructor it subscribes to:
 
+- `_build.OnRoadmapBuilding.Sync += OnRoadmapBuilding`
 - `_build.OnRoadmapBuild.Async += OnRoadmapBuildAsync`
 - `_build.OnFixBuild.Async += OnFixBuildAsync`
 - `_versionTag.VersionDeprecated.Sync += OnVersionDeprecated`
 
 It defines no `[CommandPath]` methods and does not subscribe to `World.Events` — all of its work
-is triggered from these three events.
+is triggered from these events.
+
+#### `OnRoadmapBuilding` — the gate before any build
+
+Raised once the roadmap is computed, before any build (never for a `--dry-run`, which builds
+nothing). For a publication whose `PublishableStatus` is strictly between `AlreadyPublished` and
+`BuildingPending`, it computes the gate (`PublishRoadmap.Create`) and, when it is closed, displays
+its verdict and fails the command: "Unable to publish: the profile of branch '…' would be
+incoherent. Nothing has been built."
+
+This is the refusal that matters. A regular build integrates each `dev/` branch into its base
+branch before building it, and tags: the gate refused after the builds left the base branches
+moved and `building/`/`local/` tags behind (nothing pushed, but not what the developer left). A
+closed gate is known from the roadmap alone (see
+[`PublishedProfileBuilder`](#publishedprofilebuilder--the-publication-gate)), so it is refused
+before. An open gate displays nothing here: its verdict is displayed once, by `OnRoadmapBuildAsync`.
 
 #### `OnRoadmapBuildAsync` — regular `publish` / `*publish`
 
@@ -260,8 +276,11 @@ solution — `Roadmap.BuildSolution.TargetVersion`. Package identifiers are only
 version a consumer was built against comes from its recorded `BuildContentInfo.Consumed` and is
 mapped back to the solution that produces it.
 
-`Create(monitor, roadmap, versionTag)` runs **before any build**, so a `--dry-run` gets the same
-verdict as a real publication:
+`Create(monitor, roadmap, versionTag)` reads the roadmap as it was **before any build**, so a
+`--dry-run` gets the same verdict as a real publication. A real publication computes it twice: in
+`OnRoadmapBuilding`, before any build, where a closed gate is refused; and in `OnRoadmapBuildAsync`,
+after the builds, where it is the gate of the publication (a gate that closed in between is the
+safety net: refused, with the `dev/` branches already integrated).
 
 | Member | Meaning |
 |---|---|
@@ -599,11 +618,11 @@ likewise resolved through `GitRepositoryKey` / `ISecretsStore`, documented in `C
 
 ## Known rough edges (from the code)
 
-- The gate's failure paths have no integration test coverage: `Tests/Plugins.Tests` never reaches
-  `PublishableStatus.IndirectPublishRequired`, so the `RequiredPublications` closure, its
-  producers-first ordering, `IndirectPublisher`, and `BuildFinalProfile`'s conflict branch are all
-  exercised only by reasoning. Constructing that state needs a fixture with a second configured
-  branch.
+- The gate's failure paths are only partly covered. `Tests/Plugins.Tests/IndirectPublicationTests`
+  reaches `PublishableStatus.IndirectPublishRequired` (the `RequiredPublications` published by the
+  `IndirectPublisher`) and a gate closed by `MissingArtifacts`, refused before any build. A gate
+  closed by `Discrepancies` or `BuildingAliens`, and `BuildFinalProfile`'s conflict branch, are
+  exercised only by reasoning.
 - `NuGetFeedClient.DeleteAsync` (in `CKli.ArtifactHandler.Plugin`) is fully implemented but never
   invoked by `PackageSender` or any publisher — there is no CKli-level command that deletes/unlists a
   published package version.
