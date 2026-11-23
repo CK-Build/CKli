@@ -155,7 +155,9 @@ public sealed class CommonFilesPlugin : PrimaryPluginBase
         else
         {
             ev.Issues.CheckExistingFileCase( relativeTargetPath, info );
-            if( !fileContent.SequenceEqual( info.ReadAsBytes() ) )
+            // Newline differences of a text file are ignored: Git stores LF whatever the working file has,
+            // so such an update could never be committed and the issue would come back forever.
+            if( !GitNewLineSettings.HasSameContent( fileContent, info.ReadAsBytes() ) )
             {
                 ev.Issues.UpdateFile( relativeTargetPath, () => fileContent );
             }

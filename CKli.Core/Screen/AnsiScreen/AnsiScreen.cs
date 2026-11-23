@@ -37,6 +37,9 @@ sealed partial class AnsiScreen : IScreen
 
     public int Width => _animation.ScreenWidth;
 
+    // An external program is about to own the terminal: the animation must not draw over it.
+    internal void HideAnimation() => _animation.Hide( true );
+
     public void ScreenLog( LogLevel level, string message ) => _animation.AddLog( _screenType.CreateLog( level, message ) );
 
     public void OnLog( LogLevel level, string? text, bool isOpenGroup ) => _animation.OnLog( text, isOpenGroup );

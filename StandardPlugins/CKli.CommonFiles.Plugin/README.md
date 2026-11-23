@@ -58,8 +58,12 @@ For each entry, `ContentIssueRequested` dispatches on `FileType` against `ev.Con
 `INormalizedFileProvider`) and reports through `ev.Issues` (a `ContentIssueEventArgs.Collector`, shared with `BranchModelPlugin`'s own
 checks):
 
-- `CopyFile` — `ev.Issues.CreateFile(...)` if the target is missing, or `ev.Issues.UpdateFile(...)` if the byte content differs; both
+- `CopyFile` — `ev.Issues.CreateFile(...)` if the target is missing, or `ev.Issues.UpdateFile(...)` if the content differs; both
   also call `ev.Issues.CheckExistingFileCase(...)` to catch and fix name-casing mismatches.
+  The comparison ignores the newline differences of a text file (`GitNewLineSettings.HasSameContent`): Git stores a text
+  file with LF whatever the newline of the working file, so such a difference could never be committed and the issue would
+  come back on every run. A binary file (it contains a NUL byte) is compared exactly. A file is always written with the
+  exact bytes of the `Common/` file.
 - `InitializeFile` — creates the file only when absent; otherwise only fixes casing and logs (`Info`/`Trace`) that the file was left
   as-is.
 - `HandleFileTemplate` — raises `TemplateRequired` with a `CommonFileTemplateEventArgs` carrying the original `ContentIssueEventArgs`,

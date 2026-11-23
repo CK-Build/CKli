@@ -78,6 +78,29 @@ public static class GitNewLineSettings
         }
     }
 
+    /// <summary>
+    /// Gets whether two contents are the same for Git: equal bytes, or texts that differ only by a CR before
+    /// a LF (Git stores a text file with LF whatever the newline of the working file).
+    /// A content with a NUL byte is binary (this is Git's own test) and is compared exactly.
+    /// </summary>
+    /// <param name="a">The first content.</param>
+    /// <param name="b">The second content.</param>
+    /// <returns>True if a commit would see no difference between the two contents.</returns>
+    public static bool HasSameContent( ReadOnlySpan<byte> a, ReadOnlySpan<byte> b )
+    {
+        if( a.Contains( (byte)0 ) || b.Contains( (byte)0 ) ) return a.SequenceEqual( b );
+        int i = 0, j = 0;
+        for(; ; )
+        {
+            if( IsCRLF( a, i ) ) ++i;
+            if( IsCRLF( b, j ) ) ++j;
+            if( i == a.Length || j == b.Length ) return i == a.Length && j == b.Length;
+            if( a[i++] != b[j++] ) return false;
+        }
+
+        static bool IsCRLF( ReadOnlySpan<byte> s, int i ) => i + 1 < s.Length && s[i] == '\r' && s[i + 1] == '\n';
+    }
+
     static bool IsTrue( string? v ) => v != null
                                        && (v.Equals( "true", StringComparison.OrdinalIgnoreCase )
                                            || v.Equals( "yes", StringComparison.OrdinalIgnoreCase )
