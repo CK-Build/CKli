@@ -532,10 +532,11 @@ public sealed partial class HotZonePlugin
         }
     }
 
-    // UTF-8 without BOM, CRLF.
+    // UTF-8 without BOM, CRLF for a new file. The tombstone project replaces the retired one: it keeps its newline
+    // (the repository may store it with LF).
     static void WriteText( NormalizedPath path, string text )
     {
         Directory.CreateDirectory( path.RemoveLastPart() );
-        File.WriteAllText( path, text.ReplaceLineEndings( "\r\n" ), new UTF8Encoding( false ) );
+        File.WriteAllText( path, text.ReplaceLineEndings( XmlHelper.ReadNewLine( path ) ?? "\r\n" ), new UTF8Encoding( false ) );
     }
 }

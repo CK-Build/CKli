@@ -178,7 +178,8 @@ solution folders left empty are removed) and `AddProject` (in the solution folde
 and `Directory.(Build|Packages).props` file via `CommonSolution.LoadAllProjectFiles` (this time with
 `LoadOptions.PreserveWhitespace`, to keep diffs minimal), rewrites each `<PackageReference>`'s `VersionOverride`
 and/or `Version` attribute (and each `<PackageVersion>`'s `Version` attribute) using
-`IPackageMapping.TryGetMappedVersion`, and saves every touched document back with `XmlHelper.SafeSave`. It then rewrites
+`IPackageMapping.TryGetMappedVersion`, and saves every touched document back with `XmlHelper.SafeSave` (which keeps the newline of the existing file: a
+file the repository stores with LF is not rewritten with CRLF on Windows). It then rewrites
 the `#:package Name@Version` lines of `Deployment/GenerateAssets.cs` the same way (a text rewrite of the version only;
 the packages of the solution itself are left alone). Which
 identifiers it looks at, and which unmapped version it complains about, is decided by `IPackageMapping.GetMappingType`

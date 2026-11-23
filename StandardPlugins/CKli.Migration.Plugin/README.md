@@ -146,7 +146,7 @@ handler. It:
   side effect of `NuGetHelper.SetOrRemoveNuGetSource`).
 - Re-saves every `.csproj`, `.props` and `.targets` file under the repo
   (`XmlHelper.SafeSave`, preserving whitespace) purely to normalize them
-  (no XML declaration, no BOM) — failures here are swallowed.
+  (no XML declaration, no BOM, the newline of the file is kept) — failures here are swallowed.
 
 The three steps that touch the `.slnx` — `dotnet sln migrate`, `dotnet sln
 remove` and the `.slnx` edit — go through a private `Retry`: 5 attempts,
