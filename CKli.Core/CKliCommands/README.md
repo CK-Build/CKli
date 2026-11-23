@@ -141,6 +141,16 @@ so moving a Stack to another organization means registering a key for that organ
 Opens the last log file. When `--folder` (or `-f`) is specified, the folder is opened instead
 of the last log file.
 
+On Linux the last log file is shown by the first of these that works:
+1. the command in the `CKLI_PAGER` environment variable (for instance `CKLI_PAGER=code`),
+2. the command in the `PAGER` environment variable,
+3. `xdg-open`,
+4. `less`,
+5. plain output to the console.
+
+When the output is redirected (`ckli log | grep error`), the log is written directly to the output.
+With `--folder`, the folder is opened with `xdg-open` when possible, otherwise its path is displayed.
+
 The `Log/` folder is `%LocalAppData%/CKli/Out-of-Stack-Logs/` when CKli doesn't start is a Stack folder, otherwise
 each Stack keeps its own logs in their `.PublicStack/Logs` (or `.PrivateStack/Logs`). 
 

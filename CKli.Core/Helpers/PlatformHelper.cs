@@ -1,6 +1,7 @@
 using CK.Core;
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 
 namespace CKli.Core;
@@ -46,7 +47,7 @@ static class PlatformHelper
             }
             else if( RuntimeInformation.IsOSPlatform( OSPlatform.Linux ) )
             {
-                return OpenPathLinux( monitor, path );
+                return OpenPathLinux( monitor, path, isFolder );
             }
             else
             {
@@ -89,49 +90,44 @@ static class PlatformHelper
         return p != null;
     }
 
-    static bool OpenPathLinux( IActivityMonitor monitor, string path )
+    static bool OpenPathLinux( IActivityMonitor monitor, string path, bool isFolder )
     {
-        if( IsCommandAvailable( "xdg-open" ) )
+        if( isFolder )
         {
-            using var p = Process.Start( new ProcessStartInfo
+            if( RunShell( "xdg-open \"$1\" >/dev/null 2>&1", path ) != 0 )
             {
-                FileName = "xdg-open",
-                Arguments = $"\"{path}\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            } );
-            return p != null;
+                Console.Out.WriteLine( path );
+            }
+            return true;
         }
-        else
+        var scripts = LinuxLogViewer.GetScripts( Environment.GetEnvironmentVariable( "CKLI_PAGER" ),
+                                                 Environment.GetEnvironmentVariable( "PAGER" ),
+                                                 Console.IsOutputRedirected );
+        foreach( var script in scripts )
         {
-            monitor.Error( $"Unable to open '{path}'. Install xdg-utils or open manually." );
-            return false;
+            int code = RunShell( script, path );
+            if( code == 0 ) return true;
+            // 127 is the shell's "command not found": the viewer is simply not installed.
+            if( code == 127 ) monitor.Trace( $"Log viewer '{script}' is not available." );
+            else monitor.Warn( $"Log viewer '{script}' failed with exit code {code}." );
         }
+        using var file = File.OpenRead( path );
+        using var stdout = Console.OpenStandardOutput();
+        file.CopyTo( stdout );
+        return true;
     }
 
-    /// <summary>
-    /// Checks if a command is available on the system (Unix platforms only).
-    /// </summary>
-    /// <param name="command">The command name to check.</param>
-    /// <returns>True if the command exists, false otherwise.</returns>
-    static bool IsCommandAvailable( string command )
+    // Runs a /bin/sh script that receives the path as "$1". The child process owns the terminal.
+    static int RunShell( string script, string path )
     {
-        try
+        using var p = Process.Start( new ProcessStartInfo
         {
-            using var p = Process.Start( new ProcessStartInfo
-            {
-                FileName = "which",
-                Arguments = command,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            } );
-            p?.WaitForExit();
-            return p?.ExitCode == 0;
-        }
-        catch
-        {
-            return false;
-        }
+            FileName = "/bin/sh",
+            ArgumentList = { "-c", script, "sh", path },
+            UseShellExecute = false
+        } );
+        if( p == null ) return -1;
+        p.WaitForExit();
+        return p.ExitCode;
     }
 }
