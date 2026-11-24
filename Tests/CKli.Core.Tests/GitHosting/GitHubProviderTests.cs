@@ -26,11 +26,13 @@ public class GitHubProviderTests
             // => To challenge the Read credentials, we must actually consider the ToPrivateAccessKey() instance.
             var gitKey = new GitRepositoryKey( store, new Uri( "https://github.com/CK-Build/CKli" ), isPublic: true );
             gitKey.AccessKey.PrefixPAT.ShouldBe( "GITHUB_CK_BUILD" );
-            _gitHubProvider = (HttpGitHostingProvider?)gitKey.AccessKey.HostingProvider;
-            _gitHubProvider.ShouldNotBeNull();
-            _gitHubProvider.AlwaysUseAuthentication.ShouldBeTrue();
-            Assume.That( _gitHubProvider.GitKey.ToPrivateAccessKey().GetReadCredentials( TestHelper.Monitor, out var creds ),
+            var provider = (HttpGitHostingProvider?)gitKey.AccessKey.HostingProvider;
+            provider.ShouldNotBeNull();
+            provider.AlwaysUseAuthentication.ShouldBeTrue();
+            Assume.That( provider.GitKey.ToPrivateAccessKey().GetReadCredentials( TestHelper.Monitor, out var creds ),
                          "The user-secrets store must be configured." );
+            // Cached only once the credentials are there: without them every test is skipped, not only the first one.
+            _gitHubProvider = provider;
         }
         return _gitHubProvider;
     }
