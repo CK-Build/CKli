@@ -216,15 +216,19 @@ public sealed partial class BranchNamespace
             do
             {
                 bool atLeastOne = false;
-                for( int i = sub.Count - 1; i >= 0; i-- )
+                for( int i = 0; i < sub.Count; )
                 {
                     var candidate = sub[i];
                     var parent = Find( roots, candidate.P );
                     if( parent != null )
                     {
                         parent.Add( ToXml( candidate.N, candidate.T, null, XNames.Explo ) );
-                        sub.RemoveAt( sub.Count - 1 );
+                        sub.RemoveAt( i );
                         atLeastOne = true;
+                    }
+                    else
+                    {
+                        ++i;
                     }
                 }
                 // Avoid forever loop if something's wrong in the code. This should NEVER happen.
