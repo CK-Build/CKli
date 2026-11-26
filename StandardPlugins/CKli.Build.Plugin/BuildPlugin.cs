@@ -1016,7 +1016,16 @@ public sealed partial class BuildPlugin : PrimaryPluginBase
             {
                 return null;
             }
-            var content = new BuildContentInfo( output.Consumed,
+            // The "//ck-package" directives of "Deployment/GenerateAssets.cs" are first class references that
+            // "dotnet package list" doesn't see: they are consumed by this build (the packages end up inside its assets).
+            if( !GenerateAssetsScript.ReadFirstClassPackages( monitor, buildCommit, out var scriptPackages ) )
+            {
+                return null;
+            }
+            var consumed = scriptPackages.IsEmpty
+                            ? output.Consumed
+                            : output.Consumed.Union( scriptPackages ).Order().ToImmutableArray();
+            var content = new BuildContentInfo( consumed,
                                                 publishedPackages,
                                                 output.AssetFileNames,
                                                 output.Transitive,

@@ -103,7 +103,10 @@ public sealed partial class FakeBuildTestEnv
         // <PackageReference> of the projects and of their reachable "Directory.Build.props". The transitive
         // ones can only be declared: see the remarks above.
         // GitSolutionContent.Consumed is a set: ordering it gives the strictly sorted array that BuildContentInfo requires.
-        var consumed = solution.Consumed.Order().ToImmutableArray();
+        // Like "dotnet package list", the "//ck-package" directives of "Deployment/GenerateAssets.cs" are not seen: the build
+        // plugin adds them (they are in GitSolutionContent.Consumed).
+        if( !GenerateAssetsScript.ReadFirstClassPackages( monitor, buildCommit, out var scriptPackages ) ) return null;
+        var consumed = solution.Consumed.Except( scriptPackages ).Order().ToImmutableArray();
 
         // Instead of "dotnet pack", one minimal package per packable project.
         // A project with no <IsPackable> is packable: this is the HotGraph convention.

@@ -35,7 +35,8 @@ produced/consumed package identifiers.
 - **`HotGraph.Solution`** wraps one repository's solution in the graph. It exposes `Rank` (build
   order — 0 first), `DirectRequirements` / `AllRequirements` (the solutions it depends on),
   `ScriptRequirements` (the solutions that produce a `#:package` of its `Deployment/GenerateAssets.cs`: they are ranked
-  before it but are not requirements and don't change the pivot flags),
+  before it but are not requirements and don't change the pivot flags; a `//ck-package` of the same script is a regular
+  requirement),
   `IsPivot` / `IsPivotUpstream` / `IsPivotDownstream`, and `IsDevSolution` (whether the solution was
   read from a `dev/` branch instead of the regular one).
 - **Pivots** are the repositories that triggered the graph computation (e.g. the repos being

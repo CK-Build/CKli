@@ -381,8 +381,9 @@ public sealed class MutableSolution
 
     }
 
-    // The "#:package Name@Version" directives of "Deployment/GenerateAssets.cs" (GitSolutionContent.ScriptConsumed)
-    // are upgraded like the project files: each build of the solution moves them to the World's current version.
+    // The "#:package Name@Version" (GitSolutionContent.ScriptConsumed) and "//ck-package Name@Version" (in
+    // GitSolutionContent.Consumed) directives of "Deployment/GenerateAssets.cs" are upgraded like the project files:
+    // each build of the solution moves them to the World's current version.
     bool UpdateScriptPackages( IActivityMonitor monitor, IPackageMapping mapping, PackageMapper? updated )
     {
         var path = _repo.WorkingFolder.Combine( GenerateAssetsScript.FilePath );
@@ -391,10 +392,10 @@ public sealed class MutableSolution
         {
             // Written back in UTF-8 without BOM (File.WriteAllText), the line endings are kept.
             var text = File.ReadAllText( path );
-            // A package of this solution is never upgraded (see GitSolutionContent.ScriptConsumed).
+            // A "#:package" of this solution is never upgraded (see GitSolutionContent.ScriptConsumed), a "//ck-package" can't be one.
             var ownPackages = new HashSet<string>( ProjectPaths.Select( p => Path.GetFileNameWithoutExtension( p.LastPart ) ),
                                                    StringComparer.OrdinalIgnoreCase );
-            var newText = GenerateAssetsScript.UpdatePackages( text, ( packageId, from ) =>
+            var newText = GenerateAssetsScript.UpdatePackages( text, ( packageId, from, _ ) =>
             {
                 if( !ownPackages.Contains( packageId )
                     && mapping.TryGetMappedVersion( packageId, from, out var to )

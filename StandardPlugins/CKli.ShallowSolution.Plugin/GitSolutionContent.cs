@@ -29,7 +29,9 @@ public partial class GitSolutionContent
 
     /// <summary>
     /// Gets all the &lt;PackageReference ... /&gt; that have been found in <see cref="Projects"/> files
-    /// and all "Directory.Build.props" (reachable from Projects).
+    /// and all "Directory.Build.props" (reachable from Projects), plus the "//ck-package Name@Version" directives of
+    /// the "Deployment/GenerateAssets.cs" script (see <see cref="GenerateAssetsScript"/>): the packages that the
+    /// deployment adds to an App are first class references.
     /// </summary>
     public IReadOnlySet<PackageInstance> Consumed => _consumed;
 
@@ -40,7 +42,7 @@ public partial class GitSolutionContent
     /// They order the builds (the script runs with the packages of its World) and they are upgraded
     /// like the <see cref="Consumed"/> ones when the solution is built, but they never trigger a build on their
     /// own: they are not considered by the <c>HasUpdates</c> methods. The one version per package identifier
-    /// rule covers both sets.
+    /// rule covers both sets. The "//ck-package" directives of the same script are not here: they are <see cref="Consumed"/>.
     /// </para>
     /// </summary>
     public IReadOnlySet<PackageInstance> ScriptConsumed => _scriptConsumed;
@@ -148,12 +150,23 @@ public partial class GitSolutionContent
             monitor.Error( $"Unable to read file '{GenerateAssetsScript.FilePath}'.", ex );
             return false;
         }
-        // A package of this solution is ignored: the script can only use a version that exists before the build
-        // (the built one reaches the local feed after the script ran), it is never upgraded.
-        return GenerateAssetsScript.ReadPackages( monitor,
-                                                  text,
-                                                  ( packageId, version ) => _projects.Any( p => p.Name.Equals( packageId, StringComparison.OrdinalIgnoreCase ) )
-                                                                            || AddConsumed( monitor, GenerateAssetsScript.FilePath, packageId, version, _scriptConsumed ) );
+        return GenerateAssetsScript.ReadPackages( monitor, text, ( packageId, version, isFirstClass ) =>
+        {
+            // The script can only use a version of a package of this solution that exists before the build (the
+            // built one reaches the local feed after the script ran): such a "#:package" is ignored, it is never
+            // upgraded. A "//ck-package" of this solution is an error: the solution can reference its own project.
+            if( _projects.Any( p => p.Name.Equals( packageId, StringComparison.OrdinalIgnoreCase ) ) )
+            {
+                if( !isFirstClass ) return true;
+                monitor.Error( $"""
+                                Invalid '//ck-package {packageId}@{version}' in '{GenerateAssetsScript.FilePath}': '{packageId}' is a project of this solution.
+                                The deployment can't use a version that is built after the script needs it: reference the project instead.
+                                """ );
+                return false;
+            }
+            // A "//ck-package" is a first class reference: it is Consumed (only its rewrite is the script's).
+            return AddConsumed( monitor, GenerateAssetsScript.FilePath, packageId, version, isFirstClass ? _consumed : _scriptConsumed );
+        } );
     }
 
     bool AddProjectFile( IActivityMonitor monitor, NormalizedPath path, XElement project )

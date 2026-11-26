@@ -492,7 +492,10 @@ For every `HotGraph.Solution` (ordered topologically, `OrderedSolutions`), a `Ro
 No reason comes from the `#:package` directives of `Deployment/GenerateAssets.cs` (`GitSolutionContent.ScriptConsumed`): a
 build of the solution that produces one of them doesn't build the script's solution. When that solution is built for
 another reason, the script is upgraded with the projects (`UpdateDependenciesAndCommit`), and `HasScriptUpdates` tells
-the target version computation that this adds a commit (the CI number depends on it).
+the target version computation that this adds a commit (the CI number depends on it). The `//ck-package` directives of
+the same script are first class (`GitSolutionContent.Consumed`): they give the reasons of a `<PackageReference>`.
+`dotnet package list` doesn't see them: every build (`CheckedOutBuildAsync`, so the fake harness too) adds them to the
+`BuildContentInfo.Consumed` of its version tag.
 
 `CI0` and `RollingLocal` are the two halves of "the commit already carries a version, build it in CI anyway", split
 on whether that version is published. Both are guarded by `buildReason == None`, so each can only ever be the *sole*
