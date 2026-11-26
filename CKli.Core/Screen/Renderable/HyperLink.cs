@@ -94,7 +94,8 @@ public sealed class HyperLink : IRenderable
         protected override void Render()
         {
             Target.Write( AnsiCodes.HyperLinkPrefix, default );
-            Target.Write( target.ToString(), default );
+            var wslDistro = WslHelper.WindowsTerminalDistroName;
+            Target.Write( wslDistro is null ? target.ToString() : WslHelper.ToWslUrl( target, wslDistro ), default );
             Target.Write( AnsiCodes.HyperLinkInfix, default );
             RenderContent();
             Target.Write( AnsiCodes.HyperLinkSuffix, default );
